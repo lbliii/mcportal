@@ -127,25 +127,34 @@ Limits: 8 columns, 4 panels per column, 30 items per panel, 200 saved items, 350
 
 ## Next
 
-MCPortal is a **reading platform with light social**, driven by your agent. Anything people share lives natively in MCPortal, not as public feeds.
+MCPortal is a **reading platform with light social**, driven by your agent. Anything people share lives natively in MCPortal, not as public feeds. Your portal is yours: it works without an account, and it exports in standard formats. Detailed plans live in [`docs/plans/`](docs/plans/).
 
 **M1.5: public beta.** Done when someone who isn't the author can connect, onboard, and come back the next day to a portal that still works.
 - [x] Hosted server matches local; every starter-pack source checked from Railway (sources that block cloud servers swapped out)
 - [x] `GITHUB_TOKEN` on the hosted server (fine-grained, public repos read-only; 5,000 requests/hour instead of ~60)
 - [x] Per-user rate limits and daily fetch/thumbnail caps
-- [ ] Sign-in beyond the allowlist: an invite list first, then a non-GitHub option (Google or email link)
-- [x] Durable storage: Postgres for profiles and sign-in state, point-in-time recovery on
+- [x] Durable storage: Postgres for profiles and sign-in state, point-in-time recovery on ([plan](docs/plans/postgres-storage.md))
 - [ ] Scheduled backups (daily + weekly) on the Postgres service
+- [ ] Accounts, invites and suspension replacing the allowlist; one `authorize()` gate for every tool; admins from `MCPORTAL_ADMINS` ([plan](docs/plans/identity-and-access.md), phase 1)
+- [ ] Small admin page: invites, suspensions, audit log (phase 2)
+- [ ] OPML import (bring subscriptions from another reader) and OPML export (phase 1b)
 - [ ] Migrate `railway.toml` to Railway's infrastructure-as-code format (old format works until 2026-12-01)
 - [ ] Privacy policy, support contact and screenshots; submit to Claude's connector directory
 - [ ] Landing page and README that show the first-run moment; Show HN
 
-**M2: light social** (hosted only, between signed-in users)
-- **Share** a saved item with a one-line note (Claude can draft it; you approve it)
-- **Follow** people; their shares appear in a **Following** panel, a native source kind like Saved
+**M2: your portal, everywhere, and light social**
+- **Clips:** save quotes, exchanges, explanations, tables and images from the conversation; a Clips panel; the agent can search them across chats ([plan](docs/plans/clips.md))
+- **Devices:** link a local MCPortal to your hosted account; state syncs, fetching stays local with a hosted fallback ([plan](docs/plans/local-hosted-hybrid.md))
+- **Portability:** full MCPortal export and import, saved items as bookmarks, clips as Markdown, delete account ([plan](docs/plans/identity-and-access.md#data-rights-and-portability))
+- **Public profile (opt-in):** claim a handle (e.g. `@lbliii`); nothing is public until you choose
+- **Share** a saved item or clip with a one-line note (Claude can draft it; you approve it); audience is your followers or everyone on MCPortal
+- **Follow, mute, block, report**; followed shares appear in a **Following** panel
 - **React** with one lightweight signal, so Following can surface what people liked
 
 **Later**
 - Standing intents: scheduled checks and digests ("tell me when anthropics/* ships a release")
+- Built-in views of your own reading (what you read and save, by topic and source)
 - Pictures in the reader view; clearer handling of paywalled articles
+- More sign-in options (Google, email link, passkeys) as extra identities on the same account
 - Link cards for sites without feeds (e.g. TikTok via oEmbed), shared portals for groups
+- Postgres row-level security as a third access layer
