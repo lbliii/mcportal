@@ -6,7 +6,8 @@
  *   node scripts/brand.ts          write everything
  *
  * brand/            masters: marks, wordmark, lockups, social card (SVG), usage notes
- * src/site/         what the public pages serve: favicon, app icon, social card, lockup
+ * src/site/         what the public pages serve: favicon, app icon, social card, lockup,
+ *                   hero art, and Jost Bold for headings
  * src/ui/brand/     marks inlined into the workspace (colours from its CSS)
  * src/brand-icons.ts   the icons the MCP server advertises (data: URIs)
  *
@@ -88,6 +89,38 @@ function lineMark(stroke: string, dot: string): string {
     + `<circle cx="${r2(32 * k)}" cy="${r2(27 * k)}" r="1.6" ${dot}/>`;
 }
 
+/** Stars as one path: `count` dots scattered over w x h by a fixed seed, so re-runs match. */
+function starfield(seed: number, count: number, w: number, h: number): string {
+  const rand = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
+  let d = '';
+  for (let i = 0; i < count; i++) {
+    const x = rand() * w, y = rand() * h, rad = 0.8 + rand() * 2.2;
+    d += `M${r2(x - rad)} ${r2(y)}a${r2(rad)} ${r2(rad)} 0 1 0 ${r2(2 * rad)} 0a${r2(rad)} ${r2(rad)} 0 1 0 ${r2(-2 * rad)} 0`;
+  }
+  return d;
+}
+
+/**
+ * The landing page's night sky, 1500x640: stars, a halftone planet, and the portal scene
+ * standing on the bottom edge at the right. The page pins it to the bottom-right of the hero
+ * band at the band's height, so the scene keeps clear of the headline on the left. The sky
+ * is transparent: the band behind it is ink in light mode and a darker night in dark mode.
+ */
+function heroArt(): string {
+  const W = 1500, H = 640, cx = 1160;
+  const door = arch(cx, H, 300, 470), inner = arch(cx, H, 172, 372);
+  const back = ring(cx, 470, 300, 80, -16, 'back'), front = ring(cx, 470, 300, 80, -16, 'front');
+  return svg(W, H, `<defs>${halftone('mcp-ht-hero', 14, 3.2, INK.ink)}${halftone('mcp-ht-planet', 9, 2.4, INK.ink)}</defs>`
+    + `<path d="${starfield(11, 130, W, H)}" fill="${INK.paper}" fill-opacity=".5"/>`
+    + `<circle cx="1400" cy="120" r="56" fill="${INK.mustard}"/><circle cx="1400" cy="120" r="56" fill="url(#mcp-ht-planet)" fill-opacity=".4"/>`
+    + `<path d="${back}" fill="none" stroke="${INK.mustard}" stroke-width="12" stroke-linecap="round"/>`
+    + `<path d="${door}" fill="${INK.teal}"/><path d="${door}" fill="url(#mcp-ht-hero)" fill-opacity=".35"/>`
+    + `<path d="${inner}" fill="${INK.paper}"/><circle cx="${cx}" cy="370" r="34" fill="${INK.brick}"/>`
+    + `<path d="${front}" fill="none" stroke="${INK.mustard}" stroke-width="14" stroke-linecap="round"/>`
+    + `<path d="${door}" fill="none" stroke="${INK.paper}" stroke-width="3" stroke-opacity=".5" transform="translate(9 -6)"/>`,
+  'A door in the night sky, with an orbit passing through it');
+}
+
 // ------------------------------------------------------------------ type
 
 /** SVG path data from a glyph path's commands (opentype.js's own serializer isn't reliable across versions). */
@@ -165,13 +198,7 @@ export function buildBrand(): { text: Record<string, string>; png: Record<string
   // Social card, 1200x630: the portal scene large on the right, lockup and tagline on the left.
   const social = (() => {
     const W = 1200, H = 630;
-    let seed = 7;
-    const rand = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
-    let stars = '';
-    for (let i = 0; i < 70; i++) {
-      const x = rand() * W, y = rand() * H, rad = 0.8 + rand() * 2.2;
-      stars += `M${r2(x - rad)} ${r2(y)}a${r2(rad)} ${r2(rad)} 0 1 0 ${r2(2 * rad)} 0a${r2(rad)} ${r2(rad)} 0 1 0 ${r2(-2 * rad)} 0`;
-    }
+    const stars = starfield(7, 70, W, H);
     const door = arch(900, 630, 300, 520), inner = arch(900, 630, 170, 400);
     const back = ring(900, 420, 420, 90, -14, 'back'), front = ring(900, 420, 420, 90, -14, 'front');
     const cap = 44, markSize = cap * 2.4, lx = 96, ly = 150;
@@ -202,7 +229,8 @@ export function buildBrand(): { text: Record<string, string>; png: Record<string
     'brand/lockup-stacked.svg': stacked,
     'brand/social-card.svg': social,
     'src/site/favicon.svg': svg(64, 64, portalMark()),
-    'src/site/lockup.svg': lockup(INK.ink, INK.teal),
+    'src/site/lockup-on-dark.svg': lockup(INK.paper, INK.mustard),
+    'src/site/hero.svg': heroArt(),
     // Inlined into the workspace: colours come from its CSS so they follow the theme.
     'src/ui/brand/mark-line.svg': `<svg class="brand-line" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${lineMark('stroke="currentColor"', 'class="brand-dot"')}</svg>`,
     'src/ui/brand/badge.svg': `<svg class="brand-badge" viewBox="0 0 64 64" aria-hidden="true" focusable="false">${portalMark()}</svg>`,
@@ -262,6 +290,8 @@ async function main(): Promise<void> {
     const images = sources.map(({ from, width }) => ({ width, data: render(text[from]!, width) }));
     write(file, file.endsWith('.ico') ? ico(images) : images[0]!.data);
   }
+  // The landing page's headings are set in Jost, served from the site itself (no font CDN).
+  write('src/site/jost-bold.ttf', readFileSync(path.join(ROOT, 'brand/fonts/Jost-Bold.ttf')));
   write('src/brand-icons.ts', serverIcons(render(text['brand/mark-small.svg']!, 64), text['brand/mark-small.svg']!));
 }
 

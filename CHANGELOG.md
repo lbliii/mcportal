@@ -28,6 +28,7 @@
 - **A new look:** the Portal mark (a door with an orbit through it), a Line version for the interface, and a Jost wordmark, in a mid-century sci-fi print style. The workspace header, the onboarding screen and the public pages use them.
 - **Your liminal webspace:** the new tagline. MCPortal works in any MCP agent, so the pages and invite messages no longer say it lives "inside Claude".
 - **Icons everywhere:** a favicon, an app icon and a social card for link previews. MCP clients that show server icons get the mark too (`serverInfo.icons`).
+- **The public pages in the house style:** the landing page opens on a night-sky band with a door, an orbit and a halftone planet, over cream pages (ink in dark mode). Headings are set in Jost, served by MCPortal itself, so the pages still make no third-party requests (the CSP adds `font-src 'self'`). Pictures sit on an off-register block of colour, and sections open with a halftone rule. `/privacy` and `/support` share the layout, and all three pages now talk about "your agent" instead of Claude.
 - **One source:** `npm run brand` draws every brand file from one script, and a test keeps the committed files in step with it. See `brand/README.md`.
 
 ### Pictures
