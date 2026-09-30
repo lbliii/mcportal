@@ -8,7 +8,7 @@ import {
 import { discover } from './discover.ts';
 import { buildOpml, OPML_LIMITS, parseOpml } from './opml.ts';
 import { MAX_PACKS, packSummaries, STARTER_PACKS } from './packs.ts';
-import { clipsPortal, clipsQuery, followingPortal, loadArticle, loadPortal, pinnedPortal, savedPortal, SOURCE_DOCS, type SourceDeps } from './sources.ts';
+import { clipsPortal, clipsQuery, followingPortal, loadArticle, loadPortal, pinnedPortal, savedPortal, SOURCE_DOCS, type SourceDeps, findDocs } from './sources.ts';
 import type { ClipStore } from './clips.ts';
 import type { ExportFormat } from './portability.ts';
 import type { PublicProfiles } from './public-profiles.ts';
@@ -16,6 +16,7 @@ import type { Social } from './social.ts';
 import type { ProfileStore } from './store.ts';
 import type { Actor } from './access.ts';
 import type { UsageBudget } from './lib/budget.ts';
+import { blocksToText } from './lib/markdown.ts';
 import { MAX_THUMB_BYTES, type PortalResult, type SourceKind } from './types.ts';
 
 export const ROOM_URI = 'ui://mcportal/room.html';
@@ -295,7 +296,7 @@ export const TOOLS: ToolDef[] = [
     name: 'build_room',
     title: 'Build the room from starter packs',
     description: [
-      `Set up the user's room from up to ${MAX_PACKS} starter packs (ids from open_room's setup, e.g. developer, ai, news, gaming, art, science, music, film).`,
+      `Set up the user's room from up to ${MAX_PACKS} starter packs (ids from open_room's setup, e.g. developer, docs, ai, news, gaming, art, science, music, film).`,
       'Replaces the current layout; saved items stay. Use it for first-time setup, or when the user asks to start over (confirm first if they have a room they built).',
       'An empty packs list keeps the sample layout and just finishes setup. Afterwards call open_room to show it, and offer to add anything specific with find_source.',
     ].join(' '),
@@ -468,7 +469,7 @@ export const TOOLS: ToolDef[] = [
       const url = String(args.url ?? '');
       try {
         const article = await loadArticle(url, ctx);
-        const text = article.blocks.slice(0, 60).map((b) => (b.type === 'h' ? `## ${b.text}` : b.text)).join('\n');
+        const text = blocksToText(article.blocks.slice(0, 60));
         const head = [`title: ${article.title}`, article.byline ? `byline: ${article.byline}` : ''].filter(Boolean).join('\n');
         const { saved } = await ctx.store.get(ctx.userId);
         return ok(untrusted(article.url, `${head}\n\n${text}`), { article, saved: saved.some((s) => s.url === article.url) });
@@ -590,7 +591,9 @@ export const TOOLS: ToolDef[] = [
       'Work out what MCPortal can show for something the user wants to follow, and preview it. Accepts a site address ("theverge.com"), a feed URL,',
       '"r/subreddit", "owner/repo", "hn", or a YouTube channel/playlist, Bluesky, Mastodon ("@name@server"), Medium, Substack, dev.to, PyPI, Lobsters,',
       'Stack Overflow tag or arXiv URL. For a name ("The Verge"), pass the site\'s domain. For a news topic, pass',
-      'https://news.google.com/rss/search?q=TOPIC. Returns working candidates (each already test-loaded) with a preview; add one with add_portal.',
+      'https://news.google.com/rss/search?q=TOPIC. For documentation, pass the docs address ("docs.stripe.com", "nextjs.org/docs"), a domain followed by "docs"',
+      '("react.dev docs"), or a GitHub "owner/repo" with markdown docs: you get a docs candidate that shows the site\'s sections.',
+      'Returns working candidates (each already test-loaded) with a preview; add one with add_portal.',
       'Doesn\'t change the room.',
     ].join(' '),
     inputSchema: { type: 'object', required: ['query'], additionalProperties: false, properties: { query: { type: 'string' } } },
@@ -598,7 +601,9 @@ export const TOOLS: ToolDef[] = [
     async handler(args, ctx) {
       const query = clean(args.query, 500);
       if (!query) return toolError('find_source needs a "query"');
-      const found = await discover(query, ctx.fetcher);
+      const [found, docs] = await Promise.all([discover(query, ctx.fetcher), findDocs(query, ctx)]);
+      if (docs && 'config' in docs) found.candidates.unshift({ source: 'docs', config: docs.config as unknown as Record<string, unknown>, title: docs.title, via: 'docs' });
+      else if (docs && !found.candidates.length) found.hint ??= docs.error;
       const loaded = await Promise.all(found.candidates.slice(0, 5).map(async (c, i) => {
         try {
           const portal = await loadPortal({ id: `candidate-${i}`, source: c.source, title: c.source === 'rss' ? undefined : c.title, config: c.config }, ctx);

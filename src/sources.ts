@@ -1,3 +1,4 @@
+import { docsInputUrl, docsUrl, loadDocs, parseGithubDocs, resolveDocs, type DocsConfig, type DocSite } from './adapters/docs.ts';
 import { fetchGithub, githubEndpoint, type GithubConfig } from './adapters/github.ts';
 import { fetchHn, hnEndpoint, type HnConfig } from './adapters/hn.ts';
 import { fetchArticle } from './adapters/reader.ts';
@@ -18,6 +19,7 @@ export const FRESHNESS: Record<SourceKind | 'reader', number> = {
   hn: 120,
   github: 300,
   rss: 600,
+  docs: 86_400,
   reader: 3600,
 };
 
@@ -26,7 +28,7 @@ export interface SourceDeps {
   cache: TtlCache;
 }
 
-const DEFAULT_TITLES: Record<SourceKind, string> = { hn: 'Hacker News', rss: 'Feed', github: 'GitHub', saved: 'Saved', pinned: 'Pinned', clips: 'Clips', following: 'Following' };
+const DEFAULT_TITLES: Record<SourceKind, string> = { hn: 'Hacker News', rss: 'Feed', github: 'GitHub', docs: 'Docs', saved: 'Saved', pinned: 'Pinned', clips: 'Clips', following: 'Following' };
 
 /** Saved items come from the profile, not the network. */
 export function savedPortal(portal: PortalSpec, saved: SavedItem[]): PortalResult {
@@ -106,6 +108,68 @@ export function followingPortal(portal: PortalSpec, shares: SharedItem[]): Porta
   };
 }
 
+/** A docs site's table of contents: from the portal's stored toc, or resolved from its url the first time. */
+export async function loadDocSite(config: DocsConfig, deps: SourceDeps, force = false): Promise<{ value: DocSite; cached: boolean; fetchedAt: string }> {
+  const key = config.toc ? `docs:${config.toc.url}` : `docs-resolve:${config.url}`;
+  return deps.cache.get(key, FRESHNESS.docs, () => (config.toc ? loadDocs(config.toc, deps.fetcher) : resolveDocs(config.url, deps.fetcher)), force);
+}
+
+/**
+ * Whether a find_source query asks for docs, and what to resolve: a GitHub repo or folder, a
+ * docs-looking address (docs.x, developer.x, x/docs, …), or any address followed by "docs".
+ */
+export function docsQuery(query: string): string | null {
+  const q = query.trim();
+  const stripped = q.replace(/\s+(?:docs?|documentation|reference|manual)$/i, '').trim();
+  if (/^\/?[ru]\//i.test(stripped)) return null; // r/subreddit, u/user
+  if (parseGithubDocs(stripped)) return stripped;
+  let url: URL;
+  try { url = docsUrl(stripped); } catch { return null; }
+  if (!url.hostname.includes('.')) return null;
+  const docsy = /^(?:docs?|developers?|dev|learn|guides?|reference|api|manual|book|wiki)\./i.test(url.hostname)
+    || /\/(?:docs?|documentation|reference|guides?|manual|api|book|learn)(?:\/|$)/i.test(url.pathname);
+  return stripped !== q || docsy ? stripped : null;
+}
+
+/** A docs portal candidate for find_source, already loaded (and cached for the test-load that follows). */
+export async function findDocs(query: string, deps: SourceDeps): Promise<{ config: DocsConfig; title: string } | { error: string } | null> {
+  const input = docsQuery(query);
+  if (!input) return null;
+  try {
+    const site = await resolveDocs(input, deps.fetcher);
+    await deps.cache.get(`docs:${site.toc.url}`, FRESHNESS.docs, async () => site);
+    return { config: { url: docsInputUrl(input), toc: site.toc, limit: 30 }, title: site.title };
+  } catch (error) {
+    return { error: clean((error as Error).message, 200) };
+  }
+}
+
+/** A docs portal lists the site's sections, or one section's pages. */
+export function docsItems(site: DocSite, config: DocsConfig): Item[] {
+  if (config.section) {
+    const wanted = config.section.toLowerCase();
+    const section = site.sections.find((s) => s.title.toLowerCase() === wanted);
+    if (!section) throw new Error(`${site.title} has no section "${config.section}"`);
+    return section.pages.slice(0, config.limit).map((p) => ({
+      id: p.url,
+      title: p.title,
+      url: p.url,
+      ...(p.description ? { summary: p.description } : {}),
+      meta: [p.index ? 'docs' : new URL(p.url).hostname.replace(/^www\./, '')],
+    }));
+  }
+  return site.sections.slice(0, config.limit).map((s, i) => {
+    const first = s.url ?? s.pages.find((p) => !p.index)?.url ?? s.pages[0]?.url;
+    return {
+      id: `section-${i}`,
+      title: s.title,
+      ...(first ? { url: first } : {}),
+      summary: s.pages.slice(0, 4).map((p) => p.title).join(' · '),
+      meta: [`${s.pages.length} ${s.pages.every((p) => p.index) ? 'guides' : s.pages.length === 1 ? 'page' : 'pages'}`],
+    };
+  });
+}
+
 export async function loadPortal(portal: PortalSpec, deps: SourceDeps, force = false): Promise<PortalResult> {
   if (portal.source === 'saved' || portal.source === 'pinned' || portal.source === 'clips' || portal.source === 'following') throw new Error(`${portal.source} portals are built from the profile, not fetched`);
   const config = normalizeSourceConfig(portal.source, portal.config, portal.id);
@@ -121,6 +185,13 @@ export async function loadPortal(portal: PortalSpec, deps: SourceDeps, force = f
       const c = config as GithubConfig;
       endpoint = githubEndpoint(c);
       result = await deps.cache.get(`gh:${endpoint}`, FRESHNESS.github, async () => ({ items: await fetchGithub(c, deps.fetcher) }), force);
+    } else if (portal.source === 'docs') {
+      const c = config as DocsConfig;
+      endpoint = c.toc?.url ?? c.url;
+      const site = await loadDocSite(c, deps, force);
+      endpoint = site.value.toc.url;
+      result = { ...site, value: { items: docsItems(site.value, c), feedTitle: site.value.title } };
+      if (!portal.title) title = c.section ? `${site.value.title}: ${c.section}` : site.value.title;
     } else {
       const c = config as RssConfig;
       endpoint = c.url;
@@ -177,6 +248,15 @@ export const SOURCE_DOCS = {
     },
   },
   rss: { description: 'Any RSS or Atom feed: blogs, release feeds, podcasts, YouTube channels.', config: { url: 'feed URL (http/https)', limit: '1-30' } },
+  docs: {
+    description: 'A documentation site: its sections, or one section\'s pages. Found with find_source ("docs.stripe.com", "nextjs.org/docs", "python.org docs", or a GitHub "owner/repo" with markdown docs). Pages are read with read_doc_page.',
+    config: {
+      url: 'the docs address, or a GitHub owner/repo or folder link',
+      toc: 'from find_source: { kind: llms | sphinx | sitemap | github, url } (optional; resolved on first load if missing)',
+      section: 'show only this section\'s pages (optional)',
+      limit: '1-30 (default 30)',
+    },
+  },
   saved: { description: "The user's saved items (bookmarks), newest first. Items are added with save_item and removed with remove_saved.", config: { limit: '1-30 (default 30)' } },
   clips: {
     description: "The user's clips: quotes, exchanges, notes, tables, images and links they asked to keep, newest first. Added with clip; found with search_clips.",

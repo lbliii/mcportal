@@ -1,0 +1,24 @@
+# Cloudflare Developer Documentation
+
+Explore guides and tutorials to start building on Cloudflare's platform.
+
+> Each product below links to its own llms.txt, which contains a full index of that product's documentation pages and is the recommended way to explore a specific product's content.
+
+## Application performance
+
+- [Argo Smart Routing](https://developers.cloudflare.com/argo-smart-routing/llms.txt): Route web traffic across the fastest, most reliable network paths
+- [Automatic Platform Optimization](https://developers.cloudflare.com/automatic-platform-optimization/llms.txt): Improve WordPress site performance by serving it from Cloudflare's global network
+- [Cache / CDN](https://developers.cloudflare.com/cache/llms.txt): Make websites faster by caching content across our global server network
+- [China Network](https://developers.cloudflare.com/china-network/llms.txt): Fast, global network serving visitors inside and outside of China
+- [Cloudflare Web Analytics](https://developers.cloudflare.com/web-analytics/llms.txt): Get vital web analytics for your website
+- [DNS](https://developers.cloudflare.com/dns/llms.txt): Deliver excellent performance and reliability to your domain
+- [Google tag gateway for advertisers](https://developers.cloudflare.com/google-tag-gateway/llms.txt): Add a layer of data security and privacy controls when using Google Tag Manager
+- [Health Checks](https://developers.cloudflare.com/health-checks/llms.txt): Monitor IPs or hostnames and get notified of issues
+- [Load Balancing](https://developers.cloudflare.com/load-balancing/llms.txt): Maximize application performance and availability
+- [Smart Shield](https://developers.cloudflare.com/smart-shield/llms.txt): Safeguard your origin with just a few clicks.
+- [Spectrum](https://developers.cloudflare.com/spectrum/llms.txt): Secure and accelerate any TCP or UDP-based application
+- [Speed](https://developers.cloudflare.com/speed/llms.txt): Improve the performance of your website or web application
+- [SSL/TLS](https://developers.cloudflare.com/ssl/llms.txt): Encrypt your web traffic to prevent data theft and other tampering
+- [Waiting Room](https://developers.cloudflare.com/waiting-room/llms.txt): Create a virtual waiting room to manage peak traffic
+- [Web3](https://developers.cloudflare.com/web3/llms.txt): Gateways to networks to help you develop applications without worrying about running infrastructure
+

@@ -2,9 +2,10 @@
  * 'saved' is the user's own bookmarks and 'pinned' is data the agent brought from
  * another tool (Jira, Slack, …): both live in the profile and are never fetched.
  * 'clips' come from the clip store (src/clips.ts) and 'following' from shares of
- * people the user follows (src/social.ts); neither is fetched.
+ * people the user follows (src/social.ts); neither is fetched. 'docs' is a docs
+ * site's table of contents (src/adapters/docs.ts).
  */
-export type SourceKind = 'hn' | 'rss' | 'github' | 'saved' | 'pinned' | 'clips' | 'following';
+export type SourceKind = 'hn' | 'rss' | 'github' | 'docs' | 'saved' | 'pinned' | 'clips' | 'following';
 
 export const CLIP_KINDS = ['quote', 'exchange', 'note', 'table', 'image', 'link'] as const;
 export type ClipKind = (typeof CLIP_KINDS)[number];
@@ -52,9 +53,41 @@ export interface PortalResult {
   pin?: { from: string; recipe: string };
 }
 
-export interface ArticleBlock {
-  type: 'h' | 'p' | 'li' | 'pre' | 'quote';
+/** A run of inline text: plain, a link (http(s), or "#anchor" within the page), code, or strong. */
+export interface Span {
   text: string;
+  href?: string;
+  code?: true;
+  strong?: true;
+}
+
+export const CALLOUT_TONES = ['note', 'tip', 'warning', 'danger'] as const;
+export type CalloutTone = (typeof CALLOUT_TONES)[number];
+
+/**
+ * One block of reader text. `text` is always the whole block as plain text (what the
+ * agent reads and what older views show); the optional fields add structure.
+ */
+export interface ArticleBlock {
+  type: 'h' | 'p' | 'li' | 'pre' | 'quote' | 'table' | 'callout';
+  text: string;
+  /** h: heading level 1–6. li: nesting depth 0–3. */
+  level?: number;
+  /** h: anchor id within the page. */
+  id?: string;
+  /** li: a numbered item. */
+  ordered?: true;
+  /** pre: language, e.g. "bash". */
+  lang?: string;
+  /** pre: file or tab name. callout: its title. */
+  label?: string;
+  /** callout */
+  tone?: CalloutTone;
+  /** p, li, quote, callout: inline links, code and emphasis; only present when there are some. */
+  spans?: Span[];
+  /** table */
+  columns?: string[];
+  rows?: string[][];
 }
 
 export interface Article {

@@ -4,7 +4,8 @@
  * where possible), from a laptop and from the Railway server; each pack leads
  * with a picture-rich source. Some sources treat cloud servers differently: no
  * Reddit (rate-limits servers, 429), no nasa.gov (429 from Railway), and
- * www.dezeen.com (the bare domain returns 403 to servers).
+ * www.dezeen.com (the bare domain returns 403 to servers). The docs pack's sources were
+ * resolved with scripts/docs-probe.ts, which reads each table of contents and two pages.
  */
 import type { PortalSpec } from './profile.ts';
 
@@ -17,6 +18,8 @@ export interface StarterPack {
 
 const yt = (id: string, channel: string, title: string): PortalSpec => ({ id, source: 'rss', title, config: { url: `https://www.youtube.com/feeds/videos.xml?channel_id=${channel}`, limit: 10 } });
 const feed = (id: string, url: string, title: string): PortalSpec => ({ id, source: 'rss', title, config: { url, limit: 10 } });
+/** A docs portal with its table of contents already found, so it opens without probing the site. */
+const docs = (id: string, url: string, kind: 'llms' | 'sphinx', toc: string, title: string): PortalSpec => ({ id, source: 'docs', title, config: { url, toc: { kind, url: toc }, limit: 30 } });
 
 export const STARTER_PACKS: StarterPack[] = [
   {
@@ -28,6 +31,17 @@ export const STARTER_PACKS: StarterPack[] = [
       { id: 'hn-top', source: 'hn', title: 'Hacker News', config: { feed: 'top', limit: 12 } },
       feed('github-blog', 'https://github.blog/feed/', 'The GitHub Blog'),
       feed('lobsters', 'https://lobste.rs/rss', 'Lobsters'),
+    ],
+  },
+  {
+    id: 'docs',
+    label: 'Developer docs',
+    blurb: 'The docs you use, without the clutter',
+    portals: [
+      docs('stripe-docs', 'https://docs.stripe.com', 'llms', 'https://docs.stripe.com/llms.txt', 'Stripe'),
+      docs('railway-docs', 'https://docs.railway.com', 'llms', 'https://docs.railway.com/llms.txt', 'Railway'),
+      docs('python-docs', 'https://docs.python.org/3', 'sphinx', 'https://docs.python.org/3/objects.inv', 'Python'),
+      docs('nextjs-docs', 'https://nextjs.org/docs', 'llms', 'https://nextjs.org/docs/llms.txt', 'Next.js'),
     ],
   },
   {

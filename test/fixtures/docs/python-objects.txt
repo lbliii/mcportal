@@ -1,0 +1,19 @@
+# Sphinx inventory version 2
+# Project: Python
+# Version: 3.14
+# The remainder of this file is compressed using zlib.
+PyObject_Call.callable c:functionParam 1 c-api/call.html#c.PyObject_Call -
+os py:module 0 library/os.html#module-$ -
+os.getcwd py:function 1 library/os.html#$ -
+str.split py:method 1 builtins/stdtypes.html#$ -
+PYTHONPATH std:envvar 1 using/cmdline.html#envvar-$ -
+about std:doc -1 about.html About this documentation
+glossary std:doc -1 glossary.html Glossary
+library/index std:doc -1 library/index.html The Python standard library
+library/intro std:doc -1 library/intro.html Introduction
+library/os std:doc -1 library/os.html os — Miscellaneous operating system interfaces
+reference/index std:doc -1 reference/index.html The Python Language Reference
+reference/lexical_analysis std:doc -1 reference/lexical_analysis.html Lexical analysis
+tut-intro std:label -1 tutorial/appetite.html#$ Whetting Your Appetite
+tutorial/appetite std:doc -1 tutorial/appetite.html Whetting Your Appetite
+tutorial/index std:doc -1 tutorial/index.html The Python Tutorial

@@ -19,7 +19,7 @@ export interface SourceCandidate {
   config: Record<string, unknown>;
   title: string;
   /** How it was found: native integration, known-site recipe, the page's own feed link, or a probed path. */
-  via: 'native' | 'recipe' | 'page' | 'probe' | 'feed';
+  via: 'native' | 'recipe' | 'page' | 'probe' | 'feed' | 'docs';
 }
 
 export interface Discovery {

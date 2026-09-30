@@ -73,7 +73,7 @@ test('notifications get no response; unknown methods get -32601', async () => {
 test('tools/list links open_room to the UI and hides app-only tools from the model', async () => {
   const res = await rpc(ctx(), 'tools/list');
   const tools = (res.result as any).tools as any[];
-  assert.deepEqual(tools.map((t) => t.name), ['open_room', 'build_room', 'get_profile', 'update_profile', 'read_source', 'refresh_portal', 'read_article', 'get_thumbnails', 'import_opml', 'export_opml', 'find_source', 'add_portal', 'pin_portal', 'save_item', 'remove_saved', 'list_sources', 'clip', 'search_clips', 'get_clip', 'update_clip', 'delete_clip', 'get_public_profile', 'set_public_profile', 'remove_public_profile', 'export_data', 'import_portal', 'account_settings', 'open_space', 'share', 'unshare', 'get_share', 'list_shares', 'relationship', 'list_connections', 'report']);
+  assert.deepEqual(tools.map((t) => t.name), ['open_room', 'build_room', 'get_profile', 'update_profile', 'read_source', 'refresh_portal', 'read_article', 'get_thumbnails', 'import_opml', 'export_opml', 'find_source', 'add_portal', 'pin_portal', 'save_item', 'remove_saved', 'list_sources', 'open_docs', 'read_doc_page', 'search_docs', 'clip', 'search_clips', 'get_clip', 'update_clip', 'delete_clip', 'get_public_profile', 'set_public_profile', 'remove_public_profile', 'export_data', 'import_portal', 'account_settings', 'open_space', 'share', 'unshare', 'get_share', 'list_shares', 'relationship', 'list_connections', 'report']);
   assert.equal(tools.find((t) => t.name === 'open_room')._meta.ui.resourceUri, ROOM_URI);
   assert.deepEqual(tools.find((t) => t.name === 'refresh_portal')._meta.ui.visibility, ['app']);
   assert.equal(tools.find((t) => t.name === 'read_article')._meta.ui.resourceUri, ROOM_URI, 'reader renders as its own card');
@@ -89,6 +89,7 @@ test('resources/read serves the self-contained room app', async () => {
   assert.ok(!content.text.includes('__MCPORTAL_DEV__='), 'dev bootstrap only in /preview');
   assert.ok(!/innerHTML/.test(content.text), 'UI never renders remote data as HTML');
   assert.ok(!/[\u2028\u2029]/.test(content.text), 'no raw line separators in scripts');
+  for (const [, script] of content.text.matchAll(/<script>([\s\S]*?)<\/script>/g)) new vm.Script(script); // throws on a syntax error
   const missing = await rpc(ctx(), 'resources/read', { uri: 'ui://nope' });
   assert.equal(missing.error?.code, -32602);
 });
