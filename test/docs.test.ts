@@ -7,7 +7,7 @@ import {
 } from '../src/adapters/docs.ts';
 import { TtlCache } from '../src/lib/cache.ts';
 import { normalizeSourceConfig, ProfileError } from '../src/profile.ts';
-import { loadPanel } from '../src/sources.ts';
+import { loadPortal } from '../src/sources.ts';
 import type { Fetcher, FetchOptions } from '../src/types.ts';
 
 const fixture = (name: string) => readFile(new URL(`./fixtures/docs/${name}`, import.meta.url), 'utf8');
@@ -228,7 +228,7 @@ test('scope: pages in the table of contents or on its domains; nothing else', ()
   assert.equal(siteDomain('docs.foo.co.uk'), 'foo.co.uk');
 });
 
-test('panel: a docs config validates, and the panel lists sections or one section\'s pages', async () => {
+test('portal: a docs config validates, and the portal lists sections or one section\'s pages', async () => {
   assert.throws(() => normalizeSourceConfig('docs', { url: 'ftp://x' }, 'p'), ProfileError);
   assert.throws(() => normalizeSourceConfig('docs', { url: 'https://x.dev', toc: { kind: 'algolia', url: 'https://x.dev' } }, 'p'), /toc needs a kind/);
   assert.deepEqual(normalizeSourceConfig('docs', { url: 'https://nextjs.org/docs', toc: { kind: 'llms', url: 'https://nextjs.org/docs/llms.txt' }, section: ' Guides ', limit: 99 }, 'p'), {
@@ -237,7 +237,7 @@ test('panel: a docs config validates, and the panel lists sections or one sectio
 
   const deps = { fetcher: mapFetcher({ 'https://nextjs.org/docs/llms.txt': { body: await fixture('nextjs-llms.txt') } }), cache: new TtlCache() };
   const toc = { kind: 'llms', url: 'https://nextjs.org/docs/llms.txt' };
-  const all = await loadPanel({ id: 'next', source: 'docs', config: { url: 'https://nextjs.org/docs', toc } }, deps);
+  const all = await loadPortal({ id: 'next', source: 'docs', config: { url: 'https://nextjs.org/docs', toc } }, deps);
   assert.equal(all.error, undefined);
   assert.equal(all.title, 'Next.js Documentation');
   assert.equal(all.provenance.ttlSeconds, 86_400);
@@ -247,10 +247,10 @@ test('panel: a docs config validates, and the panel lists sections or one sectio
   ]);
   assert.equal(all.items[0]!.summary, 'Installation · Project Structure · Layouts and Pages · Linking and Navigating');
 
-  const guides = await loadPanel({ id: 'g', source: 'docs', config: { url: 'https://nextjs.org/docs', toc, section: 'guides' } }, deps);
+  const guides = await loadPortal({ id: 'g', source: 'docs', config: { url: 'https://nextjs.org/docs', toc, section: 'guides' } }, deps);
   assert.equal(guides.title, 'Next.js Documentation: guides');
   assert.deepEqual(guides.items.map((i) => i.title), ['Adopting Partial Prefetching', 'AI Coding Agents']);
 
-  const missing = await loadPanel({ id: 'm', source: 'docs', config: { url: 'https://nextjs.org/docs', toc, section: 'Nope' } }, deps);
+  const missing = await loadPortal({ id: 'm', source: 'docs', config: { url: 'https://nextjs.org/docs', toc, section: 'Nope' } }, deps);
   assert.match(missing.error!, /no section "Nope"/);
 });

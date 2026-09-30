@@ -85,21 +85,21 @@ test('search by words, kind and tag; update and delete', async () => {
   assert.ok((await call(c, 'get_clip', { id: a.id })).isError);
 });
 
-test('the first clip adds a Clips panel once, and open_workspace shows clips', async () => {
+test('the first clip adds a Clips portal once, and open_room shows clips', async () => {
   const c = ctx();
   const first = await call(c, 'clip', { kind: 'quote', text: 'one' });
   assert.equal(first.structuredContent.layoutChanged, true);
-  assert.match(first.content[0]!.text, /Added a "Clips" panel/);
+  assert.match(first.content[0]!.text, /Added a "Clips" portal/);
   const second = await call(c, 'clip', { kind: 'quote', text: 'two' });
   assert.equal(second.structuredContent.layoutChanged, false);
   const profile = await c.store.get('u1');
   assert.equal(profile.columns.flatMap((col) => col.panels).filter((p) => p.source === 'clips').length, 1);
-  const ws = await call(c, 'open_workspace');
-  const panel = ws.structuredContent.panels.find((p: any) => p.source === 'clips');
-  assert.deepEqual(panel.items.map((i: any) => i.title), ['two', 'one']);
-  assert.equal(panel.items[0].clip.kind, 'quote');
-  // A filtered panel through add_panel.
-  const added = await call(c, 'add_panel', { source: 'clips', config: { kind: 'table' }, title: 'Tables' });
+  const room = await call(c, 'open_room');
+  const portal = room.structuredContent.portals.find((p: any) => p.source === 'clips');
+  assert.deepEqual(portal.items.map((i: any) => i.title), ['two', 'one']);
+  assert.equal(portal.items[0].clip.kind, 'quote');
+  // A filtered portal through add_portal.
+  const added = await call(c, 'add_portal', { source: 'clips', config: { kind: 'table' }, title: 'Tables' });
   assert.ok(!added.isError, added.content[0]!.text);
 });
 

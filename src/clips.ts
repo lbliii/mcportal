@@ -4,7 +4,7 @@
  * bloat the one document every layout edit rewrites.
  *
  * Everything in a clip is untrusted plain text or checked image bytes. Text keeps
- * its line breaks (unlike panel items); markdown-lite is parsed into blocks and
+ * its line breaks (unlike portal items); markdown-lite is parsed into blocks and
  * never interpreted as HTML. SVG is only ever shown as an <img>, so nothing in it runs.
  */
 import { randomBytes } from 'node:crypto';
@@ -52,7 +52,7 @@ export interface ClipSource {
   title?: string;
 }
 
-/** Everything about a clip except its content: what lists, panels and search return. */
+/** Everything about a clip except its content: what lists, portals and search return. */
 export interface ClipSummary {
   id: string;
   kind: ClipKind;

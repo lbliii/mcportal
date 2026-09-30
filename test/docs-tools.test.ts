@@ -163,7 +163,7 @@ async function call(c: ToolContext, name: string, args: Record<string, unknown>)
   return (res as any).result as { content: Array<{ text: string }>; structuredContent: any; isError?: boolean };
 }
 
-test('tools: find_source offers the docs, add_panel keeps them, the panel lists sections', async () => {
+test('tools: find_source offers the docs, add_portal keeps them, the portal lists sections', async () => {
   const c = await docsCtx();
   const found = await call(c, 'find_source', { query: 'docs.example.dev' });
   const docs = found.structuredContent.candidates[0];
@@ -173,13 +173,13 @@ test('tools: find_source offers the docs, add_panel keeps them, the panel lists 
   assert.equal(docs.preview[0].title, 'Docs');
   assert.equal(c.calls.filter((u) => u.endsWith('/llms.txt')).length, 1, 'resolved once; the test-load hits the cache');
 
-  const added = await call(c, 'add_panel', { source: 'docs', config: docs.config, title: 'Stripe' });
+  const added = await call(c, 'add_portal', { source: 'docs', config: docs.config, title: 'Stripe' });
   assert.equal(added.isError, undefined, added.content[0]!.text);
-  assert.equal(added.structuredContent.panel.items[0].meta[0], '10 pages');
+  assert.equal(added.structuredContent.portal.items[0].meta[0], '10 pages');
 
-  const repo = await call(c, 'add_panel', { source: 'docs', config: { url: 'acme/widgets' } });
+  const repo = await call(c, 'add_portal', { source: 'docs', config: { url: 'acme/widgets' } });
   assert.equal(repo.isError, undefined, repo.content[0]!.text);
-  assert.equal(repo.structuredContent.panel.title, 'acme/widgets');
+  assert.equal(repo.structuredContent.portal.title, 'acme/widgets');
 });
 
 test('tools: open_docs, read_doc_page and search_docs; pages are fenced and scoped to their site', async () => {
@@ -211,8 +211,8 @@ test('tools: open_docs, read_doc_page and search_docs; pages are fenced and scop
   const none = await call(c, 'search_docs', { docs: 'docs.python.org/3', query: 'zzz' });
   assert.match(none.content[0]!.text, /Nothing in Python matches/);
 
-  const missing = await call(c, 'read_doc_page', { panelId: 'nope', url: 'https://docs.stripe.com/testing.md' });
-  assert.match(missing.content[0]!.text, /No docs panel with id "nope"/);
+  const missing = await call(c, 'read_doc_page', { portalId: 'nope', url: 'https://docs.stripe.com/testing.md' });
+  assert.match(missing.content[0]!.text, /No docs portal with id "nope"/);
 });
 
 test('budget: docs tools cost like the reader', () => {
@@ -221,15 +221,15 @@ test('budget: docs tools cost like the reader', () => {
   assert.equal(toolCost('search_docs', {}), 1);
 });
 
-test('open_docs renders as its own docs card; the Developer docs pack builds a portal of docs panels', async () => {
+test('open_docs renders as its own docs card; the Developer docs pack builds a room of docs portals', async () => {
   const c = await docsCtx();
   const list = await handleMessage({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} }, c);
   const tools = (list as any).result.tools as any[];
-  assert.equal(tools.find((t) => t.name === 'open_docs')._meta.ui.resourceUri, 'ui://mcportal/workspace.html');
+  assert.equal(tools.find((t) => t.name === 'open_docs')._meta.ui.resourceUri, 'ui://mcportal/room.html');
   assert.equal(tools.find((t) => t.name === 'read_doc_page')._meta, undefined, 'pages are read by the viewer, not shown as cards');
 
   const fresh = { ...c, store: new MemoryProfileStore() };
-  const built = await call(fresh, 'build_portal', { packs: ['docs'] });
+  const built = await call(fresh, 'build_room', { packs: ['docs'] });
   assert.equal(built.isError, undefined, built.content[0]!.text);
   const panels = built.structuredContent.profile.columns.flatMap((col: any) => col.panels);
   assert.deepEqual(panels.map((p: any) => [p.id, p.source, p.config.toc.kind]), [

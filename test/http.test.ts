@@ -143,6 +143,7 @@ test('public pages: landing, privacy and support render without scripts; images 
       assert.equal(page.status, 200, path);
       assert.match(page.headers['content-type'] as string, /text\/html/);
       assert.match(page.headers['content-security-policy'] as string, /default-src 'none'/);
+      assert.match(page.headers['content-security-policy'] as string, /font-src 'self'/, 'headings load Jost from this server');
       assert.doesNotMatch(page.body, /<script/i, `${path} has no scripts`);
       assert.match(page.body, /A &lt;b&gt;Person&lt;\/b&gt;/, 'operator is escaped');
     }
@@ -150,13 +151,19 @@ test('public pages: landing, privacy and support render without scripts; images 
     assert.match((await raw(app.port, { path: '/' })).body, /http:\/\/localhost\/mcp/);
     assert.equal((await raw(app.port, { path: '/site/columns.png' })).status, 200);
     const landing = (await raw(app.port, { path: '/' })).body;
-    assert.match(landing, /<h1>Your liminal webspace\.<\/h1>/);
+    assert.match(landing, /<h1>Your liminal <span>webspace\.<\/span><\/h1>/);
+    assert.match(landing, /<img class="art" src="\/site\/hero\.svg" alt=""/, 'the hero art is decorative');
+    assert.doesNotMatch(landing, /https:\/\/fonts\.|@import|url\(http/, 'fonts come from this server, not a CDN');
+    assert.match(landing, /src:url\(\/site\/jost-bold\.ttf\)/);
     assert.match(landing, /<meta property="og:image" content="http:\/\/localhost\/site\/og\.png">/, 'link previews get an absolute image URL');
     assert.match(landing, /<link rel="icon" href="\/favicon\.svg" type="image\/svg\+xml">/);
-    assert.doesNotMatch(landing, /inside Claude/);
+    for (const path of ['/', '/privacy', '/support']) {
+      assert.doesNotMatch((await raw(app.port, { path })).body, /inside Claude|[Aa]sk Claude|tell Claude/, `${path} talks about "your agent", not one host`);
+    }
     const types: Record<string, RegExp> = {
       '/favicon.ico': /^image\/x-icon$/, '/favicon.svg': /^image\/svg\+xml$/, '/apple-touch-icon.png': /^image\/png$/,
-      '/site/og.png': /^image\/png$/, '/site/icon-512.png': /^image\/png$/, '/site/lockup.svg': /^image\/svg\+xml$/,
+      '/site/og.png': /^image\/png$/, '/site/icon-512.png': /^image\/png$/, '/site/lockup-on-dark.svg': /^image\/svg\+xml$/,
+      '/site/hero.svg': /^image\/svg\+xml$/, '/site/jost-bold.ttf': /^font\/ttf$/,
     };
     for (const [path, type] of Object.entries(types)) {
       const file = await raw(app.port, { path });

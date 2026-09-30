@@ -16,7 +16,7 @@ export const DEFAULT_SUPPORT_URL = 'https://github.com/lbliii/mcportal/issues';
 const POLICY_UPDATED = '2026-09-30';   // bump when what's stored changes
 const IMAGE_DIR = fileURLToPath(new URL('./site/', import.meta.url));
 const TAGLINE = 'Your liminal webspace.';
-const DESCRIPTION = 'MCPortal is a reading portal that lives in your agent: the sites, feeds, channels and repos you follow, one door away.';
+const DESCRIPTION = 'MCPortal is a reading room that lives in your agent: the sites, feeds, channels and repos you follow, one door away.';
 
 /** Every file served from src/site, by URL path. Nothing else in that folder is reachable. */
 const FILES: Record<string, { file: string; type: string; maxAge: number }> = {
@@ -24,7 +24,9 @@ const FILES: Record<string, { file: string; type: string; maxAge: number }> = {
   '/site/shelves.png': { file: 'shelves.png', type: 'image/png', maxAge: 86_400 },
   '/site/reader.png': { file: 'reader.png', type: 'image/png', maxAge: 86_400 },
   '/site/og.png': { file: 'og.png', type: 'image/png', maxAge: 86_400 },
-  '/site/lockup.svg': { file: 'lockup.svg', type: 'image/svg+xml', maxAge: 86_400 },
+  '/site/lockup-on-dark.svg': { file: 'lockup-on-dark.svg', type: 'image/svg+xml', maxAge: 86_400 },
+  '/site/hero.svg': { file: 'hero.svg', type: 'image/svg+xml', maxAge: 86_400 },
+  '/site/jost-bold.ttf': { file: 'jost-bold.ttf', type: 'font/ttf', maxAge: 604_800 },
   '/site/icon-512.png': { file: 'icon-512.png', type: 'image/png', maxAge: 86_400 },
   '/favicon.ico': { file: 'favicon.ico', type: 'image/x-icon', maxAge: 86_400 },
   '/favicon.svg': { file: 'favicon.svg', type: 'image/svg+xml', maxAge: 86_400 },
@@ -45,34 +47,95 @@ const HEADERS = {
   'x-content-type-options': 'nosniff',
   'x-frame-options': 'DENY',
   'referrer-policy': 'no-referrer',
-  'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; img-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
+  'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; img-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
 };
 
-function layout(title: string, body: string, site: SiteConfig): string {
-  const by = site.operator ? `Run by ${escapeHtml(site.operator)}. ` : '';
+/**
+ * The house style: a mid-century paperback. A night-sky band on top (dark in both schemes),
+ * cream paper below (ink in dark mode), Jost for headings, halftone rules, and pictures
+ * printed with an off-register block of colour behind them. Colours are brand/README.md's.
+ */
+const STYLE = `
+@font-face{font-family:"MCPortal Jost";src:url(/site/jost-bold.ttf) format("truetype");font-weight:700;font-display:swap}
+:root{--paper:#F2E6CF;--ink:#1F2A36;--teal:#2A8C82;--mustard:#E0A526;--brick:#C4452C;--night:#1F2A36;
+  --bg:var(--paper);--fg:var(--ink);--muted:#5B5346;--link:#1D6B63;--rule:#D9C8A7;--card:#EADBBE;--code:rgba(31,42,54,.08);--frame:var(--ink);color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--night:#141B23;--bg:#1F2A36;--fg:#F2E6CF;--muted:#B9AD97;--link:#E0A526;--rule:#34424F;--card:#263445;--code:rgba(242,230,207,.1);--frame:#0E141A;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:17px/1.65 system-ui,-apple-system,"Segoe UI",sans-serif}
+a{color:var(--link)}
+h1,h2,h3,.jost{font-family:"MCPortal Jost",Jost,Futura,"Century Gothic","Avenir Next",sans-serif;font-weight:700;letter-spacing:-.005em}
+h1{font-size:clamp(36px,5.2vw,54px);line-height:1.05;margin:0 0 16px}
+h2{font-size:30px;line-height:1.15;margin:64px 0 14px}
+h2::before{content:"";display:block;width:104px;height:10px;margin-bottom:20px;background:radial-gradient(circle,var(--teal) 1.5px,transparent 1.9px) 0 0/8px 8px}
+h3{font-size:19px;margin:28px 0 4px}
+.wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+main.wrap{max-width:780px;padding-bottom:72px}
+.sky{background:var(--night);color:var(--paper);position:relative;overflow:hidden}
+.sky a{color:var(--mustard)}
+nav{position:relative;z-index:1;display:flex;align-items:center;gap:22px;padding-top:22px;padding-bottom:22px;font-size:15px}
+nav a.to{color:#D4C8AF;text-decoration:none}nav a.to:hover{color:var(--paper)}
+nav .brand{margin-right:auto;display:flex}@media (max-width:520px){nav{gap:18px}}nav .brand img{height:30px;width:auto;display:block}
+.sky .title{max-width:780px;position:relative;padding-top:24px;padding-bottom:56px}
+.sky .title h1{margin:0}
+.hero .art{display:block;width:100%;height:320px;object-fit:cover;object-position:100% 100%}
+.hero .pitch{position:relative;z-index:1;padding-top:24px;padding-bottom:40px}
+.hero h1{font-size:clamp(44px,7vw,76px);line-height:1}
+.hero h1 span{color:var(--mustard)}
+.hero .lede{font-size:19px;color:#DDD1B9;max-width:520px;margin:0 0 26px}
+.cta{display:flex;flex-wrap:wrap;align-items:center;gap:22px;font-size:16px}
+.sky .button{display:inline-block;background:var(--mustard);color:var(--ink);font-weight:600;text-decoration:none;padding:10px 20px;border-radius:8px;box-shadow:4px 4px 0 var(--brick)}
+@media (min-width:1100px){
+  .hero{min-height:560px}
+  .hero .art{position:absolute;right:0;bottom:0;width:auto;height:100%}
+  .hero .pitch{padding-top:72px;padding-bottom:96px}
+  .hero .pitch>*{max-width:40%}
+}
+.lede{font-size:19px}.muted{color:var(--muted);font-size:15px}
+code{background:var(--code);padding:1px 6px;border-radius:4px;word-break:break-all;font-size:15px}
+figure{margin:40px 0}
+figure img{display:block;width:100%;height:auto;border:2px solid var(--frame);border-radius:10px;box-shadow:9px 9px 0 var(--teal)}
+figure.alt img{box-shadow:9px 9px 0 var(--mustard)}figure.alt2 img{box-shadow:9px 9px 0 var(--brick)}
+figcaption{color:var(--muted);font-size:15px;margin-top:16px}
+ol.steps{list-style:none;padding:0;margin:24px 0;counter-reset:step}
+ol.steps li{counter-increment:step;position:relative;padding-left:58px;margin:0 0 22px;min-height:40px}
+ol.steps li::before{content:counter(step);position:absolute;left:0;top:2px;width:38px;height:38px;border-radius:50%;background:var(--mustard);color:var(--ink);display:flex;align-items:center;justify-content:center;font:700 19px/1 "MCPortal Jost",Jost,Futura,sans-serif}
+ol.steps b{font-family:"MCPortal Jost",Jost,Futura,sans-serif;font-size:19px;display:block}
+.card{background:var(--card);border:2px solid var(--fg);border-radius:12px;padding:20px 24px;margin:28px 0;box-shadow:9px 9px 0 var(--mustard)}
+.card p{margin:0}.card p+p{margin-top:10px}
+table{border-collapse:collapse;font-size:15px}td,th{border-bottom:1px solid var(--rule);padding:8px 14px 8px 0;text-align:left;vertical-align:top}
+th{font-family:"MCPortal Jost",Jost,Futura,sans-serif}
+footer{background:var(--night);color:#D4C8AF;font-size:15px}
+footer .wrap{display:flex;flex-wrap:wrap;align-items:center;gap:8px 24px;padding-top:28px;padding-bottom:28px}
+footer .tag{margin-right:auto;color:var(--paper);font-size:17px}
+footer a{color:#D4C8AF}
+`;
+
+/**
+ * A page: the night-sky band (nav, then `head`), the body on paper, and the footer.
+ * `head` is the band's content below the nav; `hero` marks the landing page's taller band with art.
+ */
+function layout(title: string, head: string, body: string, site: SiteConfig, hero = false): string {
+  const by = site.operator ? `<span>Run by ${escapeHtml(site.operator)}</span>` : '';
   const card = escapeHtml(`${site.publicUrl}/site/og.png`);
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${escapeHtml(title)}</title><meta name="description" content="${escapeHtml(DESCRIPTION)}">
 <link rel="icon" href="/favicon.ico" sizes="48x48"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="preload" href="/site/jost-bold.ttf" as="font" type="font/ttf" crossorigin>
 <meta property="og:site_name" content="MCPortal"><meta property="og:title" content="${escapeHtml(title)}"><meta property="og:description" content="${escapeHtml(DESCRIPTION)}">
 <meta property="og:image" content="${card}"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="MCPortal: ${escapeHtml(TAGLINE)}">
 <meta name="twitter:card" content="summary_large_image"><meta name="theme-color" content="#1F2A36">
-<style>
-body{font:16px/1.6 system-ui,-apple-system,sans-serif;max-width:760px;margin:0 auto;padding:40px 20px 64px;color:#1b1b1a}
-a{color:#1f4fd8}h1{font-size:34px;line-height:1.2;margin:8px 0 12px}h2{font-size:21px;margin-top:40px}h3{font-size:16px;margin:24px 0 4px}
-nav{display:flex;align-items:center;gap:18px;font-size:14px}nav a{color:#6a6a66;text-decoration:none}nav .brand{margin-right:auto;display:flex}nav .brand img{height:28px;width:auto}
-.lede{font-size:19px;color:#3a3a37}.muted{color:#6a6a66;font-size:14px}
-code{background:#f3f3ef;padding:1px 5px;border-radius:4px;word-break:break-all;font-size:14px}
-figure{margin:28px 0}figure img{width:100%;border:1px solid #e3e3de;border-radius:12px}figcaption{color:#6a6a66;font-size:14px;margin-top:6px}
-.steps li{margin:6px 0}.card{border:1px solid #e3e3de;border-radius:12px;padding:16px 20px;margin:24px 0}
-table{border-collapse:collapse;font-size:14px}td,th{border-bottom:1px solid #e3e3de;padding:6px 12px 6px 0;text-align:left;vertical-align:top}
-footer{margin-top:56px;border-top:1px solid #e3e3de;padding-top:16px}
-</style></head><body>
-<nav><a class="brand" href="/"><img src="/site/lockup.svg" alt="MCPortal" width="138" height="28"></a><a href="/privacy">Privacy</a><a href="/support">Support</a><a href="/account">Account</a></nav>
-${body}
-<footer class="muted">${by}<a href="/privacy">Privacy</a> · <a href="/support">Support</a></footer>
+<style>${STYLE}</style></head><body>
+<header class="sky${hero ? ' hero' : ''}">
+<nav class="wrap"><a class="brand" href="/"><picture><source media="(max-width:520px)" srcset="/favicon.svg" width="30" height="30"><img src="/site/lockup-on-dark.svg" alt="MCPortal" width="148" height="30"></picture></a><a class="to" href="/privacy">Privacy</a><a class="to" href="/support">Support</a><a class="to" href="/account">Account</a></nav>
+${head}${hero ? '\n<img class="art" src="/site/hero.svg" alt="" width="1500" height="640">' : ''}
+</header>
+<main class="wrap">${body}</main>
+<footer><div class="wrap"><span class="tag jost">${TAGLINE}</span>${by}<a href="/privacy">Privacy</a><a href="/support">Support</a><a href="https://github.com/lbliii/mcportal">Source</a></div></footer>
 </body></html>`;
 }
+
+/** The band's content on pages other than the landing page: just the title. */
+const titleBand = (h1: string) => `<div class="wrap title"><h1>${h1}</h1></div>`;
 
 function landing(site: SiteConfig): string {
   const mcp = escapeHtml(`${site.publicUrl}/mcp`);
@@ -80,48 +143,50 @@ function landing(site: SiteConfig): string {
     ? `<p><b>MCPortal is in an invite-only beta.</b> If someone sent you an invite link, open it for your setup steps. To ask for an invite, <a href="${escapeHtml(site.supportUrl)}">get in touch</a>.</p>`
     : '<p>Anyone with a GitHub account can sign in.</p>';
   return layout(`MCPortal: ${TAGLINE}`, `
-<h1>${TAGLINE}</h1>
-<p class="lede">MCPortal is a reading portal that lives in your agent. Ask for the sites, subreddits, YouTube channels, GitHub repos and feeds you follow, and they open right in the conversation, one door away. Then read, save and talk about what you find without leaving the chat.</p>
-<figure><img src="/site/columns.png" alt="An MCPortal workspace in Claude: columns of Hacker News, GitHub releases and blog posts, side by side" width="1600" height="666"><figcaption>Columns: each source scrolls on its own.</figcaption></figure>
+<div class="wrap pitch">
+<h1>Your liminal <span>webspace.</span></h1>
+<p class="lede">A door between your agent and everything you read. MCPortal brings the sites, subreddits, YouTube channels, GitHub repos and feeds you follow into your agent, so you can read, save and talk about them without leaving the chat.</p>
+<p class="cta"><a class="button" href="#get-it">Get it</a><a href="#how">How it works</a></p>
+</div>`, `
+<figure><img src="/site/columns.png" alt="An MCPortal room: columns of Fireship videos, Hacker News, the GitHub Blog and Lobsters, side by side, each with its own colour" width="1600" height="666"><figcaption>Columns: each source scrolls on its own.</figcaption></figure>
 
-<h2>How it works</h2>
-<ul class="steps">
+<h2 id="how">How it works</h2>
+<ol class="steps">
   <li><b>Ask for what you read.</b> “Add Simon Willison's blog and r/LocalLLaMA.” Paste a site, a feed, <code>r/subreddit</code>, <code>owner/repo</code>, or a YouTube, Bluesky or Mastodon address. MCPortal finds a feed that works.</li>
-  <li><b>Arrange it by talking.</b> “Put GitHub on the left.” “Show pictures.” Starter packs (developer, AI, news, games, art, science, music, film) fill a new portal in seconds, and OPML import brings your subscriptions from another reader.</li>
-  <li><b>Read and keep things.</b> Stories open in a clean reader view with no ads. Save the good ones to a Saved panel, and ask Claude about any of them. Say “clip that” to keep a quote, an explanation, a table or a chart from the conversation, and find it again in any later chat.</li>
-</ul>
-<figure><img src="/site/shelves.png" alt="Picture shelves: one row of thumbnails per source" width="1600" height="626"><figcaption>Shelves: one row of pictures per source.</figcaption></figure>
-<figure><img src="/site/reader.png" alt="An article open in MCPortal's reader view" width="1600" height="1013"><figcaption>Reader view: just the article.</figcaption></figure>
+  <li><b>Arrange it by talking.</b> “Put GitHub on the left.” “Show pictures.” Starter packs (developer, AI, news, games, art, science, music, film) fill a new room in seconds, and OPML import brings your subscriptions from another reader.</li>
+  <li><b>Read and keep things.</b> Stories open in a clean reader view with no ads. Save the good ones to a Saved portal, and ask your agent about any of them. Say “clip that” to keep a quote, an explanation, a table or a chart from the conversation, and find it again in any later chat.</li>
+</ol>
+<figure class="alt"><img src="/site/shelves.png" alt="Picture shelves: a row of Game Maker's Toolkit videos, then Polygon" width="1600" height="626"><figcaption>Shelves: one row of pictures per source.</figcaption></figure>
+<figure class="alt2"><img src="/site/reader.png" alt="A Colossal article about the artist Eddy Firmin, open in MCPortal's reader view" width="1600" height="1013"><figcaption>Reader view: just the article.</figcaption></figure>
 
 <h2>Private by design</h2>
 <p>MCPortal fetches feeds and pictures on its server, so the sites you read don't see you until you open the original. There are no ads, trackers or analytics. Sign-in is through GitHub, and MCPortal keeps only your GitHub user ID and login. Your layout, sources, saved items and clips are yours: export them any time in open formats, or delete your account yourself. Details are in the <a href="/privacy">privacy policy</a>.</p>
 
-<h2>Get it</h2>
+<h2 id="get-it">Get it</h2>
 ${access}
-<div class="card"><p style="margin:0">In Claude, open <b>Settings → Connectors</b>, add a custom connector with this URL, and sign in with GitHub. Then ask <i>“open my portal”</i>.</p><p style="margin:8px 0 0"><code>${mcp}</code></p></div>
-<p class="muted">Prefer to run it yourself? MCPortal also runs locally as a Claude Code plugin with no account. See the <a href="https://github.com/lbliii/mcportal">source</a>.</p>`, site);
+<div class="card"><p>Add MCPortal to your agent as a custom connector (MCP server) with this URL, and sign in with GitHub. Then ask <i>“open my room”</i>.</p><p><code>${mcp}</code></p><p class="muted">In Claude, that's <b>Settings → Connectors</b>. MCPortal works in any MCP agent; the visual room appears in agents that show MCP Apps, and elsewhere you read through the chat.</p></div>
+<p class="muted">Prefer to run it yourself? MCPortal also runs locally as a Claude Code plugin with no account. See the <a href="https://github.com/lbliii/mcportal">source</a>.</p>`, site, true);
 }
 
 function privacy(site: SiteConfig): string {
   const who = site.operator ? escapeHtml(site.operator) : 'the person who runs this server';
   const support = escapeHtml(site.supportUrl);
-  return layout('MCPortal privacy policy', `
-<h1>Privacy policy</h1>
-<p class="muted">Last updated ${POLICY_UPDATED}. This policy covers the MCPortal service at <code>${escapeHtml(site.publicUrl)}</code>, which is run by ${who}.</p>
+  return layout('MCPortal privacy policy', titleBand('Privacy policy'), `
+<p class="muted" style="margin-top:40px">Last updated ${POLICY_UPDATED}. This policy covers the MCPortal service at <code>${escapeHtml(site.publicUrl)}</code>, which is run by ${who}.</p>
 
-<p>Here's the short version. MCPortal stores your GitHub user ID and login, your portal (layout, sources, saved items and clips), a public profile, shares and follows only if you use them, and short-lived sign-in tokens. It doesn't store your email, your name or your GitHub password. It has no ads, trackers or analytics, and it doesn't sell or share your data.</p>
+<p>Here's the short version. MCPortal stores your GitHub user ID and login, your room (layout, sources, saved items and clips), a public profile, shares and follows only if you use them, and short-lived sign-in tokens. It doesn't store your email, your name or your GitHub password. It has no ads, trackers or analytics, and it doesn't sell or share your data.</p>
 
 <h2>What MCPortal stores</h2>
 <table>
 <tr><th>Data</th><th>Why</th><th>How long</th></tr>
 <tr><td><b>Account:</b> your GitHub numeric user ID and login, your role, how you joined (for example, by invite), and dates</td><td>To know who you are and whether you're allowed in</td><td>Until your account is deleted</td></tr>
-<tr><td><b>Your portal:</b> its name, layout, the sources you add (feed addresses, subreddits, repos, searches), and settings</td><td>To show you your portal</td><td>Until you change it or your account is deleted</td></tr>
-<tr><td><b>Saved items:</b> the link, title, source, date and any note you add</td><td>To show your Saved panel</td><td>Until you remove them</td></tr>
-<tr><td><b>Clips:</b> quotes, parts of a conversation, notes, tables, images and links you ask Claude to keep, with any title, note and tags</td><td>To show your Clips panel and find them again in later chats</td><td>Until you delete them</td></tr>
-<tr><td><b>Pinned results:</b> if you ask Claude to pin results from another connected tool (for example, a list of issues), the titles, links, short summaries and details it copies in, and the request needed to refresh them</td><td>To show that panel</td><td>Until you remove the panel</td></tr>
+<tr><td><b>Your room:</b> its name, layout, the sources you add (feed addresses, subreddits, repos, searches), and settings</td><td>To show you your room</td><td>Until you change it or your account is deleted</td></tr>
+<tr><td><b>Saved items:</b> the link, title, source, date and any note you add</td><td>To show your Saved portal</td><td>Until you remove them</td></tr>
+<tr><td><b>Clips:</b> quotes, parts of a conversation, notes, tables, images and links you ask your agent to keep, with any title, note and tags</td><td>To show your Clips portal and find them again in later chats</td><td>Until you delete them</td></tr>
+<tr><td><b>Pinned results:</b> if you ask your agent to pin results from another connected tool (for example, a list of issues), the titles, links, short summaries and details it copies in, and the request needed to refresh them</td><td>To show that portal</td><td>Until you remove the portal</td></tr>
 <tr><td><b>Public profile and space (only if you create one):</b> your handle, display name, bio, space title and colour, and the sources you choose to feature, which other signed-in MCPortal users can see</td><td>So people can find you</td><td>Until you remove it; a handle you give up stays reserved for you for 30 days</td></tr>
 <tr><td><b>Shares:</b> links and clips you choose to share, with your note, a copy of what you shared, and who it's for (your followers or everyone on MCPortal)</td><td>To show them to the people you shared them with</td><td>Until you remove them</td></tr>
-<tr><td><b>Follows, mutes and blocks:</b> who you follow, mute and block</td><td>To build your Following panel and keep blocked people apart</td><td>Until you change them. People see how many followers you have, never who</td></tr>
+<tr><td><b>Follows, mutes and blocks:</b> who you follow, mute and block</td><td>To build your Following portal and keep blocked people apart</td><td>Until you change them. People see how many followers you have, never who</td></tr>
 <tr><td><b>Reports:</b> what you reported, why, and when</td><td>So admins can act on abuse</td><td>Kept after they're resolved; if you delete your account, your name is removed from them</td></tr>
 <tr><td><b>Sign-in tokens:</b> stored only as one-way hashes, with the app that asked for them (for example, Claude)</td><td>To keep you signed in</td><td>Access tokens 1 hour; refresh tokens 30 days</td></tr>
 <tr><td><b>Invites and the admin audit log:</b> who invited whom, and suspensions or reinstatements with a short reason</td><td>To run an invite-only service and keep a record of admin actions</td><td>The newest 2,000 log entries are kept</td></tr>
@@ -132,8 +197,8 @@ function privacy(site: SiteConfig): string {
 <p>MCPortal asks GitHub for the <code>read:user</code> scope and reads your user ID and login once, when you sign in. It then discards the GitHub token. It can't see your repositories, email or anything else in your GitHub account.</p>
 
 <h2>What MCPortal sends to other sites</h2>
-<p>When your portal loads, MCPortal's server fetches the feeds, articles and thumbnails you asked for. Those sites see the server's address, not yours. Fetched content is cached in the server's memory for between two minutes and one day, and is shared across users because it's the same public content. It isn't written to the database. When you choose to open an original story or its discussion, your browser goes to that site directly, and that site's own privacy policy applies.</p>
-<p>When you use MCPortal in Claude, what you see in your portal is also available to Claude, and Anthropic's privacy policy covers your conversations.</p>
+<p>When your room loads, MCPortal's server fetches the feeds, articles and thumbnails you asked for. Those sites see the server's address, not yours. Fetched content is cached in the server's memory for between two minutes and one day, and is shared across users because it's the same public content. It isn't written to the database. When you choose to open an original story or its discussion, your browser goes to that site directly, and that site's own privacy policy applies.</p>
+<p>What you see in your room is also available to the agent you use it in, and that agent's privacy policy covers your conversations (in Claude, Anthropic's).</p>
 
 <h2>What other people see</h2>
 <p>Nothing, unless you choose. With a public profile, you have a space: signed-in MCPortal users can open it to see your handle, name, bio, space title, the sources you chose to feature, your follower count, and the shares you made for them (your followers, or everyone). Shares are never published to the open web. Admins can see reported shares and profiles, and can hide a share or suspend an account.</p>
@@ -149,11 +214,11 @@ function privacy(site: SiteConfig): string {
 
 <h2>Your choices</h2>
 <ul>
-  <li><b>See and change your data:</b> ask Claude to show your portal settings, change them, or remove saved items at any time.</li>
-  <li><b>Take it with you:</b> ask Claude to export your data, or download it from your <a href="/account">account page</a>: everything as one file another MCPortal can import, saved items as a bookmarks file, clips as Markdown, and sources as OPML.</li>
-  <li><b>Delete clips, shares or your public profile, or block someone:</b> ask Claude at any time. Removing your public profile hides your shares from everyone.</li>
-  <li><b>Delete your account:</b> sign in on your <a href="/account">account page</a> and delete it. Your account, portal, saved items, clips, public profile, shares and follows are deleted at once, and you're signed out everywhere. Backups roll over within 30 days.</li>
-  <li><b>Disconnect:</b> remove MCPortal from Claude's connectors. You can also revoke it on GitHub under Settings → Applications.</li>
+  <li><b>See and change your data:</b> ask your agent to show your room's settings, change them, or remove saved items at any time.</li>
+  <li><b>Take it with you:</b> ask your agent to export your data, or download it from your <a href="/account">account page</a>: everything as one file another MCPortal can import, saved items as a bookmarks file, clips as Markdown, and sources as OPML.</li>
+  <li><b>Delete clips, shares or your public profile, or block someone:</b> ask your agent at any time. Removing your public profile hides your shares from everyone.</li>
+  <li><b>Delete your account:</b> sign in on your <a href="/account">account page</a> and delete it. Your account, room, saved items, clips, public profile, shares and follows are deleted at once, and you're signed out everywhere. Backups roll over within 30 days.</li>
+  <li><b>Disconnect:</b> remove MCPortal from your agent's connectors. You can also revoke it on GitHub under Settings → Applications.</li>
 </ul>
 
 <h2>Children</h2>
@@ -168,27 +233,26 @@ function privacy(site: SiteConfig): string {
 
 function support(site: SiteConfig): string {
   const url = escapeHtml(site.supportUrl);
-  return layout('MCPortal support', `
-<h1>Support</h1>
-<p>Found a bug, need a hand, or want your account deleted? Get in touch at <a href="${url}">${url}</a>. Please don't include tokens or other secrets.</p>
+  return layout('MCPortal support', titleBand('Support'), `
+<p class="lede" style="margin-top:40px">Found a bug, need a hand, or want your account deleted? Get in touch at <a href="${url}">${url}</a>. Please don't include tokens or other secrets.</p>
 
 <h2>Common questions</h2>
-<h3>How do I open my portal?</h3>
-<p>In a chat with MCPortal connected, ask <i>“open my portal”</i>. The first time, pick a few starter packs or tell Claude what you like to read.</p>
+<h3>How do I open my room?</h3>
+<p>In a chat with MCPortal connected, ask <i>“open my room”</i> (or “open my portal”). The first time, pick a few starter packs or tell your agent what you like to read.</p>
 <h3>How do I add a site?</h3>
-<p>Ask Claude to add it, or use the <b>+</b> button in the portal. Paste a web address, a feed, <code>r/subreddit</code>, <code>owner/repo</code>, or a YouTube, Bluesky or Mastodon address. MCPortal finds a feed that works and shows you a preview.</p>
-<h3>A panel says it couldn't load.</h3>
-<p>Some sites block requests from cloud servers or stop publishing their feed. Try refreshing the panel. If it keeps failing, ask Claude to find another feed for that site.</p>
+<p>Ask your agent to add it, or use the <b>+</b> button in your room. Paste a web address, a feed, <code>r/subreddit</code>, <code>owner/repo</code>, or a YouTube, Bluesky or Mastodon address. MCPortal finds a feed that works and shows you a preview.</p>
+<h3>A portal says it couldn't load.</h3>
+<p>Some sites block requests from cloud servers or stop publishing their feed. Try refreshing the portal. If it keeps failing, ask your agent to find another feed for that site.</p>
 <h3>Claude says my organization doesn't allow custom connectors.</h3>
 <p>Some work and school accounts block connectors that aren't in Claude's directory. Until MCPortal is listed there, use a personal Claude account, or ask your admin.</p>
 <h3>I got “sign-in isn't allowed for this account”.</h3>
 <p>MCPortal is invite-only right now. The invite is tied to one GitHub account, so sign in as the account that was invited.</p>
 <h3>How do I bring my subscriptions from another reader?</h3>
-<p>Export OPML from your old reader and ask Claude to import it. To take your subscriptions elsewhere, ask Claude to export OPML.</p>
+<p>Export OPML from your old reader and ask your agent to import it. To take your subscriptions elsewhere, ask your agent to export OPML.</p>
 <h3>Someone is bothering me.</h3>
-<p>Ask Claude to block them: they can't follow you or see your shares, and you won't see theirs. To tell the admins, ask Claude to report the share or the person.</p>
+<p>Ask your agent to block them: they can't follow you or see your shares, and you won't see theirs. To tell the admins, ask your agent to report the share or the person.</p>
 <h3>How do I get my data out?</h3>
-<p>Ask Claude to export it, or download it from your <a href="/account">account page</a>. Everything comes as one file another MCPortal can import; saved items also come as a bookmarks file, clips as Markdown and sources as OPML.</p>
+<p>Ask your agent to export it, or download it from your <a href="/account">account page</a>. Everything comes as one file another MCPortal can import; saved items also come as a bookmarks file, clips as Markdown and sources as OPML.</p>
 <h3>How do I delete my account?</h3>
 <p>Sign in on your <a href="/account">account page</a> and delete it there. It happens at once. See the <a href="/privacy">privacy policy</a> for what's deleted.</p>`, site);
 }

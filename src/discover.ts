@@ -1,6 +1,6 @@
 /**
  * Source discovery: turn whatever the user gives ("theverge.com", a YouTube
- * channel, "r/LocalLLaMA", "owner/repo", a feed URL) into panel specs.
+ * channel, "r/LocalLLaMA", "owner/repo", a feed URL) into portal specs.
  *
  * Order: native sources (Hacker News, GitHub), known-site recipes for feeds that
  * sites don't advertise, the page's own <link rel="alternate"> feeds, then common

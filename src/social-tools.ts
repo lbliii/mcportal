@@ -9,7 +9,7 @@ import { clean } from './lib/text.ts';
 import { httpUrl } from './profile.ts';
 import type { ClipData } from './clips.ts';
 import { AUDIENCES, SocialError, type SharedItem } from './social.ts';
-import { ensurePanel, toolError, untrusted, WORKSPACE_URI, type CallToolResult, type ToolContext, type ToolDef } from './tools.ts';
+import { ensurePortal, toolError, untrusted, ROOM_URI, type CallToolResult, type ToolContext, type ToolDef } from './tools.ts';
 
 function ok(text: string, structuredContent: Record<string, unknown>): CallToolResult {
   return { content: [{ type: 'text', text }], structuredContent };
@@ -54,12 +54,12 @@ export const SOCIAL_TOOLS: ToolDef[] = [
     name: 'open_space',
     title: 'Open a space',
     description: [
-      "Open someone's MCPortal space by handle, or the user's own space without one: their name, bio and space title, what they shared (as a grid), and the sources they recommend, which the user can add to their own portal.",
+      "Open someone's MCPortal Space by handle, or the user's own Space without one: their name, bio and Space title, their posts (what they shared, as a grid), and the sources they recommend, which the user can add to their own room.",
       'Use it when the user asks to see someone\'s space, page or profile, or their own ("what does my space look like").',
     ].join(' '),
     inputSchema: { type: 'object', additionalProperties: false, properties: { handle: handleProp } },
     annotations: { readOnlyHint: true },
-    _meta: { ui: { resourceUri: WORKSPACE_URI } },
+    _meta: { ui: { resourceUri: ROOM_URI } },
     async handler(args, ctx) {
       if (!ctx.social || !ctx.publicProfiles) return toolError(HOSTED_ONLY);
       try {
@@ -141,10 +141,10 @@ export const SOCIAL_TOOLS: ToolDef[] = [
   {
     name: 'get_share',
     title: 'Show a share',
-    description: 'Show one share in full (the note and the shared link or clip), as a card in the conversation. Ids come from the Following panel or list_shares.',
+    description: 'Show one share in full (the note and the shared link or clip), as a card in the conversation. Ids come from the Following portal or list_shares.',
     inputSchema: { type: 'object', required: ['id'], additionalProperties: false, properties: { id: { type: 'string' } } },
     annotations: { readOnlyHint: true },
-    _meta: { ui: { resourceUri: WORKSPACE_URI } },
+    _meta: { ui: { resourceUri: ROOM_URI } },
     async handler(args, ctx) {
       if (!ctx.social) return toolError(HOSTED_ONLY);
       const share = await ctx.social.get(ctx.userId, String(args.id ?? ''));
@@ -181,8 +181,8 @@ export const SOCIAL_TOOLS: ToolDef[] = [
     name: 'relationship',
     title: 'Follow, mute or block someone',
     description: [
-      'follow / unfollow a person by handle (their shares then appear in the user\'s Following panel; the first follow adds that panel);',
-      'mute / unmute (hide their shares from the user\'s Following panel);',
+      'follow / unfollow a person by handle (their shares then appear in the user\'s Following portal; the first follow adds that portal);',
+      'mute / unmute (hide their shares from the user\'s Following portal);',
       'block / unblock (they can\'t follow the user or see their shares, and the user doesn\'t see theirs; blocking removes follows both ways).',
       'Only when the user asks.',
     ].join(' '),
@@ -200,15 +200,15 @@ export const SOCIAL_TOOLS: ToolDef[] = [
         switch (args.action) {
           case 'follow': {
             const target = await ctx.social.follow(ctx.userId, handle);
-            const { profile, added } = ensurePanel(await ctx.store.get(ctx.userId), 'following', 'Following');
+            const { profile, added } = ensurePortal(await ctx.store.get(ctx.userId), 'following', 'Following');
             if (added) await ctx.store.put(ctx.userId, profile);
-            return ok(`Following @${target.handle}.${added ? ' Added a "Following" panel to the layout.' : ''}`, { handle: target.handle, layoutChanged: added, profile });
+            return ok(`Following @${target.handle}.${added ? ' Added a "Following" portal to the room.' : ''}`, { handle: target.handle, layoutChanged: added, profile });
           }
           case 'unfollow':
             return ok((await ctx.social.unfollow(ctx.userId, handle)) ? `Unfollowed @${clean(handle, 40).replace(/^@/, '')}.` : 'You weren\'t following them.', {});
           case 'mute': case 'unmute': {
             const target = await ctx.social.mute(ctx.userId, handle, args.action === 'mute');
-            return ok(args.action === 'mute' ? `Muted @${target.handle}: their shares won't show in your Following panel.` : `Unmuted @${target.handle}.`, { handle: target.handle });
+            return ok(args.action === 'mute' ? `Muted @${target.handle}: their shares won't show in your Following portal.` : `Unmuted @${target.handle}.`, { handle: target.handle });
           }
           case 'block': case 'unblock': {
             const target = await ctx.social.block(ctx.userId, handle, args.action === 'block');

@@ -441,7 +441,7 @@ export class OAuthServer {
       page(
         'Connect to MCPortal',
         `<h1>Connect to MCPortal?</h1>
-<p><strong>${escapeHtml(client.clientName)}</strong> wants to open and change your MCPortal workspace.</p>
+<p><strong>${escapeHtml(client.clientName)}</strong> wants to open and change your MCPortal room.</p>
 <p class="muted">After you approve, you'll sign in with GitHub, then be sent back to <code>${escapeHtml(redirectHost)}</code>. Only continue if you started this from that app.</p>
 <form method="post" action="/oauth/authorize">
 <input type="hidden" name="txn" value="${txnId}">

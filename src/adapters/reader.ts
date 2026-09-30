@@ -30,7 +30,31 @@ const ID = /^[\w\-.:]{1,80}$/;
 type Zone = 'article' | 'main' | 'body';
 interface Part { text: string; href?: string; code?: true }
 interface Container { name: string; main: boolean; callout?: { tone: CalloutTone; n: number }; lang?: string; id?: string }
-interface Found extends ArticleBlock { zone: Zone; calloutN?: number }
+interface Found extends ArticleBlock { zone: Zone; calloutN?: number; list?: number; shareLink?: boolean }
+
+// Share bars and article toolbars ("Share • Pin • Email", "Comments • Read Later") are lists
+// of short links. An action label, or a link to a share endpoint, marks a list as chrome; network
+// names alone ("Facebook", "LinkedIn") don't, so a real list of platforms survives.
+const SHARE_ACTION = /^(?:\d[\d,.]*k?\s*)?(?:share(?: (?:this|on|via|to) [\w .]+)?|pin(?: it)?|e-?mail(?: this)?|mail|print|comments?|read later|save(?: for later)?|bookmark|copy(?: link)?|tweet)(?:\s*\d[\d,.]*k?)?$/i;
+const SHARE_NETWORK = /^(?:x|x\.com|twitter|facebook|linkedin|reddit|pinterest|whatsapp|threads|bluesky|mastodon|tumblr|telegram|flipboard|pocket|hacker news|messenger|link)$/i;
+const SHARE_HREF = /\/\/(?:[\w-]+\.)*(?:twitter\.com\/(?:intent|share)|x\.com\/intent|facebook\.com\/(?:sharer|dialog\/share)|linkedin\.com\/(?:share|cws\/share)|pinterest\.com\/pin\/create|reddit\.com\/submit|wa\.me\/|api\.whatsapp\.com\/send|t\.me\/share|bsky\.app\/intent|news\.ycombinator\.com\/submitlink|tumblr\.com\/(?:share|widgets\/share))/i;
+const SHARE_HEADING = /^share(?: this(?: article| story| post| page)?)?\s*:?$/i;
+
+/** Lists (by id) whose every item is a share or utility link. */
+function shareLists(found: Found[]): Set<number> {
+  const items = new Map<number, Found[]>();
+  for (const b of found) {
+    if (b.type !== 'li' || b.list === undefined) continue;
+    const lis = items.get(b.list);
+    if (lis) lis.push(b); else items.set(b.list, [b]);
+  }
+  const out = new Set<number>();
+  for (const [id, lis] of items) {
+    const allShort = lis.every((b) => b.text.length <= 40 && (SHARE_ACTION.test(b.text) || SHARE_NETWORK.test(b.text) || b.shareLink));
+    if (allShort && lis.some((b) => SHARE_ACTION.test(b.text) || b.shareLink)) out.add(id);
+  }
+  return out;
+}
 
 const words = (text: string) => text.split(/\s+/).filter(Boolean).length;
 
@@ -68,7 +92,9 @@ export function extractArticle(html: string, baseUrl?: string, limits: { blocks:
   const labels = new Map<number, string>();
   const stack: Container[] = [];
   const found: Found[] = [];
-  let current: { type: ArticleBlock['type'] | 'label'; zone: Zone; parts: Part[]; level?: number; id?: string; lang?: string; callout?: Container['callout'] } | null = null;
+  let current: { type: ArticleBlock['type'] | 'label'; zone: Zone; parts: Part[]; level?: number; id?: string; lang?: string; callout?: Container['callout']; list?: number; shareLink?: boolean } | null = null;
+  const lists: number[] = [];   // open <ul>/<ol> ids, innermost last
+  let listId = 0;
   let table: { depth: number; zone: Zone; rows: string[][]; row: string[] | null; cell: string[] | null; header: boolean } | null = null;
 
   const zone = (): Zone => (article > 0 ? 'article' : main > 0 || stack.some((c) => c.main) ? 'main' : 'body');
@@ -96,7 +122,7 @@ export function extractArticle(html: string, baseUrl?: string, limits: { blocks:
       if (c.callout) labels.set(c.callout.n, clean(text, 120));
       return;
     }
-    const block: Found = { type: c.type, text, zone: c.zone };
+    const block: Found = { type: c.type, text, zone: c.zone, ...(c.list !== undefined ? { list: c.list } : {}), ...(c.shareLink ? { shareLink: true } : {}) };
     if (c.type === 'h') {
       block.level = c.level ?? 2;
       if (c.id) block.id = c.id;
@@ -173,8 +199,10 @@ export function extractArticle(html: string, baseUrl?: string, limits: { blocks:
         stack.push(entry);
         continue;
       }
+      if (name === 'ul' || name === 'ol') { lists.push(listId++); continue; }
       if (name === 'a') {
         const a = parseAttrs(tok.attrs);
+        if (current && SHARE_HREF.test(a.href ?? '')) current.shareLink = true;
         if (/\bheaderlink\b/.test(a.class ?? '')) { headerlink = true; continue; }
         href = a.href ? linkTarget(decodeEntities(a.href), baseUrl) : undefined;
         continue;
@@ -199,7 +227,7 @@ export function extractArticle(html: string, baseUrl?: string, limits: { blocks:
         const signature = name === 'dt' && !!a.id && ID.test(a.id);
         const callout = innerCallout();
         const isLabel = callout && type === 'p' && /\badmonition-title\b/.test(a.class ?? '');
-        current = { type: isLabel ? 'label' : signature ? 'h' : type === 'p' && quote > 0 ? 'quote' : type, zone: zone(), parts: [], ...(callout ? { callout } : {}) };
+        current = { type: isLabel ? 'label' : signature ? 'h' : type === 'p' && quote > 0 ? 'quote' : type, zone: zone(), parts: [], ...(callout ? { callout } : {}), ...(name === 'li' && lists.length ? { list: lists.at(-1) } : {}) };
         if (signature) { current.level = 4; current.id = a.id; }
         if (type === 'h') {
           current.level = Number(name[1]);
@@ -234,6 +262,7 @@ export function extractArticle(html: string, baseUrl?: string, limits: { blocks:
       if (at !== -1) { flush(); stack.length = at; }
       continue;
     }
+    if (name === 'ul' || name === 'ol') { flush(); lists.pop(); continue; }
     if (name === 'a') { href = undefined; headerlink = false; continue; }
     if (CODE.has(name)) { if (code > 0) code--; continue; }
     if (BLOCK[name]) {
@@ -251,9 +280,13 @@ export function extractArticle(html: string, baseUrl?: string, limits: { blocks:
   const preferred: Zone | undefined = found.some((b) => b.zone === 'article') ? 'article' : found.some((b) => b.zone === 'main') ? 'main' : undefined;
   const blocks: ArticleBlock[] = [];
   let chars = 0;
+  const chrome = shareLists(found);
+  const isChrome = (b: Found | undefined) => b?.list !== undefined && chrome.has(b.list);
   let lastCallout: { n: number; block: ArticleBlock } | undefined;
-  for (const { zone: z, calloutN, ...b } of found) {
+  for (const [i, { zone: z, calloutN, list: _list, shareLink: _share, ...b }] of found.entries()) {
     if (preferred && z !== preferred) continue;
+    if (isChrome(found[i])) continue;
+    if (b.type === 'h' && SHARE_HEADING.test(b.text) && isChrome(found[i + 1])) continue;
     if (b.type === 'h' && b.text === title) continue;
     if (blocks.length >= limits.blocks || chars + b.text.length > limits.totalChars) break;
     chars += b.text.length;

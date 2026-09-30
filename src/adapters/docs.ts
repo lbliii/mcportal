@@ -33,7 +33,7 @@ export interface DocsToc {
 export interface DocsConfig {
   /** The docs root the user asked for, e.g. https://docs.stripe.com */
   url: string;
-  /** How the table of contents was found; fixed when the panel is added, resolved on first load if missing. */
+  /** How the table of contents was found; fixed when the portal is added, resolved on first load if missing. */
   toc?: DocsToc;
   /** Show only this section's pages. */
   section?: string;
@@ -529,7 +529,7 @@ export function searchDocs(site: DocSite, query: string, limit = 20): DocHit[] {
 
 // ---- resolving a site -------------------------------------------------------------
 
-/** What a user typed ("docs.stripe.com", "owner/repo", a folder link) as the URL a docs panel stores. */
+/** What a user typed ("docs.stripe.com", "owner/repo", a folder link) as the URL a docs portal stores. */
 export function docsInputUrl(input: string): string {
   const github = parseGithubDocs(input);
   return github ? githubTocUrl({ ...github, file: undefined }) : docsUrl(input).href;
@@ -617,7 +617,7 @@ const LOADERS: Record<TocKind, { file: string[]; load: (url: string, fetcher: Fe
 
 const KIND_NAMES: Record<TocKind, string> = { llms: 'llms.txt', sphinx: 'Sphinx inventory', sitemap: 'sitemap', github: 'GitHub docs folder' };
 
-/** Load a site's table of contents from a known source (a panel's stored toc, or a nested llms.txt). */
+/** Load a site's table of contents from a known source (a portal's stored toc, or a nested llms.txt). */
 export async function loadDocs(toc: DocsToc, fetcher: Fetcher): Promise<DocSite> {
   const site = await LOADERS[toc.kind].load(toc.url, fetcher);
   if (!site) throw new DocsError(`${toc.url} isn't a readable ${KIND_NAMES[toc.kind]}`);

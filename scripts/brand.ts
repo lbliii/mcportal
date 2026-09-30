@@ -1,13 +1,14 @@
 /**
  * MCPortal's brand, drawn from one source. Writes every brand asset from the geometry
- * and type below, so the marks, favicon, social card, workspace header and MCP server
+ * and type below, so the marks, favicon, social card, room header and MCP server
  * icon can't drift apart:
  *
  *   node scripts/brand.ts          write everything
  *
  * brand/            masters: marks, wordmark, lockups, social card (SVG), usage notes
- * src/site/         what the public pages serve: favicon, app icon, social card, lockup
- * src/ui/brand/     marks inlined into the workspace (colours from its CSS)
+ * src/site/         what the public pages serve: favicon, app icon, social card, lockup,
+ *                   hero art, and Jost Bold for headings
+ * src/ui/brand/     marks inlined into the room (colours from its CSS)
  * src/brand-icons.ts   the icons the MCP server advertises (data: URIs)
  *
  * The wordmark is Jost Bold (brand/fonts, SIL OFL), converted to outlines here so
@@ -37,10 +38,15 @@ function arch(cx: number, base: number, w: number, h: number): string {
   return `M${r2(cx - a)} ${r2(base)}V${r2(top)}A${r2(a)} ${r2(a)} 0 0 1 ${r2(cx + a)} ${r2(top)}V${r2(base)}Z`;
 }
 
+/** Points on an ellipse tilted by `deg`, by parameter angle (radians). */
+function ellipse(cx: number, cy: number, rx: number, ry: number, deg: number): (t: number) => [number, number] {
+  const a = (deg * Math.PI) / 180;
+  return (t) => [cx + rx * Math.cos(t) * Math.cos(a) - ry * Math.sin(t) * Math.sin(a), cy + rx * Math.cos(t) * Math.sin(a) + ry * Math.sin(t) * Math.cos(a)];
+}
+
 /** Half of a tilted ellipse: the back half runs behind the door, the front half across it. */
 function ring(cx: number, cy: number, rx: number, ry: number, deg: number, half: 'back' | 'front'): string {
-  const a = (deg * Math.PI) / 180;
-  const at = (t: number) => [cx + rx * Math.cos(t) * Math.cos(a) - ry * Math.sin(t) * Math.sin(a), cy + rx * Math.cos(t) * Math.sin(a) + ry * Math.sin(t) * Math.cos(a)];
+  const at = ellipse(cx, cy, rx, ry, deg);
   const [from, to] = half === 'back' ? [at(Math.PI), at(0)] : [at(0), at(Math.PI)];
   return `M${r2(from[0]!)} ${r2(from[1]!)}A${r2(rx)} ${r2(ry)} ${r2(deg)} 0 1 ${r2(to[0]!)} ${r2(to[1]!)}`;
 }
@@ -83,9 +89,111 @@ function lineMark(stroke: string, dot: string): string {
   const k = 24 / 64;
   const door = arch(32 * k, 54 * k, 28 * k, 42 * k);
   const front = ring(32 * k, 38 * k, 26 * k, 8 * k, -18, 'front');
-  return `<path d="${door}" fill="none" ${stroke} stroke-width="1.9" stroke-linejoin="round"/>`
-    + `<path d="${front}" fill="none" ${stroke} stroke-width="1.9" stroke-linecap="round"/>`
+  return `<path d="${door}" fill="none" ${stroke} stroke-width="${ICON_STROKE}" stroke-linejoin="round"/>`
+    + `<path d="${front}" fill="none" ${stroke} stroke-width="${ICON_STROKE}" stroke-linecap="round"/>`
     + `<circle cx="${r2(32 * k)}" cy="${r2(27 * k)}" r="1.6" ${dot}/>`;
+}
+
+// ------------------------------------------------------------------ icons
+
+/** Every UI icon and the Line mark share this stroke (24-unit grid, round caps and joins). */
+const ICON_STROKE = 1.75;
+/** The house corner for rounded rectangles in icons. */
+const R = 3;
+
+interface Icon { d: string; dot?: [number, number, number] }
+
+/**
+ * An arc of a tilted orbit from `from` to `to` degrees (clockwise on screen), ending in an
+ * arrowhead that follows the orbit: refresh is a trip around it.
+ */
+function orbitArrow(cx: number, cy: number, rx: number, ry: number, deg: number, from: number, to: number, head: number): string {
+  const at = ellipse(cx, cy, rx, ry, deg), rad = (v: number) => (v * Math.PI) / 180;
+  const [x0, y0] = at(rad(from)), [x1, y1] = at(rad(to)), [xb, yb] = at(rad(to) - 0.01);
+  const len = Math.hypot(x1 - xb, y1 - yb), ux = (x1 - xb) / len, uy = (y1 - yb) / len;
+  const barb = (sign: number) => [x1 - head * (ux - sign * uy) * Math.SQRT1_2, y1 - head * (uy + sign * ux) * Math.SQRT1_2];
+  const [l, r] = [barb(1), barb(-1)];
+  return `M${r2(x0)} ${r2(y0)}A${r2(rx)} ${r2(ry)} ${r2(deg)} ${to - from > 180 ? 1 : 0} 1 ${r2(x1)} ${r2(y1)}`
+    + `M${r2(l[0]!)} ${r2(l[1]!)}L${r2(x1)} ${r2(y1)}L${r2(r[0]!)} ${r2(r[1]!)}`;
+}
+
+/** A rounded rectangle as a path, corners of radius R. */
+function box(x: number, y: number, w: number, h: number, r = R): string {
+  return `M${x + r} ${y}h${w - 2 * r}a${r} ${r} 0 0 1 ${r} ${r}v${h - 2 * r}a${r} ${r} 0 0 1 ${-r} ${r}h${2 * r - w}a${r} ${r} 0 0 1 ${-r} ${-r}v${2 * r - h}a${r} ${r} 0 0 1 ${r} ${-r}z`;
+}
+
+/**
+ * The room's icons, on the Line mark's 24-unit grid and stroke. Where an icon has a frame,
+ * it borrows the mark: columns are two doorways, the bookmark and the "open original" frame are
+ * arch-topped, a space is someone's doorway, refresh runs around a tilted orbit, and the feed
+ * icon's dot is the moon's size. Everything else keeps the familiar shape with the house corner.
+ */
+function icons(): Record<string, Icon> {
+  // A shelf row: one picture, then the next running off the edge.
+  const shelf = (y: number) => `${box(3.5, y, 7.5, 6, 2.5)}M20.5 ${y}H16.5a2.5 2.5 0 0 0-2.5 2.5v1a2.5 2.5 0 0 0 2.5 2.5h4`;
+  const bubble = 'M7 5h10a3 3 0 0 1 3 3v6.5a3 3 0 0 1-3 3h-6l-3.5 2.5v-2.5H7a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3z';
+  return {
+    columns: { d: arch(7.25, 19.5, 6.5, 15) + arch(16.75, 19.5, 6.5, 15) },
+    shelves: { d: shelf(4.5) + shelf(13.5) },
+    chat: { d: 'M11.5 5H7a3 3 0 0 0-3 3v6.5a3 3 0 0 0 3 3h.5V20l3.5-2.5h4.5a3 3 0 0 0 3-3V12M14.5 4.5h5v5M19.5 4.5l-6 6' },
+    sources: { d: 'M5 12.5a6.5 6.5 0 0 1 6.5 6.5M5 6a13 13 0 0 1 13 13', dot: [5.5, 18.5, 1.6] },
+    refresh: { d: orbitArrow(12, 12, 8.5, 6.5, -18, 0, 290, 3) },
+    expand: { d: 'M4 9.5V7a3 3 0 0 1 3-3h2.5M14.5 4H17a3 3 0 0 1 3 3v2.5M20 14.5V17a3 3 0 0 1-3 3h-2.5M9.5 20H7a3 3 0 0 1-3-3v-2.5' },
+    collapse: { d: 'M9.5 4v2.5a3 3 0 0 1-3 3H4M20 9.5h-2.5a3 3 0 0 1-3-3V4M14.5 20v-2.5a3 3 0 0 1 3-3H20M4 14.5h2.5a3 3 0 0 1 3 3V20' },
+    back: { d: 'M19 12H5.5M11 6l-6 6 6 6' },
+    left: { d: 'M14.5 6l-6 6 6 6' },
+    right: { d: 'M9.5 6l6 6-6 6' },
+    external: { d: 'M16 13.5V20H4V10a6 6 0 0 1 6-6M10.5 13.5L20 4M14 4h6v6' },
+    comment: { d: bubble },
+    up: { d: 'M12 19V6.5M6.5 12L12 6.5l5.5 5.5' },
+    plus: { d: 'M12 5v14M5 12h14' },
+    check: { d: 'M5 12.5l4.5 4.5L19 7.5' },
+    play: { d: 'M8.5 6.2v11.6a1 1 0 0 0 1.5.86l9.3-5.8a1 1 0 0 0 0-1.72L10 5.34a1 1 0 0 0-1.5.86z' },
+    bookmark: { d: 'M7 20V9.5a5 5 0 0 1 10 0V20l-5-3.5z' },
+    share: { d: 'M12 14.5V4.5M8 8.5l4-4 4 4M5.5 12.5v4.5a3 3 0 0 0 3 3h7a3 3 0 0 0 3-3v-4.5' },
+    space: { d: `${arch(12, 20, 14, 16)}M8.75 20a3.25 3.25 0 0 1 6.5 0`, dot: [12, 12.25, 2.1] },
+  };
+}
+
+/** The icon set as a plain script for the room (inlined by roomHtml()). */
+function iconScript(): string {
+  return `// Generated by scripts/brand.ts. Do not edit: change the script and re-run it.
+/** The UI icon set: 24-unit paths (and an optional filled dot) drawn in currentColor. */
+const ICON_STROKE = ${ICON_STROKE};
+const ICONS = ${JSON.stringify(icons())};
+`;
+}
+
+/** Stars as one path: `count` dots scattered over w x h by a fixed seed, so re-runs match. */
+function starfield(seed: number, count: number, w: number, h: number): string {
+  const rand = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
+  let d = '';
+  for (let i = 0; i < count; i++) {
+    const x = rand() * w, y = rand() * h, rad = 0.8 + rand() * 2.2;
+    d += `M${r2(x - rad)} ${r2(y)}a${r2(rad)} ${r2(rad)} 0 1 0 ${r2(2 * rad)} 0a${r2(rad)} ${r2(rad)} 0 1 0 ${r2(-2 * rad)} 0`;
+  }
+  return d;
+}
+
+/**
+ * The landing page's night sky, 1500x640: stars, a halftone planet, and the portal scene
+ * standing on the bottom edge at the right. The page pins it to the bottom-right of the hero
+ * band at the band's height, so the scene keeps clear of the headline on the left. The sky
+ * is transparent: the band behind it is ink in light mode and a darker night in dark mode.
+ */
+function heroArt(): string {
+  const W = 1500, H = 640, cx = 1160;
+  const door = arch(cx, H, 300, 470), inner = arch(cx, H, 172, 372);
+  const back = ring(cx, 470, 300, 80, -16, 'back'), front = ring(cx, 470, 300, 80, -16, 'front');
+  return svg(W, H, `<defs>${halftone('mcp-ht-hero', 14, 3.2, INK.ink)}${halftone('mcp-ht-planet', 9, 2.4, INK.ink)}</defs>`
+    + `<path d="${starfield(11, 130, W, H)}" fill="${INK.paper}" fill-opacity=".5"/>`
+    + `<circle cx="1400" cy="120" r="56" fill="${INK.mustard}"/><circle cx="1400" cy="120" r="56" fill="url(#mcp-ht-planet)" fill-opacity=".4"/>`
+    + `<path d="${back}" fill="none" stroke="${INK.mustard}" stroke-width="12" stroke-linecap="round"/>`
+    + `<path d="${door}" fill="${INK.teal}"/><path d="${door}" fill="url(#mcp-ht-hero)" fill-opacity=".35"/>`
+    + `<path d="${inner}" fill="${INK.paper}"/><circle cx="${cx}" cy="370" r="34" fill="${INK.brick}"/>`
+    + `<path d="${front}" fill="none" stroke="${INK.mustard}" stroke-width="14" stroke-linecap="round"/>`
+    + `<path d="${door}" fill="none" stroke="${INK.paper}" stroke-width="3" stroke-opacity=".5" transform="translate(9 -6)"/>`,
+  'A door in the night sky, with an orbit passing through it');
 }
 
 // ------------------------------------------------------------------ type
@@ -165,13 +273,7 @@ export function buildBrand(): { text: Record<string, string>; png: Record<string
   // Social card, 1200x630: the portal scene large on the right, lockup and tagline on the left.
   const social = (() => {
     const W = 1200, H = 630;
-    let seed = 7;
-    const rand = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
-    let stars = '';
-    for (let i = 0; i < 70; i++) {
-      const x = rand() * W, y = rand() * H, rad = 0.8 + rand() * 2.2;
-      stars += `M${r2(x - rad)} ${r2(y)}a${r2(rad)} ${r2(rad)} 0 1 0 ${r2(2 * rad)} 0a${r2(rad)} ${r2(rad)} 0 1 0 ${r2(-2 * rad)} 0`;
-    }
+    const stars = starfield(7, 70, W, H);
     const door = arch(900, 630, 300, 520), inner = arch(900, 630, 170, 400);
     const back = ring(900, 420, 420, 90, -14, 'back'), front = ring(900, 420, 420, 90, -14, 'front');
     const cap = 44, markSize = cap * 2.4, lx = 96, ly = 150;
@@ -202,10 +304,12 @@ export function buildBrand(): { text: Record<string, string>; png: Record<string
     'brand/lockup-stacked.svg': stacked,
     'brand/social-card.svg': social,
     'src/site/favicon.svg': svg(64, 64, portalMark()),
-    'src/site/lockup.svg': lockup(INK.ink, INK.teal),
-    // Inlined into the workspace: colours come from its CSS so they follow the theme.
+    'src/site/lockup-on-dark.svg': lockup(INK.paper, INK.mustard),
+    'src/site/hero.svg': heroArt(),
+    // Inlined into the room: colours come from its CSS so they follow the theme.
     'src/ui/brand/mark-line.svg': `<svg class="brand-line" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${lineMark('stroke="currentColor"', 'class="brand-dot"')}</svg>`,
     'src/ui/brand/badge.svg': `<svg class="brand-badge" viewBox="0 0 64 64" aria-hidden="true" focusable="false">${portalMark()}</svg>`,
+    'src/ui/brand/icons.js': iconScript(),
     'src/ui/brand/wordmark.svg': `<svg class="brand-word" viewBox="${wmBox}" role="img" aria-label="MCPortal"><path class="brand-mc" d="${wm.mc}"/><path class="brand-portal" d="${wm.portal}"/></svg>`,
   };
   const png = {
@@ -262,6 +366,8 @@ async function main(): Promise<void> {
     const images = sources.map(({ from, width }) => ({ width, data: render(text[from]!, width) }));
     write(file, file.endsWith('.ico') ? ico(images) : images[0]!.data);
   }
+  // The landing page's headings are set in Jost, served from the site itself (no font CDN).
+  write('src/site/jost-bold.ttf', readFileSync(path.join(ROOT, 'brand/fonts/Jost-Bold.ttf')));
   write('src/brand-icons.ts', serverIcons(render(text['brand/mark-small.svg']!, 64), text['brand/mark-small.svg']!));
 }
 

@@ -38,24 +38,24 @@ export function authorize(actor: Actor, action: Action, resource: Resource = {})
 }
 
 /**
- * What each tool does, for the gate. Every tool acts on the caller's own portal
+ * What each tool does, for the gate. Every tool acts on the caller's own room
  * (no tool takes a user id). Unknown tools are treated as writes.
  */
 export const TOOL_ACTIONS: Record<string, Action> = {
   get_profile: 'read',
   list_sources: 'read',
-  open_workspace: 'fetch',
+  open_room: 'fetch',
   read_source: 'fetch',
-  refresh_panel: 'fetch',
+  refresh_portal: 'fetch',
   read_article: 'fetch',
   get_thumbnails: 'fetch',
   find_source: 'fetch',
   export_opml: 'read',
   import_opml: 'write',
-  build_portal: 'write',
+  build_room: 'write',
   update_profile: 'write',
-  add_panel: 'write',
-  pin_panel: 'write',
+  add_portal: 'write',
+  pin_portal: 'write',
   save_item: 'write',
   remove_saved: 'write',
   clip: 'write',
