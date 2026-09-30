@@ -29,6 +29,7 @@
 - **Your liminal webspace:** the new tagline. MCPortal works in any MCP agent, so the pages and invite messages no longer say it lives "inside Claude".
 - **Icons everywhere:** a favicon, an app icon and a social card for link previews. MCP clients that show server icons get the mark too (`serverInfo.icons`).
 - **The public pages in the house style:** the landing page opens on a night-sky band with a door, an orbit and a halftone planet, over cream pages (ink in dark mode). Headings are set in Jost, served by MCPortal itself, so the pages still make no third-party requests (the CSP adds `font-src 'self'`). Pictures sit on an off-register block of colour, and sections open with a halftone rule. `/privacy` and `/support` share the layout, and all three pages now talk about "your agent" instead of Claude.
+- **Icons that match the mark:** the workspace's icons are redrawn on the Line mark's grid and stroke. Columns are two doorways, the bookmark and "open original" have arched tops, a space is someone's doorway, refresh runs around a tilted orbit, and corners share one radius. They're generated with the marks, so they can't drift apart.
 - **One source:** `npm run brand` draws every brand file from one script, and a test keeps the committed files in step with it. See `brand/README.md`.
 
 ### Pictures

@@ -440,6 +440,22 @@ test('brand: committed assets match what scripts/brand.ts draws', async () => {
   assert.match(text['src/ui/brand/wordmark.svg']!, /aria-label="MCPortal"/);
 });
 
+test('brand: every icon the workspace asks for is in the generated set, drawn on the 24-unit grid', async () => {
+  const { text } = buildBrand();
+  const { ICONS, ICON_STROKE } = vm.runInNewContext(`${text['src/ui/brand/icons.js']}; ({ ICONS, ICON_STROKE })`);
+  assert.equal(ICON_STROKE, 1.75);
+  assert.match(text['brand/mark-line.svg']!, /stroke-width="1\.75"/, 'the Line mark shares the icon stroke');
+  const page = await readFile(new URL('../src/ui/workspace.html', import.meta.url), 'utf8');
+  const used = new Set([...page.matchAll(/(?:icon|iconButton)\('(\w+)'|data-icon="(\w+)"|icon\(full \? '(\w+)' : '(\w+)'\)/g)].flatMap((m) => m.slice(1).filter(Boolean)));
+  assert.ok(used.size >= 19, `found the icon names in workspace.html (${used.size})`);
+  for (const name of used) assert.ok(Object.hasOwn(ICONS, name), `icon "${name}" is missing from scripts/brand.ts`);
+  for (const [name, { d, dot }] of Object.entries(ICONS) as [string, { d: string; dot?: number[] }][]) {
+    const numbers = d.match(/-?\d*\.?\d+/g)!.map(Number);
+    assert.ok(numbers.every((n) => n >= -24 && n <= 24), `${name} stays on the grid`);
+    if (dot) assert.equal(dot.length, 3, name);
+  }
+});
+
 test('onboarding: a new user gets the welcome, build_portal assembles packs, and it sticks', async () => {
   const c = newUser();
   const welcome = await call(c, 'open_workspace');
