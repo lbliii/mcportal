@@ -12,6 +12,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { OAuthServer } from './auth/oauth.ts';
 import { AuthStore } from './auth/store.ts';
+import { limitsFromEnv, UsageBudget, type BudgetLimits } from './lib/budget.ts';
 import type { TtlCache } from './lib/cache.ts';
 import { isLoopbackHost } from './lib/ip.ts';
 import { handleMessage, RPC, rpcError, SERVER_INFO, workspaceHtml, type JsonRpcResponse, type Log } from './mcp.ts';
@@ -36,6 +37,8 @@ export interface AppConfig {
   /** Behind a reverse proxy (Railway): use the last X-Forwarded-For hop for per-IP limits. */
   trustProxy: boolean;
   dataDir: string;
+  /** Per-user tool budget (MCPORTAL_LIMIT_PER_MINUTE / _PER_DAY / _GLOBAL_PER_DAY). */
+  limits: Partial<BudgetLimits>;
 }
 
 export interface AppDeps {
@@ -44,6 +47,7 @@ export interface AppDeps {
   cache: TtlCache;
   log?: Log;
   now?: () => number;
+  budget?: UsageBudget;
 }
 
 function list(value: string | undefined): string[] {
@@ -73,6 +77,7 @@ export function configFromEnv(env: NodeJS.ProcessEnv, dataDir: string): AppConfi
     allowUnauthenticated: env.MCPORTAL_ALLOW_UNAUTHENTICATED === '1' || (!hasAuth && isLoopbackHost(host)),
     trustProxy: env.MCPORTAL_TRUST_PROXY === '1' || Boolean(env.RAILWAY_ENVIRONMENT),
     dataDir,
+    limits: limitsFromEnv(env),
   };
   if (!hasAuth && !isLoopbackHost(host) && env.MCPORTAL_ALLOW_UNAUTHENTICATED !== '1') {
     throw new Error(
@@ -132,7 +137,8 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
       )
     : undefined;
 
-  const context = (userId: string): ToolContext => ({ store: deps.store, fetcher: deps.fetcher, cache: deps.cache, userId });
+  const budget = deps.budget ?? new UsageBudget(config.limits, deps.now);
+  const context = (userId: string): ToolContext => ({ store: deps.store, fetcher: deps.fetcher, cache: deps.cache, userId, budget });
 
   /** The user for a request, or undefined if it isn't authenticated. */
   async function authenticate(req: IncomingMessage): Promise<string | undefined> {

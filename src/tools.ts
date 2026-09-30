@@ -8,6 +8,7 @@ import { discover } from './discover.ts';
 import { MAX_PACKS, packSummaries, STARTER_PACKS } from './packs.ts';
 import { loadArticle, loadPanel, savedPanel, SOURCE_DOCS, type SourceDeps } from './sources.ts';
 import type { ProfileStore } from './store.ts';
+import type { UsageBudget } from './lib/budget.ts';
 import type { PanelResult, SourceKind } from './types.ts';
 
 export const WORKSPACE_URI = 'ui://mcportal/workspace.html';
@@ -15,6 +16,8 @@ export const WORKSPACE_URI = 'ui://mcportal/workspace.html';
 export interface ToolContext extends SourceDeps {
   store: ProfileStore;
   userId: string;
+  /** Hosted server only: charged per tool call. Local stdio has none (unlimited). */
+  budget?: UsageBudget;
 }
 
 export interface CallToolResult {

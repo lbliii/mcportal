@@ -16,6 +16,7 @@ import { WORKSPACE_URI, type ToolContext } from '../src/tools.ts';
 import { pageFeeds, recipesFor } from '../src/discover.ts';
 import { parseFeed } from '../src/adapters/rss.ts';
 import { STARTER_PACKS } from '../src/packs.ts';
+import { toolCost, UsageBudget } from '../src/lib/budget.ts';
 
 /** A user who has already set up their portal (the sample layout). Use newUser() for onboarding. */
 function ctx(overrides: Partial<ToolContext> = {}): ToolContext {
@@ -330,6 +331,34 @@ test('starter packs: well-formed, unique ids, valid configs, no Reddit', () => {
     }
     validateProfile({ columns: [{ panels: pack.panels }] });
   }
+});
+
+test('budget: per-minute burst, daily and global caps; refusals charge nothing', async () => {
+  let t = 0;
+  const b = new UsageBudget({ perMinute: 10, perDay: 25, globalPerDay: 40 }, () => t);
+  assert.equal(b.take('a', 6).ok, true);
+  const burst = b.take('a', 5);
+  assert.deepEqual(burst, { ok: false, scope: 'minute', retryAfterSeconds: 60 });
+  assert.equal(b.take('a', 4).ok, true, 'the refused call was not charged');
+  t += 61_000; assert.equal(b.take('a', 10).ok, true);
+  t += 61_000; const day = b.take('a', 10);
+  assert.equal(day.ok === false && day.scope, 'day');
+  assert.equal(b.take('b', 10).ok, true, 'other users are unaffected');
+  t += 61_000; assert.equal(b.take('c', 9).ok, true);
+  t += 61_000; const global = b.take('d', 5);
+  assert.equal(global.ok === false && global.scope, 'global');
+  t += 86_400_000; assert.equal(b.take('a', 10).ok, true, 'everything resets after a day');
+
+  assert.equal(toolCost('find_source', {}), 5);
+  assert.equal(toolCost('get_thumbnails', { urls: new Array(24).fill('x') }), 4);
+  assert.equal(toolCost('get_profile', {}), 1);
+
+  // Wired into tool calls: a limited call returns a friendly tool error and doesn't run.
+  const c = ctx({ budget: new UsageBudget({ perMinute: 5 }) });
+  assert.equal((await call(c, 'find_source', { query: 'example.com' })).isError, undefined);
+  const limited = await call(c, 'find_source', { query: 'example.com' });
+  assert.equal(limited.isError, true);
+  assert.match(limited.content[0]!.text, /per-minute limit/);
 });
 
 test('read_article returns fenced plain text with provenance', async () => {

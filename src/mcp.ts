@@ -5,6 +5,7 @@
  */
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
+import { budgetMessage, toolCost } from './lib/budget.ts';
 import { publicToolList, toolError, TOOLS, WORKSPACE_URI, type ToolContext } from './tools.ts';
 
 export const SERVER_INFO = { name: 'mcportal', title: 'MCPortal', version: '0.2.0' };
@@ -105,6 +106,13 @@ export async function handleMessage(message: unknown, ctx: ToolContext, log: Log
       const tool = TOOLS.find((t) => t.name === name);
       if (!tool) return rpcError(req.id, RPC.invalidParams, `Unknown tool: ${name}`);
       const args = (params.arguments as Record<string, unknown> | undefined) ?? {};
+      if (ctx.budget) {
+        const verdict = ctx.budget.take(ctx.userId, toolCost(name, args));
+        if (!verdict.ok) {
+          log(`tools/call ${name} limited (${verdict.scope}, retry in ${verdict.retryAfterSeconds}s)`);
+          return reply(req.id, toolError(budgetMessage(verdict)));
+        }
+      }
       const started = Date.now();
       try {
         const result = await tool.handler(args, ctx);
