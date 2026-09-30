@@ -127,7 +127,7 @@ export function addPanelTo(profile: Profile, spec: PanelSpec, column?: number): 
   const key = (p: PanelSpec) => `${p.source}:${JSON.stringify({ ...p.config, limit: undefined })}`;
   const probe = validateProfile({ ...profile, columns: [{ panels: [spec] }] }).columns[0]!.panels[0]!;
   const dupe = profile.columns.flatMap((c) => c.panels).find((p) => key(p) === key(probe));
-  if (dupe) return { error: `That source is already in the portal as "${dupe.title ?? dupe.id}" (id ${dupe.id}).` };
+  if (dupe) return { error: `That source is already in the room as "${dupe.title ?? dupe.id}" (id ${dupe.id}).` };
 
   const columns = profile.columns.map((c) => ({ ...c, panels: [...c.panels] }));
   const n = columns.length;
@@ -234,7 +234,7 @@ function savedResult(text: string, profile: Profile, layoutChanged: boolean): Ca
 }
 
 function summarizePanels(profile: Profile, panels: PanelResult[], notice?: string): string {
-  const lines = [`MCPortal workspace "${profile.name}": ${describeLayout(profile)}.`];
+  const lines = [`MCPortal room "${profile.name}": ${describeLayout(profile)}.`];
   if (notice) lines.push(`Notice for the user: ${notice}`);
   for (const panel of panels) {
     if (panel.error) {
@@ -244,7 +244,7 @@ function summarizePanels(profile: Profile, panels: PanelResult[], notice?: strin
     if (panel.pin) {
       lines.push(`\n[${panel.panelId}] ${panel.items.length} items pinned from ${panel.pin.from}, updated ${panel.provenance.fetchedAt}. To refresh: ${panel.pin.recipe}; then pin_panel with panelId ${panel.panelId}.`);
     } else lines.push(`\n[${panel.panelId}] ${panel.items.length} items`);
-    lines.push(untrusted(panel.provenance.endpoint, [`panel title: ${panel.title}`, ...panel.items.slice(0, 5).map(itemLine)].join('\n')));
+    lines.push(untrusted(panel.provenance.endpoint, [`portal title: ${panel.title}`, ...panel.items.slice(0, 5).map(itemLine)].join('\n')));
   }
   return lines.join('\n');
 }
@@ -263,13 +263,13 @@ const panelSchema = {
 export const TOOLS: ToolDef[] = [
   {
     name: 'open_workspace',
-    title: 'Open MCPortal workspace',
+    title: 'Open your MCPortal room',
     description:
-      "Open the user's MCPortal workspace: a multi-panel view of their sources (Hacker News, GitHub, RSS, and data pinned from their other tools) laid out according to their saved preferences. Use this when the user asks to open their portal, dashboard, or morning view, or asks what's new across their sources.",
+      "Open the user's MCPortal room: their portals onto their sources (Hacker News, GitHub, RSS, and data pinned from their other tools), arranged by their saved layout. Use this when the user asks to open their room, portal, MCPortal, dashboard, or morning view, or asks what's new across their sources.",
     inputSchema: {
       type: 'object',
       additionalProperties: false,
-      properties: { setup: { type: 'boolean', description: 'Show the welcome and starter packs, e.g. when the user asks to start over or rebuild their portal.' } },
+      properties: { setup: { type: 'boolean', description: 'Show the welcome and starter packs, e.g. when the user asks to start over or rebuild their room.' } },
     },
     annotations: { readOnlyHint: true, openWorldHint: true },
     _meta: { ui: { resourceUri: WORKSPACE_URI } },
@@ -280,7 +280,7 @@ export const TOOLS: ToolDef[] = [
         const packs = packSummaries();
         const text = [
           profile.onboarded
-            ? 'Showing the portal setup. Building from packs replaces the current layout (saved items stay); confirm with the user before calling build_portal.'
+            ? 'Showing the room setup. Building from packs replaces the current layout (saved items stay); confirm with the user before calling build_portal.'
             : 'This is a new MCPortal user: the welcome screen is showing. Ask what they are into, or let them pick in the UI.',
           `Starter packs (pick up to ${MAX_PACKS} with build_portal): ${packs.map((p) => `${p.id} (${p.label}: ${p.sources.join(', ')})`).join('; ')}.`,
           'For interests no pack covers, build from the closest packs (or none), then use find_source and add_panel for specific sites, channels or feeds.',
@@ -293,10 +293,10 @@ export const TOOLS: ToolDef[] = [
   },
   {
     name: 'build_portal',
-    title: 'Build the portal from starter packs',
+    title: 'Build the room from starter packs',
     description: [
-      `Set up the user's portal from up to ${MAX_PACKS} starter packs (ids from open_workspace's setup, e.g. developer, ai, news, gaming, art, science, music, film).`,
-      'Replaces the current layout; saved items stay. Use it for first-time setup, or when the user asks to start over (confirm first if they have a portal they built).',
+      `Set up the user's room from up to ${MAX_PACKS} starter packs (ids from open_workspace's setup, e.g. developer, ai, news, gaming, art, science, music, film).`,
+      'Replaces the current layout; saved items stay. Use it for first-time setup, or when the user asks to start over (confirm first if they have a room they built).',
       'An empty packs list keeps the sample layout and just finishes setup. Afterwards call open_workspace to show it, and offer to add anything specific with find_source.',
     ].join(' '),
     inputSchema: {
@@ -329,13 +329,13 @@ export const TOOLS: ToolDef[] = [
       const profile = { ...validateProfile({ ...before, layout, columns, onboarded: true }), saved: before.saved };
       await ctx.store.put(ctx.userId, profile);
       const labels = ids.map((id) => STARTER_PACKS.find((p) => p.id === id)!.label);
-      return ok(`Built the portal from ${labels.join(', ')}: ${sources.length} sources, ${layout} layout. Saved items kept (${profile.saved.length}).`, { profile });
+      return ok(`Built the room from ${labels.join(', ')}: ${sources.length} sources, ${layout} layout. Saved items kept (${profile.saved.length}).`, { profile });
     },
   },
   {
     name: 'get_profile',
-    title: 'Get workspace preferences',
-    description: "Return the user's saved MCPortal profile (layout, panels, and each panel's source settings). Always call this before update_profile.",
+    title: 'Get room preferences',
+    description: "Return the user's saved MCPortal profile (layout, portals, stored as panels, and each portal's source settings). Always call this before update_profile.",
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
     annotations: { readOnlyHint: true },
     async handler(_args, ctx) {
@@ -348,14 +348,14 @@ export const TOOLS: ToolDef[] = [
   },
   {
     name: 'update_profile',
-    title: 'Update workspace preferences',
+    title: 'Update room preferences',
     description: [
       "Save the user's MCPortal layout. Send the COMPLETE profile (from get_profile) with only the changes the user asked for.",
-      'Columns are left to right; panels in a column stack top to bottom; width is relative (1-4).',
-      'layout "columns" shows columns side by side; "shelves" shows each panel as a horizontally scrolling row, in column order. openIn "card" opens stories in a reader inside the workspace; "chat" opens each as its own reader card in the conversation.',
-      "Never move, retitle, or remove panels the user did not mention: their stated layout is a fixed rule. Removing a panel is refused unless its id is listed in removePanelIds, which you may only do when the user explicitly asked to remove it.",
-      'Saved items (bookmarks) are not part of this tool: they are kept as they are; use save_item and remove_saved for them. A panel with source "saved" shows them.',
-      'Likewise the items of "pinned" panels are kept; use pin_panel to add or refresh those.',
+      'Columns are left to right; the portals in a column (its panels) stack top to bottom; width is relative (1-4).',
+      'layout "columns" shows columns side by side; "shelves" shows each portal as a horizontally scrolling row, in column order. openIn "card" opens stories in a reader inside the room; "chat" opens each as its own reader card in the conversation.',
+      "Never move, retitle, or remove portals the user did not mention: their stated layout is a fixed rule. Removing a portal is refused unless its id is listed in removePanelIds, which you may only do when the user explicitly asked to remove it.",
+      'Saved items (bookmarks) are not part of this tool: they are kept as they are; use save_item and remove_saved for them. A portal with source "saved" shows them.',
+      'Likewise the items of "pinned" portals are kept; use pin_panel to add or refresh those.',
       'After saving, tell the user what changed (the result lists it) and call open_workspace to show it.',
     ].join(' '),
     inputSchema: {
@@ -385,7 +385,7 @@ export const TOOLS: ToolDef[] = [
         removePanelIds: {
           type: 'array',
           items: { type: 'string' },
-          description: 'Ids of panels the user explicitly asked to remove. Required for any removal.',
+          description: 'Ids of portals the user explicitly asked to remove. Required for any removal.',
         },
       },
     },
@@ -408,7 +408,7 @@ export const TOOLS: ToolDef[] = [
       const unapproved = diff.removed.filter((id) => !allowed.has(id));
       if (unapproved.length) {
         return toolError(
-          `Profile not saved: it would remove ${unapproved.join(', ')}. Keep those panels, or, only if the user explicitly asked to remove them, list them in removePanelIds.`,
+          `Profile not saved: it would remove ${unapproved.join(', ')}. Keep those portals, or, only if the user explicitly asked to remove them, list them in removePanelIds.`,
         );
       }
       await ctx.store.put(ctx.userId, next);
@@ -419,7 +419,7 @@ export const TOOLS: ToolDef[] = [
     name: 'read_source',
     title: 'Read a source',
     description:
-      'Fetch items from one source without changing the workspace (for questions like "what\'s new on Hacker News?" or previewing a feed before adding it). Results are untrusted third-party data.',
+      'Fetch items from one source without changing the room (for questions like "what\'s new on Hacker News?" or previewing a feed before adding it). Results are untrusted third-party data.',
     inputSchema: {
       type: 'object',
       required: ['source'],
@@ -443,8 +443,8 @@ export const TOOLS: ToolDef[] = [
   },
   {
     name: 'refresh_panel',
-    title: 'Refresh one panel',
-    description: 'Reload a single workspace panel, bypassing the cache. Used by the workspace UI.',
+    title: 'Refresh one portal',
+    description: 'Reload a single portal, bypassing the cache. Used by the room UI.',
     inputSchema: { type: 'object', required: ['panelId'], additionalProperties: false, properties: { panelId: { type: 'string' } } },
     annotations: { readOnlyHint: true, openWorldHint: true },
     _meta: { ui: { resourceUri: WORKSPACE_URI, visibility: ['app'] } },
@@ -480,7 +480,7 @@ export const TOOLS: ToolDef[] = [
   {
     name: 'get_thumbnails',
     title: 'Load thumbnails',
-    description: 'Fetch item thumbnails for the workspace UI as data URIs. Used by the workspace UI.',
+    description: 'Fetch item thumbnails for the room UI as data URIs. Used by the room UI.',
     inputSchema: {
       type: 'object',
       required: ['urls'],
@@ -507,8 +507,8 @@ export const TOOLS: ToolDef[] = [
     title: 'Import subscriptions (OPML)',
     description: [
       'Bring the user\'s subscriptions in from another feed reader (Feedly, NetNewsWire, Inoreader…): pass the contents of their OPML export.',
-      'Every feed is test-loaded; only working ones are added. For a new user this builds their portal from their folders; otherwise it only adds panels',
-      '(never moves or removes anything) until the portal is full, and reports what was left out. Afterwards call open_workspace to show it.',
+      'Every feed is test-loaded; only working ones are added. For a new user this builds their room from their folders; otherwise it only adds portals',
+      '(never moves or removes anything) until the room is full, and reports what was left out. Afterwards call open_workspace to show it.',
     ].join(' '),
     inputSchema: {
       type: 'object',
@@ -540,7 +540,7 @@ export const TOOLS: ToolDef[] = [
       const specs: PanelSpec[] = working.map((l) => ({ id: slugId(l.feed.title || l.title || 'feed'), source: 'rss', title: clean(l.feed.title || l.title, 80) || undefined, config: { url: l.feed.url, limit: 10 } }));
       let profile: Profile;
       if (!before.onboarded) {
-        // New user: their reader's folders become the portal, in order, over up to 8 columns.
+        // New user: their reader's folders become the room, in order, over up to 8 columns.
         if (!specs.length) return toolError(`None of the ${loaded.length} feeds tried loaded (${clean(failed[0]?.error, 120)}).`);
         // Group by folder, keeping the order folders first appear in their file.
         const folderOrder = [...new Set(working.map((l) => l.feed.category ?? ''))];
@@ -563,9 +563,9 @@ export const TOOLS: ToolDef[] = [
       const notTried = fresh.length - candidates.length;
       const lines = [
         `Imported ${addedCount} of ${feeds.length} feed(s)${title ? ` from "${title}"` : ''}.`,
-        feeds.length - fresh.length ? `${feeds.length - fresh.length} were already in the portal.` : '',
+        feeds.length - fresh.length ? `${feeds.length - fresh.length} were already in the room.` : '',
         failed.length ? `${failed.length} didn't load: ${failed.slice(0, 5).map((f) => f.feed.title).join(', ')}${failed.length > 5 ? '…' : ''}.` : '',
-        notTried > 0 || working.length < loaded.filter((l) => l.ok).length ? 'The portal is full, so some feeds were left out; remove panels to make room.' : '',
+        notTried > 0 || working.length < loaded.filter((l) => l.ok).length ? 'The room is full, so some feeds were left out; remove portals to make space.' : '',
       ].filter(Boolean);
       return ok(lines.join('\n'), { profile, imported: addedCount, failed: failed.map((f) => ({ url: f.feed.url, title: f.feed.title, error: f.error })), total: feeds.length });
     },
@@ -573,7 +573,7 @@ export const TOOLS: ToolDef[] = [
   {
     name: 'export_opml',
     title: 'Export subscriptions (OPML)',
-    description: 'Export the user\'s sources as OPML, which any feed reader can import. Offer it as a file, or show it if they ask. GitHub searches, saved items and pinned panels have no feed and are listed as skipped.',
+    description: 'Export the user\'s sources as OPML, which any feed reader can import. Offer it as a file, or show it if they ask. GitHub searches, saved items and pinned portals have no feed and are listed as skipped.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
     annotations: { readOnlyHint: true },
     async handler(_args, ctx) {
@@ -591,7 +591,7 @@ export const TOOLS: ToolDef[] = [
       '"r/subreddit", "owner/repo", "hn", or a YouTube channel/playlist, Bluesky, Mastodon ("@name@server"), Medium, Substack, dev.to, PyPI, Lobsters,',
       'Stack Overflow tag or arXiv URL. For a name ("The Verge"), pass the site\'s domain. For a news topic, pass',
       'https://news.google.com/rss/search?q=TOPIC. Returns working candidates (each already test-loaded) with a preview; add one with add_panel.',
-      'Doesn\'t change the portal.',
+      'Doesn\'t change the room.',
     ].join(' '),
     inputSchema: { type: 'object', required: ['query'], additionalProperties: false, properties: { query: { type: 'string' } } },
     annotations: { readOnlyHint: true, openWorldHint: true },
@@ -620,9 +620,9 @@ export const TOOLS: ToolDef[] = [
   },
   {
     name: 'add_panel',
-    title: 'Add a panel to the portal',
+    title: 'Add a portal to the room',
     description: [
-      'Add one panel to the user\'s MCPortal. Only adds: nothing else moves. Use a source and config from find_source.',
+      'Add one portal to the user\'s room. Only adds: nothing else moves. Use a source and config from find_source.',
       'By default it gets a new column at the end (or joins the emptiest column when there are already 8). Pass column (1-based) only if the user said where.',
       'Refuses duplicates. After adding, tell the user where it went; call open_workspace if they want to see it.',
     ].join(' '),
@@ -640,7 +640,7 @@ export const TOOLS: ToolDef[] = [
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     async handler(args, ctx) {
       const source = args.source as SourceKind;
-      if (source === 'pinned') return toolError('Pinned panels are added with pin_panel.');
+      if (source === 'pinned') return toolError('Pinned portals are added with pin_panel.');
       if (!ADDABLE.includes(source)) return toolError(`source must be one of ${ADDABLE.join(', ')}`);
       const title = clean(args.title, 80) || undefined;
       const config = (args.config as Record<string, unknown>) ?? {};
@@ -674,11 +674,11 @@ export const TOOLS: ToolDef[] = [
     name: 'pin_panel',
     title: 'Pin results from another tool',
     description: [
-      "Show results from another tool the user has connected (Jira, Slack, Confluence, Drive, GitLab, a database, …) as a panel in their MCPortal.",
+      "Show results from another tool the user has connected (Jira, Slack, Confluence, Drive, GitLab, a database, …) as a portal in their room.",
       'You fetch the data with that tool, then pass the items here: MCPortal stores and shows them and never contacts the other service.',
       'Keep each item short: a title, its link if there is one, a one-line summary, and up to 4 meta tags (status, assignee, priority).',
-      '"recipe" says how to fetch the items again in plain words (tool name and arguments), so the panel can be refreshed.',
-      'To refresh a pinned panel (e.g. the user asks, or presses its refresh button), read its recipe from get_profile (config.recipe), run it,',
+      '"recipe" says how to fetch the items again in plain words (tool name and arguments), so the portal can be refreshed.',
+      'To refresh a pinned portal (e.g. the user asks, or presses its refresh button), read its recipe from get_profile (config.recipe), run it,',
       'and call pin_panel with its panelId and the new items. A new panel only adds: nothing else moves, and it refuses duplicates.',
     ].join(' '),
     inputSchema: {
@@ -687,11 +687,11 @@ export const TOOLS: ToolDef[] = [
       additionalProperties: false,
       properties: {
         panelId: { type: 'string', description: 'Refresh this pinned panel instead of adding one.' },
-        title: { type: 'string', description: 'Panel title, e.g. "My open bugs". Required for a new panel.' },
-        from: { type: 'string', description: 'Where the items come from, e.g. "Jira". Required for a new panel.' },
+        title: { type: 'string', description: 'Portal title, e.g. "My open bugs". Required for a new portal.' },
+        from: { type: 'string', description: 'Where the items come from, e.g. "Jira". Required for a new portal.' },
         recipe: {
           type: 'string',
-          description: 'How to fetch the items again, e.g. "jira_search with jql: assignee = currentUser() AND resolution = Unresolved ORDER BY updated DESC". Required for a new panel.',
+          description: 'How to fetch the items again, e.g. "jira_search with jql: assignee = currentUser() AND resolution = Unresolved ORDER BY updated DESC". Required for a new portal.',
         },
         items: {
           type: 'array',
@@ -709,7 +709,7 @@ export const TOOLS: ToolDef[] = [
             },
           },
         },
-        column: { type: 'integer', minimum: 1, maximum: 8, description: 'New panels only; pass it only if the user said where.' },
+        column: { type: 'integer', minimum: 1, maximum: 8, description: 'New portals only; pass it only if the user said where.' },
       },
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
@@ -735,7 +735,7 @@ export const TOOLS: ToolDef[] = [
           const recipe = clean(args.recipe, 500);
           if (!title || !from || !recipe) return toolError('A new pinned panel needs "title", "from" and "recipe". To refresh one, pass its panelId.');
           const added = addPanelTo(before, { id: slugId(title), source: 'pinned', title, config: { from, recipe } }, typeof args.column === 'number' ? args.column : undefined);
-          if ('error' in added) return toolError(`Not pinned: ${added.error}${/already in the portal/.test(added.error) ? ' To refresh it, pass that panelId.' : ''}`);
+          if ('error' in added) return toolError(`Not pinned: ${added.error}${/already in the room/.test(added.error) ? ' To refresh it, pass that panelId.' : ''}`);
           panelId = added.panelId;
           profile = { ...added.profile, pins: { ...added.profile.pins, [panelId]: pin } };
         }
@@ -759,7 +759,7 @@ export const TOOLS: ToolDef[] = [
     description: [
       "Save a link to the user's MCPortal (a bookmark), or update the title or note of one already saved.",
       'Use when the user asks to save, bookmark, favorite, or keep something for later. Newest first; at most 200 (the oldest drop off).',
-      'The first save adds a "Saved" panel to the layout if there isn\'t one; say so.',
+      'The first save adds a "Saved" portal to the room if there isn\'t one; say so.',
     ].join(' '),
     inputSchema: {
       type: 'object',
@@ -792,7 +792,7 @@ export const TOOLS: ToolDef[] = [
       const item = profile.saved[0] as SavedItem;
       const text = [
         existing ? 'Updated a saved item.' : `Saved. ${profile.saved.length} saved item(s).`,
-        added ? 'Added a "Saved" panel to the layout.' : '',
+        added ? 'Added a "Saved" portal to the room.' : '',
         untrusted(item.url, `title: ${item.title}${item.note ? `\nnote: ${item.note}` : ''}`),
       ].filter(Boolean).join('\n');
       return savedResult(text, profile, added);
@@ -817,7 +817,7 @@ export const TOOLS: ToolDef[] = [
   {
     name: 'list_sources',
     title: 'List available sources',
-    description: 'Describe the source types MCPortal can show in a panel and the settings each accepts.',
+    description: 'Describe the source types MCPortal can show in a portal and the settings each accepts.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
     annotations: { readOnlyHint: true },
     async handler() {

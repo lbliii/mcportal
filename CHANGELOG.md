@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Vocabulary
+- **Room and portals:** your whole setup is now your **room**, and each window onto a source is a **portal** (it was called a panel). The app, tool descriptions, server instructions, skill, web pages and README use the new words. "Open my portal" still opens the room. Tool names and stored data are unchanged for now; see the glossary and rename plan in [docs/product-map.md](docs/product-map.md).
+- **Product map:** [docs/product-map.md](docs/product-map.md) maps every vertical, feature, component, variant and primitive.
+
 ### Clips
 - **Keep things from the conversation:** say “clip that” and Claude saves a quote, an exchange (verbatim), a note, a table, an image (an SVG, PNG, JPEG or WebP chart or diagram) or a link, with a title, note and tags (`clip`).
 - **Find them in later chats:** `search_clips` by words, kind or tag, and `get_clip` shows one as its own clip card. `update_clip` and `delete_clip` edit and remove them.

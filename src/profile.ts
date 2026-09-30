@@ -69,7 +69,7 @@ export interface Profile {
   saved: SavedItem[];
   /** Items of pinned panels, by panel id. Only pin_panel changes them; update_profile carries them over. */
   pins: Record<string, PinnedData>;
-  /** False only for a brand-new user who hasn't picked their portal yet (shows the welcome). */
+  /** False only for a brand-new user who hasn't set up their room yet (shows the welcome). */
   onboarded: boolean;
   updatedAt: string;
 }
@@ -339,12 +339,12 @@ export function diffProfiles(before: Profile, after: Profile): ProfileDiff {
 
 export function describeDiff(diff: ProfileDiff): string {
   const parts = (Object.entries(diff) as Array<[string, string[]]>).filter(([, v]) => v.length).map(([k, v]) => `${k}: ${v.join(', ')}`);
-  return parts.length ? parts.join('; ') : 'no panel changes';
+  return parts.length ? parts.join('; ') : 'no portal changes';
 }
 
 /** A short, human-readable description of the layout, for the model and for diffs. */
 export function describeLayout(profile: Profile): string {
-  const mode = `${profile.layout} layout, stories open in ${profile.openIn === 'chat' ? 'their own chat card' : 'the workspace'}, ${profile.saved.length} saved`;
+  const mode = `${profile.layout} layout, stories open in ${profile.openIn === 'chat' ? 'their own chat card' : 'the room'}, ${profile.saved.length} saved`;
   return `${mode}; ` + profile.columns
     .map((c, i) => `column ${i + 1} (width ${c.width}): ${c.panels.map((p) => `${p.title ?? p.id} [${p.source}]`).join(' / ')}`)
     .join('; ');

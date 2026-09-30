@@ -16,7 +16,7 @@ export const DEFAULT_SUPPORT_URL = 'https://github.com/lbliii/mcportal/issues';
 const POLICY_UPDATED = '2026-09-30';   // bump when what's stored changes
 const IMAGE_DIR = fileURLToPath(new URL('./site/', import.meta.url));
 const TAGLINE = 'Your liminal webspace.';
-const DESCRIPTION = 'MCPortal is a reading portal that lives in your agent: the sites, feeds, channels and repos you follow, one door away.';
+const DESCRIPTION = 'MCPortal is a reading room that lives in your agent: the sites, feeds, channels and repos you follow, one door away.';
 
 /** Every file served from src/site, by URL path. Nothing else in that folder is reachable. */
 const FILES: Record<string, { file: string; type: string; maxAge: number }> = {
@@ -81,8 +81,8 @@ function landing(site: SiteConfig): string {
     : '<p>Anyone with a GitHub account can sign in.</p>';
   return layout(`MCPortal: ${TAGLINE}`, `
 <h1>${TAGLINE}</h1>
-<p class="lede">MCPortal is a reading portal that lives in your agent. Ask for the sites, subreddits, YouTube channels, GitHub repos and feeds you follow, and they open right in the conversation, one door away. Then read, save and talk about what you find without leaving the chat.</p>
-<figure><img src="/site/columns.png" alt="An MCPortal workspace in Claude: columns of Hacker News, GitHub releases and blog posts, side by side" width="1600" height="666"><figcaption>Columns: each source scrolls on its own.</figcaption></figure>
+<p class="lede">MCPortal is a reading room that lives in your agent. Ask for the sites, subreddits, YouTube channels, GitHub repos and feeds you follow, and they open right in the conversation, one door away. Then read, save and talk about what you find without leaving the chat.</p>
+<figure><img src="/site/columns.png" alt="An MCPortal room in Claude: columns of Hacker News, GitHub releases and blog posts, side by side" width="1600" height="666"><figcaption>Columns: each source scrolls on its own.</figcaption></figure>
 
 <h2>How it works</h2>
 <ul class="steps">
@@ -98,7 +98,7 @@ function landing(site: SiteConfig): string {
 
 <h2>Get it</h2>
 ${access}
-<div class="card"><p style="margin:0">In Claude, open <b>Settings → Connectors</b>, add a custom connector with this URL, and sign in with GitHub. Then ask <i>“open my portal”</i>.</p><p style="margin:8px 0 0"><code>${mcp}</code></p></div>
+<div class="card"><p style="margin:0">In Claude, open <b>Settings → Connectors</b>, add a custom connector with this URL, and sign in with GitHub. Then ask <i>“open my room”</i>.</p><p style="margin:8px 0 0"><code>${mcp}</code></p></div>
 <p class="muted">Prefer to run it yourself? MCPortal also runs locally as a Claude Code plugin with no account. See the <a href="https://github.com/lbliii/mcportal">source</a>.</p>`, site);
 }
 
@@ -109,7 +109,7 @@ function privacy(site: SiteConfig): string {
 <h1>Privacy policy</h1>
 <p class="muted">Last updated ${POLICY_UPDATED}. This policy covers the MCPortal service at <code>${escapeHtml(site.publicUrl)}</code>, which is run by ${who}.</p>
 
-<p>Here's the short version. MCPortal stores your GitHub user ID and login, your portal (layout, sources, saved items and clips), a public profile, shares and follows only if you use them, and short-lived sign-in tokens. It doesn't store your email, your name or your GitHub password. It has no ads, trackers or analytics, and it doesn't sell or share your data.</p>
+<p>Here's the short version. MCPortal stores your GitHub user ID and login, your room (layout, sources, saved items and clips), a public profile, shares and follows only if you use them, and short-lived sign-in tokens. It doesn't store your email, your name or your GitHub password. It has no ads, trackers or analytics, and it doesn't sell or share your data.</p>
 
 <h2>What MCPortal stores</h2>
 <table>
@@ -132,8 +132,8 @@ function privacy(site: SiteConfig): string {
 <p>MCPortal asks GitHub for the <code>read:user</code> scope and reads your user ID and login once, when you sign in. It then discards the GitHub token. It can't see your repositories, email or anything else in your GitHub account.</p>
 
 <h2>What MCPortal sends to other sites</h2>
-<p>When your portal loads, MCPortal's server fetches the feeds, articles and thumbnails you asked for. Those sites see the server's address, not yours. Fetched content is cached in the server's memory for between two minutes and one day, and is shared across users because it's the same public content. It isn't written to the database. When you choose to open an original story or its discussion, your browser goes to that site directly, and that site's own privacy policy applies.</p>
-<p>When you use MCPortal in Claude, what you see in your portal is also available to Claude, and Anthropic's privacy policy covers your conversations.</p>
+<p>When your room loads, MCPortal's server fetches the feeds, articles and thumbnails you asked for. Those sites see the server's address, not yours. Fetched content is cached in the server's memory for between two minutes and one day, and is shared across users because it's the same public content. It isn't written to the database. When you choose to open an original story or its discussion, your browser goes to that site directly, and that site's own privacy policy applies.</p>
+<p>When you use MCPortal in Claude, what you see in your room is also available to Claude, and Anthropic's privacy policy covers your conversations.</p>
 
 <h2>What other people see</h2>
 <p>Nothing, unless you choose. With a public profile, you have a space: signed-in MCPortal users can open it to see your handle, name, bio, space title, the sources you chose to feature, your follower count, and the shares you made for them (your followers, or everyone). Shares are never published to the open web. Admins can see reported shares and profiles, and can hide a share or suspend an account.</p>
@@ -152,7 +152,7 @@ function privacy(site: SiteConfig): string {
   <li><b>See and change your data:</b> ask Claude to show your portal settings, change them, or remove saved items at any time.</li>
   <li><b>Take it with you:</b> ask Claude to export your data, or download it from your <a href="/account">account page</a>: everything as one file another MCPortal can import, saved items as a bookmarks file, clips as Markdown, and sources as OPML.</li>
   <li><b>Delete clips, shares or your public profile, or block someone:</b> ask Claude at any time. Removing your public profile hides your shares from everyone.</li>
-  <li><b>Delete your account:</b> sign in on your <a href="/account">account page</a> and delete it. Your account, portal, saved items, clips, public profile, shares and follows are deleted at once, and you're signed out everywhere. Backups roll over within 30 days.</li>
+  <li><b>Delete your account:</b> sign in on your <a href="/account">account page</a> and delete it. Your account, room, saved items, clips, public profile, shares and follows are deleted at once, and you're signed out everywhere. Backups roll over within 30 days.</li>
   <li><b>Disconnect:</b> remove MCPortal from Claude's connectors. You can also revoke it on GitHub under Settings → Applications.</li>
 </ul>
 
@@ -173,12 +173,12 @@ function support(site: SiteConfig): string {
 <p>Found a bug, need a hand, or want your account deleted? Get in touch at <a href="${url}">${url}</a>. Please don't include tokens or other secrets.</p>
 
 <h2>Common questions</h2>
-<h3>How do I open my portal?</h3>
-<p>In a chat with MCPortal connected, ask <i>“open my portal”</i>. The first time, pick a few starter packs or tell Claude what you like to read.</p>
+<h3>How do I open my room?</h3>
+<p>In a chat with MCPortal connected, ask <i>“open my room”</i> (or “open my portal”). The first time, pick a few starter packs or tell Claude what you like to read.</p>
 <h3>How do I add a site?</h3>
-<p>Ask Claude to add it, or use the <b>+</b> button in the portal. Paste a web address, a feed, <code>r/subreddit</code>, <code>owner/repo</code>, or a YouTube, Bluesky or Mastodon address. MCPortal finds a feed that works and shows you a preview.</p>
-<h3>A panel says it couldn't load.</h3>
-<p>Some sites block requests from cloud servers or stop publishing their feed. Try refreshing the panel. If it keeps failing, ask Claude to find another feed for that site.</p>
+<p>Ask Claude to add it, or use the <b>+</b> button in your room. Paste a web address, a feed, <code>r/subreddit</code>, <code>owner/repo</code>, or a YouTube, Bluesky or Mastodon address. MCPortal finds a feed that works and shows you a preview.</p>
+<h3>A portal says it couldn't load.</h3>
+<p>Some sites block requests from cloud servers or stop publishing their feed. Try refreshing the portal. If it keeps failing, ask Claude to find another feed for that site.</p>
 <h3>Claude says my organization doesn't allow custom connectors.</h3>
 <p>Some work and school accounts block connectors that aren't in Claude's directory. Until MCPortal is listed there, use a personal Claude account, or ask your admin.</p>
 <h3>I got “sign-in isn't allowed for this account”.</h3>

@@ -64,7 +64,7 @@ export const CLIP_TOOLS: ToolDef[] = [
       `image: svg (markup) or image (a data: URI of a PNG, JPEG or WebP, up to ${CLIP_LIMITS.image / 1000} KB), for a chart or diagram already made in the chat;`,
       'link: url.',
       'Give a short title, the user\'s own words as note if they said why, and tags if they named any. source says where it came from ({ kind: "article", url, title } for an article).',
-      'The first clip adds a "Clips" panel to the layout if there isn\'t one; say so.',
+      'The first clip adds a "Clips" portal to the room if there isn\'t one; say so.',
     ].join(' '),
     inputSchema: {
       type: 'object',
@@ -115,7 +115,7 @@ export const CLIP_TOOLS: ToolDef[] = [
       const summary = summaryOf(clip);
       const text = [
         `Clipped "${clip.title}" (id ${clip.id}, ${clip.kind}). ${count} clip(s).`,
-        added ? 'Added a "Clips" panel to the layout.' : '',
+        added ? 'Added a "Clips" portal to the room.' : '',
         untrusted(sourceLabel(clip), summaryLine(summary)),
       ].filter(Boolean).join('\n');
       return ok(text, { clip: summary, profile, layoutChanged: added, panels: await clipPanels(ctx, profile) });
@@ -160,7 +160,7 @@ export const CLIP_TOOLS: ToolDef[] = [
   {
     name: 'get_clip',
     title: 'Show a clip',
-    description: "Show one of the user's clips in full, as a card in the conversation (\"show me that table\"). Get the id from search_clips or the Clips panel.",
+    description: "Show one of the user's clips in full, as a card in the conversation (\"show me that table\"). Get the id from search_clips or the Clips portal.",
     inputSchema: { type: 'object', required: ['id'], additionalProperties: false, properties: { id: { type: 'string' } } },
     annotations: { readOnlyHint: true },
     _meta: { ui: { resourceUri: WORKSPACE_URI } },

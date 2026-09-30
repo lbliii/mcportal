@@ -89,7 +89,7 @@ test('the first clip adds a Clips panel once, and open_workspace shows clips', a
   const c = ctx();
   const first = await call(c, 'clip', { kind: 'quote', text: 'one' });
   assert.equal(first.structuredContent.layoutChanged, true);
-  assert.match(first.content[0]!.text, /Added a "Clips" panel/);
+  assert.match(first.content[0]!.text, /Added a "Clips" portal/);
   const second = await call(c, 'clip', { kind: 'quote', text: 'two' });
   assert.equal(second.structuredContent.layoutChanged, false);
   const profile = await c.store.get('u1');

@@ -253,8 +253,8 @@
   <button class="ib ws-only" id="btnSpace" data-icon="space" title="Your space: what people who follow you see" aria-label="Open your space"></button>
   <button class="ib ws-only" id="btnAdd" data-icon="plus" aria-pressed="false" title="Add a source: any site, feed, subreddit, YouTube channel or repo" aria-label="Add a source"></button>
   <button class="ib ws-only" id="btnOpenIn" data-icon="chat" aria-pressed="false" title="Open stories as their own card in the conversation" aria-label="Open stories in chat" hidden></button>
-  <button class="ib ws-only" id="btnSources" data-icon="sources" aria-pressed="false" title="Show where each panel's data came from" aria-label="Show sources"></button>
-  <button class="ib ws-only" id="btnRefresh" data-icon="refresh" title="Refresh all panels" aria-label="Refresh all panels"></button>
+  <button class="ib ws-only" id="btnSources" data-icon="sources" aria-pressed="false" title="Show where each portal's data came from" aria-label="Show sources"></button>
+  <button class="ib ws-only" id="btnRefresh" data-icon="refresh" title="Refresh all portals" aria-label="Refresh all portals"></button>
   <button class="ib" id="btnExpand" data-icon="expand" title="Fullscreen" aria-label="Fullscreen"></button>
 </header>
 <section id="addSheet" class="add-sheet ws-only" hidden>
@@ -381,7 +381,7 @@
       else if (data && data.clip && data.clip.data) { gotInitialResult = true; showClipCard(data.clip); }
       else if (data && data.article) { gotInitialResult = true; showArticleCard(data.article, data.saved); }
       else if (data && data.profile && data.panels) { gotInitialResult = true; renderWorkspace(data); }
-      else if (params.isError) setStatus('The workspace could not load');
+      else if (params.isError) setStatus('Your room could not load');
     } else if (method === 'ui/notifications/host-context-changed') {
       applyHostContext(params);
     } else if (method === 'ui/notifications/tool-cancelled') {
@@ -504,7 +504,7 @@
     $('wsName').textContent = rebuilding ? '· start over' : '· welcome';
     setStatus('');
     const chosen = new Set();
-    const build = el('button', { class: 'btn primary', disabled: true, onclick: () => buildPortal([...chosen]) }, 'Build my portal');
+    const build = el('button', { class: 'btn primary', disabled: true, onclick: () => buildPortal([...chosen]) }, 'Build my room');
     const cards = packs.map((p) => el('button', {
       class: 'pack', 'aria-pressed': 'false', title: p.sources.join(' · '),
       onclick: (e) => {
@@ -513,7 +513,7 @@
         card.setAttribute('aria-pressed', String(chosen.has(p.id)));
         for (const c of cards) if (c.getAttribute('aria-pressed') !== 'true') c.disabled = chosen.size >= maxPacks;
         build.disabled = !chosen.size;
-        build.textContent = chosen.size ? `Build my portal (${chosen.size})` : 'Build my portal';
+        build.textContent = chosen.size ? `Build my room (${chosen.size})` : 'Build my room';
       },
     }, el('span', { class: 'tick', 'aria-hidden': 'true' }, icon('check')),
       el('span', { class: 'pl' }, p.label), el('span', { class: 'pb' }, p.blurb), el('span', { class: 'ps' }, p.sources.join(' · '))));
@@ -531,8 +531,8 @@
       $('brandBadge').content.firstElementChild.cloneNode(true),
       el('h1', null, rebuilding ? 'Start over' : 'Make it yours'),
       el('p', { class: 'lede' }, rebuilding
-        ? `Pick up to ${maxPacks} packs to rebuild your portal. This replaces your current layout; your saved items stay.`
-        : `Pick up to ${maxPacks} things you're into. MCPortal builds your portal from sources that work, and you can change anything later.`),
+        ? `Pick up to ${maxPacks} packs to rebuild your room. This replaces your current layout; your saved items stay.`
+        : `Pick up to ${maxPacks} things you're into. MCPortal builds your room from sources that work, and you can change anything later.`),
       el('div', { class: 'packs' }, cards),
       el('div', { class: 'welcome-actions' }, build,
         rebuilding
@@ -547,7 +547,7 @@
   }
 
   async function buildPortal(packIds) {
-    const note = el('div', { class: 'building' }, packIds.length ? 'Assembling your portal…' : 'Opening the sample…');
+    const note = el('div', { class: 'building' }, packIds.length ? 'Assembling your room…' : 'Opening the sample…');
     $('welcome').append(note);
     for (const b of $('welcome').querySelectorAll('button')) b.disabled = true;
     try {
@@ -748,8 +748,8 @@
     const on = state.saved.has(item.url);
     return el('button', {
       class: cls, 'data-save-url': item.url, 'aria-pressed': String(on),
-      title: on ? 'Saved (click to remove)' : 'Save to your portal',
-      'aria-label': on ? 'Remove from saved' : 'Save to your portal',
+      title: on ? 'Saved (click to remove)' : 'Save to your room',
+      'aria-label': on ? 'Remove from saved' : 'Save to your room',
       onclick: (e) => { e.stopPropagation(); toggleSaved(item, source); },
     }, icon('bookmark'));
   }
@@ -758,8 +758,8 @@
     for (const b of document.querySelectorAll('[data-save-url]')) {
       const on = state.saved.has(b.dataset.saveUrl);
       b.setAttribute('aria-pressed', String(on));
-      b.title = on ? 'Saved (click to remove)' : 'Save to your portal';
-      b.setAttribute('aria-label', on ? 'Remove from saved' : 'Save to your portal');
+      b.title = on ? 'Saved (click to remove)' : 'Save to your room';
+      b.setAttribute('aria-label', on ? 'Remove from saved' : 'Save to your room');
     }
   }
 
@@ -776,7 +776,7 @@
       if (state.profile) {
         state.profile = { ...state.profile, ...data.profile };
         if (data.panel) state.panels.set(data.panel.panelId, data.panel);
-        if (data.layoutChanged) { drawLayout(); toast('Saved. Your portal now has a Saved panel.'); }
+        if (data.layoutChanged) { drawLayout(); toast('Saved. Your room now has a Saved portal.'); }
         else if (data.panel) {
           const node = document.querySelector(`[data-panel="${CSS.escape(data.panel.panelId)}"]`);
           if (node) node.replaceWith(renderPanel(data.panel.panelId));
@@ -888,7 +888,7 @@
           input.focus();
           return;
         }
-        $('grid').replaceChildren(el('div', { class: 'panel', style: 'flex:1' }, el('div', { class: 'error' }, `Couldn't open the workspace: ${error.message}`)));
+        $('grid').replaceChildren(el('div', { class: 'panel', style: 'flex:1' }, el('div', { class: 'error' }, `Couldn't open your room: ${error.message}`)));
       } finally {
         loading = null;
       }
@@ -983,7 +983,7 @@
   }
   function readerTop(url, withBack, title) {
     return el('div', { class: 'reader-top' },
-      withBack ? iconButton('back', 'Back to the workspace', closeReader, 'ib') : null,
+      withBack ? iconButton('back', 'Back to your room', closeReader, 'ib') : null,
       iconButton('external', 'Open the original', () => openLink(url), 'ib'),
       title ? saveButton({ url, title }, 'reader', 'ib save') : null);
   }
@@ -1015,7 +1015,7 @@
     const src = clip.source || {};
     const from = src.url ? (src.title || new URL(src.url).hostname) : src.kind === 'conversation' ? 'a conversation' : (src.title || '');
     const top = el('div', { class: 'reader-top' },
-      withBack ? iconButton('back', 'Back to the workspace', closeReader, 'ib') : null,
+      withBack ? iconButton('back', 'Back to your room', closeReader, 'ib') : null,
       src.url && isHttpUrl(src.url) ? iconButton('external', 'Open where it came from', () => openLink(src.url), 'ib') : null);
     return [top, el('h1', null, clip.title),
       el('div', { class: 'byline' }, [`${clip.kind[0].toUpperCase()}${clip.kind.slice(1)}`, from ? `from ${from}` : '', `clipped ${ago(clip.createdAt)}`].filter(Boolean).join(' · ')),
@@ -1052,7 +1052,7 @@
   async function openClip(item) {
     const reader = $('reader');
     $('grid').hidden = true; reader.hidden = false; reader.scrollTop = 0; window.scrollTo(0, 0);
-    reader.replaceChildren(el('div', { class: 'reader-top' }, iconButton('back', 'Back to the workspace', closeReader, 'ib')), el('h1', null, item.title), el('div', { class: 'byline' }, 'Loading…'));
+    reader.replaceChildren(el('div', { class: 'reader-top' }, iconButton('back', 'Back to your room', closeReader, 'ib')), el('h1', null, item.title), el('div', { class: 'byline' }, 'Loading…'));
     try {
       const clip = (await callTool('get_clip', { id: item.clip.id })).structuredContent.clip;
       reader.replaceChildren(...clipNodes(clip, true));
@@ -1063,7 +1063,7 @@
         }, 5000).catch(() => {});
       }
     } catch (error) {
-      reader.replaceChildren(el('div', { class: 'reader-top' }, iconButton('back', 'Back to the workspace', closeReader, 'ib')), el('h1', null, item.title),
+      reader.replaceChildren(el('div', { class: 'reader-top' }, iconButton('back', 'Back to your room', closeReader, 'ib')), el('h1', null, item.title),
         el('div', { class: 'error' }, `That clip isn't available (${error.message}).`));
     }
   }
@@ -1092,7 +1092,7 @@
   function openComposer(item) {
     const reader = $('reader');
     $('grid').hidden = true; reader.hidden = false; reader.scrollTop = 0; window.scrollTo(0, 0);
-    reader.replaceChildren(el('div', { class: 'reader-top' }, iconButton('back', 'Back to the workspace', closeReader, 'ib')),
+    reader.replaceChildren(el('div', { class: 'reader-top' }, iconButton('back', 'Back to your room', closeReader, 'ib')),
       el('h1', null, item.title), el('div', { class: 'byline' }, item.url), composer({ savedUrl: item.url }, item.title));
   }
 
@@ -1146,7 +1146,7 @@
         el('div', { class: 'st' }, el('div', null, src.title), el('div', null, src.source === 'rss' ? (() => { try { return new URL(src.config.url).hostname.replace(/^www\./, ''); } catch { return 'feed'; } })() : src.source === 'hn' ? 'Hacker News' : 'GitHub')), add);
     });
     return [
-      withBack ? el('div', { class: 'reader-top' }, iconButton('back', 'Back to the workspace', back || closeReader, 'ib')) : null,
+      withBack ? el('div', { class: 'reader-top' }, iconButton('back', 'Back to your room', back || closeReader, 'ib')) : null,
       el('div', { class: 'space-head' },
         el('h1', null, name),
         el('div', { class: 'who' }, [`@${space.handle}`, space.spaceTitle && space.displayName ? space.displayName : null].filter(Boolean).join(' · ')),
@@ -1193,7 +1193,7 @@
     const who = share.mine ? 'You' : `@${share.author.handle}`;
     const to = share.audience === 'mcportal' ? 'everyone on MCPortal' : 'followers';
     const top = el('div', { class: 'reader-top' },
-      withBack ? iconButton('back', 'Back to the workspace', closeReader, 'ib') : null,
+      withBack ? iconButton('back', 'Back to your room', closeReader, 'ib') : null,
       share.url && isHttpUrl(share.url) ? iconButton('external', 'Open the original', () => openLink(share.url), 'ib') : null);
     const body = share.clip ? clipBody(share.clip.data)
       : share.url && isHttpUrl(share.url) ? [el('p', null, el('button', { class: 'btn', onclick: () => openLink(share.url) }, share.url))] : [];
@@ -1237,7 +1237,7 @@
       if (back) nodes[0].replaceChildren(iconButton('back', 'Back to the space', () => back(scroll), 'ib'), ...[...nodes[0].children].slice(1));
       reader.replaceChildren(...nodes);
     } catch (error) {
-      reader.replaceChildren(el('div', { class: 'reader-top' }, iconButton('back', 'Back to the workspace', closeReader, 'ib')), el('h1', null, item.title),
+      reader.replaceChildren(el('div', { class: 'reader-top' }, iconButton('back', 'Back to your room', closeReader, 'ib')), el('h1', null, item.title),
         el('div', { class: 'error' }, `That share isn't available (${error.message}).`));
     }
   }
