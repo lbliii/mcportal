@@ -4,7 +4,7 @@
 
 - **v0.1 (M1):** plugin daily driver: MCP server, workspace app, `/portal`, Railway config.
 - **v0.2 (toward M1.5):** hardened after an adversarial review, plus **OAuth 2.1 with GitHub sign-in and per-user profiles**, so a hosted deployment can be added to Claude as a custom connector.
-- **v0.3 (M1.5 in progress):** built for chat hosts: a sideways-scrolling columns lane and picture shelves, icon controls, reader cards, **saved items**, **add anything** (paste a site, channel, subreddit or repo; MCPortal finds the feed), **thumbnails** fetched by the server, and **starter packs** that build a new user's portal in seconds.
+- **v0.3 (M1.5, invite-only beta):** a chat-native workspace (columns lane, picture shelves, reader cards), **add anything** (MCPortal finds the feed), **thumbnails**, **starter packs** and **OPML import**, **saved items**, and a hosted service with **Postgres**, **usage limits**, **accounts, invites and an admin page**. See [CHANGELOG.md](CHANGELOG.md).
 
 ```
 you: /portal put GitHub on the left and add Simon Willison's blog

@@ -9,7 +9,7 @@ import { authorize, localActor, toolAction } from './access.ts';
 import { budgetMessage, toolCost } from './lib/budget.ts';
 import { publicToolList, toolError, TOOLS, WORKSPACE_URI, type ToolContext } from './tools.ts';
 
-export const SERVER_INFO = { name: 'mcportal', title: 'MCPortal', version: '0.2.0' };
+export const SERVER_INFO = { name: 'mcportal', title: 'MCPortal', version: '0.3.0' };
 export const SUPPORTED_PROTOCOL_VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05'];
 export const MCP_APP_MIME = 'text/html;profile=mcp-app';
 

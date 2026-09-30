@@ -22,7 +22,7 @@ import zlib from 'node:zlib';
 import type { FetchOptions, FetchResponse, Fetcher } from '../types.ts';
 import { isPublicAddress } from './ip.ts';
 
-export const USER_AGENT = 'MCPortal/0.2 (+https://github.com/lbliii/mcportal)';
+export const USER_AGENT = 'MCPortal/0.3 (+https://github.com/lbliii/mcportal)';
 
 export class BoundaryError extends Error {
   override name = 'BoundaryError';

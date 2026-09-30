@@ -1,6 +1,6 @@
 {
   "name": "mcportal",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Your personal, agent-composed workspace: Hacker News, GitHub and any RSS feed in one multi-panel view, arranged the way you ask, with reader view and no ads.",
   "author": {
     "name": "Lawrence Lane"
