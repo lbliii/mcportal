@@ -386,12 +386,27 @@ test('admin page: browser-bound GitHub sign-in, admins only, CSRF and same-origi
     const invited = await post('/admin/api/invite', { who: 'mallory' }, { ...sameOrigin(app.port), 'x-csrf': state.csrf });
     assert.equal(invited.status, 200);
     assert.deepEqual(JSON.parse(invited.body).invites.map((i: { login: string }) => i.login), ['mallory']);
+    const code = JSON.parse(invited.body).invites[0].code as string;
+    assert.match(code, /^[A-Za-z0-9_-]{24}$/);
+
+    // The public join page explains the steps for exactly that person; no script, not indexed.
+    const join = await raw(app.port, { path: `/join/${code}` });
+    assert.equal(join.status, 200);
+    assert.match(join.body, /@Lawrence invited <b>@mallory<\/b>/);
+    assert.match(join.body, /sign in with GitHub as <b>@mallory<\/b>/);
+    assert.match(join.body, /http:\/\/localhost\/mcp/);
+    assert.equal(join.headers['x-robots-tag'], 'noindex, nofollow');
+    assert.doesNotMatch(String(join.headers['content-security-policy']), /script-src/);
+    assert.equal((await raw(app.port, { path: '/join/not-a-real-code-at-all-000' })).status, 404);
 
     // Mallory can now sign in to MCPortal, but not to the admin page.
     const mallory = await signIn('gh-code-mallory');
     assert.equal(mallory.status, 403);
     assert.match(mallory.body, /isn.t an admin/);
     assert.equal(cookieOf(mallory, 'mcportal_admin'), undefined);
+    assert.match((await raw(app.port, { path: `/join/${code}` })).body, /@mallory is already in/, 'the link reflects that the invite was used');
+    const reinvite = await post('/admin/api/invite', { who: 'mallory' }, { ...sameOrigin(app.port), 'x-csrf': state.csrf });
+    assert.match(JSON.parse(reinvite.body).error, /already has an account/);
 
     const self = await post('/admin/api/suspend', { who: 'lawrence' }, { ...sameOrigin(app.port), 'x-csrf': state.csrf });
     assert.equal(self.status, 400, "can't suspend yourself");

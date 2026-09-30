@@ -42,14 +42,17 @@ export async function runAdmin(args: string[], dataDir: string, out: (line: stri
         out(`${all.length} account(s)`);
         for (const a of all) out(`  ${a.id.padEnd(22)} @${(a.login ?? '?').padEnd(20)} ${a.status.padEnd(10)} ${a.role.padEnd(6)} via ${a.via.padEnd(9)} since ${when(a.createdAt)}`);
         out(`${invites.length} pending invite(s)`);
-        for (const i of invites) out(`  @${i.login.padEnd(20)} invited by ${i.invitedBy} on ${when(i.createdAt)}`);
+        for (const i of invites) out(`  @${i.login.padEnd(20)} invited by ${i.invitedBy} on ${when(i.createdAt)}  code ${i.code ?? '(none)'}`);
         return 0;
       }
-      case 'invite':
+      case 'invite': {
         if (!target) { out(USAGE); return 2; }
-        await accounts.invite(target, actor);
-        out(`Invited @${target.replace(/^@/, '').toLowerCase()}. Their account is created the first time they sign in with GitHub.`);
+        const invite = await accounts.invite(target, actor);
+        const base = process.env.MCPORTAL_PUBLIC_URL || (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : '');
+        out(`Invited @${invite.login}. Their account is created the first time they sign in with GitHub.`);
+        out(base ? `Send them: ${base.replace(/\/+$/, '')}/join/${invite.code}` : `Invite code: ${invite.code} (their link is <public URL>/join/<code>)`);
         return 0;
+      }
       case 'uninvite':
         if (!target) { out(USAGE); return 2; }
         out((await accounts.uninvite(target, actor)) ? `Invite for @${target} revoked.` : `No pending invite for @${target}.`);

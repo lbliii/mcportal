@@ -19,6 +19,7 @@
  * memory; it's reloaded periodically so changes made by the admin CLI (another
  * process) take effect. One server instance.
  */
+import { randomBytes } from 'node:crypto';
 import type { AuthPersistence } from './auth/store.ts';
 import { clean } from './lib/text.ts';
 
@@ -37,10 +38,18 @@ export interface Account {
   updatedAt: number;
 }
 
+/**
+ * An invite for one GitHub login. `code` makes the shareable /join/<code> link. It
+ * isn't a credential: sign-in still has to be as `login`, so it's stored as is and
+ * can be shown to admins again. Kept after use (acceptedAt) so the link can say so.
+ */
 export interface Invite {
   login: string;
   invitedBy: string;
   createdAt: number;
+  code?: string;
+  acceptedAt?: number;
+  accountId?: string;
 }
 
 export interface AuditEntry {
@@ -182,7 +191,8 @@ export class Accounts {
         existing.updatedAt = now;
         return { ok: true, account: existing };
       }
-      const invite = doc.invites[login];
+      const pending = doc.invites[login];
+      const invite = pending && !pending.acceptedAt ? pending : undefined;
       const byConfig = this.configAdmits(id);
       if (!byConfig && !invite) return { ok: false, reason: 'not_invited' };
       const account: Account = {
@@ -197,7 +207,10 @@ export class Accounts {
       };
       doc.accounts[account.id] = account;
       doc.identities[key] = account.id;
-      delete doc.invites[login];
+      if (invite) {
+        invite.acceptedAt = now;
+        invite.accountId = account.id;
+      }
       doc.audit.push({ at: now, actor: account.id, action: 'account.created', target: account.id, detail: invite ? `invited by ${invite.invitedBy}` : this.bootstrap.openSignup ? 'open sign-up' : 'bootstrap' });
       return { ok: true, account };
     });
@@ -224,7 +237,10 @@ export class Accounts {
     const l = login.trim().toLowerCase().replace(/^@/, '');
     if (!LOGIN.test(l)) return Promise.reject(new Error(`"${login}" isn't a valid GitHub login`));
     return this.write((doc) => {
-      const invite: Invite = { login: l, invitedBy: by, createdAt: this.now() };
+      const existing = doc.invites[l];
+      if (existing && !existing.acceptedAt && existing.code) return existing;   // inviting again keeps the same link
+      if (Object.values(doc.accounts).some((a) => a.login === l)) throw new Error(`@${l} already has an account`);
+      const invite: Invite = { login: l, invitedBy: by, createdAt: this.now(), code: randomBytes(18).toString('base64url') };
       doc.invites[l] = invite;
       doc.audit.push({ at: invite.createdAt, actor: by, action: 'invite.created', target: l });
       return invite;
@@ -234,7 +250,7 @@ export class Accounts {
   uninvite(login: string, by: string): Promise<boolean> {
     const l = login.trim().toLowerCase().replace(/^@/, '');
     return this.write((doc) => {
-      if (!doc.invites[l]) return false;
+      if (!doc.invites[l] || doc.invites[l].acceptedAt) return false;
       delete doc.invites[l];
       doc.audit.push({ at: this.now(), actor: by, action: 'invite.revoked', target: l });
       return true;
@@ -254,7 +270,17 @@ export class Accounts {
 
   async list(): Promise<{ accounts: Account[]; invites: Invite[] }> {
     await this.load(true);
-    return { accounts: Object.values(this.doc!.accounts).sort((a, b) => a.createdAt - b.createdAt), invites: Object.values(this.doc!.invites) };
+    return {
+      accounts: Object.values(this.doc!.accounts).sort((a, b) => a.createdAt - b.createdAt),
+      invites: Object.values(this.doc!.invites).filter((i) => !i.acceptedAt),
+    };
+  }
+
+  /** The invite behind a /join/<code> link (pending or accepted), if any. */
+  async findInvite(code: string): Promise<Invite | undefined> {
+    if (!/^[A-Za-z0-9_-]{16,64}$/.test(code)) return undefined;
+    await this.load();
+    return Object.values(this.doc!.invites).find((i) => i.code === code);
   }
 
   async auditLog(limit = 50): Promise<AuditEntry[]> {

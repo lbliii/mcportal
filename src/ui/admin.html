@@ -32,6 +32,10 @@
   #msg { min-height: 20px; font-size: 12.5px; margin-top: 6px; }
   #msg.err { color: var(--bad); }
   .wrap { overflow-x: auto; }
+  .share { display: none; margin-top: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg2); }
+  .share.on { display: block; }
+  .share textarea { width: 100%; min-height: 64px; margin: 6px 0; font: inherit; font-size: 13px; padding: 7px 9px; border: 1px solid var(--border); border-radius: 7px; background: transparent; color: var(--fg); resize: vertical; }
+  .actions { display: flex; gap: 6px; flex-wrap: wrap; }
 </style>
 </head>
 <body>
@@ -50,6 +54,11 @@
     <span class="muted">Their account is created the first time they sign in with GitHub.</span>
   </form>
   <div id="msg" role="status"></div>
+  <div class="share" id="share">
+    <div class="muted" id="shareTitle"></div>
+    <textarea id="shareText" readonly></textarea>
+    <div class="actions"><button class="primary" id="copyShare" type="button">Copy message</button><button id="copyShareLink" type="button">Copy link only</button></div>
+  </div>
 
   <h2>Pending invites</h2>
   <div class="wrap"><table><thead><tr><th>GitHub</th><th>Invited by</th><th>When</th><th></th></tr></thead><tbody id="invites"></tbody></table></div>
@@ -90,10 +99,29 @@
     return data;
   }
 
+  // ---- invite links and ready-to-send messages
+  const linkFor = (i) => (i.code ? `${location.origin}/join/${i.code}` : '');
+  const messageFor = (i) => `Hi @${i.login}! I've invited you to MCPortal, a reading portal that lives inside Claude. Set it up here (sign in with GitHub as @${i.login}): ${linkFor(i)}`;
+  async function copy(text, what) {
+    try { await navigator.clipboard.writeText(text); say(`Copied the ${what}.`); }
+    catch { showShare(null, text); say(`Couldn't use the clipboard; select the ${what} below and copy it.`, true); }
+  }
+  function showShare(invite, text) {
+    $('share').classList.add('on');
+    $('shareTitle').textContent = invite ? `Send this to @${invite.login} (Slack, email, a text…):` : 'Copy this:';
+    $('shareText').value = text || messageFor(invite);
+    $('copyShare').onclick = () => copy($('shareText').value, 'message');
+    $('copyShareLink').hidden = !invite;
+    $('copyShareLink').onclick = () => invite && copy(linkFor(invite), 'link');
+  }
+
   function render(data) {
     $('invites').replaceChildren(...(data.invites.length ? data.invites.map((i) => el('tr', null,
       el('td', null, `@${i.login}`), el('td', null, i.invitedBy), el('td', null, when(i.createdAt)),
-      el('td', null, el('button', { class: 'danger', onclick: () => act('uninvite', i.login, `Revoke the invite for @${i.login}?`) }, 'Revoke')))) : [el('tr', null, el('td', { colspan: '4', class: 'empty' }, 'No pending invites.'))]));
+      el('td', null, el('span', { class: 'actions' },
+        i.code ? el('button', { onclick: () => { showShare(i); copy(messageFor(i), 'message'); } }, 'Copy message') : null,
+        i.code ? el('button', { onclick: () => copy(linkFor(i), 'link') }, 'Copy link') : null,
+        el('button', { class: 'danger', onclick: () => act('uninvite', i.login, `Revoke the invite for @${i.login}? Their link stops working.`) }, 'Revoke'))))) : [el('tr', null, el('td', { colspan: '4', class: 'empty' }, 'No pending invites.'))]));
 
     $('accounts').replaceChildren(...(data.accounts.length ? data.accounts.map((a) => {
       const self = a.id === me.accountId;
@@ -125,9 +153,12 @@
     const login = $('inviteLogin').value.trim();
     if (!login) return;
     try {
-      render(await api('/admin/api/invite', { who: login }));
+      const data = await api('/admin/api/invite', { who: login });
+      render(data);
       $('inviteLogin').value = '';
-      say(`Invited @${login.replace(/^@/, '')}.`);
+      const invite = data.invites.find((i) => i.login === login.replace(/^@/, '').toLowerCase());
+      say(`Invited @${login.replace(/^@/, '')}. Send them the message below.`);
+      if (invite) showShare(invite);
     } catch (error) { say(error.message, true); }
   });
 

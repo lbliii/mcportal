@@ -7,6 +7,7 @@
  *   POST /admin/logout
  *   GET  /admin/api/state    accounts, invites, audit log, CSRF token
  *   POST /admin/api/{invite,uninvite,suspend,reinstate}
+ *   GET  /join/<code>        public: how an invited person connects (no script)
  *
  * Sessions live in memory (sign in again after a deploy), in an HttpOnly,
  * SameSite=Lax cookie. Every change needs the session, a same-origin request and
@@ -95,9 +96,39 @@ export class AdminPanel {
     return req.headers['sec-fetch-site'] === 'same-origin';
   }
 
+  /** The /join/<code> page: who invited them and the steps to connect. */
+  private async join(res: ServerResponse, code: string): Promise<void> {
+    const headers = { 'x-robots-tag': 'noindex, nofollow' };
+    const invite = await this.accounts.findInvite(code);
+    if (!invite) {
+      return sendHtml(res, 404, page('Invite not valid', '<h1>This invite link isn\'t valid anymore</h1><p>It may have been revoked. Ask the person who invited you for a new one.</p>'), headers);
+    }
+    const login = escapeHtml(invite.login);
+    if (invite.acceptedAt) {
+      return sendHtml(res, 200, page('Already in', `<h1>@${login} is already in</h1><p>MCPortal is connected to that account. In Claude, ask <i>“open my portal”</i>.</p>`), headers);
+    }
+    const inviter = invite.invitedBy.startsWith('admin:') ? `@${escapeHtml(invite.invitedBy.slice(6))}` : 'The admin';
+    const mcp = escapeHtml(`${this.publicUrl}/mcp`);
+    sendHtml(res, 200, page('You\'re invited to MCPortal', `
+<h1>You're invited to MCPortal</h1>
+<p>${inviter} invited <b>@${login}</b> to MCPortal, a reading portal that lives inside Claude: the sites, channels and feeds you follow, laid out the way you like.</p>
+<ol>
+  <li>In Claude, open <b>Settings → Connectors</b> and choose <b>Add custom connector</b>.</li>
+  <li>Name it <b>MCPortal</b> and use this URL:<br><code>${mcp}</code></li>
+  <li>Click <b>Connect</b> and sign in with GitHub as <b>@${login}</b>.</li>
+  <li>In a new chat, ask: <i>“open my portal”</i>.</li>
+</ol>
+<p class="muted">The invite is for @${login}, so signing in with another GitHub account won't work. If your organization's Claude doesn't allow custom connectors, the hosted portal isn't available to you yet.</p>`), headers);
+  }
+
   /** Returns true if it handled the request. */
   async handle(req: IncomingMessage, res: ServerResponse, url: URL): Promise<boolean> {
     const route = url.pathname.replace(/\/+$/, '') || '/';
+    const joinCode = route.match(/^\/join\/([^/]+)$/)?.[1];
+    if (joinCode !== undefined && req.method === 'GET') {
+      await this.join(res, decodeURIComponent(joinCode));
+      return true;
+    }
     if (route !== '/admin' && !route.startsWith('/admin/')) return false;
 
     if (route === '/admin/login' && req.method === 'GET') {

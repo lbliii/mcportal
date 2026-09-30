@@ -31,6 +31,23 @@ test('accounts: allowlisted accounts depend on config; invited accounts persist 
   assert.equal(renamed.ok && renamed.account.id, 'github-666');
 });
 
+test('invites: a stable link per invite, kept after use, gone when revoked', async () => {
+  const accounts = new Accounts(memoryPersistence(), makeBootstrap(['admin'], []));
+  const first = await accounts.invite('@Mallory', 'admin:x');
+  const again = await accounts.invite('mallory', 'admin:x');
+  assert.equal(again.code, first.code, 'inviting again keeps the same link');
+  assert.equal((await accounts.findInvite(first.code!))?.login, 'mallory');
+  await accounts.admit(mallory);
+  assert.ok((await accounts.findInvite(first.code!))?.acceptedAt, 'kept after use');
+  assert.equal((await accounts.list()).invites.length, 0, 'but no longer pending');
+  assert.equal(await accounts.uninvite('mallory', 'x'), false, 'used invites cannot be revoked');
+  await assert.rejects(accounts.invite('mallory', 'x'), /already has an account/);
+  const eve = await accounts.invite('eve', 'x');
+  assert.equal(await accounts.uninvite('eve', 'x'), true);
+  assert.equal(await accounts.findInvite(eve.code!), undefined);
+  assert.equal(await accounts.findInvite('../../etc/passwd'), undefined);
+});
+
 test('accounts: open sign-up only when nothing is configured or explicitly on; admins from bootstrap', async () => {
   assert.equal(makeBootstrap([], []).openSignup, true, 'matches the old behavior');
   assert.equal(makeBootstrap(['x'], []).openSignup, false);
