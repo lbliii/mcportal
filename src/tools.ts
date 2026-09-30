@@ -5,6 +5,7 @@ import {
   validateProfile, type PanelSpec, type PinnedConfig, type Profile, type SavedItem,
 } from './profile.ts';
 import { discover } from './discover.ts';
+import { buildOpml, OPML_LIMITS, parseOpml } from './opml.ts';
 import { MAX_PACKS, packSummaries, STARTER_PACKS } from './packs.ts';
 import { loadArticle, loadPanel, pinnedPanel, savedPanel, SOURCE_DOCS, type SourceDeps } from './sources.ts';
 import type { ProfileStore } from './store.ts';
@@ -447,6 +448,87 @@ export const TOOLS: ToolDef[] = [
       }
       const loaded = Object.values(images).filter(Boolean).length;
       return ok(`${loaded} of ${urls.length} thumbnails loaded`, { images });
+    },
+  },
+  {
+    name: 'import_opml',
+    title: 'Import subscriptions (OPML)',
+    description: [
+      'Bring the user\'s subscriptions in from another feed reader (Feedly, NetNewsWire, Inoreader…): pass the contents of their OPML export.',
+      'Every feed is test-loaded; only working ones are added. For a new user this builds their portal from their folders; otherwise it only adds panels',
+      '(never moves or removes anything) until the portal is full, and reports what was left out. Afterwards call open_workspace to show it.',
+    ].join(' '),
+    inputSchema: {
+      type: 'object',
+      required: ['opml'],
+      additionalProperties: false,
+      properties: { opml: { type: 'string', description: 'The OPML file contents (XML)' } },
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
+    async handler(args, ctx) {
+      const xml = String(args.opml ?? '');
+      if (xml.length > OPML_LIMITS.bytes) return toolError(`That OPML file is over ${OPML_LIMITS.bytes / 1_000_000} MB`);
+      const { title, feeds } = parseOpml(xml);
+      if (!feeds.length) return toolError("No feeds found. Is that an OPML export? It should contain <outline xmlUrl=\"…\"> entries.");
+      const before = await ctx.store.get(ctx.userId);
+      const have = new Set(before.columns.flatMap((c) => c.panels).map((p) => (p.source === 'rss' ? String((p.config as { url?: string }).url) : '')));
+      const fresh = feeds.filter((f) => !have.has(f.url));
+      const room = LIMITS.columns * LIMITS.panelsPerColumn - (before.onboarded ? before.columns.reduce((n, c) => n + c.panels.length, 0) : 0);
+      // Test-load (6 at a time) only as many as could fit, in the file's order.
+      const candidates = fresh.slice(0, Math.max(0, room) + 8);
+      const loaded: Array<{ feed: (typeof feeds)[number]; ok: boolean; error?: string; title?: string }> = [];
+      for (let i = 0; i < candidates.length; i += 6) {
+        loaded.push(...await Promise.all(candidates.slice(i, i + 6).map(async (feed) => {
+          const panel = await loadPanel({ id: 'import', source: 'rss', config: { url: feed.url, limit: 10 } }, ctx);
+          return panel.error || !panel.items.length ? { feed, ok: false, error: panel.error ?? 'empty feed' } : { feed, ok: true, title: panel.title };
+        })));
+      }
+      const working = loaded.filter((l) => l.ok).slice(0, Math.max(0, room));
+      const failed = loaded.filter((l) => !l.ok);
+      const specs: PanelSpec[] = working.map((l) => ({ id: slugId(l.feed.title || l.title || 'feed'), source: 'rss', title: clean(l.feed.title || l.title, 80) || undefined, config: { url: l.feed.url, limit: 10 } }));
+      let profile: Profile;
+      if (!before.onboarded) {
+        // New user: their reader's folders become the portal, in order, over up to 8 columns.
+        if (!specs.length) return toolError(`None of the ${loaded.length} feeds tried loaded (${clean(failed[0]?.error, 120)}).`);
+        // Group by folder, keeping the order folders first appear in their file.
+        const folderOrder = [...new Set(working.map((l) => l.feed.category ?? ''))];
+        const byCategory = [...working].sort((a, b) => folderOrder.indexOf(a.feed.category ?? '') - folderOrder.indexOf(b.feed.category ?? ''));
+        const ordered = byCategory.map((l) => specs[working.indexOf(l)]!);
+        const perColumn = Math.ceil(ordered.length / LIMITS.columns);
+        const columns = [];
+        for (let i = 0; i < ordered.length; i += perColumn) columns.push({ width: 1, panels: ordered.slice(i, i + perColumn) });
+        profile = { ...validateProfile({ ...before, layout: 'shelves', columns, onboarded: true }), saved: before.saved };
+      } else {
+        profile = before;
+        for (const spec of specs) {
+          const added = addPanelTo(profile, spec);
+          if ('error' in added) break;
+          profile = added.profile;
+        }
+      }
+      await ctx.store.put(ctx.userId, profile);
+      const addedCount = profile.columns.flatMap((c) => c.panels).length - (before.onboarded ? before.columns.flatMap((c) => c.panels).length : 0);
+      const notTried = fresh.length - candidates.length;
+      const lines = [
+        `Imported ${addedCount} of ${feeds.length} feed(s)${title ? ` from "${title}"` : ''}.`,
+        feeds.length - fresh.length ? `${feeds.length - fresh.length} were already in the portal.` : '',
+        failed.length ? `${failed.length} didn't load: ${failed.slice(0, 5).map((f) => f.feed.title).join(', ')}${failed.length > 5 ? '…' : ''}.` : '',
+        notTried > 0 || working.length < loaded.filter((l) => l.ok).length ? 'The portal is full, so some feeds were left out; remove panels to make room.' : '',
+      ].filter(Boolean);
+      return ok(lines.join('\n'), { profile, imported: addedCount, failed: failed.map((f) => ({ url: f.feed.url, title: f.feed.title, error: f.error })), total: feeds.length });
+    },
+  },
+  {
+    name: 'export_opml',
+    title: 'Export subscriptions (OPML)',
+    description: 'Export the user\'s sources as OPML, which any feed reader can import. Offer it as a file, or show it if they ask. GitHub searches, saved items and pinned panels have no feed and are listed as skipped.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+    annotations: { readOnlyHint: true },
+    async handler(_args, ctx) {
+      const profile = await ctx.store.get(ctx.userId);
+      const { opml, count, skipped } = buildOpml(profile);
+      const note = `${count} source(s) exported${skipped.length ? `; skipped (no feed): ${skipped.join(', ')}` : ''}.`;
+      return ok(`${note}\n\n${opml}`, { opml, count, skipped, filename: 'mcportal-subscriptions.opml' });
     },
   },
   {

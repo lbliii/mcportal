@@ -16,6 +16,7 @@ import { WORKSPACE_URI, type ToolContext } from '../src/tools.ts';
 import { pageFeeds, recipesFor } from '../src/discover.ts';
 import { parseFeed } from '../src/adapters/rss.ts';
 import { STARTER_PACKS } from '../src/packs.ts';
+import { buildOpml, parseOpml } from '../src/opml.ts';
 import { toolCost, UsageBudget } from '../src/lib/budget.ts';
 
 /** A user who has already set up their portal (the sample layout). Use newUser() for onboarding. */
@@ -61,7 +62,7 @@ test('notifications get no response; unknown methods get -32601', async () => {
 test('tools/list links open_workspace to the UI and hides app-only tools from the model', async () => {
   const res = await rpc(ctx(), 'tools/list');
   const tools = (res.result as any).tools as any[];
-  assert.deepEqual(tools.map((t) => t.name), ['open_workspace', 'build_portal', 'get_profile', 'update_profile', 'read_source', 'refresh_panel', 'read_article', 'get_thumbnails', 'find_source', 'add_panel', 'pin_panel', 'save_item', 'remove_saved', 'list_sources']);
+  assert.deepEqual(tools.map((t) => t.name), ['open_workspace', 'build_portal', 'get_profile', 'update_profile', 'read_source', 'refresh_panel', 'read_article', 'get_thumbnails', 'import_opml', 'export_opml', 'find_source', 'add_panel', 'pin_panel', 'save_item', 'remove_saved', 'list_sources']);
   assert.equal(tools.find((t) => t.name === 'open_workspace')._meta.ui.resourceUri, WORKSPACE_URI);
   assert.deepEqual(tools.find((t) => t.name === 'refresh_panel')._meta.ui.visibility, ['app']);
   assert.equal(tools.find((t) => t.name === 'read_article')._meta.ui.resourceUri, WORKSPACE_URI, 'reader renders as its own card');
@@ -409,6 +410,60 @@ test('budget: per-minute burst, daily and global caps; refusals charge nothing',
   const limited = await call(c, 'find_source', { query: 'example.com' });
   assert.equal(limited.isError, true);
   assert.match(limited.content[0]!.text, /per-minute limit/);
+});
+
+test('opml: parse folders, dedupe, drop bad links; export round-trips', () => {
+  const parsed = parseOpml(`<?xml version="1.0"?><opml version="2.0"><head><title>My &amp; Feeds</title></head><body>
+    <outline text="Tech"><outline type="rss" text="Example" xmlUrl="https://example.com/feed.xml"/>
+      <outline text="Inner"><outline text="Deep" xmlUrl="https://ex.com/a?x=1&amp;y=2"/></outline></outline>
+    <outline text="Loose" xmlUrl="https://kottke.org/feed"></outline>
+    <outline text="Bad" xmlUrl="javascript:alert(1)"/><outline text="Again" xmlUrl="https://kottke.org/feed"/></body></opml>`);
+  assert.equal(parsed.title, 'My & Feeds');
+  assert.deepEqual(parsed.feeds, [
+    { url: 'https://example.com/feed.xml', title: 'Example', category: 'Tech' },
+    { url: 'https://ex.com/a?x=1&y=2', title: 'Deep', category: 'Inner' },
+    { url: 'https://kottke.org/feed', title: 'Loose' },
+  ]);
+
+  const out = buildOpml({ ...defaultProfile(), name: 'Mine & yours' });
+  assert.equal(out.count, 2, 'HN and the RSS feed');
+  assert.deepEqual(out.skipped, ['Active MCP repos'], 'a GitHub search has no feed');
+  const back = parseOpml(out.opml);
+  assert.equal(back.title, 'Mine & yours (MCPortal)');
+  assert.deepEqual(back.feeds.map((f) => f.url), ['https://news.ycombinator.com/rss', 'https://simonwillison.net/atom/everything/']);
+});
+
+test('import_opml: builds a new user\'s portal from working feeds; only adds for existing portals', async () => {
+  const opml = `<opml version="2.0"><body><outline text="Blogs">
+    <outline text="Example blog" xmlUrl="https://example.com/feed.xml"/>
+    <outline text="Gone" xmlUrl="https://nothing.example.org/feed"/></outline></body></opml>`;
+  const c = newUser();
+  const res = await call(c, 'import_opml', { opml });
+  assert.equal(res.isError, undefined);
+  assert.equal(res.structuredContent.imported, 1);
+  assert.equal(res.structuredContent.failed[0].title, 'Gone');
+  assert.match(res.content[0]!.text, /Imported 1 of 2[\s\S]*1 didn't load: Gone/);
+  const p = res.structuredContent.profile;
+  assert.equal(p.onboarded, true);
+  assert.equal(p.layout, 'shelves');
+  assert.deepEqual(p.columns.flatMap((col: any) => col.panels.map((x: any) => x.title)), ['Example blog']);
+
+  // Folders keep the order they have in the file (not alphabetical).
+  const ordered = await call(newUser(), 'import_opml', { opml: `<opml><body>
+    <outline text="Zebra"><outline text="Z feed" xmlUrl="https://example.com/feed.xml"/></outline>
+    <outline text="Alpha"><outline text="A feed" xmlUrl="https://example.com/feed.xml?a"/></outline></body></opml>` });
+  assert.deepEqual(ordered.structuredContent.profile.columns.flatMap((col: any) => col.panels.map((x: any) => x.title)), ['Z feed', 'A feed']);
+
+  const again = await call(c, 'import_opml', { opml });
+  assert.equal(again.structuredContent.imported, 0);
+  assert.match(again.content[0]!.text, /1 were already in the portal/);
+
+  const existing = ctx();
+  const added = await call(existing, 'import_opml', { opml });
+  const cols = added.structuredContent.profile.columns;
+  assert.deepEqual(cols.slice(0, 3).map((col: any) => col.panels[0].id), ['hn-top', 'gh-mcp', 'simonw'], 'nothing moved');
+  assert.equal(cols.length, 4);
+  assert.equal((await call(existing, 'import_opml', { opml: '<html>not opml</html>' })).isError, true);
 });
 
 test('read_article returns fenced plain text with provenance', async () => {

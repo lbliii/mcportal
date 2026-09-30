@@ -48,6 +48,8 @@ export const TOOL_ACTIONS: Record<string, Action> = {
   read_article: 'fetch',
   get_thumbnails: 'fetch',
   find_source: 'fetch',
+  export_opml: 'read',
+  import_opml: 'write',
   build_portal: 'write',
   update_profile: 'write',
   add_panel: 'write',

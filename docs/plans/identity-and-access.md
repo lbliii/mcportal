@@ -1,6 +1,6 @@
 # Plan: identity and access
 
-**Status:** proposed (2026-09-30). **Milestones:** accounts, invites and `authorize()` in M1.5; public profiles and social in M2.
+**Status:** phase 1 and OPML (1b) built (2026-09-30); the rest proposed. Phase 1 keeps accounts, identities, invites and the audit log as one document (a file or a Postgres row, like the OAuth state) rather than separate tables; they move to tables when M2's social features need joins. Invites are their own list rather than an `invited` account status, and accounts record how they got in (`invite`, `bootstrap`, `open`). **Milestones:** accounts, invites and `authorize()` in M1.5; public profiles and social in M2.
 
 ## Principles
 

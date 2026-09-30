@@ -76,10 +76,21 @@ args = ["/Users/llane/Developer/mcportal/bin/mcportal.mjs", "--stdio"]
 3. Create a **GitHub OAuth App** (GitHub → Settings → Developer settings → OAuth Apps):
    - Homepage URL: `https://<your-domain>`
    - Authorization callback URL: `https://<your-domain>/oauth/callback`
-4. Set variables: `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, and to keep it private `MCPORTAL_ALLOWED_GITHUB_USERS=<your-login>`.
+4. Set variables: `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, and `MCPORTAL_ADMINS=<your-login>`. Setting admins makes the server invite-only; invite people with `mcportal admin invite <login>` (below).
 5. In Claude, add a custom connector with URL `https://<your-domain>/mcp`. Claude discovers the auth server, registers itself, and sends you through MCPortal's consent screen and GitHub sign-in.
 
-Each GitHub user gets their own profile (`/data/github-<id>.json`). Tokens are opaque, stored hashed, and bound to this server's `/mcp` resource. Access tokens last 1 hour; refresh tokens rotate on use. `MCPORTAL_ALLOWED_GITHUB_USERS` accepts logins or numeric GitHub ids (ids survive renames). Removing someone takes effect on their next request.
+Each person gets an account (`github-<id>`, which survives GitHub renames) and their own profile. Tokens are opaque, stored hashed, and bound to this server's `/mcp` resource. Access tokens last 1 hour; refresh tokens rotate on use. Every tool call passes one access gate: suspended accounts can't act, and tools only ever act on the caller's own portal.
+
+**Managing who's in** (never exposed as MCP tools, so nothing a model reads can use them). On Railway, run them in the service with `railway ssh --service mcportal -- node bin/mcportal.mjs admin …`:
+
+```bash
+node bin/mcportal.mjs admin list                   # accounts and pending invites
+node bin/mcportal.mjs admin invite <github-login>   # account is created at first sign-in
+node bin/mcportal.mjs admin suspend <login> [why]  # cut off within 30 s; reinstate to undo
+node bin/mcportal.mjs admin audit                  # who did what, when
+```
+
+`MCPORTAL_ALLOWED_GITHUB_USERS` (logins or numeric ids) still works as an allowlist: people admitted that way lose access when removed from it. Invited people stay until suspended.
 
 **Alternative for single-user setups:** set `MCPORTAL_TOKEN` instead and connect with a custom header (Claude Code):
 
@@ -122,6 +133,8 @@ The `/preview` page never contains secrets. With a static token it asks for the 
 | `list_sources` | model | Source types and their settings |
 | `refresh_panel` | app only | Reload one panel, bypassing cache |
 | `get_thumbnails` | app only | Fetch item pictures through the guarded fetcher as data URIs |
+| `import_opml` | model + app | Bring subscriptions from another reader: test-load each feed, build a new user's portal from their folders or add to an existing one |
+| `export_opml` | model | Sources as OPML for any feed reader (GitHub searches, saved and pinned panels have no feed and are listed as skipped) |
 
 Limits: 8 columns, 4 panels per column, 30 items per panel, 200 saved items, 350 KB per picture. Freshness: HN 2 min, GitHub 5 min, RSS 10 min, reader 1 h, pictures 1 day.
 
@@ -135,9 +148,9 @@ MCPortal is a **reading platform with light social**, driven by your agent. Anyt
 - [x] Per-user rate limits and daily fetch/thumbnail caps
 - [x] Durable storage: Postgres for profiles and sign-in state, point-in-time recovery on ([plan](docs/plans/postgres-storage.md))
 - [ ] Scheduled backups (daily + weekly) on the Postgres service
-- [ ] Accounts, invites and suspension replacing the allowlist; one `authorize()` gate for every tool; admins from `MCPORTAL_ADMINS` ([plan](docs/plans/identity-and-access.md), phase 1)
+- [x] Accounts, invites and suspension replacing the allowlist; one `authorize()` gate for every tool; admins from `MCPORTAL_ADMINS`; `mcportal admin` commands ([plan](docs/plans/identity-and-access.md), phase 1)
 - [ ] Small admin page: invites, suspensions, audit log (phase 2)
-- [ ] OPML import (bring subscriptions from another reader) and OPML export (phase 1b)
+- [x] OPML import (bring subscriptions from another reader) and OPML export (phase 1b)
 - [ ] Migrate `railway.toml` to Railway's infrastructure-as-code format (old format works until 2026-12-01)
 - [ ] Privacy policy, support contact and screenshots; submit to Claude's connector directory
 - [ ] Landing page and README that show the first-run moment; Show HN

@@ -207,6 +207,7 @@
     <input id="addInput" type="text" autocomplete="off" spellcheck="false" placeholder="theverge.com, r/LocalLLaMA, youtube.com/@channel, owner/repo…" aria-label="Site, feed, subreddit, channel or repo">
     <button class="btn" type="submit">Find</button>
   </form>
+  <div class="add-hint"><button class="link-btn" type="button" id="btnImportOpml">Import subscriptions from another reader (OPML)</button></div>
   <div class="add-hint" id="addHint">Paste a site or feed and MCPortal finds what it can show. Sites with feeds, Reddit, YouTube, Bluesky, Mastodon, GitHub, Substack and more.</div>
   <ul class="cands" id="addResults"></ul>
 </section>
@@ -214,6 +215,7 @@
   <div class="col" style="flex-grow:1"><div class="panel"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div></div>
 </main>
 <section id="welcome" class="welcome" hidden></section>
+<input type="file" id="opmlFile" accept=".opml,.xml,text/xml,application/xml,text/x-opml" hidden>
 <article id="reader" class="reader" hidden></article>
 <div class="toast" id="toast" role="status"></div>
 
@@ -471,7 +473,8 @@
       el('div', { class: 'welcome-actions' }, build,
         rebuilding
           ? el('button', { class: 'link-btn', onclick: () => { loading = null; loadWorkspace(); } }, 'Cancel')
-          : el('button', { class: 'link-btn', onclick: () => buildPortal([]) }, 'Skip, show me a sample')),
+          : el('button', { class: 'link-btn', onclick: () => buildPortal([]) }, 'Skip, show me a sample'),
+        rebuilding ? null : el('button', { class: 'link-btn', onclick: () => pickOpml() }, 'Coming from another reader? Import OPML')),
       DEV ? null : el('div', { class: 'ask' },
         el('p', { class: 'lede' }, 'Into something no pack covers? Describe it and Claude will find the sources.'),
         el('div', { class: 'add-row' }, describe, el('button', { class: 'btn', onclick: askClaude }, 'Ask Claude'))),
@@ -956,6 +959,36 @@
       toast(error.message.replace(/^Not added: /, ''));
     }
   }
+
+  // ------------------------------------------------------------ OPML import
+  // If the host blocks file pickers in embedded views, the user can attach the file in chat instead.
+  function pickOpml() {
+    try { $('opmlFile').value = ''; $('opmlFile').click(); }
+    catch { toast('Attach the OPML file in the chat and ask Claude to import it'); }
+  }
+  $('opmlFile').addEventListener('change', async () => {
+    const file = $('opmlFile').files && $('opmlFile').files[0];
+    if (!file) return;
+    if (file.size > 1_000_000) { toast('That file is over 1 MB'); return; }
+    const status = root.classList.contains('welcome-view') ? el('div', { class: 'building' }) : null;
+    if (status) $('welcome').append(status);
+    const say = (t) => (status ? (status.textContent = t) : setStatus(t));
+    say('Importing: checking every feed…');
+    try {
+      const text = await file.text();
+      const res = await callTool('import_opml', { opml: text });
+      const summary = (res.content || []).map((c) => c.text).join(' ').split('\n')[0];
+      say('Loading your sources…');
+      const result = await callTool('open_workspace');
+      toggleAdd(false);
+      renderWorkspace(result.structuredContent);
+      toast(summary);
+    } catch (error) {
+      say('');
+      toast(`Import failed: ${error.message}`);
+    }
+  });
+  $('btnImportOpml').addEventListener('click', () => pickOpml());
 
   $('btnAdd').addEventListener('click', () => toggleAdd());
   $('addForm').addEventListener('submit', (e) => {
