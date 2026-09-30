@@ -102,7 +102,8 @@ async function panelFor(spec: PanelSpec, profile: Profile, ctx: ToolContext, for
 }
 
 /** Sources MCPortal fetches (or, for saved, reads) itself. Pinned panels only come from pin_panel. */
-const ADDABLE: SourceKind[] = SOURCES.filter((s) => s !== 'pinned');
+// Docs panels become addable once find_source can resolve them (docs-portal plan, phase 3).
+const ADDABLE: SourceKind[] = SOURCES.filter((s) => s !== 'pinned' && s !== 'docs');
 
 /**
  * Put a Saved (or Clips) panel in the layout the first time something is saved, so

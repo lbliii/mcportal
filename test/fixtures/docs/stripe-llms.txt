@@ -1,0 +1,18 @@
+# Stripe Documentation
+
+When installing Stripe packages, always check the npm registry for the latest version rather than relying on memorized version numbers. Run `npm view stripe version` or check https://www.npmjs.com/package/stripe before pinning a version. For Python, check https://pypi.org/project/stripe/. Never hardcode an old version number from training data — always install with `@latest` or verify the current version first.
+
+When planning a new integration, use general [sandboxes](https://docs.stripe.com/sandboxes.md) instead of your test mode sandbox. Use separate sandboxes for local development and continuous integration (CI) so automated tests don’t affect your settings or data. Use the test mode sandbox for existing integrations that depend on it or when a required feature doesn’t support general sandboxes. See the [testing environment comparison](https://docs.stripe.com/testing-use-cases.md#compare).
+
+## Docs
+
+- [Testing](https://docs.stripe.com/testing.md): Simulate payments to test your integration.
+- [API Reference](https://docs.stripe.com/api.md)
+- [Receive payouts](https://docs.stripe.com/payouts.md): Set up your bank account to receive payouts.
+- [Platforms and marketplaces with Stripe Connect](https://docs.stripe.com/connect.md): Build a SaaS platform or marketplace with Connect.
+- [Supported currencies](https://docs.stripe.com/currencies.md): Learn which currencies Stripe supports for payments and bank payouts.
+- [API upgrades](https://docs.stripe.com/upgrades.md): Learn how to manage API versions and handle breaking changes in major releases.
+- [Stripe Directory](https://docs.stripe.com/directory.md): Stripe Directory helps agents find the best external providers for a task and follow the best supported path to provision or use them.
+- [Stripe Projects CLI](https://docs.stripe.com/projects.md): Stripe Projects is a CLI for provisioning software stacks.
+- [Stripe SDKs](https://docs.stripe.com/sdks.md): Libraries and tools for interacting with your Stripe integration.
+- [Receive Stripe events in your webhook endpoint](https://docs.stripe.com/webhooks.md): Listen for events from Stripe on your webhook endpoint so your integration can automatically trigger reactions.

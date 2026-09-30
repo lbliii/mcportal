@@ -1,3 +1,4 @@
+import { loadDocs, resolveDocs, type DocsConfig, type DocSite } from './adapters/docs.ts';
 import { fetchGithub, githubEndpoint, type GithubConfig } from './adapters/github.ts';
 import { fetchHn, hnEndpoint, type HnConfig } from './adapters/hn.ts';
 import { fetchArticle } from './adapters/reader.ts';
@@ -18,6 +19,7 @@ export const FRESHNESS: Record<SourceKind | 'reader', number> = {
   hn: 120,
   github: 300,
   rss: 600,
+  docs: 86_400,
   reader: 3600,
 };
 
@@ -26,7 +28,7 @@ export interface SourceDeps {
   cache: TtlCache;
 }
 
-const DEFAULT_TITLES: Record<SourceKind, string> = { hn: 'Hacker News', rss: 'Feed', github: 'GitHub', saved: 'Saved', pinned: 'Pinned', clips: 'Clips', following: 'Following' };
+const DEFAULT_TITLES: Record<SourceKind, string> = { hn: 'Hacker News', rss: 'Feed', github: 'GitHub', docs: 'Docs', saved: 'Saved', pinned: 'Pinned', clips: 'Clips', following: 'Following' };
 
 /** Saved items come from the profile, not the network. */
 export function savedPanel(panel: PanelSpec, saved: SavedItem[]): PanelResult {
@@ -106,6 +108,38 @@ export function followingPanel(panel: PanelSpec, shares: SharedItem[]): PanelRes
   };
 }
 
+/** A docs site's table of contents: from the panel's stored toc, or resolved from its url the first time. */
+export async function loadDocSite(config: DocsConfig, deps: SourceDeps, force = false): Promise<{ value: DocSite; cached: boolean; fetchedAt: string }> {
+  const key = config.toc ? `docs:${config.toc.url}` : `docs-resolve:${config.url}`;
+  return deps.cache.get(key, FRESHNESS.docs, () => (config.toc ? loadDocs(config.toc, deps.fetcher) : resolveDocs(config.url, deps.fetcher)), force);
+}
+
+/** A docs panel lists the site's sections, or one section's pages. */
+export function docsItems(site: DocSite, config: DocsConfig): Item[] {
+  if (config.section) {
+    const wanted = config.section.toLowerCase();
+    const section = site.sections.find((s) => s.title.toLowerCase() === wanted);
+    if (!section) throw new Error(`${site.title} has no section "${config.section}"`);
+    return section.pages.slice(0, config.limit).map((p) => ({
+      id: p.url,
+      title: p.title,
+      url: p.url,
+      ...(p.description ? { summary: p.description } : {}),
+      meta: [p.index ? 'docs' : new URL(p.url).hostname.replace(/^www\./, '')],
+    }));
+  }
+  return site.sections.slice(0, config.limit).map((s, i) => {
+    const first = s.url ?? s.pages.find((p) => !p.index)?.url ?? s.pages[0]?.url;
+    return {
+      id: `section-${i}`,
+      title: s.title,
+      ...(first ? { url: first } : {}),
+      summary: s.pages.slice(0, 4).map((p) => p.title).join(' · '),
+      meta: [`${s.pages.length} ${s.pages.every((p) => p.index) ? 'guides' : s.pages.length === 1 ? 'page' : 'pages'}`],
+    };
+  });
+}
+
 export async function loadPanel(panel: PanelSpec, deps: SourceDeps, force = false): Promise<PanelResult> {
   if (panel.source === 'saved' || panel.source === 'pinned' || panel.source === 'clips' || panel.source === 'following') throw new Error(`${panel.source} panels are built from the profile, not fetched`);
   const config = normalizeSourceConfig(panel.source, panel.config, panel.id);
@@ -121,6 +155,13 @@ export async function loadPanel(panel: PanelSpec, deps: SourceDeps, force = fals
       const c = config as GithubConfig;
       endpoint = githubEndpoint(c);
       result = await deps.cache.get(`gh:${endpoint}`, FRESHNESS.github, async () => ({ items: await fetchGithub(c, deps.fetcher) }), force);
+    } else if (panel.source === 'docs') {
+      const c = config as DocsConfig;
+      endpoint = c.toc?.url ?? c.url;
+      const site = await loadDocSite(c, deps, force);
+      endpoint = site.value.toc.url;
+      result = { ...site, value: { items: docsItems(site.value, c), feedTitle: site.value.title } };
+      if (!panel.title) title = c.section ? `${site.value.title}: ${c.section}` : site.value.title;
     } else {
       const c = config as RssConfig;
       endpoint = c.url;

@@ -2,9 +2,10 @@
  * 'saved' is the user's own bookmarks and 'pinned' is data the agent brought from
  * another tool (Jira, Slack, …): both live in the profile and are never fetched.
  * 'clips' come from the clip store (src/clips.ts) and 'following' from shares of
- * people the user follows (src/social.ts); neither is fetched.
+ * people the user follows (src/social.ts); neither is fetched. 'docs' is a docs
+ * site's table of contents (src/adapters/docs.ts).
  */
-export type SourceKind = 'hn' | 'rss' | 'github' | 'saved' | 'pinned' | 'clips' | 'following';
+export type SourceKind = 'hn' | 'rss' | 'github' | 'docs' | 'saved' | 'pinned' | 'clips' | 'following';
 
 export const CLIP_KINDS = ['quote', 'exchange', 'note', 'table', 'image', 'link'] as const;
 export type ClipKind = (typeof CLIP_KINDS)[number];

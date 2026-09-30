@@ -1,0 +1,27 @@
+# Next.js Documentation
+
+> Reference and guides for Next.js 16.3.8 — the React framework for building full-stack web applications. Sections cover Getting Started, App Router, Architecture, and Community Resources.
+
+@doc-version: 16.3.8
+@doc-version-notes: Some features may have extended or refined behavior in minor or patch releases
+
+
+## [Getting Started](https://nextjs.org/docs/app/getting-started)
+
+Learn how to create full-stack web applications with the Next.js App Router.
+
+- [Installation](https://nextjs.org/docs/app/getting-started/installation): Learn how to create a new Next.js application with the `create-next-app` CLI, and set up TypeScript, ESLint, and Module Path Aliases.
+- [Project Structure](https://nextjs.org/docs/app/getting-started/project-structure): Learn the folder and file conventions in Next.js, and how to organize your project.
+- [Layouts and Pages](https://nextjs.org/docs/app/getting-started/layouts-and-pages): Learn how to create your first pages and layouts, and link between them with the Link component.
+- [Linking and Navigating](https://nextjs.org/docs/app/getting-started/linking-and-navigating): Learn how the built-in navigation optimizations work, including prefetching, prerendering, and client-side navigation, and how to optimize navigation for dynamic routes and slow networks.
+- [Server and Client Components](https://nextjs.org/docs/app/getting-started/server-and-client-components): Learn how you can use React Server and Client Components to render parts of your application on the server or the client.
+- [Fetching Data](https://nextjs.org/docs/app/getting-started/fetching-data): Learn how to fetch data and stream content that depends on data.
+- [Mutating Data](https://nextjs.org/docs/app/getting-started/mutating-data): Learn how to mutate data using Server Functions and Server Actions in Next.js.
+- [Caching](https://nextjs.org/docs/app/getting-started/caching): Learn how to cache data and UI in Next.js
+
+## [Guides](https://nextjs.org/docs/app/guides)
+
+Learn how to implement common patterns and real-world use cases using Next.js
+
+- [Adopting Partial Prefetching](https://nextjs.org/docs/app/guides/adopting-partial-prefetching): Learn how to enable Partial Prefetching and what changes for `<Link>`.
+- [AI Coding Agents](https://nextjs.org/docs/app/guides/ai-agents): Learn how to configure your Next.js project so AI coding agents use up-to-date documentation instead of outdated training data.

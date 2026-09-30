@@ -1,6 +1,6 @@
 # Plan: docs portal — read any docs site without its front end
 
-**Status:** proposed (2026-09-30). **Milestone:** first new portal type after columns and shelves; the developer hook for paid plans.
+**Status:** phase 1 shipped (2026-09-30); phase 2 next. **Milestone:** first new portal type after columns and shelves; the developer hook for paid plans.
 
 ## Goal
 
@@ -26,16 +26,17 @@ The site is resolved once, when the panel is added; the result is stored in the 
 
 **Table of contents** (first that validates wins):
 
-1. **`llms.txt`**: at the path the user gave, then walking up to the site root (`nextjs.org/docs/llms.txt` before `nextjs.org/llms.txt`), then `docs.<domain>` and `<domain>/docs`. Links that point at other `llms.txt` files become sub-sections, one level deep, at most 30 children.
+1. **`llms.txt`**: at the path the user gave, then walking up to the site root (`nextjs.org/docs/llms.txt` before `nextjs.org/llms.txt`), then `docs.<domain>` and `<domain>/docs`. Links that point at other `llms.txt` files are marked as nested indexes and opened only when the reader goes into one (Cloudflare has 109). Links to whole-docs dumps (`llms-full.txt`, `llms-small.txt`…) are skipped. Anything before the `# Name` line is skipped: Pydantic puts instructions for agents there.
 2. **Sphinx `objects.inv`** at the same candidate paths: `std:doc` entries become pages; other entries become the symbol index.
 3. **`sitemap.xml`** (and `sitemap_index.xml`) under the docs path, grouped into sections by the first path segment, titled from the URL until a page is opened.
 
+Candidates are tried **one request at a time**, nearest first, stopping at the first that works: Django answers bursts with 429.
+
 **Each page:**
 
-1. The TOC link as is, if the response is markdown.
-2. The page URL with `Accept: text/markdown`.
-3. The page URL with `.md` appended (after removing a trailing `/`), then `/index.md`.
-4. The HTML reader ([adapters/reader.ts](../../src/adapters/reader.ts)).
+1. The TOC link itself, asking for markdown first (`Accept: text/markdown, …, text/html;q=0.5`). One request covers both "the link is already `.md`" and content negotiation; an HTML answer is kept for step 3.
+2. The page URL with `.md` appended (after removing a trailing `/` or `.html`).
+3. The HTML reader ([adapters/reader.ts](../../src/adapters/reader.ts)).
 
 The route that worked is remembered per site (in memory, alongside the TOC), so later pages go straight to it. `llms-full.txt` isn't on the reading path; see phase 5.
 
@@ -134,7 +135,7 @@ The user wants docs in the welcome showcase: Stripe and Railway at least, plus P
 }
 ```
 
-That's one of each kind of reading: payments API, a platform, a language, a framework; and it exercises both TOC routes. Verified alternates if one fails from the server: React, Vercel, Expo, Cloudflare, Pydantic, uv, Django, MCP.
+That's one of each kind of reading: payments API, a platform, a language, a framework; and it exercises both TOC routes. Verified alternates if one fails from the server: React, Expo, Cloudflare, Pydantic, uv, Django, MCP. (Vercel's `llms.txt` only points at two huge sitemap pages, so it's out.)
 
 As with the other packs, every source must be checked **from the Railway server** as well as a laptop before it ships (`packs.ts` records sites that treat cloud IPs differently). The pack card on the welcome screen lists the four names like the others; the `build_portal` description and enum pick it up from `STARTER_PACKS` automatically.
 
@@ -152,12 +153,30 @@ As with the other packs, every source must be checked **from the Railway server*
 
 | # | Ships | Verifies |
 |---|---|---|
-| 1 | `src/adapters/docs.ts`: `llms.txt` parser (with nesting), `objects.inv` parser, resolver ladder with body validation, page ladder with learned route; `docs` source kind and config normalisation; `scripts/docs-probe.ts` (the probe as a script, run locally or on the server) | Unit tests against fixtures from Stripe, Railway, Cloudflare (nested), Python (Sphinx), Cursor (fake 200), Docker (empty links); probe output checked in as a report |
+| 1 ✅ | `src/adapters/docs.ts`: `llms.txt` parser (with nesting), `objects.inv` parser, resolver ladder with body validation, page ladder with learned route; `docs` source kind and config normalisation; `scripts/docs-probe.ts` (the probe as a script, run locally or on the server) | Unit tests against fixtures from Stripe, Railway, Cloudflare (nested), Python (Sphinx), Cursor (fake 200), Docker (empty links); probe output checked in as a report |
 | 2 | `src/lib/markdown.ts` with the richer blocks, MDX and directive cleanup; clips moved onto it; HTML reader gains `role=main`, tables and heading levels | Tests: every MDX component case, tables, callouts, spans reject `javascript:` links; clips tests still pass unchanged |
 | 3 | Tools: `find_source` learns docs, `open_docs`, `read_doc_page`, `search_docs`, `read_source` for docs; server instructions; budget costs | Tool tests: fenced output, fetch scope refuses off-site URLs, section filter, search ranking |
 | 4 | UI: Docs panel in columns and shelves, docs viewer (TOC, search, on-this-page, prev/next, in-docs links), docs card in chat, narrow-screen drawer; the **Developer docs** starter pack | Preview: Stripe, Railway, Python and Next.js end to end; a page with `<Tabs>` and `<Info>`; mobile width; pack checked from the Railway server |
 | 5 | Search inside pages: build an index from `llms-full.txt` when it splits cleanly (the two easy conventions first), else from pages as they're read; Sphinx symbol jump ("`str.split`") | Search quality on Stripe and Python; memory stays inside the cache budget |
 | 6 (later) | Docs sites' own MCP servers (Mintlify, GitBook) as a source; "what changed since you last read it" (the Watch portal idea); docs in Spaces | Separate plan |
+
+## Phase 1 results
+
+`node scripts/docs-probe.ts` from a laptop, 2026-09-30: 12 of 14 sites resolve and read two sample pages each.
+
+| Site | Contents | Size | Pages read via |
+|---|---|---|---|
+| Stripe | `llms.txt` | 38 sections, 448 pages | markdown |
+| Railway | `llms.txt` | 60 sections, 410 pages | markdown |
+| Python | `objects.inv` | 14 sections, 538 pages, 14,147 symbols | HTML reader |
+| Next.js | `llms.txt` | 6 sections, 284 pages | `.md` sibling |
+| React, Expo, Pydantic, uv, MCP | `llms.txt` | 55–558 pages | markdown |
+| Cloudflare | nested `llms.txt` | 109 product indexes | markdown |
+| Django | `objects.inv` | 673 pages, 3,388 symbols | HTML reader |
+| FastAPI | sitemap | 152 pages | HTML reader |
+| Astro, Tailwind | nothing found | | |
+
+Still to do before the pack ships: run the probe from the Railway server.
 
 ## Open questions
 

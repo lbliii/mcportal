@@ -4,6 +4,7 @@
  * user placed unless asked, so updates are validated whole-profile writes.
  */
 import { HN_FEEDS, type HnConfig } from './adapters/hn.ts';
+import { TOC_KINDS, type DocsConfig, type TocKind } from './adapters/docs.ts';
 import { REPO_PATTERN, type GithubConfig } from './adapters/github.ts';
 import type { RssConfig } from './adapters/rss.ts';
 import { clean } from './lib/text.ts';
@@ -76,7 +77,7 @@ export interface Profile {
 
 /** Columns scroll sideways, so there can be more than fit on screen. */
 export const LIMITS = { columns: 8, panelsPerColumn: 4, items: 30, saved: 200 } as const;
-export const SOURCES: SourceKind[] = ['hn', 'rss', 'github', 'saved', 'pinned', 'clips', 'following'];
+export const SOURCES: SourceKind[] = ['hn', 'rss', 'github', 'docs', 'saved', 'pinned', 'clips', 'following'];
 
 export class ProfileError extends Error {
   override name = 'ProfileError';
@@ -133,7 +134,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-export function normalizeSourceConfig(source: SourceKind, raw: unknown, where: string): HnConfig | RssConfig | GithubConfig | PinnedConfig | ClipsConfig | { limit: number } {
+export function normalizeSourceConfig(source: SourceKind, raw: unknown, where: string): HnConfig | RssConfig | GithubConfig | DocsConfig | PinnedConfig | ClipsConfig | { limit: number } {
   const config = isRecord(raw) ? raw : {};
   if (source === 'saved' || source === 'following') return { limit: clampInt(config.limit, 1, LIMITS.items, LIMITS.items) };
   if (source === 'clips') {
@@ -146,6 +147,20 @@ export function normalizeSourceConfig(source: SourceKind, raw: unknown, where: s
     const recipe = clean(config.recipe, 500);
     if (!from || !recipe) throw new ProfileError(`${where}: pinned needs "from" (where the items came from) and "recipe" (how to fetch them again)`);
     return { from, recipe, limit: clampInt(config.limit, 1, LIMITS.items, LIMITS.items) };
+  }
+  if (source === 'docs') {
+    const url = httpUrl(config.url);
+    if (!url) throw new ProfileError(`${where}: docs needs a valid http(s) "url"`);
+    const docs: DocsConfig = { url, limit: clampInt(config.limit, 1, LIMITS.items, LIMITS.items) };
+    if (config.toc !== undefined) {
+      const toc = isRecord(config.toc) ? config.toc : {};
+      const tocUrl = httpUrl(toc.url);
+      if (!(TOC_KINDS as readonly unknown[]).includes(toc.kind) || !tocUrl) throw new ProfileError(`${where}: docs toc needs a kind (${TOC_KINDS.join(', ')}) and an http(s) url`);
+      docs.toc = { kind: toc.kind as TocKind, url: tocUrl };
+    }
+    const section = clean(config.section, 120);
+    if (section) docs.section = section;
+    return docs;
   }
   const limit = clampInt(config.limit, 1, LIMITS.items, 10);
   if (source === 'hn') {
