@@ -58,8 +58,8 @@ export interface AuthPersistence {
   write(json: string): Promise<void>;
 }
 
-export function fileAuthPersistence(dataDir: string): AuthPersistence {
-  const file = path.join(dataDir, 'auth.json');
+export function fileAuthPersistence(dataDir: string, name = 'auth.json'): AuthPersistence {
+  const file = path.join(dataDir, name);
   return {
     async read() {
       try {

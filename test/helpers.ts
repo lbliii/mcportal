@@ -5,7 +5,7 @@ import { request } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { createApp, type AppConfig } from '../src/http.ts';
+import { createApp, type AppConfig, type AppDeps } from '../src/http.ts';
 import { TtlCache } from '../src/lib/cache.ts';
 import { createFixtureFetcher } from '../src/lib/fixture-fetch.ts';
 import { MemoryProfileStore } from '../src/store.ts';
@@ -18,7 +18,7 @@ export interface Running {
   close: () => Promise<void>;
 }
 
-export async function startApp(overrides: Partial<AppConfig> = {}, fetcher: Fetcher = createFixtureFetcher()): Promise<Running> {
+export async function startApp(overrides: Partial<AppConfig> = {}, fetcher: Fetcher = createFixtureFetcher(), deps: Partial<AppDeps> = {}): Promise<Running> {
   const dataDir = overrides.dataDir ?? (await mkdtemp(path.join(tmpdir(), 'mcportal-http-')));
   const config: AppConfig = {
     host: '127.0.0.1',
@@ -33,7 +33,7 @@ export async function startApp(overrides: Partial<AppConfig> = {}, fetcher: Fetc
     ...overrides,
     dataDir,
   };
-  const server = createApp(config, { store: new MemoryProfileStore(), fetcher, cache: new TtlCache(), log: () => {} });
+  const server = createApp(config, { store: new MemoryProfileStore(), fetcher, cache: new TtlCache(), log: () => {}, ...deps });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const port = (server.address() as AddressInfo).port;
   return { base: `http://127.0.0.1:${port}`, port, server, close: () => new Promise((r) => server.close(() => r())) };

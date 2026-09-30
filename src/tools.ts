@@ -8,6 +8,7 @@ import { discover } from './discover.ts';
 import { MAX_PACKS, packSummaries, STARTER_PACKS } from './packs.ts';
 import { loadArticle, loadPanel, pinnedPanel, savedPanel, SOURCE_DOCS, type SourceDeps } from './sources.ts';
 import type { ProfileStore } from './store.ts';
+import type { Actor } from './access.ts';
 import type { UsageBudget } from './lib/budget.ts';
 import type { PanelResult, SourceKind } from './types.ts';
 
@@ -18,6 +19,8 @@ export interface ToolContext extends SourceDeps {
   userId: string;
   /** Hosted server only: charged per tool call. Local stdio has none (unlimited). */
   budget?: UsageBudget;
+  /** Who is acting (role, status). Absent = the local owner. */
+  actor?: Actor;
 }
 
 export interface CallToolResult {

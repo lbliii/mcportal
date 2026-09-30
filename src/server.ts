@@ -5,7 +5,8 @@
  *   node bin/mcportal.mjs --stdio    stdio transport (used by the local plugin)
  */
 import { createInterface } from 'node:readline';
-import type { AuthPersistence } from './auth/store.ts';
+import { Accounts, bootstrapFromEnv } from './accounts.ts';
+import { fileAuthPersistence, type AuthPersistence } from './auth/store.ts';
 import { createApp, configFromEnv, type AppConfig } from './http.ts';
 import { TtlCache } from './lib/cache.ts';
 import { createFixtureFetcher } from './lib/fixture-fetch.ts';
@@ -44,15 +45,15 @@ function runStdio(ctx: ToolContext): void {
 }
 
 /** Postgres when DATABASE_URL is set (hosted), otherwise files in the data directory. */
-async function openStorage(dataDir: string): Promise<{ store: ProfileStore; authPersistence?: AuthPersistence; storage: 'files' | 'postgres' }> {
+async function openStorage(dataDir: string): Promise<{ store: ProfileStore; authPersistence?: AuthPersistence; accountsPersistence: AuthPersistence; storage: 'files' | 'postgres' }> {
   const url = process.env.DATABASE_URL;
-  if (!url) return { store: new FileProfileStore(dataDir), storage: 'files' };
+  if (!url) return { store: new FileProfileStore(dataDir), accountsPersistence: fileAuthPersistence(dataDir, 'accounts.json'), storage: 'files' };
   const { connect, ensureSchema, importFiles, PgProfileStore, pgAuthPersistence } = await import('./db.ts');
   const db = await connect(url);
   await ensureSchema(db);
   const imported = await importFiles(db, dataDir);
   if (!imported.skipped) log(`imported from ${dataDir}: ${imported.profiles} profile(s)${imported.auth ? ', OAuth state' : ''}`);
-  return { store: new PgProfileStore(db), authPersistence: pgAuthPersistence(db), storage: 'postgres' };
+  return { store: new PgProfileStore(db), authPersistence: pgAuthPersistence(db), accountsPersistence: pgAuthPersistence(db, 'accounts'), storage: 'postgres' };
 }
 
 export function main(argv = process.argv): void {
@@ -63,6 +64,12 @@ export function main(argv = process.argv): void {
 }
 
 async function start(argv: string[]): Promise<void> {
+  const adminAt = argv.indexOf('admin');
+  if (adminAt !== -1 && adminAt <= 2) {
+    const { runAdmin } = await import('./admin-cli.ts');
+    process.exitCode = await runAdmin(argv.slice(adminAt + 1), defaultDataDir());
+    return;
+  }
   process.on('unhandledRejection', (error) => log(`unhandled rejection: ${(error as Error)?.stack ?? error}`));
   process.on('uncaughtException', (error) => log(`uncaught exception: ${error.stack ?? error}`));
 
@@ -86,8 +93,10 @@ async function start(argv: string[]): Promise<void> {
     process.exitCode = 1;
     return;
   }
-  const { store, authPersistence, storage } = await openStorage(dataDir);
-  const server = createApp(config, { store, fetcher, cache, log, authPersistence, storage });
+  const { store, authPersistence, accountsPersistence, storage } = await openStorage(dataDir);
+  const accounts = new Accounts(accountsPersistence, { ...bootstrapFromEnv(process.env) });
+  await accounts.load();
+  const server = createApp(config, { store, fetcher, cache, log, authPersistence, storage, accounts });
   server.listen(config.port, config.host, () => {
     const mode = config.github ? `GitHub OAuth${config.allowedGithubUsers.length ? ` (allowed: ${config.allowedGithubUsers.join(', ')})` : ' (any GitHub user)'}` : config.staticToken ? 'static token' : 'no auth (loopback only)';
     log(`http on ${config.host}:${config.port}  public URL: ${config.publicUrl}  auth: ${mode}  storage: ${storage === 'postgres' ? 'postgres' : dataDir}`);

@@ -299,3 +299,48 @@ test('client ID metadata documents work without registration', async () => {
     await app.close();
   }
 });
+
+test('invite-only: admins and invited logins get in and get accounts; others are refused; suspension cuts off at once', async () => {
+  const { Accounts, makeBootstrap, memoryPersistence } = await import('../src/accounts.ts');
+  const users = { 'gh-code-lawrence': { id: 42, login: 'Lawrence' }, 'gh-code-mallory': { id: 666, login: 'mallory' }, 'gh-code-eve': { id: 7, login: 'eve' } };
+  const accounts = new Accounts(memoryPersistence(), makeBootstrap(['lawrence'], []));
+  await accounts.invite('Mallory', 'test');
+  const app = await startApp({ github: { clientId: 'gh-client', clientSecret: 'gh-secret' } }, fakeUpstreams(users).fetcher, { accounts });
+  const getProfile = JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'get_profile', arguments: {} } });
+  const call = (token: string) => raw(app.port, { method: 'POST', path: '/mcp', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: getProfile });
+  try {
+    const clientId = await register(app);
+    const { verifier, challenge } = pkce();
+    const signIn = async (code: string) => {
+      const back = await authorize(app, clientId, challenge, code);
+      const granted = back.searchParams.get('code');
+      if (!granted) return { error: back.searchParams.get('error_description') };
+      const res = await raw(app.port, { method: 'POST', path: '/oauth/token', ...form({ grant_type: 'authorization_code', code: granted, client_id: clientId, redirect_uri: CLIENT_REDIRECT, code_verifier: verifier }) });
+      return JSON.parse(res.body) as { access_token: string; refresh_token: string };
+    };
+
+    const lawrence = await signIn('gh-code-lawrence');
+    const mallory = await signIn('gh-code-mallory');
+    const eve = await signIn('gh-code-eve');
+    assert.match(String((eve as { error: string }).error), /invite-only/);
+    assert.equal((await call((lawrence as { access_token: string }).access_token)).status, 200);
+    assert.equal((await call((mallory as { access_token: string }).access_token)).status, 200);
+
+    const { accounts: all, invites } = await accounts.list();
+    assert.deepEqual(all.map((a) => [a.id, a.role, a.via]).sort(), [['github-42', 'admin', 'bootstrap'], ['github-666', 'user', 'invite']]);
+    assert.equal(invites.length, 0, 'the invite is used up');
+
+    await accounts.setStatus('mallory', 'suspended', 'test', 'spam');
+    assert.equal((await call((mallory as { access_token: string }).access_token)).status, 401, 'suspension applies on the next request');
+    const refresh = await raw(app.port, { method: 'POST', path: '/oauth/token', ...form({ grant_type: 'refresh_token', refresh_token: (mallory as { refresh_token: string }).refresh_token, client_id: clientId }) });
+    assert.equal(JSON.parse(refresh.body).error, 'invalid_grant');
+    assert.match(String(((await signIn('gh-code-mallory')) as { error: string }).error), /suspended/);
+
+    await accounts.setStatus('github-666', 'active', 'test');
+    assert.ok('access_token' in (await signIn('gh-code-mallory')), 'reinstated');
+    const audit = (await accounts.auditLog()).map((e) => e.action);
+    assert.deepEqual(audit.slice(0, 2), ['account.reinstated', 'account.suspended']);
+  } finally {
+    await app.close();
+  }
+});

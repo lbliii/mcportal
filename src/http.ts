@@ -11,7 +11,8 @@
 import { timingSafeEqual } from 'node:crypto';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { OAuthServer } from './auth/oauth.ts';
-import { AuthStore, type AuthPersistence } from './auth/store.ts';
+import { AuthStore, fileAuthPersistence, type AuthPersistence } from './auth/store.ts';
+import { Accounts, bootstrapFromEnv } from './accounts.ts';
 import { limitsFromEnv, UsageBudget, type BudgetLimits } from './lib/budget.ts';
 import type { TtlCache } from './lib/cache.ts';
 import { isLoopbackHost } from './lib/ip.ts';
@@ -50,6 +51,8 @@ export interface AppDeps {
   budget?: UsageBudget;
   /** Where OAuth state persists; defaults to auth.json in the data directory. */
   authPersistence?: AuthPersistence;
+  /** Accounts, invites and roles; defaults to accounts.json in the data directory with bootstrap from the env. */
+  accounts?: Accounts;
   /** Reported by /health. */
   storage?: 'files' | 'postgres';
 }
@@ -132,17 +135,20 @@ const ABOUT = (base: string, oauth: boolean) => `<!doctype html><meta charset="u
 
 export function createApp(config: AppConfig, deps: AppDeps): Server {
   const log = deps.log ?? ((m: string) => process.stderr.write(`[mcportal] ${m}\n`));
+  // Normally passed in by server.ts; otherwise accounts.json next to the other data, bootstrapped from the env.
+  const accounts = deps.accounts ?? new Accounts(fileAuthPersistence(config.dataDir, 'accounts.json'), bootstrapFromEnv(process.env, config.allowedGithubUsers), deps.now);
   const oauth = config.github
     ? new OAuthServer(
         { publicUrl: config.publicUrl, github: config.github, allowedGithubUsers: config.allowedGithubUsers, trustProxy: config.trustProxy },
         new AuthStore(deps.authPersistence ?? config.dataDir, deps.now),
         deps.fetcher,
         deps.now,
+        accounts,
       )
     : undefined;
 
   const budget = deps.budget ?? new UsageBudget(config.limits ?? {}, deps.now);
-  const context = (userId: string): ToolContext => ({ store: deps.store, fetcher: deps.fetcher, cache: deps.cache, userId, budget });
+  const context = (userId: string): ToolContext => ({ store: deps.store, fetcher: deps.fetcher, cache: deps.cache, userId, budget, actor: accounts.actor(userId) });
 
   /** The user for a request, or undefined if it isn't authenticated. */
   async function authenticate(req: IncomingMessage): Promise<string | undefined> {

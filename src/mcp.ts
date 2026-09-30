@@ -5,6 +5,7 @@
  */
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
+import { authorize, localActor, toolAction } from './access.ts';
 import { budgetMessage, toolCost } from './lib/budget.ts';
 import { publicToolList, toolError, TOOLS, WORKSPACE_URI, type ToolContext } from './tools.ts';
 
@@ -106,6 +107,12 @@ export async function handleMessage(message: unknown, ctx: ToolContext, log: Log
       const tool = TOOLS.find((t) => t.name === name);
       if (!tool) return rpcError(req.id, RPC.invalidParams, `Unknown tool: ${name}`);
       const args = (params.arguments as Record<string, unknown> | undefined) ?? {};
+      // The one gate: every tool acts on the caller's own portal.
+      const decision = authorize(ctx.actor ?? localActor(ctx.userId), toolAction(name), { ownerId: ctx.userId });
+      if (!decision.ok) {
+        log(`tools/call ${name} denied: ${decision.reason}`);
+        return reply(req.id, toolError(decision.reason));
+      }
       if (ctx.budget) {
         const verdict = ctx.budget.take(ctx.userId, toolCost(name, args));
         if (!verdict.ok) {

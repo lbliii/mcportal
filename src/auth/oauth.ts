@@ -23,6 +23,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { fetchJson } from '../lib/safe-fetch.ts';
 import { clean } from '../lib/text.ts';
 import type { Fetcher } from '../types.ts';
+import { Accounts, makeBootstrap, memoryPersistence } from '../accounts.ts';
 import { CLIENT_LIMITS, type AuthStore, type Identity, type TokenRecord } from './store.ts';
 
 export const SCOPE = 'mcportal';
@@ -199,6 +200,7 @@ const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-headers
 export class OAuthServer {
   private config: OAuthConfig;
   private store: AuthStore;
+  private accounts: Accounts;
   private fetcher: Fetcher;
   private now: () => number;
   private txns = new Map<string, Txn>();
@@ -207,11 +209,13 @@ export class OAuthServer {
   private cimdCache = new Map<string, { info: ClientInfo; expiresAt: number }>();
   private limits: { register: RateLimiter; registerGlobal: RateLimiter; authorize: RateLimiter; token: RateLimiter };
 
-  constructor(config: OAuthConfig, store: AuthStore, fetcher: Fetcher, now: () => number = Date.now) {
+  constructor(config: OAuthConfig, store: AuthStore, fetcher: Fetcher, now: () => number = Date.now, accounts?: Accounts) {
     this.config = config;
     this.store = store;
     this.fetcher = fetcher;
     this.now = now;
+    // Without an accounts store, the allowlist alone decides (empty = anyone), as before accounts existed.
+    this.accounts = accounts ?? new Accounts(memoryPersistence(), makeBootstrap([], config.allowedGithubUsers), now);
     this.limits = {
       register: new RateLimiter(10, 60 * 60 * 1000, now),
       registerGlobal: new RateLimiter(200, 60 * 60 * 1000, now),
@@ -263,10 +267,9 @@ export class OAuthServer {
     };
   }
 
-  /** Is this GitHub identity (still) allowed? Checked at sign-in, on every request and on refresh. */
+  /** Is this GitHub identity (still) let in? Checked on every request, on token exchange and on refresh. */
   isAllowed(identity: Pick<Identity, 'githubId' | 'login'>): boolean {
-    const allowed = this.config.allowedGithubUsers;
-    return allowed.length === 0 || allowed.includes(identity.login.toLowerCase()) || allowed.includes(String(identity.githubId));
+    return this.accounts.isActive({ githubId: identity.githubId, login: identity.login });
   }
 
   /** Access-token check for /mcp. Returns the user id or undefined. */
@@ -525,7 +528,11 @@ export class OAuthServer {
     });
     if (typeof user.id !== 'number' || typeof user.login !== 'string') return toClient({ error: 'access_denied', error_description: 'Could not read GitHub profile' });
     const identity: Identity = { userId: `github-${user.id}`, githubId: user.id, login: user.login };
-    if (!this.isAllowed(identity)) return toClient({ error: 'access_denied', error_description: 'This MCPortal server is private' });
+    const admission = await this.accounts.admit({ githubId: user.id, login: user.login });
+    if (!admission.ok) {
+      const why = admission.reason === 'suspended' ? 'This account is suspended' : 'This MCPortal server is invite-only. Ask its owner for an invite.';
+      return toClient({ error: 'access_denied', error_description: why });
+    }
     const code = randomBytes(32).toString('base64url');
     setLimited(
       this.codes,
