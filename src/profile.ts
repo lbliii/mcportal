@@ -22,9 +22,18 @@ export interface ColumnSpec {
   panels: PanelSpec[];
 }
 
+/** columns: side-by-side panels. shelves: one horizontally scrolling row per panel. */
+export const LAYOUTS = ['columns', 'shelves'] as const;
+export type Layout = (typeof LAYOUTS)[number];
+/** Where a story opens: card = reader inside the workspace, chat = its own reader card in the conversation. */
+export const OPEN_IN = ['card', 'chat'] as const;
+export type OpenIn = (typeof OPEN_IN)[number];
+
 export interface Profile {
   version: 1;
   name: string;
+  layout: Layout;
+  openIn: OpenIn;
   columns: ColumnSpec[];
   updatedAt: string;
 }
@@ -40,6 +49,8 @@ export function defaultProfile(now = new Date()): Profile {
   return {
     version: 1,
     name: 'morning',
+    layout: 'columns',
+    openIn: 'card',
     updatedAt: now.toISOString(),
     columns: [
       { width: 1, panels: [{ id: 'hn-top', source: 'hn', title: 'Hacker News', config: { feed: 'top', limit: 12 } }] },
@@ -144,7 +155,9 @@ export function validateProfile(input: unknown, now = new Date()): Profile {
   });
 
   const name = clean(input.name, 60) || 'workspace';
-  return { version: 1, name, columns, updatedAt: now.toISOString() };
+  const layout = (LAYOUTS as readonly unknown[]).includes(input.layout) ? (input.layout as Layout) : 'columns';
+  const openIn = (OPEN_IN as readonly unknown[]).includes(input.openIn) ? (input.openIn as OpenIn) : 'card';
+  return { version: 1, name, layout, openIn, columns, updatedAt: now.toISOString() };
 }
 
 export function findPanel(profile: Profile, panelId: string): PanelSpec | undefined {
@@ -156,6 +169,7 @@ export function findPanel(profile: Profile, panelId: string): PanelSpec | undefi
 }
 
 export interface ProfileDiff {
+  settings: string[];
   added: string[];
   removed: string[];
   moved: string[];
@@ -173,7 +187,9 @@ function locate(profile: Profile): Map<string, { column: number; index: number; 
 export function diffProfiles(before: Profile, after: Profile): ProfileDiff {
   const a = locate(before);
   const b = locate(after);
-  const diff: ProfileDiff = { added: [], removed: [], moved: [], retitled: [], reconfigured: [] };
+  const diff: ProfileDiff = { settings: [], added: [], removed: [], moved: [], retitled: [], reconfigured: [] };
+  if (before.layout !== after.layout) diff.settings.push(`layout ${before.layout} → ${after.layout}`);
+  if (before.openIn !== after.openIn) diff.settings.push(`openIn ${before.openIn} → ${after.openIn}`);
   for (const [id, was] of a) {
     const now = b.get(id);
     if (!now) {
@@ -195,7 +211,8 @@ export function describeDiff(diff: ProfileDiff): string {
 
 /** A short, human-readable description of the layout, for the model and for diffs. */
 export function describeLayout(profile: Profile): string {
-  return profile.columns
+  const mode = `${profile.layout} layout, stories open in ${profile.openIn === 'chat' ? 'their own chat card' : 'the workspace'}`;
+  return `${mode}; ` + profile.columns
     .map((c, i) => `column ${i + 1} (width ${c.width}): ${c.panels.map((p) => `${p.title ?? p.id} [${p.source}]`).join(' / ')}`)
     .join('; ');
 }

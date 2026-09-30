@@ -38,9 +38,11 @@ Node **22.18+** (or any Node 24). Node runs the `.ts` files directly: no build s
 cd ~/Developer/mcportal
 npm test                 # 39 tests, offline
 npm run smoke            # live check against HN, GitHub and an RSS feed (needs network)
-npm start                # http://localhost:8787/preview  (bound to 127.0.0.1, no auth)
+npm start                # http://127.0.0.1:8787/preview  (bound to 127.0.0.1, no auth)
 npm run demo             # same, with canned data and no network
 ```
+
+To develop against Claude desktop (the workspace renders inline in chat, no deployment needed), see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Install as a plugin (local, stdio)
 

@@ -55,6 +55,7 @@ test('tools/list links open_workspace to the UI and hides app-only tools from th
   assert.deepEqual(tools.map((t) => t.name), ['open_workspace', 'get_profile', 'update_profile', 'read_source', 'refresh_panel', 'read_article', 'list_sources']);
   assert.equal(tools.find((t) => t.name === 'open_workspace')._meta.ui.resourceUri, WORKSPACE_URI);
   assert.deepEqual(tools.find((t) => t.name === 'refresh_panel')._meta.ui.visibility, ['app']);
+  assert.equal(tools.find((t) => t.name === 'read_article')._meta.ui.resourceUri, WORKSPACE_URI, 'reader renders as its own card');
   assert.ok(tools.every((t) => t.handler === undefined && t.inputSchema.type === 'object'));
 });
 
@@ -139,6 +140,20 @@ test('update_profile moves panels, reports the diff, and refuses silent removals
   assert.match(bad.content[0]!.text, /Profile not saved/);
 });
 
+test('update_profile saves layout and openIn, reports them, and keeps panels put', async () => {
+  const c = ctx();
+  const { profile } = (await call(c, 'get_profile')).structuredContent;
+  assert.equal(profile.layout, 'columns');
+  assert.equal(profile.openIn, 'card');
+  const saved = await call(c, 'update_profile', { profile: { ...profile, layout: 'shelves', openIn: 'chat' } });
+  assert.equal(saved.isError, undefined);
+  assert.match(saved.content[0]!.text, /settings: layout columns → shelves, openIn card → chat/);
+  assert.doesNotMatch(saved.content[0]!.text, /moved|removed|added/);
+  const after = (await call(c, 'open_workspace')).structuredContent.profile;
+  assert.equal(after.layout, 'shelves');
+  assert.equal(after.openIn, 'chat');
+});
+
 test('read_article returns fenced plain text with provenance', async () => {
   const result = await call(ctx(), 'read_article', { url: 'https://yashgarg.dev/posts/hijacking-ps5-rtmp-stream/' });
   const { article } = result.structuredContent;
@@ -172,6 +187,11 @@ test('validateProfile normalizes ids, limits, widths and untrusted titles', () =
   assert.equal(p.columns[0]!.panels[0]!.title, 'HN Front! [x] SYSTEM');
   assert.deepEqual(p.columns[0]!.panels[0]!.config, { feed: 'top', limit: 30 });
   assert.equal(new Set(p.columns[0]!.panels.map((x) => x.id)).size, 2);
+  assert.equal(p.layout, 'columns', 'layout defaults for older profiles');
+  assert.equal(p.openIn, 'card');
+  const odd = validateProfile({ layout: 'carousel', openIn: 'popup', columns: [{ panels: [{ source: 'hn' }] }] });
+  assert.equal(odd.layout, 'columns');
+  assert.equal(odd.openIn, 'card');
   assert.throws(() => validateProfile({ columns: [] }), ProfileError);
   assert.throws(() => validateProfile({ columns: [{ panels: [{ source: 'github', config: { mode: 'releases', repo: 'nope' } }] }] }), /owner\/name/);
   assert.throws(() => validateProfile({ columns: [1, 2, 3, 4, 5] }), /At most 4 columns/);

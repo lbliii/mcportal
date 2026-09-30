@@ -33,47 +33,83 @@
   }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
-  html, body { margin: 0; background: var(--bg2); color: var(--fg); font: 13.5px/1.45 var(--font-sans, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif); }
+  /* Inline in a chat the app has no backdrop of its own, so it sits in the host's
+     surface like native UI. Fullscreen and the browser preview (.framed) get one. */
+  :root { --page: transparent; --surface: transparent; }
+  :root.framed { --page: var(--bg2); --surface: var(--bg); }
+  html, body { margin: 0; background: var(--page); color: var(--fg); font: 13.5px/1.45 var(--font-sans, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif); }
   button { font: inherit; color: inherit; }
 
-  .bar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--bg); border-bottom: 1px solid var(--border); }
+  .bar { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 5px 8px 5px 12px; background: var(--page); border-bottom: 1px solid var(--border); }
   .brand { font-weight: 650; letter-spacing: -0.01em; }
+  .brand { display: inline-flex; align-items: center; gap: 5px; }
   .brand span { color: var(--accent); }
+  .brand .mark { display: inline-flex; }
+  .brand .mark svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
   .ws-name { color: var(--fg2); font-size: 12px; }
   .spacer { flex: 1; }
   .status { color: var(--fg2); font-size: 12px; }
   .btn { border: 1px solid var(--border); background: var(--bg); border-radius: 7px; padding: 4px 10px; font-size: 12px; cursor: pointer; }
   .btn:hover { background: var(--hover); }
   .btn[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+  /* icon controls: every control is a 26px square icon with a tooltip, so text keeps the room */
+  .ib { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--fg2); cursor: pointer; }
+  .ib:hover, .ib:focus-visible { background: var(--hover); color: var(--fg); outline: none; }
+  .ib[aria-pressed="true"] { color: var(--accent); background: var(--hover); }
+  .ib svg, .mi svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+  .ib.sm { width: 22px; height: 22px; }
+  .ib.sm svg { width: 14px; height: 14px; }
+  .seg { display: inline-flex; gap: 1px; padding: 1px; border: 1px solid var(--border); border-radius: 7px; }
+  .seg .ib { width: 24px; height: 22px; border-radius: 5px; }
+  .sep { width: 1px; height: 16px; background: var(--border); margin: 0 3px; }
+  :root.article-view .ws-only { display: none !important; }
 
-  .grid { display: flex; gap: 12px; padding: 12px; align-items: flex-start; overflow-x: auto; }
-  .col { display: flex; flex-direction: column; gap: 12px; min-width: 240px; flex-basis: 0; }
-  .panel { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); display: flex; flex-direction: column; overflow: hidden; }
-  .panel-head { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-bottom: 1px solid var(--border); }
+  /* columns: a lane of fixed-width columns that scrolls sideways; each column scrolls its own items */
+  :root { --lane-h: 560px; }
+  :root.fullscreen { --lane-h: calc(100vh - 38px); }
+  .grid { display: flex; gap: 10px; padding: 10px; height: var(--lane-h); overflow-x: auto; overflow-y: hidden; scroll-snap-type: x proximity; scroll-padding: 0 10px; overscroll-behavior-x: contain; }
+  .col { flex: var(--w, 1) 0 calc(var(--w, 1) * 288px); min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 10px; scroll-snap-align: start; }
+  .col .panel { flex: 1 1 0; min-height: 0; }
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); display: flex; flex-direction: column; overflow: hidden; }
+  .panel-head { display: flex; align-items: center; gap: 7px; padding: 5px 6px 5px 11px; border-bottom: 1px solid var(--border); }
   .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
   .panel-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .panel-count { color: var(--fg2); font-size: 12px; }
-  .icon-btn { margin-left: auto; border: 0; background: none; cursor: pointer; color: var(--fg2); padding: 2px 6px; border-radius: 6px; }
-  .icon-btn:hover { background: var(--hover); color: var(--fg); }
-  .items { list-style: none; margin: 0; padding: 4px; max-height: 480px; overflow-y: auto; }
-  :root.fullscreen .items { max-height: calc(100vh - 170px); }
-  .item { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 8px 9px; border-radius: 7px; cursor: pointer; }
+  .panel-head .tools { margin-left: auto; display: flex; gap: 1px; }
+  .items { list-style: none; margin: 0; padding: 3px; flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+  .item { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 6px 8px; border-radius: 6px; cursor: pointer; }
   .item:hover, .item:focus-visible { background: var(--hover); outline: none; }
-  .item-title { font-weight: 500; }
-  .item-meta { color: var(--fg2); font-size: 12px; margin-top: 2px; display: flex; flex-wrap: wrap; gap: 4px 10px; }
-  .item-summary { color: var(--fg2); font-size: 12.5px; margin-top: 3px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  .item-links { display: flex; gap: 10px; margin-top: 4px; }
-  .link { font-size: 12px; color: var(--accent); background: none; border: 0; padding: 0; cursor: pointer; }
-  .link:hover { text-decoration: underline; }
+  .item-title { font-weight: 500; line-height: 1.35; }
+  .item-meta { color: var(--fg2); font-size: 11.5px; margin-top: 2px; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 9px; }
+  .item-summary { color: var(--fg2); font-size: 12.5px; margin-top: 2px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  /* inline meta icons: comment count links to the discussion, the arrow opens the original */
+  .mi { display: inline-flex; align-items: center; gap: 3px; border: 0; padding: 1px 3px; margin: -1px -3px; border-radius: 4px; background: none; color: inherit; font: inherit; cursor: pointer; }
+  .mi svg { width: 12px; height: 12px; }
+  .mi:hover, .mi:focus-visible { color: var(--accent); background: var(--bg2); outline: none; }
+  .mi.go { margin-left: auto; }
   .panel-foot { display: none; padding: 7px 12px; border-top: 1px solid var(--border); color: var(--fg2); font-size: 11.5px; word-break: break-all; }
   :root.show-sources .panel-foot { display: block; }
+  /* shelves: one horizontally scrolling row of cards per panel */
+  .grid.shelves { display: block; height: auto; padding: 10px 0 2px; overflow: visible; }
+  .shelf { margin-bottom: 12px; }
+  .shelf-head { display: flex; align-items: center; gap: 7px; padding: 0 8px 4px 12px; }
+  .shelf-head .tools { margin-left: auto; display: flex; gap: 1px; }
+  .shelf-row { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding: 0 12px; padding: 2px 12px 10px; scrollbar-width: thin; }
+  .card { flex: 0 0 216px; width: 216px; min-width: 0; overflow: hidden; height: 150px; scroll-snap-align: start; background: var(--surface); border: 1px solid var(--border); border-top: 3px solid var(--c); border-radius: var(--radius); padding: 9px 11px; display: flex; flex-direction: column; gap: 4px; cursor: pointer; }
+  .card:hover, .card:focus-visible { background: var(--hover); outline: none; }
+  .card .item-title { font-weight: 600; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .card .item-summary { margin-top: 0; }
+  .card .item-meta { margin-top: auto; flex-wrap: nowrap; overflow: hidden; white-space: nowrap; }
+  :root.fullscreen .card { flex-basis: 264px; width: 264px; height: 176px; }
+  .shelf .panel-foot { border: 0; padding: 0 12px 4px; }
   .empty, .error { padding: 16px 12px; color: var(--fg2); }
   .error { color: #c2410c; }
   .skeleton { height: 12px; margin: 12px; border-radius: 4px; background: var(--hover); }
 
   .reader { max-width: 740px; margin: 0 auto; padding: 16px 20px 40px; }
   .reader[hidden] { display: none; }
-  .reader-top { display: flex; gap: 8px; align-items: center; margin-bottom: 14px; }
+  :root:not(.fullscreen) .reader { max-height: 640px; overflow-y: auto; }
+  .reader-top { display: flex; gap: 2px; align-items: center; margin: -6px 0 10px -6px; }
   .reader h1 { font-size: 24px; line-height: 1.25; margin: 6px 0 6px; letter-spacing: -0.01em; }
   .reader .byline { color: var(--fg2); margin-bottom: 18px; }
   .reader .body p, .reader .body li { font-size: 15px; line-height: 1.65; margin: 0 0 14px; }
@@ -87,13 +123,19 @@
 </head>
 <body>
 <header class="bar">
-  <div class="brand">MC<span>Portal</span></div>
+  <div class="brand"><span class="mark" data-icon="portal"></span>MC<span>Portal</span></div>
   <div class="ws-name" id="wsName"></div>
   <div class="spacer"></div>
   <span class="status" id="status">Connecting…</span>
-  <button class="btn" id="btnSources" aria-pressed="false" title="Show where each panel's data came from">Sources</button>
-  <button class="btn" id="btnRefresh" title="Refresh all panels">Refresh</button>
-  <button class="btn" id="btnExpand" title="Toggle fullscreen">Expand</button>
+  <span class="sep ws-only"></span>
+  <div class="seg ws-only" role="group" aria-label="Layout">
+    <button class="ib" data-layout="columns" data-icon="columns" aria-pressed="true" title="Columns: scroll sideways, then down each column" aria-label="Columns layout"></button>
+    <button class="ib" data-layout="shelves" data-icon="shelves" aria-pressed="false" title="Shelves: one sideways row per source" aria-label="Shelves layout"></button>
+  </div>
+  <button class="ib ws-only" id="btnOpenIn" data-icon="chat" aria-pressed="false" title="Open stories as their own card in the conversation" aria-label="Open stories in chat" hidden></button>
+  <button class="ib ws-only" id="btnSources" data-icon="sources" aria-pressed="false" title="Show where each panel's data came from" aria-label="Show sources"></button>
+  <button class="ib ws-only" id="btnRefresh" data-icon="refresh" title="Refresh all panels" aria-label="Refresh all panels"></button>
+  <button class="ib" id="btnExpand" data-icon="expand" title="Fullscreen" aria-label="Fullscreen"></button>
 </header>
 <main id="grid" class="grid" aria-live="polite">
   <div class="col" style="flex-grow:1"><div class="panel"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div></div>
@@ -107,7 +149,38 @@
   const APP_INFO = { name: 'mcportal-workspace', version: '0.1.0' };
   const DEV = window.__MCPORTAL_DEV__ || null;   // set by /preview: talk to /mcp directly
   const root = document.documentElement;
+  if (DEV) root.classList.add('framed');
   const $ = (id) => document.getElementById(id);
+
+  // MCPortal icon set: 24px grid, 1.75px round strokes, 1.5px corner radius, drawn in currentColor.
+  const ICONS = {
+    portal: 'M7.5 3.5h9a4 4 0 0 1 4 4v9a4 4 0 0 1 -4 4h-9a4 4 0 0 1 -4 -4v-9a4 4 0 0 1 4 -4z M8.5 19.5v-6a3.5 3.5 0 0 1 7 0v6',
+    columns: 'M5 4h3a1.5 1.5 0 0 1 1.5 1.5v13a1.5 1.5 0 0 1 -1.5 1.5h-3a1.5 1.5 0 0 1 -1.5 -1.5v-13a1.5 1.5 0 0 1 1.5 -1.5z M13.5 4h3a1.5 1.5 0 0 1 1.5 1.5v13a1.5 1.5 0 0 1 -1.5 1.5h-3a1.5 1.5 0 0 1 -1.5 -1.5v-13a1.5 1.5 0 0 1 1.5 -1.5z M20.5 5.5v13',
+    shelves: 'M5 4.5h5a1.5 1.5 0 0 1 1.5 1.5v3a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 9V6A1.5 1.5 0 0 1 5 4.5z M20.5 4.5h-5A1.5 1.5 0 0 0 14 6v3a1.5 1.5 0 0 0 1.5 1.5h5 M5 13.5h2a1.5 1.5 0 0 1 1.5 1.5v3A1.5 1.5 0 0 1 7 19.5H5A1.5 1.5 0 0 1 3.5 18v-3A1.5 1.5 0 0 1 5 13.5z M20.5 13.5h-8a1.5 1.5 0 0 0-1.5 1.5v3a1.5 1.5 0 0 0 1.5 1.5h8',
+    chat: 'M11 5H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h1.5v3l4-3H16a2 2 0 0 0 2-2v-3 M14.5 4.5h5v5 M19.5 4.5l-6 6',
+    sources: 'M5 19h.01 M5 12.5a6.5 6.5 0 0 1 6.5 6.5 M5 6a13 13 0 0 1 13 13',
+    refresh: 'M19.5 12a7.5 7.5 0 1 1-2.2-5.3l2.2 2.3 M19.5 4.5V9H15',
+    expand: 'M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9 M15 4h3.5A1.5 1.5 0 0 1 20 5.5V9 M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15 M9 20H5.5A1.5 1.5 0 0 1 4 18.5V15',
+    collapse: 'M9 4v3.5A1.5 1.5 0 0 1 7.5 9H4 M20 9h-3.5A1.5 1.5 0 0 1 15 7.5V4 M15 20v-3.5a1.5 1.5 0 0 1 1.5-1.5H20 M4 15h3.5A1.5 1.5 0 0 1 9 16.5V20',
+    back: 'M19 12H5.5 M11 6l-6 6 6 6',
+    left: 'M14.5 6l-6 6 6 6',
+    right: 'M9.5 6l6 6-6 6',
+    external: 'M13.5 4.5h6v6 M19.5 4.5l-8 8 M17.5 14v4a2 2 0 0 1-2 2h-9.5a2 2 0 0 1-2-2V8.5a2 2 0 0 1 2-2h4',
+    comment: 'M6 5h12a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-6.5l-4.5 3.5v-3.5H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z',
+    up: 'M12 19V6.5 M6.5 12L12 6.5l5.5 5.5',
+  };
+  function icon(name) {
+    const NS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('aria-hidden', 'true');
+    const path = document.createElementNS(NS, 'path'); path.setAttribute('d', ICONS[name]);
+    svg.append(path);
+    return svg;
+  }
+  function iconButton(name, label, onclick, cls = 'ib sm') {
+    return el('button', { class: cls, title: label, 'aria-label': label, onclick }, icon(name));
+  }
+  for (const node of document.querySelectorAll('[data-icon]')) node.replaceChildren(icon(node.dataset.icon));
 
   // ------------------------------------------------------------ host bridge (MCP Apps, postMessage JSON-RPC)
   const pending = new Map();
@@ -120,6 +193,7 @@
   let devToken = null;
   try { devToken = DEV && DEV.needsToken ? sessionStorage.getItem('mcportal-token') : null; } catch { devToken = null; }
   let loading = null;
+  let articleUrl = null;   // set when this view belongs to a read_article call (a reader card)
 
   function hostRequest(method, params, timeoutMs = 30000) {
     const id = nextId++;
@@ -154,12 +228,15 @@
 
   function onHostNotification(method, params) {
     if (method === 'ui/notifications/tool-input' || method === 'ui/notifications/tool-input-partial') {
-      toolRunning = true;   // the host is running open_workspace for us: wait for its result
+      toolRunning = true;   // the host is running our tool: wait for its result
+      const args = params.arguments || {};
+      if (typeof args.url === 'string') { articleUrl = args.url; root.classList.add('article-view'); }
       setStatus('Loading…');
     } else if (method === 'ui/notifications/tool-result') {
       toolRunning = false;
       const data = params.structuredContent;
-      if (data && data.profile && data.panels) { gotInitialResult = true; renderWorkspace(data); }
+      if (data && data.article) { gotInitialResult = true; showArticleCard(data.article); }
+      else if (data && data.profile && data.panels) { gotInitialResult = true; renderWorkspace(data); }
       else if (params.isError) setStatus('The workspace could not load');
     } else if (method === 'ui/notifications/host-context-changed') {
       applyHostContext(params);
@@ -215,15 +292,21 @@
   function setDisplayMode(mode) {
     displayMode = mode;
     root.classList.toggle('fullscreen', mode === 'fullscreen');
-    $('btnExpand').textContent = mode === 'fullscreen' ? 'Collapse' : 'Expand';
+    root.classList.toggle('framed', mode === 'fullscreen' || Boolean(DEV));
+    const full = mode === 'fullscreen';
+    $('btnExpand').replaceChildren(icon(full ? 'collapse' : 'expand'));
+    $('btnExpand').title = full ? 'Exit fullscreen' : 'Fullscreen';
+    $('btnExpand').setAttribute('aria-label', $('btnExpand').title);
   }
 
-  // Tell the host how tall we are so the inline frame fits the content.
+  // Tell the host how tall we are so the inline frame fits the content. Measure the
+  // body, not documentElement.scrollHeight: that never drops below the frame's current
+  // height, so the frame could grow (reader view) but never shrink back.
   let lastHeight = 0, sizeTimer = 0;
   new ResizeObserver(() => {
     clearTimeout(sizeTimer);
     sizeTimer = setTimeout(() => {
-      const height = Math.ceil(document.documentElement.scrollHeight);
+      const height = Math.ceil(document.body.getBoundingClientRect().height);
       if (Math.abs(height - lastHeight) > 2) { lastHeight = height; hostNotify('ui/notifications/size-changed', { width: Math.ceil(window.innerWidth), height }); }
     }, 60);
   }).observe(document.body);
@@ -256,7 +339,12 @@
     if (s < 86400 * 30) return `${Math.floor(s / 86400)}d ago`;
     return new Date(iso).toLocaleDateString();
   }
-  function setStatus(text) { $('status').textContent = text; }
+  function setStatus(text) { $('status').textContent = text; $('status').title = ''; }
+  function setUpdated(iso) {
+    const t = new Date(iso || Date.now());
+    setStatus(t.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }));
+    $('status').title = `Updated ${t.toLocaleString()}`;
+  }
   let toastTimer = 0;
   function toast(text) {
     const t = $('toast'); t.textContent = text; t.classList.add('show');
@@ -264,22 +352,71 @@
   }
 
   function renderWorkspace(data) {
-    state.profile = data.profile;
+    state.profile = { layout: 'columns', openIn: 'card', ...data.profile };
     state.panels = new Map(data.panels.map((p) => [p.panelId, p]));
     $('wsName').textContent = `· ${data.profile.name}`;
-    const grid = $('grid');
-    grid.replaceChildren(...data.profile.columns.map((col) =>
-      el('div', { class: 'col', style: `flex-grow:${col.width}` }, col.panels.map((spec) => renderPanel(spec.id)))));
-    setStatus(`Updated ${new Date(data.generatedAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
+    drawLayout();
+    setUpdated(data.generatedAt);
     if (data.notice) toast(data.notice);
   }
 
+  function drawLayout() {
+    const p = state.profile;
+    const shelves = p.layout === 'shelves';
+    const grid = $('grid');
+    grid.classList.toggle('shelves', shelves);
+    grid.replaceChildren(...(shelves
+      ? p.columns.flatMap((col) => col.panels).map((spec) => renderShelf(spec.id))
+      : p.columns.map((col) => el('div', { class: 'col', style: `--w:${col.width}` }, col.panels.map((spec) => renderPanel(spec.id))))));
+    for (const b of document.querySelectorAll('[data-layout]')) b.setAttribute('aria-pressed', String(b.dataset.layout === p.layout));
+    $('btnOpenIn').setAttribute('aria-pressed', String(p.openIn === 'chat'));
+  }
+
+  function renderShelf(panelId) {
+    const panel = state.panels.get(panelId);
+    const wrap = el('section', { class: 'shelf', 'data-panel': panelId });
+    if (!panel) { wrap.append(el('div', { class: 'empty' }, 'Loading…')); return wrap; }
+    const color = `var(--src-${panel.source})`;
+    const row = el('div', { class: 'shelf-row' });
+    const page = (dir) => row.scrollBy({ left: dir * Math.max(200, row.clientWidth - 60), behavior: 'smooth' });
+    wrap.append(el('div', { class: 'shelf-head' },
+      el('span', { class: 'dot', style: `background:${color}` }),
+      el('span', { class: 'panel-title', title: panel.title }, panel.title),
+      el('span', { class: 'panel-count' }, panel.error ? '' : String(panel.items.length)),
+      el('span', { class: 'tools' },
+        iconButton('left', `Scroll ${panel.title} left`, () => page(-1)),
+        iconButton('right', `Scroll ${panel.title} right`, () => page(1)),
+        iconButton('refresh', `Refresh ${panel.title}`, () => refreshPanel(panelId)))));
+    if (panel.error) wrap.append(el('div', { class: 'error' }, `Couldn't load: ${panel.error}`));
+    else if (!panel.items.length) wrap.append(el('div', { class: 'empty' }, 'Nothing here yet.'));
+    else {
+      row.append(...panel.items.map((item) => renderCard(item, panel, color)));
+      wrap.append(row);
+    }
+    const p = panel.provenance;
+    wrap.append(el('div', { class: 'panel-foot' }, `${p.source} · ${p.endpoint} · fetched ${new Date(p.fetchedAt).toLocaleTimeString()}${p.cached ? ' (cached)' : ''}`));
+    return wrap;
+  }
+
+  function renderCard(item, panel, color) {
+    const meta = compactMeta(item).out;
+    return el('div', {
+      class: 'card', role: 'button', tabindex: '0', style: `--c:${color}`, title: item.title,
+      onclick: () => openItem(item, panel),
+      onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) openItem(item, panel); },
+    },
+      el('div', { class: 'item-title' }, item.title),
+      item.summary ? el('div', { class: 'item-summary' }, item.summary) : null,
+      meta.length ? el('div', { class: 'item-meta' }, meta) : null);
+  }
+
   function renderPanel(panelId) {
+    if (state.profile && state.profile.layout === 'shelves') return renderShelf(panelId);
     const panel = state.panels.get(panelId);
     const wrap = el('section', { class: 'panel', 'data-panel': panelId });
     if (!panel) { wrap.append(el('div', { class: 'empty' }, 'Loading…')); return wrap; }
     const color = `var(--src-${panel.source})`;
-    const refresh = el('button', { class: 'icon-btn', title: 'Refresh panel', 'aria-label': `Refresh ${panel.title}`, onclick: () => refreshPanel(panelId) }, '↻');
+    const refresh = el('span', { class: 'tools' }, iconButton('refresh', `Refresh ${panel.title}`, () => refreshPanel(panelId)));
     wrap.append(el('div', { class: 'panel-head' },
       el('span', { class: 'dot', style: `background:${color}` }),
       el('span', { class: 'panel-title', title: panel.title }, panel.title),
@@ -294,25 +431,38 @@
     return wrap;
   }
 
-  function renderItem(item, panel) {
-    const meta = [...item.meta];
-    if (item.publishedAt) meta.push(ago(item.publishedAt));
-    const links = [];
-    if (item.url) links.push(el('button', { class: 'link', onclick: (e) => { e.stopPropagation(); openLink(item.url); } }, 'Open ↗'));
-    if (item.discussionUrl && item.discussionUrl !== item.url) {
-      links.push(el('button', { class: 'link', onclick: (e) => { e.stopPropagation(); openLink(item.discussionUrl); } }, 'Discussion'));
+  // Compact meta: "364 points" -> ▲364, "192 comments" -> a comment-count link to the
+  // discussion, "by someone" dropped (kept in the tooltip). Unknown strings pass through.
+  function compactMeta(item) {
+    const out = [];
+    let byline = '';
+    for (const m of item.meta) {
+      let hit;
+      if ((hit = /^([\d.,]+k?) points?$/.exec(m))) out.push(el('span', { class: 'mi', style: 'cursor:default' }, icon('up'), hit[1]));
+      else if ((hit = /^([\d.,]+k?) comments?$/.exec(m))) {
+        const url = item.discussionUrl && item.discussionUrl !== item.url ? item.discussionUrl : null;
+        out.push(url
+          ? el('button', { class: 'mi', title: 'Open the discussion', 'aria-label': `${hit[1]} comments, open the discussion`, onclick: (e) => { e.stopPropagation(); openLink(url); } }, icon('comment'), hit[1])
+          : el('span', { class: 'mi', style: 'cursor:default' }, icon('comment'), hit[1]));
+      } else if (/^by /.test(m)) byline = m;
+      else out.push(el('span', null, m));
     }
-    const readable = item.url && panel.source !== 'github';
+    if (item.publishedAt) out.push(el('span', null, ago(item.publishedAt)));
+    return { out, byline };
+  }
+
+  function renderItem(item, panel) {
+    const { out, byline } = compactMeta(item);
+    if (item.url) out.push(el('button', { class: 'mi go', title: 'Open the original', 'aria-label': 'Open the original', onclick: (e) => { e.stopPropagation(); openLink(item.url); } }, icon('external')));
     return el('div', {
       class: 'item', role: 'button', tabindex: '0',
-      title: readable ? 'Open in reader view' : 'Open',
-      onclick: () => (readable ? openReader(item, panel) : openLink(item.url)),
-      onkeydown: (e) => { if (e.key === 'Enter') (readable ? openReader(item, panel) : openLink(item.url)); },
+      title: [item.url && panel.source !== 'github' ? 'Open in reader view' : 'Open', byline].filter(Boolean).join(' · '),
+      onclick: () => openItem(item, panel),
+      onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) openItem(item, panel); },
     },
       el('div', { class: 'item-title' }, item.title),
-      meta.length ? el('div', { class: 'item-meta' }, meta.map((m) => el('span', null, m))) : null,
       item.summary ? el('div', { class: 'item-summary' }, item.summary) : null,
-      links.length ? el('div', { class: 'item-links' }, links) : null);
+      out.length ? el('div', { class: 'item-meta' }, out) : null);
   }
 
   async function refreshPanel(panelId) {
@@ -362,24 +512,73 @@
   }
 
   // ------------------------------------------------------------ reader view
+  function openItem(item, panel) {
+    const readable = item.url && panel.source !== 'github';
+    if (!readable) return openLink(item.url);
+    if (!DEV && state.profile && state.profile.openIn === 'chat') return openInChat(item, panel);
+    return openReader(item, panel);
+  }
+
+  // Ask the host to post a message so the model opens the story with read_article,
+  // which renders as its own reader card below this one. Only the URL goes into the
+  // message: titles are third-party text and must never be spoken in the user's voice.
+  async function openInChat(item, panel) {
+    if (!isHttpUrl(item.url) || item.url.length > 2000) return openReader(item, panel);
+    try {
+      await hostRequest('ui/message', { role: 'user', content: [{ type: 'text', text: `Open this in MCPortal's reader view: ${item.url}` }] }, 10000);
+      toast('Opening in the conversation…');
+    } catch {
+      toast('This host cannot open a new card; opening here instead');
+      openReader(item, panel);
+    }
+  }
+
+  function articleNodes(a, via, withBack) {
+    const body = el('div', { class: 'body' }, a.blocks.map((b) =>
+      b.type === 'h' ? el('h2', null, b.text)
+      : b.type === 'pre' ? el('pre', null, b.text)
+      : b.type === 'quote' ? el('blockquote', null, b.text)
+      : b.type === 'li' ? el('p', null, `• ${b.text}`)
+      : el('p', null, b.text)));
+    const site = a.siteName && a.siteName !== a.byline ? a.siteName : null;
+    const by = [a.byline, site, `${Math.max(1, Math.round(a.wordCount / 230))} min read`].filter(Boolean).join(' · ');
+    const p = a.provenance;
+    return [readerTop(a.url, withBack), el('h1', null, a.title), el('div', { class: 'byline' }, by), body,
+      el('div', { class: 'prov' }, `Reader view of ${p.endpoint}${via ? ` · via ${via}` : ''} · fetched ${new Date(p.fetchedAt).toLocaleString()}${p.cached ? ' (cached)' : ''}. Text only; scripts, trackers and ads removed.`)];
+  }
+
+  // This view belongs to a read_article call: it is a reader card, not a workspace.
+  function showArticleCard(a) {
+    root.classList.add('article-view');
+    $('wsName').textContent = '· reader';
+    $('grid').hidden = true;
+    const reader = $('reader');
+    reader.hidden = false; reader.scrollTop = 0;
+    reader.replaceChildren(...articleNodes(a, null, false));
+    setStatus('');
+  }
+
+  async function loadArticleCard(url) {
+    setStatus('Loading…');
+    try {
+      const result = await callTool('read_article', { url });
+      showArticleCard(result.structuredContent.article);
+    } catch (error) {
+      setStatus('');
+      $('grid').hidden = true;
+      $('reader').hidden = false;
+      $('reader').replaceChildren(readerTop(url, false), el('div', { class: 'error' }, `Reader view isn't available for this page (${error.message}).`));
+    }
+  }
+
   async function openReader(item, panel) {
     const reader = $('reader');
-    $('grid').hidden = true; reader.hidden = false; window.scrollTo(0, 0);
-    reader.replaceChildren(readerTop(item.url), el('h1', null, item.title), el('div', { class: 'byline' }, 'Loading reader view…'));
+    $('grid').hidden = true; reader.hidden = false; reader.scrollTop = 0; window.scrollTo(0, 0);
+    reader.replaceChildren(readerTop(item.url, true), el('h1', null, item.title), el('div', { class: 'byline' }, 'Loading reader view…'));
     try {
       const result = await callTool('read_article', { url: item.url });
       const a = result.structuredContent.article;
-      const body = el('div', { class: 'body' }, a.blocks.map((b) =>
-        b.type === 'h' ? el('h2', null, b.text)
-        : b.type === 'pre' ? el('pre', null, b.text)
-        : b.type === 'quote' ? el('blockquote', null, b.text)
-        : b.type === 'li' ? el('p', null, `• ${b.text}`)
-        : el('p', null, b.text)));
-      const site = a.siteName && a.siteName !== a.byline ? a.siteName : null;
-      const by = [a.byline, site, `${Math.max(1, Math.round(a.wordCount / 230))} min read`].filter(Boolean).join(' · ');
-      const p = a.provenance;
-      reader.replaceChildren(readerTop(a.url), el('h1', null, a.title), el('div', { class: 'byline' }, by), body,
-        el('div', { class: 'prov' }, `Reader view of ${p.endpoint} · via ${panel.title} · fetched ${new Date(p.fetchedAt).toLocaleString()}${p.cached ? ' (cached)' : ''}. Text only; scripts, trackers and ads removed.`));
+      reader.replaceChildren(...articleNodes(a, panel.title, true));
       if (!DEV) {
         const safeTitle = String(a.title).replace(/[\u0000-\u001f\u007f\u2028\u2029"]/g, ' ').slice(0, 160);
         hostRequest('ui/update-model-context', {
@@ -388,17 +587,17 @@
         }, 5000).catch(() => {});
       }
     } catch (error) {
-      reader.replaceChildren(readerTop(item.url), el('h1', null, item.title),
+      reader.replaceChildren(readerTop(item.url, true), el('h1', null, item.title),
         el('div', { class: 'error' }, `Reader view isn't available for this page (${error.message}).`),
         el('button', { class: 'btn', onclick: () => openLink(item.url) }, 'Open the original'));
     }
   }
-  function readerTop(url) {
+  function readerTop(url, withBack) {
     return el('div', { class: 'reader-top' },
-      el('button', { class: 'btn', onclick: closeReader }, '← Back'),
-      el('button', { class: 'btn', onclick: () => openLink(url) }, 'Open original ↗'));
+      withBack ? iconButton('back', 'Back to the workspace', closeReader, 'ib') : null,
+      iconButton('external', 'Open the original', () => openLink(url), 'ib'));
   }
-  function closeReader() { $('reader').hidden = true; $('grid').hidden = false; }
+  function closeReader() { if (articleUrl) return; $('reader').hidden = true; $('grid').hidden = false; }
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('reader').hidden) closeReader(); });
 
   // ------------------------------------------------------------ toolbar
@@ -406,11 +605,31 @@
     const on = !root.classList.contains('show-sources');
     root.classList.toggle('show-sources', on); e.currentTarget.setAttribute('aria-pressed', String(on));
   });
+  // Layout and open-in are saved to the profile, so the next open_workspace keeps them.
+  async function saveSettings(change) {
+    if (!state.profile) return;
+    const before = state.profile;
+    state.profile = { ...before, ...change };
+    drawLayout();
+    try {
+      const result = await callTool('update_profile', { profile: state.profile });
+      state.profile = result.structuredContent.profile;
+    } catch (error) {
+      state.profile = before; drawLayout();
+      toast(`Couldn't save: ${error.message}`);
+    }
+  }
+  for (const b of document.querySelectorAll('[data-layout]')) {
+    b.addEventListener('click', () => { if (state.profile && state.profile.layout !== b.dataset.layout) saveSettings({ layout: b.dataset.layout }); });
+  }
+  $('btnOpenIn').addEventListener('click', () => {
+    if (state.profile) saveSettings({ openIn: state.profile.openIn === 'chat' ? 'card' : 'chat' });
+  });
   $('btnRefresh').addEventListener('click', async () => {
     if (!state.profile) return loadWorkspace();
     setStatus('Refreshing…');
     await Promise.all([...state.panels.keys()].map(refreshPanel));
-    setStatus(`Updated ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
+    setUpdated();
   });
   $('btnExpand').addEventListener('click', async () => {
     const want = displayMode === 'fullscreen' ? 'inline' : 'fullscreen';
@@ -437,6 +656,7 @@
     } catch (error) {
       console.warn('[mcportal] ui/initialize failed', error);
     }
+    $('btnOpenIn').hidden = false;
     hostNotify('ui/notifications/initialized', {});
     // If the host opened us without running the tool (e.g. a restored view), fetch the
     // workspace ourselves. If it IS running the tool, wait for that result instead.
@@ -444,7 +664,7 @@
     const check = () => {
       if (gotInitialResult) return;
       if (toolRunning && Date.now() - started < 45000) { setTimeout(check, 1000); return; }
-      loadWorkspace();
+      articleUrl ? loadArticleCard(articleUrl) : loadWorkspace();
     };
     setTimeout(check, 3000);
   }
