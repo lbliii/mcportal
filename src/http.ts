@@ -13,7 +13,10 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { OAuthServer } from './auth/oauth.ts';
 import { AuthStore, fileAuthPersistence, type AuthPersistence } from './auth/store.ts';
 import { Accounts, bootstrapFromEnv } from './accounts.ts';
+import { AccountPage } from './account.ts';
 import { AdminPanel } from './admin.ts';
+import { deliverToFile } from './portability.ts';
+import type { PublicProfiles } from './public-profiles.ts';
 import { DEFAULT_SUPPORT_URL, serveSite, type SiteConfig } from './site.ts';
 import { limitsFromEnv, UsageBudget, type BudgetLimits } from './lib/budget.ts';
 import type { TtlCache } from './lib/cache.ts';
@@ -51,6 +54,8 @@ export interface AppDeps {
   store: ProfileStore;
   /** Clips; defaults to files under the data directory. */
   clips?: ClipStore;
+  /** Handles and public profiles (only with GitHub sign-in: a single-token server has no social layer). */
+  publicProfiles?: PublicProfiles;
   fetcher: Fetcher;
   cache: TtlCache;
   log?: Log;
@@ -153,7 +158,19 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
   const budget = deps.budget ?? new UsageBudget(config.limits ?? {}, deps.now);
   const site: SiteConfig = { supportUrl: DEFAULT_SUPPORT_URL, ...config.site, publicUrl: config.publicUrl, inviteOnly: Boolean(oauth) && !accounts.openSignup };
   const clips = deps.clips ?? new FileClipStore(config.dataDir);
-  const context = (userId: string): ToolContext => ({ store: deps.store, clips, fetcher: deps.fetcher, cache: deps.cache, userId, budget, actor: accounts.actor(userId) });
+  const publicProfiles = oauth ? deps.publicProfiles : undefined;
+  // The account page needs GitHub sign-in; without it, exports are written to the data directory.
+  const account = oauth ? new AccountPage({ accounts, oauth, store: deps.store, clips, publicProfiles, publicUrl: config.publicUrl, log, now: deps.now }) : undefined;
+  const context = (userId: string): ToolContext => ({
+    store: deps.store, clips, publicProfiles, fetcher: deps.fetcher, cache: deps.cache, userId, budget, actor: accounts.actor(userId),
+    accountUrl: account?.url,
+    deliver: async (format) => {
+      if (!account) return deliverToFile(format, userId, { store: deps.store, clips }, config.dataDir);
+      // Built when the link is opened, so it's current and the big ones aren't built twice.
+      const summary = { mcportal: 'everything', bookmarks: 'saved items', clips: 'clips as Markdown', opml: 'sources as OPML' }[format];
+      return { kind: 'link', where: account.downloadLink(userId, format), summary };
+    },
+  });
 
   /** The user for a request, or undefined if it isn't authenticated. */
   async function authenticate(req: IncomingMessage): Promise<string | undefined> {
@@ -203,6 +220,7 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
     }
     if (oauth && (await oauth.handle(req, res, url))) return;
     if (admin && (await admin.handle(req, res, url))) return;
+    if (account && (await account.handle(req, res, url))) return;
 
     if (req.method === 'GET' && (await serveSite(res, url.pathname, site))) return;
 

@@ -20,7 +20,8 @@ const DAY = 86_400_000;
 /** Units for one call. Unknown tools cost 1. */
 export function toolCost(name: string, args: Record<string, unknown>): number {
   switch (name) {
-    case 'import_opml': return 20;
+    case 'import_opml': case 'import_portal': return 20;
+    case 'export_data': return 5;
     case 'find_source': return 5;
     case 'open_workspace': return 3;
     case 'refresh_panel': case 'read_article': case 'read_source': case 'add_panel': return 2;

@@ -421,3 +421,77 @@ test('admin page: browser-bound GitHub sign-in, admins only, CSRF and same-origi
     await app.close();
   }
 });
+
+test('account page: download everything, one-time links, and delete the account (CSRF, typed confirmation, tokens revoked)', async () => {
+  const { Accounts, makeBootstrap, memoryPersistence } = await import('../src/accounts.ts');
+  const { PublicProfiles } = await import('../src/public-profiles.ts');
+  const { MemoryClipStore } = await import('../src/clips.ts');
+  const users = { 'gh-code-lawrence': { id: 42, login: 'Lawrence' }, 'gh-code-mallory': { id: 666, login: 'mallory' } };
+  const accounts = new Accounts(memoryPersistence(), makeBootstrap([], ['lawrence']));
+  const publicProfiles = new PublicProfiles(memoryPersistence());
+  const clips = new MemoryClipStore();
+  const app = await startApp({ github: { clientId: 'gh-client', clientSecret: 'gh-secret' } }, fakeUpstreams(users).fetcher, { accounts, publicProfiles, clips });
+  const cookieOf = (res: { headers: Record<string, string | string[] | undefined> }, name: string) =>
+    ([] as string[]).concat(res.headers['set-cookie'] ?? []).map((c) => c.split(';')[0]!).find((c) => c.startsWith(`${name}=`) && c.length > name.length + 1);
+  try {
+    // Connect as an MCP client and put some data in.
+    const clientId = await register(app);
+    const { verifier, challenge } = pkce();
+    const code = (await authorize(app, clientId, challenge, 'gh-code-lawrence')).searchParams.get('code')!;
+    const tokens = JSON.parse((await raw(app.port, { method: 'POST', path: '/oauth/token', ...form({ grant_type: 'authorization_code', code, client_id: clientId, redirect_uri: CLIENT_REDIRECT, code_verifier: verifier, resource: 'http://localhost/mcp' }) })).body);
+    const tool = async (name: string, args: Record<string, unknown> = {}) => {
+      const res = await raw(app.port, { method: 'POST', path: '/mcp', headers: { 'content-type': 'application/json', authorization: `Bearer ${tokens.access_token}` }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }) });
+      return { status: res.status, result: res.status === 200 ? JSON.parse(res.body).result : undefined };
+    };
+    assert.equal((await tool('clip', { kind: 'quote', text: 'keep me' })).status, 200);
+    assert.equal((await tool('set_public_profile', { handle: 'lawrence' })).result.structuredContent.profile.handle, 'lawrence');
+    assert.match((await tool('account_settings')).result.content[0].text, /http:\/\/localhost\/account/);
+
+    // export_data hands out a link that works once.
+    const link = new URL((await tool('export_data', { format: 'mcportal' })).result.structuredContent.where);
+    const download = await raw(app.port, { path: link.pathname });
+    assert.equal(download.status, 200);
+    assert.match(String(download.headers['content-disposition']), /attachment; filename="mcportal-export-/);
+    assert.equal(JSON.parse(download.body).clips[0].data.text, 'keep me');
+    assert.equal((await raw(app.port, { path: link.pathname })).status, 410, 'one use');
+    assert.equal((await raw(app.port, { path: '/download/not-a-real-token-at-all' })).status, 410);
+
+    // The account page: sign in (browser-bound), see your data, download.
+    assert.match((await raw(app.port, { path: '/account' })).body, /Sign in with GitHub/);
+    assert.equal((await raw(app.port, { path: '/account/export/mcportal' })).status, 302, 'downloads need a session');
+    const start = await raw(app.port, { path: '/account/login' });
+    const gh = new URL(String(start.headers.location));
+    const done = await raw(app.port, { path: `/oauth/callback?code=gh-code-lawrence&state=${gh.searchParams.get('state')}`, headers: { cookie: cookieOf(start, 'mcportal_page')! } });
+    assert.equal(done.headers.location, '/account');
+    const session = cookieOf(done, 'mcportal_account')!;
+    const home = await raw(app.port, { path: '/account', headers: { cookie: session } });
+    assert.match(home.body, /Signed in as <b>@Lawrence<\/b>\. Public profile: <b>@lawrence<\/b>/);
+    assert.match(home.body, /1 clip\(s\)/);
+    assert.doesNotMatch(String(home.headers['content-security-policy']), /script-src/);
+    const csrf = home.body.match(/name="csrf" value="([^"]+)"/)![1]!;
+    const bookmarks = await raw(app.port, { path: '/account/export/bookmarks', headers: { cookie: session } });
+    assert.match(bookmarks.body, /NETSCAPE-Bookmark-file-1/);
+
+    // Deleting needs same origin, the CSRF token and the typed confirmation.
+    const del = (data: Record<string, string>, headers: Record<string, string> = sameOrigin(app.port)) => {
+      const f = form(data);
+      return raw(app.port, { method: 'POST', path: '/account/delete', headers: { ...f.headers, ...headers, cookie: session }, body: f.body });
+    };
+    assert.equal((await del({ csrf, confirm: 'delete @lawrence' }, { origin: 'https://evil.example' })).status, 403);
+    assert.equal((await del({ csrf: 'wrong', confirm: 'delete @lawrence' })).status, 403);
+    assert.equal((await del({ csrf, confirm: 'delete' })).status, 400);
+    assert.equal((await tool('search_clips')).result.structuredContent.clips.length, 1, 'nothing deleted yet');
+    const gone = await del({ csrf, confirm: 'Delete @Lawrence' });
+    assert.equal(gone.status, 200, gone.body);
+    assert.match(gone.body, /Your account is deleted/);
+
+    assert.equal((await tool('search_clips')).status, 401, 'tokens are revoked');
+    assert.equal((await clips.list('github-42')).length, 0);
+    assert.equal(await publicProfiles.get('github-42'), undefined);
+    assert.equal((await accounts.list()).accounts.length, 0);
+    assert.equal((await accounts.auditLog(5))[0]!.action, 'account.deleted');
+    assert.equal((await raw(app.port, { path: '/account', headers: { cookie: session } })).body.includes('Signed in'), false, 'the session is gone');
+  } finally {
+    await app.close();
+  }
+});

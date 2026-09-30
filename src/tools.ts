@@ -9,6 +9,8 @@ import { buildOpml, OPML_LIMITS, parseOpml } from './opml.ts';
 import { MAX_PACKS, packSummaries, STARTER_PACKS } from './packs.ts';
 import { clipsPanel, clipsQuery, loadArticle, loadPanel, pinnedPanel, savedPanel, SOURCE_DOCS, type SourceDeps } from './sources.ts';
 import type { ClipStore } from './clips.ts';
+import type { ExportFormat } from './portability.ts';
+import type { PublicProfiles } from './public-profiles.ts';
 import type { ProfileStore } from './store.ts';
 import type { Actor } from './access.ts';
 import type { UsageBudget } from './lib/budget.ts';
@@ -20,6 +22,12 @@ export interface ToolContext extends SourceDeps {
   store: ProfileStore;
   /** The user's clips. Absent where clips aren't set up; the clip tools then refuse. */
   clips?: ClipStore;
+  /** Handles and public profiles: hosted only (local MCPortal has no social layer). */
+  publicProfiles?: PublicProfiles;
+  /** Hand an export to the user: a one-time download link (HTTP) or a file on disk (local). */
+  deliver?: (format: ExportFormat) => Promise<{ kind: 'link' | 'file'; where: string; summary: string }>;
+  /** The account page (download everything, delete the account), when the server has one. */
+  accountUrl?: string;
   userId: string;
   /** Hosted server only: charged per tool call. Local stdio has none (unlimited). */
   budget?: UsageBudget;
@@ -103,7 +111,7 @@ export function ensurePanel(profile: Profile, source: 'saved' | 'clips', title: 
  * Add one panel without touching anything else: into `column` (1-based; one past
  * the last makes a new column), else a new column, else the emptiest column.
  */
-function addPanelTo(profile: Profile, spec: PanelSpec, column?: number): { profile: Profile; panelId: string } | { error: string } {
+export function addPanelTo(profile: Profile, spec: PanelSpec, column?: number): { profile: Profile; panelId: string } | { error: string } {
   const key = (p: PanelSpec) => `${p.source}:${JSON.stringify({ ...p.config, limit: undefined })}`;
   const probe = validateProfile({ ...profile, columns: [{ panels: [spec] }] }).columns[0]!.panels[0]!;
   const dupe = profile.columns.flatMap((c) => c.panels).find((p) => key(p) === key(probe));

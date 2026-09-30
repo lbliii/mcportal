@@ -14,6 +14,8 @@ export interface Actor {
   accountId: string;
   role: Role;
   status: AccountStatus;
+  /** The GitHub login, when known (suggests a handle). */
+  login?: string;
 }
 
 /** read: look at your own data · write: change it · fetch: cause outbound requests · admin: manage others */
@@ -61,6 +63,12 @@ export const TOOL_ACTIONS: Record<string, Action> = {
   get_clip: 'read',
   update_clip: 'write',
   delete_clip: 'write',
+  get_public_profile: 'read',
+  set_public_profile: 'write',
+  remove_public_profile: 'write',
+  export_data: 'read',
+  import_portal: 'write',
+  account_settings: 'read',
 };
 
 export function toolAction(name: string): Action {

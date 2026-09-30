@@ -139,6 +139,10 @@ The `/preview` page never contains secrets. With a static token it asks for the 
 | `search_clips` | model | Find clips by words, kind or tag, newest first |
 | `get_clip` | model + app | One clip in full; renders as its own clip card |
 | `update_clip` / `delete_clip` | model | Change a clip's title, note or tags, or delete it |
+| `get_public_profile` / `set_public_profile` / `remove_public_profile` | model | Your opt-in public profile (handle, name, bio), or someone else's by handle. Hosted only |
+| `export_data` | model | Everything as an MCPortal export, saved items as bookmarks, clips as Markdown, or sources as OPML: a one-time download link (hosted) or a file (local) |
+| `import_portal` | model | Add an MCPortal export to the portal; only adds |
+| `account_settings` | model | Link to `/account`, where people download everything or delete their account (never a tool) |
 
 Limits: 8 columns, 4 panels per column, 30 items per panel, 200 saved items, 350 KB per picture. Clips: 32 KB of text, 500 KB per image, tables up to 50 × 500, and 1,000 clips or 50 MB per user. Freshness: HN 2 min, GitHub 5 min, RSS 10 min, reader 1 h, pictures 1 day.
 
@@ -163,8 +167,8 @@ MCPortal is a **reading platform with light social**, driven by your agent. Anyt
 **M2: your portal, everywhere, and light social**
 - [x] **Clips:** save quotes, exchanges, explanations, tables and images from the conversation; a Clips panel; the agent can search them across chats ([plan](docs/plans/clips.md)). Next: clip a quote from a reader selection, Postgres full-text search
 - **Devices:** link a local MCPortal to your hosted account; state syncs, fetching stays local with a hosted fallback ([plan](docs/plans/local-hosted-hybrid.md))
-- **Portability:** full MCPortal export and import, saved items as bookmarks, clips as Markdown, delete account ([plan](docs/plans/identity-and-access.md#data-rights-and-portability))
-- **Public profile (opt-in):** claim a handle (e.g. `@lbliii`); nothing is public until you choose
+- [x] **Portability:** full MCPortal export and import, saved items as bookmarks, clips as Markdown, delete account at `/account` ([plan](docs/plans/identity-and-access.md#data-rights-and-portability))
+- [x] **Public profile (opt-in):** claim a handle (e.g. `@lbliii`); nothing is public until you choose
 - **Share** a saved item or clip with a one-line note (Claude can draft it; you approve it); audience is your followers or everyone on MCPortal
 - **Follow, mute, block, report**; followed shares appear in a **Following** panel
 - **React** with one lightweight signal, so Following can surface what people liked

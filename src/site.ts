@@ -47,7 +47,7 @@ figure{margin:28px 0}figure img{width:100%;border:1px solid #e3e3de;border-radiu
 table{border-collapse:collapse;font-size:14px}td,th{border-bottom:1px solid #e3e3de;padding:6px 12px 6px 0;text-align:left;vertical-align:top}
 footer{margin-top:56px;border-top:1px solid #e3e3de;padding-top:16px}
 </style></head><body>
-<nav><a class="brand" href="/">MCPortal</a><a href="/privacy">Privacy</a><a href="/support">Support</a></nav>
+<nav><a class="brand" href="/">MCPortal</a><a href="/privacy">Privacy</a><a href="/support">Support</a><a href="/account">Account</a></nav>
 ${body}
 <footer class="muted">${by}<a href="/privacy">Privacy</a> · <a href="/support">Support</a></footer>
 </body></html>`;
@@ -73,7 +73,7 @@ function landing(site: SiteConfig): string {
 <figure><img src="/site/reader.png" alt="An article open in MCPortal's reader view" width="1600" height="1013"><figcaption>Reader view: just the article.</figcaption></figure>
 
 <h2>Private by design</h2>
-<p>MCPortal fetches feeds and pictures on its server, so the sites you read don't see you until you open the original. There are no ads, trackers or analytics. Sign-in is through GitHub, and MCPortal keeps only your GitHub user ID and login. Your layout, sources and saved items are yours, and your subscriptions export as OPML. Details are in the <a href="/privacy">privacy policy</a>.</p>
+<p>MCPortal fetches feeds and pictures on its server, so the sites you read don't see you until you open the original. There are no ads, trackers or analytics. Sign-in is through GitHub, and MCPortal keeps only your GitHub user ID and login. Your layout, sources, saved items and clips are yours: export them any time in open formats, or delete your account yourself. Details are in the <a href="/privacy">privacy policy</a>.</p>
 
 <h2>Get it</h2>
 ${access}
@@ -88,7 +88,7 @@ function privacy(site: SiteConfig): string {
 <h1>Privacy policy</h1>
 <p class="muted">Last updated ${POLICY_UPDATED}. This policy covers the MCPortal service at <code>${escapeHtml(site.publicUrl)}</code>, which is run by ${who}.</p>
 
-<p>Here's the short version. MCPortal stores your GitHub user ID and login, your portal (layout, sources, saved items and clips), and short-lived sign-in tokens. It doesn't store your email, your name or your GitHub password. It has no ads, trackers or analytics, and it doesn't sell or share your data.</p>
+<p>Here's the short version. MCPortal stores your GitHub user ID and login, your portal (layout, sources, saved items and clips), a public profile only if you create one, and short-lived sign-in tokens. It doesn't store your email, your name or your GitHub password. It has no ads, trackers or analytics, and it doesn't sell or share your data.</p>
 
 <h2>What MCPortal stores</h2>
 <table>
@@ -98,6 +98,7 @@ function privacy(site: SiteConfig): string {
 <tr><td><b>Saved items:</b> the link, title, source, date and any note you add</td><td>To show your Saved panel</td><td>Until you remove them</td></tr>
 <tr><td><b>Clips:</b> quotes, parts of a conversation, notes, tables, images and links you ask Claude to keep, with any title, note and tags</td><td>To show your Clips panel and find them again in later chats</td><td>Until you delete them</td></tr>
 <tr><td><b>Pinned results:</b> if you ask Claude to pin results from another connected tool (for example, a list of issues), the titles, links, short summaries and details it copies in, and the request needed to refresh them</td><td>To show that panel</td><td>Until you remove the panel</td></tr>
+<tr><td><b>Public profile (only if you create one):</b> your handle, display name and bio, which other signed-in MCPortal users can see</td><td>So people can find you</td><td>Until you remove it; a handle you give up stays reserved for you for 30 days</td></tr>
 <tr><td><b>Sign-in tokens:</b> stored only as one-way hashes, with the app that asked for them (for example, Claude)</td><td>To keep you signed in</td><td>Access tokens 1 hour; refresh tokens 30 days</td></tr>
 <tr><td><b>Invites and the admin audit log:</b> who invited whom, and suspensions or reinstatements with a short reason</td><td>To run an invite-only service and keep a record of admin actions</td><td>The newest 2,000 log entries are kept</td></tr>
 </table>
@@ -122,9 +123,9 @@ function privacy(site: SiteConfig): string {
 <h2>Your choices</h2>
 <ul>
   <li><b>See and change your data:</b> ask Claude to show your portal settings, change them, or remove saved items at any time.</li>
-  <li><b>Take it with you:</b> ask Claude to export your subscriptions as OPML.</li>
-  <li><b>Delete clips:</b> ask Claude to delete any clip.</li>
-  <li><b>Delete your account:</b> ask through <a href="${support}">support</a>, and your account, portal, saved items and clips will be deleted within 30 days. A self-serve option is coming.</li>
+  <li><b>Take it with you:</b> ask Claude to export your data, or download it from your <a href="/account">account page</a>: everything as one file another MCPortal can import, saved items as a bookmarks file, clips as Markdown, and sources as OPML.</li>
+  <li><b>Delete clips or your public profile:</b> ask Claude at any time.</li>
+  <li><b>Delete your account:</b> sign in on your <a href="/account">account page</a> and delete it. Your account, portal, saved items, clips and public profile are deleted at once, and you're signed out everywhere. Backups roll over within 30 days.</li>
   <li><b>Disconnect:</b> remove MCPortal from Claude's connectors. You can also revoke it on GitHub under Settings → Applications.</li>
 </ul>
 
@@ -157,8 +158,10 @@ function support(site: SiteConfig): string {
 <p>MCPortal is invite-only right now. The invite is tied to one GitHub account, so sign in as the account that was invited.</p>
 <h3>How do I bring my subscriptions from another reader?</h3>
 <p>Export OPML from your old reader and ask Claude to import it. To take your subscriptions elsewhere, ask Claude to export OPML.</p>
+<h3>How do I get my data out?</h3>
+<p>Ask Claude to export it, or download it from your <a href="/account">account page</a>. Everything comes as one file another MCPortal can import; saved items also come as a bookmarks file, clips as Markdown and sources as OPML.</p>
 <h3>How do I delete my account?</h3>
-<p>Ask at <a href="${url}">${url}</a> and it'll be done within 30 days. See the <a href="/privacy">privacy policy</a> for what's deleted.</p>`, site);
+<p>Sign in on your <a href="/account">account page</a> and delete it there. It happens at once. See the <a href="/privacy">privacy policy</a> for what's deleted.</p>`, site);
 }
 
 /** Serves /, /privacy, /support and /site/*.png. Returns true if it handled the request. */

@@ -5,7 +5,7 @@
  * replaced by the default profile so the user is never locked out.
  */
 import { randomBytes } from 'node:crypto';
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { defaultProfile, validateProfile, type Profile } from './profile.ts';
@@ -15,6 +15,8 @@ export interface ProfileStore {
   put(userId: string, profile: Profile): Promise<void>;
   /** A one-time notice for the user (e.g. "your profile was unreadable and was reset"). */
   takeNotice?(userId: string): string | undefined;
+  /** Remove the user's profile (account deletion). */
+  delete(userId: string): Promise<void>;
 }
 
 export function defaultDataDir(): string {
@@ -87,6 +89,10 @@ export class FileProfileStore implements ProfileStore {
     return this.mutex.run(userId, () => atomicWrite(this.file(userId), `${JSON.stringify(profile, null, 2)}\n`));
   }
 
+  delete(userId: string): Promise<void> {
+    return this.mutex.run(userId, () => rm(this.file(userId), { force: true }));
+  }
+
   takeNotice(userId: string): string | undefined {
     const notice = this.notices.get(userId);
     this.notices.delete(userId);
@@ -107,5 +113,9 @@ export class MemoryProfileStore implements ProfileStore {
 
   async put(userId: string, profile: Profile): Promise<void> {
     this.profiles.set(userId, structuredClone(profile));
+  }
+
+  async delete(userId: string): Promise<void> {
+    this.profiles.delete(userId);
   }
 }

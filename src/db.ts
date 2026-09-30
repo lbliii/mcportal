@@ -110,6 +110,11 @@ export class PgProfileStore implements ProfileStore {
     );
   }
 
+  async delete(userId: string): Promise<void> {
+    await this.db.query(`DELETE FROM mcportal_profiles WHERE user_id = $1`, [userId]);
+    await this.db.query(`DELETE FROM mcportal_kv WHERE key LIKE $1`, [`corrupt-profile:${userId.replace(/[\\%_]/g, (c) => `\\${c}`)}:%`]);
+  }
+
   /** Revision of a user's profile, 0 if none (for the sync plan's ETags). */
   async rev(userId: string): Promise<number> {
     const { rows } = await this.db.query<{ rev: string }>(`SELECT rev FROM mcportal_profiles WHERE user_id = $1`, [userId]);
@@ -187,6 +192,11 @@ export class PgClipStore implements ClipStore {
   async delete(userId: string, id: string): Promise<boolean> {
     const r = await this.db.query(`DELETE FROM mcportal_clips WHERE user_id = $1 AND id = $2`, [userId, id]);
     return (r.rowCount ?? 0) > 0;
+  }
+
+  async deleteAll(userId: string): Promise<number> {
+    const r = await this.db.query(`DELETE FROM mcportal_clips WHERE user_id = $1`, [userId]);
+    return r.rowCount ?? 0;
   }
 
   async usage(userId: string): Promise<{ count: number; bytes: number }> {

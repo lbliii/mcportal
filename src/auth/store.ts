@@ -165,6 +165,15 @@ export class AuthStore {
     return record;
   }
 
+  /** Revoke every token of a user (account deletion). Returns how many records went. */
+  revokeUser(userId: string): Promise<number> {
+    return this.write((d) => {
+      let n = 0;
+      for (const [hash, r] of Object.entries(d.tokens)) if (r.userId === userId) { delete d.tokens[hash]; n++; }
+      return n;
+    });
+  }
+
   private revokeGrant(d: Data, grantId: string): void {
     for (const [hash, r] of Object.entries(d.tokens)) if (r.grantId === grantId) delete d.tokens[hash];
   }

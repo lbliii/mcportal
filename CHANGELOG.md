@@ -9,6 +9,12 @@
 - **Safe by construction:** clip text is always fenced as untrusted for the model and built as text in the UI. Images are checked by their bytes, and an SVG is only ever shown as an image, so nothing in it runs.
 - **Storage:** files locally (`<data dir>/clips/`) and a new `mcportal_clips` table on the hosted server (schema version 2, upgraded in place).
 
+### Your data and identity
+- **Export everything:** `export_data` gives a one-time download link (hosted) or a file (local). You get one versioned MCPortal export (layout, sources, saved items, clips, public profile), saved items as a bookmarks file, clips as Markdown with front matter and images (`.tar.gz`), or sources as OPML.
+- **Import:** `import_portal` adds an MCPortal export to any portal. It only adds, running twice changes nothing, and every clip is re-validated.
+- **Account page** at `/account`: sign in with GitHub to download everything or delete your account. Deletion needs the typed confirmation, and it removes the portal, clips and public profile, revokes every sign-in token and removes the account. It is never an MCP tool.
+- **Public profiles (opt-in):** claim a handle (suggested from your GitHub login) with a display name and bio. Other signed-in users can look you up. A handle you give up is held for you for 30 days.
+
 ### Hosted service
 - **Public pages:** a landing page at `/` with screenshots, a privacy policy at `/privacy` and support at `/support`. `MCPORTAL_SUPPORT_URL` and `MCPORTAL_OPERATOR` configure them.
 - **Railway infrastructure as code:** `.railway/railway.ts` replaces `railway.toml`.

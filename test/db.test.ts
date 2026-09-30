@@ -146,3 +146,23 @@ test('pg clips: round-trip, search, tags, paging, isolation, limits, schema v2',
     (CLIP_LIMITS as any).bytesPerUser = cap;
   }
 });
+
+test('pg deletion: a profile (and its kept corrupt copies) and all clips of one user', { skip }, async () => {
+  const { buildClip } = await import('../src/clips.ts');
+  const { PgClipStore } = await import('../src/db.ts');
+  const profiles = new PgProfileStore(db);
+  const clips = new PgClipStore(db);
+  await profiles.put('del_1', validateProfile({ ...defaultProfile(), name: 'Doomed' }));
+  await profiles.put('keep', validateProfile({ ...defaultProfile(), name: 'Kept' }));
+  await db.query(`INSERT INTO mcportal_kv (key, value) VALUES ('corrupt-profile:del_1:1', '{}'), ('corrupt-profile:del%1:1', '{}')`);
+  await clips.add('del_1', buildClip({ kind: 'quote', text: 'a' }));
+  await clips.add('del_1', buildClip({ kind: 'quote', text: 'b' }));
+  await clips.add('keep', buildClip({ kind: 'quote', text: 'c' }));
+  await profiles.delete('del_1');
+  assert.equal(await clips.deleteAll('del_1'), 2);
+  assert.equal(await profiles.rev('del_1'), 0);
+  assert.equal((await profiles.get('keep')).name, 'Kept');
+  assert.equal((await clips.list('keep')).length, 1);
+  const kv = await db.query<{ key: string }>(`SELECT key FROM mcportal_kv WHERE key LIKE 'corrupt-profile:del%' ORDER BY key`);
+  assert.deepEqual(kv.rows.map((r) => r.key), ['corrupt-profile:del%1:1'], 'the LIKE pattern is escaped: only del_1\'s copies go');
+});

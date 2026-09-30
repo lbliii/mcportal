@@ -397,6 +397,8 @@ export interface ClipStore {
   list(userId: string, query?: ClipQuery): Promise<ClipSummary[]>;
   update(userId: string, id: string, patch: ClipPatch): Promise<Clip | undefined>;
   delete(userId: string, id: string): Promise<boolean>;
+  /** Every clip of the user (account deletion). Returns how many. */
+  deleteAll(userId: string): Promise<number>;
   usage(userId: string): Promise<{ count: number; bytes: number }>;
 }
 
@@ -460,6 +462,10 @@ abstract class DocumentClipStore implements ClipStore {
       const rest = clips.filter((c) => c.id !== id);
       return rest.length === clips.length ? { result: false } : { clips: rest, result: true };
     });
+  }
+
+  deleteAll(userId: string): Promise<number> {
+    return this.edit(userId, (clips) => ({ clips: [], result: clips.length }));
   }
 
   async usage(userId: string): Promise<{ count: number; bytes: number }> {

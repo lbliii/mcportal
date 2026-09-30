@@ -222,13 +222,36 @@ export class Accounts {
   }
 
   /** Role and status for the access gate. Unknown accounts are plain active users (bootstrap/legacy). */
-  actor(accountId: string): { accountId: string; role: Role; status: AccountStatus } {
+  actor(accountId: string): { accountId: string; role: Role; status: AccountStatus; login?: string } {
     void this.load();
     const account = this.doc?.accounts[accountId];
-    if (account) return { accountId, role: account.role, status: account.status };
+    if (account) return { accountId, role: account.role, status: account.status, ...(account.login ? { login: account.login } : {}) };
     const githubId = Number(accountId.replace(/^github-/, ''));
     const admin = Number.isFinite(githubId) && this.bootstrap.admins.includes(String(githubId));
     return { accountId, role: admin ? 'admin' : 'user', status: 'active' };
+  }
+
+  /** The account a GitHub identity belongs to, whatever its status. */
+  async forIdentity(id: GithubIdentity): Promise<Account | undefined> {
+    await this.load();
+    return this.doc!.accounts[this.doc!.identities[`github:${id.githubId}`] ?? ''];
+  }
+
+  /**
+   * Remove an account, its sign-in identities and its (used) invite. The caller has
+   * already deleted the account's data. Signing in again later is a new account, if
+   * config or a new invite lets them in.
+   */
+  deleteAccount(accountId: string, by: string): Promise<boolean> {
+    return this.write((doc) => {
+      const account = doc.accounts[accountId];
+      if (!account) return false;
+      delete doc.accounts[accountId];
+      for (const [key, id] of Object.entries(doc.identities)) if (id === accountId) delete doc.identities[key];
+      for (const [login, invite] of Object.entries(doc.invites)) if (invite.accountId === accountId) delete doc.invites[login];
+      doc.audit.push({ at: this.now(), actor: by, action: 'account.deleted', target: accountId, detail: account.login ? `@${account.login}` : undefined });
+      return true;
+    });
   }
 
   // ---------------------------------------------------------------- admin (CLI / admin page only; never MCP tools)

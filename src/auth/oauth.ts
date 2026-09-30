@@ -277,6 +277,11 @@ export class OAuthServer {
     return this.accounts.isActive({ githubId: identity.githubId, login: identity.login });
   }
 
+  /** Sign a user out everywhere (account deletion). */
+  revokeUser(userId: string): Promise<number> {
+    return this.store.revokeUser(userId);
+  }
+
   /** Access-token check for /mcp. Returns the user id or undefined. */
   async authenticate(token: string): Promise<string | undefined> {
     const record = await this.store.verifyAccess(token, this.resource);
