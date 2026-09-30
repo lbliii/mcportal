@@ -59,3 +59,5 @@ The fallback art uses seven more ink sets in the same spirit (see `src/ui/art.js
 ## Voice
 
 Portals, doors, thresholds and transmissions: a little mysterious and a little 90s ("webspace"), always followed by a plain sentence that says what MCPortal does. MCPortal works in any MCP agent, so copy talks about "your agent" rather than one host.
+
+In the workspace the voice is pulp: the colourful language of a 1950s sci-fi paperback. The machinery talks sci-fi (transmissions, signals, frequencies, the ether), your own actions talk fantasy (summon, conjure, materialize), and good news gets an exclamation mark ("It's alive!"). Keep the flourish to a few words, and let a plain sentence carry the facts and the next step, especially in errors. Some things stay plain: tooltips and accessible labels, which lead with the action; anything about deleting, blocking, reporting, accounts or privacy; and the text MCPortal sends to the model.

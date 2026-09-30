@@ -427,6 +427,7 @@ test('fallback art: distinct styles per source, varied placement per item, inlin
   assert.ok(html.includes('const portalArt = (() => {'));
   assert.ok(html.includes('<svg class="brand-line"') && html.includes('<svg class="brand-word"') && html.includes('<svg class="brand-badge"'), 'brand marks inlined');
   assert.doesNotMatch(html, /include:/, 'every include resolved');
+  assert.doesNotMatch(html, /\bClaude\b|your assistant/, 'the workspace talks about "your agent": MCPortal runs in any MCP host');
 });
 
 test('brand: committed assets match what scripts/brand.ts draws', async () => {
