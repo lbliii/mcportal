@@ -54,6 +54,8 @@ export interface FetchResponse {
 }
 
 export interface FetchOptions {
+  method?: 'GET' | 'POST';
+  body?: string;
   headers?: Record<string, string>;
   maxBytes?: number;
   timeoutMs?: number;

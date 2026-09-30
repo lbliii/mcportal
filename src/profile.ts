@@ -6,6 +6,7 @@
 import { HN_FEEDS, type HnConfig } from './adapters/hn.ts';
 import { REPO_PATTERN, type GithubConfig } from './adapters/github.ts';
 import type { RssConfig } from './adapters/rss.ts';
+import { clean } from './lib/text.ts';
 import type { SourceKind } from './types.ts';
 
 export interface PanelSpec {
@@ -132,7 +133,7 @@ export function validateProfile(input: unknown, now = new Date()): Profile {
       if (!isRecord(pRaw)) throw new ProfileError(`${where} must be an object`);
       const source = pRaw.source as SourceKind;
       if (!SOURCES.includes(source)) throw new ProfileError(`${where}: source must be one of ${SOURCES.join(', ')}`);
-      const title = typeof pRaw.title === 'string' && pRaw.title.trim() ? pRaw.title.trim().slice(0, 80) : undefined;
+      const title = clean(pRaw.title, 80) || undefined;
       let id = slug(typeof pRaw.id === 'string' && pRaw.id ? pRaw.id : title ?? `${source}-${ci}-${pi}`) || `${source}-${ci}-${pi}`;
       while (seen.has(id)) id = `${id}-2`;
       seen.add(id);
@@ -142,7 +143,7 @@ export function validateProfile(input: unknown, now = new Date()): Profile {
     return { width: clampInt(colRaw.width, 1, 4, 1), panels };
   });
 
-  const name = typeof input.name === 'string' && input.name.trim() ? input.name.trim().slice(0, 60) : 'workspace';
+  const name = clean(input.name, 60) || 'workspace';
   return { version: 1, name, columns, updatedAt: now.toISOString() };
 }
 
@@ -152,6 +153,44 @@ export function findPanel(profile: Profile, panelId: string): PanelSpec | undefi
     if (panel) return panel;
   }
   return undefined;
+}
+
+export interface ProfileDiff {
+  added: string[];
+  removed: string[];
+  moved: string[];
+  retitled: string[];
+  reconfigured: string[];
+}
+
+function locate(profile: Profile): Map<string, { column: number; index: number; panel: PanelSpec }> {
+  const map = new Map<string, { column: number; index: number; panel: PanelSpec }>();
+  profile.columns.forEach((c, column) => c.panels.forEach((panel, index) => map.set(panel.id, { column, index, panel })));
+  return map;
+}
+
+/** What changed between two layouts, by panel id. */
+export function diffProfiles(before: Profile, after: Profile): ProfileDiff {
+  const a = locate(before);
+  const b = locate(after);
+  const diff: ProfileDiff = { added: [], removed: [], moved: [], retitled: [], reconfigured: [] };
+  for (const [id, was] of a) {
+    const now = b.get(id);
+    if (!now) {
+      diff.removed.push(id);
+      continue;
+    }
+    if (was.column !== now.column || was.index !== now.index) diff.moved.push(`${id} (column ${was.column + 1} → ${now.column + 1})`);
+    if ((was.panel.title ?? '') !== (now.panel.title ?? '')) diff.retitled.push(id);
+    if (JSON.stringify(was.panel.config) !== JSON.stringify(now.panel.config) || was.panel.source !== now.panel.source) diff.reconfigured.push(id);
+  }
+  for (const id of b.keys()) if (!a.has(id)) diff.added.push(id);
+  return diff;
+}
+
+export function describeDiff(diff: ProfileDiff): string {
+  const parts = (Object.entries(diff) as Array<[string, string[]]>).filter(([, v]) => v.length).map(([k, v]) => `${k}: ${v.join(', ')}`);
+  return parts.length ? parts.join('; ') : 'no panel changes';
 }
 
 /** A short, human-readable description of the layout, for the model and for diffs. */

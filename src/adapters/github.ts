@@ -1,4 +1,5 @@
 import { fetchJson } from '../lib/safe-fetch.ts';
+import { clean, safeHttpUrl } from '../lib/text.ts';
 import type { Fetcher, Item } from '../types.ts';
 
 export const GITHUB_API = 'https://api.github.com';
@@ -11,7 +12,8 @@ export interface GithubConfig {
   limit: number;
 }
 
-export const REPO_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
+/** owner/name, where neither segment is "." or ".." (no path traversal on api.github.com). */
+export const REPO_PATTERN = /^(?!\.{1,2}\/)[A-Za-z0-9_.-]+\/(?!\.{1,2}$)[A-Za-z0-9_.-]+$/;
 
 interface Repo {
   id: number;
@@ -36,7 +38,8 @@ interface Release {
 
 export function githubEndpoint(config: GithubConfig): string {
   if (config.mode === 'releases') {
-    return `${GITHUB_API}/repos/${config.repo}/releases?per_page=${config.limit}`;
+    const [owner, name] = (config.repo ?? '').split('/');
+    return `${GITHUB_API}/repos/${encodeURIComponent(owner ?? '')}/${encodeURIComponent(name ?? '')}/releases?per_page=${config.limit}`;
   }
   const params = new URLSearchParams({
     q: config.query ?? 'topic:mcp',
@@ -48,10 +51,7 @@ export function githubEndpoint(config: GithubConfig): string {
 }
 
 function headers(token = process.env.GITHUB_TOKEN): Record<string, string> {
-  const h: Record<string, string> = {
-    accept: 'application/vnd.github+json',
-    'x-github-api-version': '2022-11-28',
-  };
+  const h: Record<string, string> = { accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28' };
   if (token) h.authorization = `Bearer ${token}`;
   return h;
 }
@@ -64,24 +64,26 @@ export async function fetchGithub(config: GithubConfig, fetcher: Fetcher): Promi
   const url = githubEndpoint(config);
   if (config.mode === 'releases') {
     const releases = await fetchJson<Release[]>(fetcher, url, { headers: headers() });
+    if (!Array.isArray(releases)) throw new Error('GitHub returned an unexpected response');
     return releases
-      .filter((r) => !r.draft)
+      .filter((r) => r && !r.draft)
       .map((r) => ({
         id: String(r.id),
-        title: r.name?.trim() || r.tag_name,
-        url: r.html_url,
-        meta: [r.tag_name, ...(r.prerelease ? ['pre-release'] : []), ...(r.author ? [`by ${r.author.login}`] : [])],
+        title: clean(r.name, 200) || clean(r.tag_name, 100),
+        url: safeHttpUrl(r.html_url),
+        meta: [clean(r.tag_name, 60), ...(r.prerelease ? ['pre-release'] : []), ...(r.author ? [`by ${clean(r.author.login, 40)}`] : [])],
         publishedAt: r.published_at ?? undefined,
       }));
   }
   const data = await fetchJson<{ items: Repo[] }>(fetcher, url, { headers: headers() });
+  if (!Array.isArray(data?.items)) throw new Error('GitHub returned an unexpected response');
   return data.items.map((r) => ({
     id: String(r.id),
-    title: r.full_name,
-    url: r.html_url,
-    summary: r.description ?? undefined,
-    score: r.stargazers_count,
-    meta: [`★ ${compact(r.stargazers_count)}`, ...(r.language ? [r.language] : [])],
+    title: clean(r.full_name, 140),
+    url: safeHttpUrl(r.html_url),
+    summary: clean(r.description, 240) || undefined,
+    score: Number(r.stargazers_count) || 0,
+    meta: [`★ ${compact(Number(r.stargazers_count) || 0)}`, ...(r.language ? [clean(r.language, 30)] : [])],
     publishedAt: r.pushed_at,
   }));
 }

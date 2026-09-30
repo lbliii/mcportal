@@ -1,8 +1,10 @@
 /**
- * Dependency-free RSS 2.0 / Atom parser. It only extracts the handful of fields
- * a panel needs, and every value comes out as plain text.
+ * Dependency-free RSS 2.0 / Atom parser. Linear time: every search is an
+ * indexOf that starts at the current cursor, so unclosed tags can't cause
+ * quadratic scans. Every value comes out as plain, single-line text.
  */
-import { decodeEntities, htmlToText, stripCdata, truncate } from '../lib/text.ts';
+import { parseAttrs } from '../lib/html.ts';
+import { clean, decodeEntities, hostOf, htmlToText, safeHttpUrl, stripCdata, truncate } from '../lib/text.ts';
 import type { Fetcher, Item } from '../types.ts';
 
 export interface RssConfig {
@@ -15,75 +17,106 @@ export interface ParsedFeed {
   items: Item[];
 }
 
-function escapeTag(name: string): string {
-  return name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+function isBoundary(code: number): boolean {
+  return Number.isNaN(code) || code === 62 || code === 47 || code === 32 || code === 9 || code === 10 || code === 13;
 }
 
-function tagText(block: string, name: string): string | undefined {
-  const re = new RegExp(`<${escapeTag(name)}(?:\\s[^>]*)?>([\\s\\S]*?)</${escapeTag(name)}>`, 'i');
-  const match = block.match(re);
-  if (!match) return undefined;
-  return stripCdata(match[1]!).trim();
+/** Index of the next `<name` start tag at or after `from` (exact name), or -1. */
+function findOpen(lower: string, name: string, from: number): number {
+  const needle = `<${name}`;
+  let i = lower.indexOf(needle, from);
+  while (i !== -1 && !isBoundary(lower.charCodeAt(i + needle.length))) i = lower.indexOf(needle, i + 1);
+  return i;
 }
 
-function attr(tag: string, name: string): string | undefined {
-  const match = tag.match(new RegExp(`\\s${name}\\s*=\\s*("([^"]*)"|'([^']*)')`, 'i'));
-  return match ? decodeEntities(match[2] ?? match[3] ?? '') : undefined;
+/** Split out top-level <item>/<entry> blocks. */
+function blocksOf(xml: string, lower: string, name: string, max: number): string[] {
+  const out: string[] = [];
+  const close = `</${name}>`;
+  let i = 0;
+  while (out.length < max) {
+    const start = findOpen(lower, name, i);
+    if (start === -1) break;
+    const end = lower.indexOf(close, start);
+    if (end === -1) break;
+    out.push(xml.slice(start, end + close.length));
+    i = end + close.length;
+  }
+  return out;
 }
 
-function atomLink(entry: string): string | undefined {
-  const links = entry.match(/<link\b[^>]*>/gi) ?? [];
-  const alternate = links.find((l) => !/\brel\s*=/.test(l) || /\brel\s*=\s*["']alternate["']/i.test(l));
-  return attr(alternate ?? links[0] ?? '', 'href');
+/** Inner text of the first <name>…</name> in a block, CDATA unwrapped. */
+function tagText(block: string, lower: string, name: string): string | undefined {
+  const start = findOpen(lower, name, 0);
+  if (start === -1) return undefined;
+  const gt = lower.indexOf('>', start);
+  if (gt === -1) return undefined;
+  if (lower.charCodeAt(gt - 1) === 47 /* self-closing */) return '';
+  const end = lower.indexOf(`</${name}>`, gt);
+  if (end === -1) return undefined;
+  return stripCdata(block.slice(gt + 1, end)).trim();
+}
+
+function atomLink(block: string, lower: string): string | undefined {
+  let first: string | undefined;
+  let i = 0;
+  while (true) {
+    const start = findOpen(lower, 'link', i);
+    if (start === -1) break;
+    const gt = lower.indexOf('>', start);
+    if (gt === -1) break;
+    const attrs = parseAttrs(block.slice(start + 5, gt));
+    if (attrs.href) {
+      if (!attrs.rel || attrs.rel.toLowerCase() === 'alternate') return attrs.href;
+      first ??= attrs.href;
+    }
+    i = gt + 1;
+  }
+  return first;
 }
 
 function toIso(value: string | undefined): string | undefined {
   if (!value) return undefined;
-  const d = new Date(value.trim());
+  const d = new Date(value.trim().slice(0, 64));
   return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
 }
 
-function safeHttpUrl(value: string | undefined, base?: string): string | undefined {
-  if (!value) return undefined;
-  try {
-    const url = new URL(decodeEntities(value.trim()), base);
-    return url.protocol === 'http:' || url.protocol === 'https:' ? url.href : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
 export function parseFeed(xml: string, limit = 20, baseUrl?: string): ParsedFeed {
-  const isAtom = /<feed[\s>]/i.test(xml) && /<entry[\s>]/i.test(xml);
-  const blocks = xml.match(isAtom ? /<entry[\s>][\s\S]*?<\/entry>/gi : /<item[\s>][\s\S]*?<\/item>/gi) ?? [];
-  const head = xml.slice(0, xml.search(isAtom ? /<entry[\s>]/i : /<item[\s>]/i) >>> 0);
-  const title = htmlToText(tagText(head, 'title') ?? '') || 'Feed';
+  const lower = xml.toLowerCase();
+  const isAtom = findOpen(lower, 'feed', 0) !== -1 && findOpen(lower, 'entry', 0) !== -1;
+  const itemTag = isAtom ? 'entry' : 'item';
+  const firstItem = findOpen(lower, itemTag, 0);
+  const head = firstItem === -1 ? xml : xml.slice(0, firstItem);
+  const title = clean(htmlToText(tagText(head, head.toLowerCase(), 'title') ?? ''), 120) || 'Feed';
 
-  const items: Item[] = blocks.slice(0, limit).map((block, index) => {
-    const itemTitle = htmlToText(tagText(block, 'title') ?? '') || '(untitled)';
-    const link = isAtom ? atomLink(block) : tagText(block, 'link') ?? tagText(block, 'guid');
+  const items: Item[] = blocksOf(xml, lower, itemTag, limit).map((block, index) => {
+    const bl = block.toLowerCase();
+    const itemTitle = clean(htmlToText(tagText(block, bl, 'title') ?? ''), 300) || '(untitled)';
+    const link = isAtom ? atomLink(block, bl) : tagText(block, bl, 'link') || tagText(block, bl, 'guid');
     const url = safeHttpUrl(link, baseUrl);
     const rawSummary = isAtom
-      ? tagText(block, 'summary') ?? tagText(block, 'content')
-      : tagText(block, 'description') ?? tagText(block, 'content:encoded');
-    let summaryText = rawSummary ? htmlToText(decodeEntities(rawSummary)) : '';
-    // Many feeds repeat the title as the first line of the summary.
+      ? tagText(block, bl, 'summary') ?? tagText(block, bl, 'content')
+      : tagText(block, bl, 'description') ?? tagText(block, bl, 'content:encoded');
+    // Summaries are usually entity-escaped HTML: decode, then strip the markup.
+    let summaryText = rawSummary ? htmlToText(decodeEntities(rawSummary.slice(0, 50_000))) : '';
     if (summaryText.startsWith(itemTitle)) summaryText = summaryText.slice(itemTitle.length).trim();
-    const summary = summaryText ? truncate(summaryText, 240) : undefined;
-    const author = htmlToText(
-      (isAtom ? tagText(tagText(block, 'author') ?? '', 'name') : tagText(block, 'dc:creator') ?? tagText(block, 'author')) ?? '',
+    const summary = summaryText ? clean(truncate(summaryText, 240), 240) : undefined;
+    const authorBlock = isAtom ? tagText(block, bl, 'author') ?? '' : '';
+    const author = clean(
+      htmlToText((isAtom ? tagText(authorBlock, authorBlock.toLowerCase(), 'name') : tagText(block, bl, 'dc:creator') ?? tagText(block, bl, 'author')) ?? ''),
+      80,
     );
     const publishedAt = toIso(
-      isAtom ? tagText(block, 'published') ?? tagText(block, 'updated') : tagText(block, 'pubDate') ?? tagText(block, 'dc:date'),
+      isAtom ? tagText(block, bl, 'published') ?? tagText(block, bl, 'updated') : tagText(block, bl, 'pubdate') ?? tagText(block, bl, 'dc:date'),
     );
     const meta: string[] = [];
     if (author) meta.push(`by ${author}`);
-    if (url) meta.push(new URL(url).hostname.replace(/^www\./, ''));
+    if (url) meta.push(hostOf(url));
     return {
-      id: htmlToText(tagText(block, isAtom ? 'id' : 'guid') ?? '') || url || `${index}`,
+      id: clean(htmlToText(tagText(block, bl, isAtom ? 'id' : 'guid') ?? ''), 300) || url || `${index}`,
       title: itemTitle,
       url,
-      summary: summary || undefined,
+      summary,
       meta,
       publishedAt,
     };

@@ -22,6 +22,8 @@ MCPortal is the user's workspace. They decide what's in it and where it goes. Yo
 - Columns go left to right. Panels in a column stack top to bottom. `width` is relative (1-4).
 - Keep every panel's `id` when editing. New panels need `source`, `config` and ideally a short `title`.
 - **Never move, remove or retitle a panel the user didn't mention.** Their stated layout is a fixed rule. If a request is ambiguous ("put it on the side"), ask which side.
+- Removing a panel only works if you pass its id in `removePanelIds`. Do that only when the user explicitly asked to remove it. If `update_profile` refuses a save because it "would remove" something, you dropped a panel by mistake: put it back.
+- After saving, tell the user what changed using the `Changes:` line from the result.
 - Limits: 4 columns, 4 panels per column, 30 items per panel.
 
 ## Sources

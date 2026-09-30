@@ -3,6 +3,7 @@ import { fetchHn, hnEndpoint, type HnConfig } from './adapters/hn.ts';
 import { fetchArticle } from './adapters/reader.ts';
 import { fetchRss, type RssConfig } from './adapters/rss.ts';
 import type { TtlCache } from './lib/cache.ts';
+import { clean } from './lib/text.ts';
 import { normalizeSourceConfig, type PanelSpec } from './profile.ts';
 import type { Article, Fetcher, Item, PanelResult, SourceKind } from './types.ts';
 
@@ -47,7 +48,7 @@ export async function loadPanel(panel: PanelSpec, deps: SourceDeps, force = fals
         },
         force,
       );
-      if (!panel.title && result.value.feedTitle) title = result.value.feedTitle;
+      if (!panel.title && result.value.feedTitle) title = clean(result.value.feedTitle, 80);
     }
     return {
       panelId: panel.id,
@@ -62,7 +63,7 @@ export async function loadPanel(panel: PanelSpec, deps: SourceDeps, force = fals
       source: panel.source,
       title,
       items: [],
-      error: (error as Error).message,
+      error: clean((error as Error).message, 200) || 'Unknown error',
       provenance: { source: panel.source, endpoint, fetchedAt: new Date().toISOString(), cached: false, ttlSeconds: FRESHNESS[panel.source] },
     };
   }

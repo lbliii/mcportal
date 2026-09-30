@@ -7,7 +7,7 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { publicToolList, toolError, TOOLS, WORKSPACE_URI, type ToolContext } from './tools.ts';
 
-export const SERVER_INFO = { name: 'mcportal', title: 'MCPortal', version: '0.1.0' };
+export const SERVER_INFO = { name: 'mcportal', title: 'MCPortal', version: '0.2.0' };
 export const SUPPORTED_PROTOCOL_VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05'];
 export const MCP_APP_MIME = 'text/html;profile=mcp-app';
 
@@ -19,11 +19,25 @@ const INSTRUCTIONS = [
 
 const WORKSPACE_HTML_PATH = fileURLToPath(new URL('./ui/workspace.html', import.meta.url));
 
-export async function workspaceHtml(options: { dev?: boolean; token?: string } = {}): Promise<string> {
+/** JSON that is safe to embed inside a <script> element. */
+export function scriptJson(value: unknown): string {
+  return JSON.stringify(value)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
+}
+
+/**
+ * The workspace app. With `dev`, it is bootstrapped to call /mcp directly
+ * (the /preview page). No secrets are ever embedded.
+ */
+export async function workspaceHtml(options: { dev?: boolean; needsToken?: boolean } = {}): Promise<string> {
   const html = await readFile(WORKSPACE_HTML_PATH, 'utf8');
   if (!options.dev) return html;
-  const boot = `<script>window.__MCPORTAL_DEV__=${JSON.stringify({ token: options.token ?? null })};</script>`;
-  return html.replace('<!--MCPORTAL_BOOT-->', boot);
+  const boot = `<script>window.__MCPORTAL_DEV__=${scriptJson({ needsToken: Boolean(options.needsToken) })};</script>`;
+  return html.replace('<!--MCPORTAL_BOOT-->', () => boot);
 }
 
 export interface JsonRpcRequest {

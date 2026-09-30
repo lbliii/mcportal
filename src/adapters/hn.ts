@@ -1,4 +1,5 @@
 import { fetchJson } from '../lib/safe-fetch.ts';
+import { clean, hostOf, safeHttpUrl } from '../lib/text.ts';
 import type { Fetcher, Item } from '../types.ts';
 
 export const HN_API = 'https://hacker-news.firebaseio.com/v0';
@@ -18,7 +19,6 @@ interface HnStory {
   score?: number;
   descendants?: number;
   time?: number;
-  type?: string;
   deleted?: boolean;
   dead?: boolean;
 }
@@ -27,28 +27,41 @@ export function hnEndpoint(config: HnConfig): string {
   return `${HN_API}/${config.feed}stories.json`;
 }
 
+function toItem(s: HnStory): Item | null {
+  if (!s || typeof s.id !== 'number' || !s.title || s.deleted || s.dead) return null;
+  const discussionUrl = `https://news.ycombinator.com/item?id=${s.id}`;
+  const url = safeHttpUrl(s.url) ?? discussionUrl;
+  const meta = [`${Number(s.score) || 0} points`, `${Number(s.descendants) || 0} comments`];
+  const by = clean(s.by, 40);
+  if (by) meta.push(`by ${by}`);
+  if (url !== discussionUrl) meta.push(hostOf(url));
+  return {
+    id: String(s.id),
+    title: clean(s.title, 300),
+    url,
+    discussionUrl,
+    score: Number(s.score) || 0,
+    meta,
+    publishedAt: typeof s.time === 'number' ? new Date(s.time * 1000).toISOString() : undefined,
+  };
+}
+
 export async function fetchHn(config: HnConfig, fetcher: Fetcher): Promise<Item[]> {
-  const ids = await fetchJson<number[]>(fetcher, hnEndpoint(config));
+  const ids = await fetchJson<unknown>(fetcher, hnEndpoint(config));
+  if (!Array.isArray(ids)) throw new Error('Hacker News returned an unexpected response');
   const stories = await Promise.all(
-    ids.slice(0, config.limit).map((id) =>
-      fetchJson<HnStory | null>(fetcher, `${HN_API}/item/${id}.json`).catch(() => null),
-    ),
+    ids
+      .filter((id): id is number => Number.isInteger(id))
+      .slice(0, config.limit)
+      .map((id) => fetchJson<HnStory>(fetcher, `${HN_API}/item/${id}.json`).catch(() => null)),
   );
-  return stories
-    .filter((s): s is HnStory => Boolean(s && s.title && !s.deleted && !s.dead))
-    .map((s) => {
-      const discussionUrl = `https://news.ycombinator.com/item?id=${s.id}`;
-      const meta = [`${s.score ?? 0} points`, `${s.descendants ?? 0} comments`];
-      if (s.by) meta.push(`by ${s.by}`);
-      if (s.url) meta.push(new URL(s.url).hostname.replace(/^www\./, ''));
-      return {
-        id: String(s.id),
-        title: s.title!,
-        url: s.url ?? discussionUrl,
-        discussionUrl,
-        score: s.score,
-        meta,
-        publishedAt: s.time ? new Date(s.time * 1000).toISOString() : undefined,
-      };
-    });
+  // One malformed story must never take down the panel.
+  return stories.flatMap((s) => {
+    try {
+      const item = s ? toItem(s) : null;
+      return item ? [item] : [];
+    } catch {
+      return [];
+    }
+  });
 }

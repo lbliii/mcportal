@@ -1,143 +1,178 @@
 /**
- * Bounded outbound HTTP, borrowed from Orrery's "boundaries" pattern.
+ * Bounded outbound HTTP (Orrery's "boundaries" pattern).
  *
- * MCPortal fetches URLs that users (and, indirectly, agents) choose: RSS feeds
- * and articles. That makes it an SSRF target, so every request:
- *   - must be http(s) with no embedded credentials,
- *   - must resolve only to public IP addresses (checked on every redirect hop),
- *   - follows at most a few redirects, manually,
- *   - is capped in size and time.
+ * MCPortal fetches URLs that users and agents choose (feeds, articles), which
+ * makes it an SSRF target. Every request:
+ *   - must be http(s) with no embedded credentials and no local hostnames;
+ *   - may only CONNECT to public addresses. The check runs inside the socket's
+ *     DNS lookup, so the address that is validated is the address that is used
+ *     (no DNS-rebinding window between a check and the fetch);
+ *   - follows at most a few redirects manually, re-checking each hop and
+ *     dropping credentials when the host changes;
+ *   - is capped in time and in *decompressed* bytes.
+ *
+ * Built on node:http/https so it stays dependency-free.
  */
-import { lookup } from 'node:dns/promises';
+import { lookup as dnsLookup, type LookupAddress } from 'node:dns';
+import http, { type IncomingMessage } from 'node:http';
+import https from 'node:https';
 import { isIP } from 'node:net';
+import { pipeline, type Readable } from 'node:stream';
+import zlib from 'node:zlib';
 import type { FetchOptions, FetchResponse, Fetcher } from '../types.ts';
+import { isPublicAddress } from './ip.ts';
 
-export const USER_AGENT = 'MCPortal/0.1 (+https://github.com/lbliii/mcportal)';
+export const USER_AGENT = 'MCPortal/0.2 (+https://github.com/lbliii/mcportal)';
 
 export class BoundaryError extends Error {
   override name = 'BoundaryError';
 }
 
-function ipv4ToInt(ip: string): number {
-  return ip.split('.').reduce((acc, part) => (acc << 8) + Number(part), 0) >>> 0;
-}
-
-const PRIVATE_V4: Array<[string, number]> = [
-  ['0.0.0.0', 8],
-  ['10.0.0.0', 8],
-  ['100.64.0.0', 10],
-  ['127.0.0.0', 8],
-  ['169.254.0.0', 16],
-  ['172.16.0.0', 12],
-  ['192.0.0.0', 24],
-  ['192.168.0.0', 16],
-  ['198.18.0.0', 15],
-  ['224.0.0.0', 4],
-  ['240.0.0.0', 4],
-];
-
+/** Backwards-compatible name used by tests and callers. */
 export function isPrivateAddress(ip: string): boolean {
-  const family = isIP(ip);
-  if (family === 4) {
-    const n = ipv4ToInt(ip);
-    return PRIVATE_V4.some(([base, bits]) => {
-      const mask = bits === 0 ? 0 : (~0 << (32 - bits)) >>> 0;
-      return (n & mask) === (ipv4ToInt(base) & mask);
-    });
-  }
-  if (family === 6) {
-    const lower = ip.toLowerCase();
-    if (lower === '::' || lower === '::1') return true;
-    const mapped = lower.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
-    if (mapped) return isPrivateAddress(mapped[1]!);
-    return /^(fc|fd|fe8|fe9|fea|feb|ff)/.test(lower);
-  }
-  return true;
+  return !isPublicAddress(ip);
 }
 
-export async function assertPublicUrl(raw: string): Promise<URL> {
+/** Static checks that don't need DNS. Hostnames are checked again at connect time. */
+export function assertPublicUrl(raw: string): URL {
   let url: URL;
   try {
     url = new URL(raw);
   } catch {
-    throw new BoundaryError(`Not a valid URL: ${raw}`);
+    throw new BoundaryError('Not a valid URL');
   }
-  if (url.protocol !== 'https:' && url.protocol !== 'http:') {
-    throw new BoundaryError(`Only http(s) URLs are allowed: ${url.protocol}`);
+  // Error messages never echo URL parts: they can reach the model, and URLs are attacker-chosen.
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') throw new BoundaryError('Only http(s) URLs are allowed');
+  if (url.username || url.password) throw new BoundaryError('URLs with embedded credentials are not allowed');
+  const host = url.hostname.replace(/^\[|\]$/g, '').toLowerCase();
+  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.internal') || host.endsWith('.local')) {
+    throw new BoundaryError('Refusing to fetch a local host');
   }
-  if (url.username || url.password) {
-    throw new BoundaryError('URLs with embedded credentials are not allowed');
-  }
-  const host = url.hostname.replace(/^\[|\]$/g, '');
-  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.internal')) {
-    throw new BoundaryError(`Refusing to fetch local host: ${host}`);
-  }
-  const addresses = isIP(host) ? [host] : (await lookup(host, { all: true })).map((a) => a.address);
-  if (addresses.length === 0 || addresses.some(isPrivateAddress)) {
-    throw new BoundaryError(`Refusing to fetch non-public address for ${host}`);
-  }
+  if (isIP(host) && !isPublicAddress(host)) throw new BoundaryError('Refusing to fetch a non-public address');
   return url;
 }
 
-async function readCapped(res: Response, maxBytes: number, truncate: boolean): Promise<{ text: string; truncated: boolean }> {
-  if (!res.body) return { text: '', truncated: false };
-  const reader = res.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  let truncated = false;
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    total += value.byteLength;
-    if (total > maxBytes) {
-      if (!truncate) {
-        await reader.cancel();
-        throw new BoundaryError(`Response exceeded ${maxBytes} bytes`);
-      }
-      chunks.push(value.subarray(0, value.byteLength - (total - maxBytes)));
-      truncated = true;
-      await reader.cancel();
-      break;
+type LookupCallback = (err: NodeJS.ErrnoException | null, address?: string | LookupAddress[], family?: number) => void;
+
+/** DNS lookup that refuses to hand a non-public address to the socket. */
+export function guardedLookup(hostname: string, options: { all?: boolean; family?: number } | number, callback: LookupCallback): void {
+  const opts = typeof options === 'number' ? { family: options } : options ?? {};
+  dnsLookup(hostname, { family: opts.family ?? 0, all: true }, (err, addresses) => {
+    if (err) return callback(err);
+    const list = addresses as LookupAddress[];
+    if (list.length === 0 || list.some((a) => !isPublicAddress(a.address))) {
+      return callback(new BoundaryError('Refusing to connect to a non-public address') as NodeJS.ErrnoException);
     }
-    chunks.push(value);
-  }
-  return { text: new TextDecoder().decode(Buffer.concat(chunks)), truncated };
+    if (opts.all) return callback(null, list);
+    return callback(null, list[0]!.address, list[0]!.family);
+  });
 }
+
+function request(url: URL, method: string, headers: Record<string, string>, body: string | undefined, signal: AbortSignal): Promise<IncomingMessage> {
+  const mod = url.protocol === 'https:' ? https : http;
+  return new Promise((resolve, reject) => {
+    const req = mod.request(url, { method, headers, lookup: guardedLookup as never, signal }, resolve);
+    req.on('error', reject);
+    if (body !== undefined) req.write(body);
+    req.end();
+  });
+}
+
+/**
+ * Decompress with pipeline() so an abort, timeout or upstream error on the
+ * socket also destroys the decompressor (a plain .pipe() would leave it
+ * waiting forever on a stalled gzip stream).
+ */
+function decoded(res: IncomingMessage): Readable {
+  const encoding = String(res.headers['content-encoding'] ?? '').toLowerCase();
+  const decoder =
+    encoding === 'gzip' || encoding === 'x-gzip' ? zlib.createGunzip()
+    : encoding === 'deflate' ? zlib.createInflate()
+    : encoding === 'br' ? zlib.createBrotliDecompress()
+    : undefined;
+  if (!decoder) return res;
+  pipeline(res, decoder, () => {});
+  return decoder;
+}
+
+async function readCapped(stream: Readable, maxBytes: number, truncate: boolean): Promise<{ text: string; truncated: boolean }> {
+  const chunks: Buffer[] = [];
+  let total = 0;
+  for await (const chunk of stream) {
+    const buf = chunk as Buffer;
+    if (total + buf.length > maxBytes) {
+      stream.destroy();
+      if (!truncate) throw new BoundaryError(`Response exceeded ${maxBytes} bytes`);
+      chunks.push(buf.subarray(0, maxBytes - total));
+      return { text: Buffer.concat(chunks).toString('utf8'), truncated: true };
+    }
+    total += buf.length;
+    chunks.push(buf);
+  }
+  return { text: Buffer.concat(chunks).toString('utf8'), truncated: false };
+}
+
+/** Decode and read a response body within a byte cap. Exported for tests. */
+export function readResponse(res: IncomingMessage, maxBytes: number, truncate = false): Promise<{ text: string; truncated: boolean }> {
+  return readCapped(decoded(res), maxBytes, truncate);
+}
+
+const SENSITIVE = ['authorization', 'cookie', 'proxy-authorization'];
 
 export const safeFetch: Fetcher = async (target: string, options: FetchOptions = {}): Promise<FetchResponse> => {
   const maxRedirects = options.maxRedirects ?? 3;
   const maxBytes = options.maxBytes ?? 2_000_000;
-  let current = target;
+  const signal = AbortSignal.timeout(options.timeoutMs ?? 10_000);
+  let method = options.method ?? 'GET';
+  let body = options.body;
+  let headers: Record<string, string> = {
+    'user-agent': USER_AGENT,
+    'accept-encoding': 'gzip, deflate, br',
+    ...Object.fromEntries(Object.entries(options.headers ?? {}).map(([k, v]) => [k.toLowerCase(), v])),
+  };
+  let url = assertPublicUrl(target);
+  const originalHost = url.host;
+
   for (let hop = 0; hop <= maxRedirects; hop++) {
-    await assertPublicUrl(current);
-    const res = await fetch(current, {
-      redirect: 'manual',
-      signal: AbortSignal.timeout(options.timeoutMs ?? 10_000),
-      headers: { 'user-agent': USER_AGENT, ...options.headers },
-    });
-    if (res.status >= 300 && res.status < 400) {
-      const location = res.headers.get('location');
-      if (!location) throw new BoundaryError(`Redirect without location from ${current}`);
-      current = new URL(location, current).href;
+    let res: IncomingMessage;
+    try {
+      res = await request(url, method, headers, body, signal);
+    } catch (error) {
+      if (error instanceof BoundaryError) throw error;
+      if ((error as Error).name === 'AbortError' || (error as Error).name === 'TimeoutError') throw new BoundaryError(`Timed out fetching ${url.host}`);
+      throw new Error(`Could not reach ${url.host}: ${(error as NodeJS.ErrnoException).code ?? (error as Error).message}`);
+    }
+    const status = res.statusCode ?? 0;
+    if (status >= 300 && status < 400 && res.headers.location) {
+      res.resume();
+      let next: URL;
+      try {
+        next = assertPublicUrl(new URL(res.headers.location, url).href);
+      } catch {
+        throw new BoundaryError(`${url.host} redirected to a disallowed URL`);
+      }
+      if (next.host !== originalHost) headers = Object.fromEntries(Object.entries(headers).filter(([k]) => !SENSITIVE.includes(k)));
+      if (status === 303 || ((status === 301 || status === 302) && method !== 'GET')) {
+        method = 'GET';
+        body = undefined;
+      }
+      url = next;
       continue;
     }
-    const { text, truncated } = await readCapped(res, maxBytes, options.truncate ?? false);
-    return {
-      status: res.status,
-      url: current,
-      contentType: res.headers.get('content-type') ?? '',
-      text,
-      truncated,
-    };
+    const { text, truncated } = await readResponse(res, maxBytes, options.truncate ?? false);
+    return { status, url: url.href, contentType: String(res.headers['content-type'] ?? ''), text, truncated };
   }
-  throw new BoundaryError(`Too many redirects starting at ${target}`);
+  throw new BoundaryError(`Too many redirects from ${new URL(target).host}`);
 };
 
-/** Fetch and parse JSON, raising a readable error on non-2xx responses. */
+/** Fetch and parse JSON with errors that never echo upstream content. */
 export async function fetchJson<T>(fetcher: Fetcher, url: string, options?: FetchOptions): Promise<T> {
   const res = await fetcher(url, options);
-  if (res.status < 200 || res.status >= 300) {
-    throw new Error(`${new URL(url).host} responded ${res.status}`);
+  const host = new URL(url).host;
+  if (res.status < 200 || res.status >= 300) throw new Error(`${host} responded ${res.status}`);
+  try {
+    return JSON.parse(res.text) as T;
+  } catch {
+    throw new Error(`${host} returned invalid JSON`);
   }
-  return JSON.parse(res.text) as T;
 }
