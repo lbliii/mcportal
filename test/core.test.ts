@@ -89,6 +89,7 @@ test('resources/read serves the self-contained workspace app', async () => {
   assert.ok(!content.text.includes('__MCPORTAL_DEV__='), 'dev bootstrap only in /preview');
   assert.ok(!/innerHTML/.test(content.text), 'UI never renders remote data as HTML');
   assert.ok(!/[\u2028\u2029]/.test(content.text), 'no raw line separators in scripts');
+  for (const [, script] of content.text.matchAll(/<script>([\s\S]*?)<\/script>/g)) new vm.Script(script); // throws on a syntax error
   const missing = await rpc(ctx(), 'resources/read', { uri: 'ui://nope' });
   assert.equal(missing.error?.code, -32602);
 });

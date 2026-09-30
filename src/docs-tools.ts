@@ -13,7 +13,7 @@ import { blocksToText } from './lib/markdown.ts';
 import { clean } from './lib/text.ts';
 import { findPanel, LIMITS, normalizeSourceConfig } from './profile.ts';
 import { FRESHNESS, loadDocSite } from './sources.ts';
-import { toolError, untrusted, type CallToolResult, type ToolContext, type ToolDef } from './tools.ts';
+import { toolError, untrusted, WORKSPACE_URI, type CallToolResult, type ToolContext, type ToolDef } from './tools.ts';
 import type { ArticleBlock, Provenance } from './types.ts';
 
 /** How much of a page the model gets as text; the app gets every block. */
@@ -96,13 +96,14 @@ export const DOCS_TOOLS: ToolDef[] = [
     name: 'open_docs',
     title: 'Open a docs site',
     description: [
-      'Open a documentation site as a table of contents: its sections and pages, with links. Works with docs sites (via their llms.txt, Sphinx inventory or sitemap)',
+      'Open a documentation site in the docs viewer (contents, search, the page, on-this-page), shown as its own card. Also returns the table of contents: its sections and pages, with links. Works with docs sites (via their llms.txt, Sphinx inventory or sitemap)',
       'and with GitHub repos whose docs are markdown ("owner/repo", or a link to a docs folder or file). For a nested docs index (a page marked as one), pass its URL.',
-      'Then read pages with read_doc_page and find them with search_docs. To keep the docs in the portal, use find_source and add_panel instead.',
+      'Pass a GitHub file link to open at that page. Then read pages with read_doc_page and find them with search_docs. To keep the docs in the portal, use find_source and add_panel instead.',
       'Titles and descriptions are third-party text.',
     ].join(' '),
     inputSchema: { type: 'object', additionalProperties: false, properties: siteArgs },
     annotations: { readOnlyHint: true, openWorldHint: true },
+    _meta: { ui: { resourceUri: WORKSPACE_URI } },
     async handler(args, ctx) {
       try {
         const input = clean(args.docs, 500);

@@ -220,3 +220,19 @@ test('budget: docs tools cost like the reader', () => {
   assert.equal(toolCost('open_docs', {}), 2);
   assert.equal(toolCost('search_docs', {}), 1);
 });
+
+test('open_docs renders as its own docs card; the Developer docs pack builds a portal of docs panels', async () => {
+  const c = await docsCtx();
+  const list = await handleMessage({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} }, c);
+  const tools = (list as any).result.tools as any[];
+  assert.equal(tools.find((t) => t.name === 'open_docs')._meta.ui.resourceUri, 'ui://mcportal/workspace.html');
+  assert.equal(tools.find((t) => t.name === 'read_doc_page')._meta, undefined, 'pages are read by the viewer, not shown as cards');
+
+  const fresh = { ...c, store: new MemoryProfileStore() };
+  const built = await call(fresh, 'build_portal', { packs: ['docs'] });
+  assert.equal(built.isError, undefined, built.content[0]!.text);
+  const panels = built.structuredContent.profile.columns.flatMap((col: any) => col.panels);
+  assert.deepEqual(panels.map((p: any) => [p.id, p.source, p.config.toc.kind]), [
+    ['stripe-docs', 'docs', 'llms'], ['railway-docs', 'docs', 'llms'], ['python-docs', 'docs', 'sphinx'], ['nextjs-docs', 'docs', 'llms'],
+  ]);
+});

@@ -296,7 +296,7 @@ export const TOOLS: ToolDef[] = [
     name: 'build_portal',
     title: 'Build the portal from starter packs',
     description: [
-      `Set up the user's portal from up to ${MAX_PACKS} starter packs (ids from open_workspace's setup, e.g. developer, ai, news, gaming, art, science, music, film).`,
+      `Set up the user's portal from up to ${MAX_PACKS} starter packs (ids from open_workspace's setup, e.g. developer, docs, ai, news, gaming, art, science, music, film).`,
       'Replaces the current layout; saved items stay. Use it for first-time setup, or when the user asks to start over (confirm first if they have a portal they built).',
       'An empty packs list keeps the sample layout and just finishes setup. Afterwards call open_workspace to show it, and offer to add anything specific with find_source.',
     ].join(' '),

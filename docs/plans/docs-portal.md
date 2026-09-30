@@ -1,6 +1,6 @@
 # Plan: docs portal — read any docs site without its front end
 
-**Status:** phases 1–3 shipped (2026-09-30); phase 4 (the docs viewer and the starter pack) next. **Milestone:** first new portal type after columns and shelves; the developer hook for paid plans.
+**Status:** phases 1–4 shipped (2026-09-30), except checking the pack's sources from the Railway server. Next: lanes (a viewer mode), then phase 5 (search inside pages). **Milestone:** first new portal type after columns and shelves; the developer hook for paid plans.
 
 ## Goal
 
@@ -176,9 +176,18 @@ As with the other packs, every source must be checked **from the Railway server*
 | 1 ✅ | `src/adapters/docs.ts`: `llms.txt` parser (with nesting), `objects.inv` parser, resolver ladder with body validation, page ladder with learned route; `docs` source kind and config normalisation; `scripts/docs-probe.ts` (the probe as a script, run locally or on the server) | Unit tests against fixtures from Stripe, Railway, Cloudflare (nested), Python (Sphinx), Cursor (fake 200), Docker (empty links); probe output checked in as a report |
 | 2 ✅ | `src/lib/markdown.ts` with the richer blocks, MDX and directive cleanup; clips moved onto it; HTML reader gains `role=main`, tables and heading levels | Tests: every MDX component case, tables, callouts, spans reject `javascript:` links; clips tests still pass unchanged |
 | 3 ✅ | GitHub docs folders; tools: `find_source` learns docs, `open_docs`, `read_doc_page`, `search_docs`, `read_source` for docs; server instructions; budget costs | Tool tests: fenced output, fetch scope refuses off-site URLs, section filter, search ranking |
-| 4 | UI: Docs panel in columns and shelves, docs viewer (TOC, search, on-this-page, prev/next, in-docs links), docs card in chat, narrow-screen drawer; the **Developer docs** starter pack | Preview: Stripe, Railway, Python and Next.js end to end; a page with `<Tabs>` and `<Info>`; mobile width; pack checked from the Railway server |
+| 4 ✅ | UI: Docs panel in columns and shelves, docs viewer (TOC, search, on-this-page, prev/next, in-docs links), docs card in chat, narrow-screen drawer; the **Developer docs** starter pack | Preview: Stripe, Railway, Python and Next.js end to end; a page with `<Tabs>` and `<Info>`; mobile width; pack checked from the Railway server |
 | 5 | Search inside pages: build an index from `llms-full.txt` when it splits cleanly (the two easy conventions first), else from pages as they're read; Sphinx symbol jump ("`str.split`") | Search quality on Stripe and Python; memory stays inside the cache budget |
 | 6 (later) | Docs sites' own MCP servers (Mintlify, GitBook) as a source; "what changed since you last read it" (the Watch portal idea); docs in Spaces | Separate plan |
+
+## Phase 4 notes
+
+- **The docs viewer** opens from any docs panel item (columns or shelves) and as its own card from `open_docs`. Left: the site title, search (titles, and symbols on Sphinx sites), and the contents, with only the current page's section open and the current page highlighted. Middle: breadcrumb (site › section), the page, previous/next. Right, above 1,080px wide: "On this page" from its H2 and H3 headings. Under 760px the contents is a drawer behind a Contents button.
+- **Anchors work:** a symbol hit (`str.split`) opens its page and scrolls to its signature; heading links scroll within the page; anchors clear the sticky top bar.
+- **Nested indexes** (Cloudflare's products) open as their own docs with a "← Cloudflare Developer Documentation" link back up.
+- **The Developer docs pack** (Stripe, Railway, Python, Next.js) is on the welcome screen next to Developer, with each table of contents already resolved in `packs.ts`, so a new portal opens without probing. Checked in the preview on a fresh portal: four docs shelves, no errors, pages open in the viewer.
+- **A test now compiles the app's inline script,** after a stray parenthesis stopped the whole workspace from loading in the preview (the unit tests didn't cover the UI's syntax).
+- **Still to do before release:** run `node scripts/docs-probe.ts` from the Railway server (the pack's sites have only been checked from a laptop).
 
 ## Phase 3 notes
 
