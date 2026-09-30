@@ -75,6 +75,46 @@ function atomLink(block: string, lower: string): string | undefined {
   return first;
 }
 
+/** Attributes of the first `<name ...>` tag in a block, or undefined. */
+function tagAttrs(block: string, lower: string, name: string): Record<string, string> | undefined {
+  const start = findOpen(lower, name, 0);
+  if (start === -1) return undefined;
+  const gt = lower.indexOf('>', start);
+  if (gt === -1) return undefined;
+  return parseAttrs(block.slice(start + name.length + 1, gt));
+}
+
+const IMAGE_EXT = /\.(jpe?g|png|webp|gif)(\?|$)/i;
+
+/**
+ * A thumbnail for an item: media:thumbnail, an image media:content or enclosure,
+ * itunes:image, else the first <img> in the item's HTML. YouTube thumbnails are
+ * swapped for the 320x180 size.
+ */
+function itemImage(block: string, lower: string, baseUrl?: string): string | undefined {
+  const candidates: Array<string | undefined> = [];
+  candidates.push(tagAttrs(block, lower, 'media:thumbnail')?.url);
+  const content = tagAttrs(block, lower, 'media:content');
+  if (content && (content.medium === 'image' || /^image\//.test(content.type ?? '') || IMAGE_EXT.test(content.url ?? ''))) candidates.push(content.url);
+  const enclosure = tagAttrs(block, lower, 'enclosure');
+  if (enclosure && /^image\//.test(enclosure.type ?? '')) candidates.push(enclosure.url);
+  candidates.push(tagAttrs(block, lower, 'itunes:image')?.href);
+  if (!candidates.some(Boolean)) {
+    // First <img> inside the (usually entity-escaped) HTML content.
+    const html = decodeEntities(stripCdata(block.slice(0, 200_000)));
+    const img = html.match(/<img\b[^>]*?\ssrc\s*=\s*["']([^"']+)["']/i)?.[1];
+    candidates.push(img ? decodeEntities(img) : undefined);
+  }
+  for (const raw of candidates) {
+    const url = safeHttpUrl(raw ? decodeEntities(raw) : undefined, baseUrl);
+    if (!url || url.startsWith('data:')) continue;
+    const u = new URL(url);
+    if (/(^|\.)ytimg\.com$/.test(u.hostname)) u.pathname = u.pathname.replace(/\/(hq|sd|maxres)?default\.jpg$/, '/mqdefault.jpg');
+    return u.href;
+  }
+  return undefined;
+}
+
 function toIso(value: string | undefined): string | undefined {
   if (!value) return undefined;
   const d = new Date(value.trim().slice(0, 64));
@@ -112,7 +152,11 @@ export function parseFeed(xml: string, limit = 20, baseUrl?: string): ParsedFeed
     const meta: string[] = [];
     if (author) meta.push(`by ${author}`);
     if (url) meta.push(hostOf(url));
+    const image = itemImage(block, bl, baseUrl);
+    const video = Boolean(url && /^https:\/\/(www\.)?youtube\.com\/(watch|shorts)/.test(url));
     return {
+      ...(image ? { image: { url: image, kind: 'thumb' as const } } : {}),
+      ...(video ? { video: true } : {}),
       id: clean(htmlToText(tagText(block, bl, isAtom ? 'id' : 'guid') ?? ''), 300) || url || `${index}`,
       title: itemTitle,
       url,

@@ -11,6 +11,10 @@ export interface Item {
   meta: string[];
   score?: number;
   publishedAt?: string;
+  /** A picture for the item: a content thumbnail, or a small avatar (GitHub owners). Fetched via get_thumbnails. */
+  image?: { url: string; kind: 'thumb' | 'avatar' };
+  /** The link is a video (YouTube). */
+  video?: boolean;
 }
 
 /** "Show your work": where a block's data came from and how fresh it is. */
@@ -63,6 +67,8 @@ export interface FetchOptions {
   maxRedirects?: number;
   /** When true, oversized bodies are cut off instead of rejected (used for HTML). */
   truncate?: boolean;
+  /** When true, `text` is the body as base64 (images). */
+  binary?: boolean;
 }
 
 export type Fetcher = (url: string, options?: FetchOptions) => Promise<FetchResponse>;

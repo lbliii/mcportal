@@ -18,17 +18,18 @@ function fixtureFor(url: URL): { file: string; type: string } | undefined {
   if (url.host === 'simonwillison.net' && url.pathname.startsWith('/atom/')) return { file: 'simonw.atom', type: 'application/xml' };
   if (url.host === 'example.com' && url.pathname === '/feed.xml') return { file: 'sample.rss', type: 'application/rss+xml' };
   if (url.host === 'example.com' && url.pathname === '/') return { file: 'site.html', type: 'text/html; charset=utf-8' };
+  if (url.host === 'img.example.com') return url.pathname.endsWith('.svg') ? { file: 'evil.svg', type: 'image/png' } : { file: 'thumb.png', type: 'image/png' };
   if (url.host === 'yashgarg.dev') return { file: 'article.html', type: 'text/html; charset=utf-8' };
   return undefined;
 }
 
 export function createFixtureFetcher(calls: string[] = []): Fetcher {
-  return async (target) => {
+  return async (target, options = {}) => {
     calls.push(target);
     const url = new URL(target);
     const match = fixtureFor(url);
     if (!match) return { status: 404, url: target, contentType: 'text/plain', text: 'not found', truncated: false };
-    const text = await readFile(DIR + match.file, 'utf8');
+    const text = await readFile(DIR + match.file, options.binary ? 'base64' : 'utf8');
     return { status: 200, url: target, contentType: match.type, text, truncated: false };
   };
 }

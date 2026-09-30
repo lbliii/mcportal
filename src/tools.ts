@@ -112,6 +112,34 @@ function addPanelTo(profile: Profile, spec: PanelSpec, column?: number): { profi
   return { profile: next, panelId };
 }
 
+const IMAGE_TYPES: Record<string, (b: Buffer) => boolean> = {
+  'image/jpeg': (b) => b[0] === 0xff && b[1] === 0xd8,
+  'image/png': (b) => b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])),
+  'image/gif': (b) => b.subarray(0, 4).toString('latin1') === 'GIF8',
+  'image/webp': (b) => b.subarray(0, 4).toString('latin1') === 'RIFF' && b.subarray(8, 12).toString('latin1') === 'WEBP',
+};
+const MAX_IMAGE_BYTES = 350_000;
+
+/**
+ * Fetch one image through the guarded fetcher and return it as a data: URI, so the
+ * UI never contacts third parties and needs no CSP exceptions. Only JPEG, PNG, GIF
+ * and WebP whose bytes match their type; no SVG. Cached for a day (failures too).
+ */
+async function thumbnail(url: string, ctx: ToolContext): Promise<string | null> {
+  const result = await ctx.cache.get(`img:${url}`, 86_400, async () => {
+    try {
+      const res = await ctx.fetcher(url, { binary: true, maxBytes: MAX_IMAGE_BYTES, timeoutMs: 6000, headers: { accept: 'image/avif;q=0,image/webp,image/png,image/jpeg,image/gif;q=0.8' } });
+      if (res.status < 200 || res.status >= 300) return null;
+      const bytes = Buffer.from(res.text, 'base64');
+      const type = Object.keys(IMAGE_TYPES).find((t) => IMAGE_TYPES[t]!(bytes));
+      return type ? `data:${type};base64,${res.text}` : null;
+    } catch {
+      return null;   // too big, timed out, blocked address: just no picture
+    }
+  });
+  return result.value;
+}
+
 /** What the saving tools return: the model gets a fenced summary, the app gets state to redraw. */
 function savedResult(text: string, profile: Profile, layoutChanged: boolean): CallToolResult {
   const spec = findSavedPanel(profile);
@@ -297,6 +325,31 @@ export const TOOLS: ToolDef[] = [
       } catch (error) {
         return toolError(`Could not open ${clean(url, 200)}: ${clean((error as Error).message, 200)}`);
       }
+    },
+  },
+  {
+    name: 'get_thumbnails',
+    title: 'Load thumbnails',
+    description: 'Fetch item thumbnails for the workspace UI as data URIs. Used by the workspace UI.',
+    inputSchema: {
+      type: 'object',
+      required: ['urls'],
+      additionalProperties: false,
+      properties: { urls: { type: 'array', maxItems: 24, items: { type: 'string' } } },
+    },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+    _meta: { ui: { resourceUri: WORKSPACE_URI, visibility: ['app'] } },
+    async handler(args, ctx) {
+      const urls = [...new Set((Array.isArray(args.urls) ? args.urls : []).slice(0, 24).map(String))];
+      const images: Record<string, string | null> = {};   // keyed by the URL exactly as the UI sent it
+      for (let i = 0; i < urls.length; i += 6) {   // at most 6 fetches at a time
+        await Promise.all(urls.slice(i, i + 6).map(async (raw) => {
+          const url = httpUrl(raw);
+          images[raw] = url ? await thumbnail(url, ctx) : null;
+        }));
+      }
+      const loaded = Object.values(images).filter(Boolean).length;
+      return ok(`${loaded} of ${urls.length} thumbnails loaded`, { images });
     },
   },
   {

@@ -121,6 +121,26 @@
   .cand-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .cand-sub, .cand-prev { color: var(--fg2); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .cand-prev { font-size: 12px; margin-top: 2px; }
+  /* pictures: fetched by the server as data: URIs, loaded as they scroll into view */
+  .thumb { position: relative; flex: none; overflow: hidden; border-radius: 6px; background: color-mix(in srgb, var(--c, var(--fg2)) 14%, transparent); }
+  .thumb img { display: block; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .2s; }
+  .thumb img.on { opacity: 1; }
+  .thumb .play { position: absolute; right: 6px; bottom: 6px; width: 24px; height: 24px; border-radius: 50%; background: rgba(0,0,0,.62); color: #fff; display: flex; align-items: center; justify-content: center; }
+  .thumb .play svg { width: 12px; height: 12px; fill: currentColor; stroke: none; margin-left: 2px; }
+  .item-row { display: flex; gap: 9px; align-items: flex-start; }
+  .item-row .thumb { width: 88px; height: 50px; margin-top: 2px; }
+  .item-text { flex: 1; min-width: 0; }
+  .avatar { display: inline-block; width: 16px; height: 16px; border-radius: 4px; vertical-align: -3px; margin-right: 6px; background: var(--hover); object-fit: cover; }
+  .avatar.gone { display: none; }
+  .card.media { height: 214px; padding: 0; gap: 0; }
+  .card.media .thumb { height: 118px; border-radius: 0; }
+  .card.media .thumb .ph { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--fg2); font-size: 11.5px; padding: 0 10px; text-align: center; }
+  .card.media .thumb img.on + .ph { display: none; }
+  .card-body { display: flex; flex-direction: column; gap: 4px; flex: 1; min-height: 0; padding: 8px 11px 9px; }
+  .card.media .item-title { -webkit-line-clamp: 2; }
+  .card.media .item-summary { display: none; }
+  :root.fullscreen .card.media { height: 246px; }
+  :root.fullscreen .card.media .thumb { height: 148px; }
   .empty, .error { padding: 16px 12px; color: var(--fg2); }
   .error { color: #c2410c; }
   .skeleton { height: 12px; margin: 12px; border-radius: 4px; background: var(--hover); }
@@ -197,6 +217,7 @@
     comment: 'M6 5h12a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-6.5l-4.5 3.5v-3.5H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z',
     up: 'M12 19V6.5 M6.5 12L12 6.5l5.5 5.5',
     plus: 'M12 5v14M5 12h14',
+    play: 'M8 5.5v13l10.5-6.5z',
     bookmark: 'M7 4.5h10a1 1 0 0 1 1 1v14l-6-4-6 4v-14a1 1 0 0 1 1-1z',
   };
   function icon(name) {
@@ -421,26 +442,36 @@
     if (panel.error) wrap.append(el('div', { class: 'error' }, `Couldn't load: ${panel.error}`));
     else if (!panel.items.length) wrap.append(el('div', { class: 'empty' }, 'Nothing here yet.'));
     else {
-      row.append(...panel.items.map((item) => renderCard(item, panel, color)));
+      // A picture row only when most items have pictures; otherwise it's mostly empty boxes.
+      const withThumbs = panel.items.filter((i) => i.image && i.image.kind === 'thumb').length;
+      const media = withThumbs >= 2 && withThumbs * 2 >= panel.items.length;
+      row.append(...panel.items.map((item) => renderCard(item, panel, color, media)));
       wrap.append(row);
     }
     const p = panel.provenance;
     wrap.append(el('div', { class: 'panel-foot' }, `${p.source} · ${p.endpoint} · fetched ${new Date(p.fetchedAt).toLocaleTimeString()}${p.cached ? ' (cached)' : ''}`));
+    primePictures(wrap);
     return wrap;
   }
 
-  function renderCard(item, panel, color) {
+  // In a media shelf every card gets a picture area, so the row stays even.
+  function renderCard(item, panel, color, media) {
     const meta = compactMeta(item).out;
     const save = saveButton(item, panel.source);
     if (save) { save.classList.add('go'); meta.push(save); }
+    const avatar = item.image && item.image.kind === 'avatar' ? avatarImg(item) : null;
+    const body = [
+      el('div', { class: 'item-title' }, avatar, item.title),
+      media ? null : item.summary ? el('div', { class: 'item-summary' }, item.summary) : null,
+      meta.length ? el('div', { class: 'item-meta' }, meta) : null,
+    ];
+    let host = '';
+    try { host = item.url ? new URL(item.url).hostname.replace(/^www\./, '') : ''; } catch { host = ''; }
     return el('div', {
-      class: 'card', role: 'button', tabindex: '0', style: `--c:${color}`, title: item.title,
+      class: media ? 'card media' : 'card', role: 'button', tabindex: '0', style: `--c:${color}`, title: item.title,
       onclick: () => openItem(item, panel),
       onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) openItem(item, panel); },
-    },
-      el('div', { class: 'item-title' }, item.title),
-      item.summary ? el('div', { class: 'item-summary' }, item.summary) : null,
-      meta.length ? el('div', { class: 'item-meta' }, meta) : null);
+    }, media ? [thumbBox(item.image && item.image.kind === 'thumb' ? item : { ...item, image: undefined }, color, host), el('div', { class: 'card-body' }, body)] : body);
   }
 
   function renderPanel(panelId) {
@@ -461,7 +492,74 @@
     const p = panel.provenance;
     wrap.append(el('div', { class: 'panel-foot' },
       `${p.source} · ${p.endpoint} · fetched ${new Date(p.fetchedAt).toLocaleTimeString()}${p.cached ? ' (cached)' : ''} · fresh for ${p.ttlSeconds}s`));
+    primePictures(wrap);
     return wrap;
+  }
+
+  // ------------------------------------------------------------ pictures
+  // The server fetches images (get_thumbnails) and returns data: URIs, so this view
+  // never contacts third parties. Requested in batches as they scroll into view.
+  const pictures = new Map();   // image url -> data URI, or null when unavailable
+  const wanted = new Set();
+  let pictureTimer = 0, pictureBusy = false;
+
+  function showPicture(node) {
+    const url = node.dataset.img;
+    if (!pictures.has(url)) return false;
+    const data = pictures.get(url);
+    const img = node.tagName === 'IMG' ? node : node.querySelector('img');
+    if (data && img) { img.src = data; img.classList.add('on'); }
+    else if (!data && node.classList.contains('avatar')) node.classList.add('gone');
+    return true;
+  }
+  const seen = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (!e.isIntersecting) continue;
+      seen.unobserve(e.target);
+      if (!showPicture(e.target)) { wanted.add(e.target.dataset.img); clearTimeout(pictureTimer); pictureTimer = setTimeout(loadPictures, 60); }
+    }
+  }, { rootMargin: '200px' });
+
+  async function loadPictures() {
+    if (pictureBusy || !wanted.size) return;
+    pictureBusy = true;
+    const batch = [...wanted].slice(0, 24);
+    batch.forEach((u) => wanted.delete(u));
+    try {
+      const { images } = (await callTool('get_thumbnails', { urls: batch })).structuredContent;
+      for (const u of batch) pictures.set(u, images[u] || null);
+    } catch {
+      for (const u of batch) pictures.set(u, null);
+    }
+    for (const node of document.querySelectorAll('[data-img]')) if (batch.includes(node.dataset.img)) showPicture(node);
+    pictureBusy = false;
+    if (wanted.size) loadPictures();
+  }
+
+  // The first few pictures in each panel are what's on screen: ask for them now,
+  // without waiting on visibility (which never fires in a hidden or background frame).
+  function primePictures(panelNode, count = 6) {
+    const urls = [...new Set([...panelNode.querySelectorAll('[data-img]')].map((n) => n.dataset.img))].slice(0, count);
+    for (const u of urls) if (!pictures.has(u)) wanted.add(u);
+    if (wanted.size) { clearTimeout(pictureTimer); pictureTimer = setTimeout(loadPictures, 30); }
+  }
+
+  function watchPicture(node) {
+    if (!showPicture(node)) seen.observe(node);
+    return node;
+  }
+  function thumbBox(item, color, placeholder) {
+    const box = el('div', { class: 'thumb', style: `--c:${color}` },
+      el('img', { alt: '', loading: 'lazy', decoding: 'async' }),
+      placeholder ? el('div', { class: 'ph' }, placeholder) : null,
+      item.video ? el('span', { class: 'play', 'aria-hidden': 'true' }, icon('play')) : null);
+    if (!item.image) return box;
+    box.dataset.img = item.image.url;
+    return watchPicture(box);
+  }
+  function avatarImg(item) {
+    const img = el('img', { class: 'avatar', alt: '', 'data-img': item.image.url });
+    return watchPicture(img);
   }
 
   // ------------------------------------------------------------ saving
@@ -536,15 +634,19 @@
     const { out, byline } = compactMeta(item);
     if (item.url) out.push(el('button', { class: 'mi go', title: 'Open the original', 'aria-label': 'Open the original', onclick: (e) => { e.stopPropagation(); openLink(item.url); } }, icon('external')));
     out.push(saveButton(item, panel.source));
+    const avatar = item.image && item.image.kind === 'avatar' ? avatarImg(item) : null;
+    const text = [
+      el('div', { class: 'item-title' }, avatar, item.title),
+      item.summary ? el('div', { class: 'item-summary' }, item.summary) : null,
+      out.length ? el('div', { class: 'item-meta' }, out) : null,
+    ];
+    const thumb = item.image && item.image.kind === 'thumb';
     return el('div', {
       class: 'item', role: 'button', tabindex: '0',
       title: [item.url && panel.source !== 'github' ? 'Open in reader view' : 'Open', byline].filter(Boolean).join(' · '),
       onclick: () => openItem(item, panel),
       onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) openItem(item, panel); },
-    },
-      el('div', { class: 'item-title' }, item.title),
-      item.summary ? el('div', { class: 'item-summary' }, item.summary) : null,
-      out.length ? el('div', { class: 'item-meta' }, out) : null);
+    }, thumb ? el('div', { class: 'item-row' }, thumbBox(item, `var(--src-${panel.source})`), el('div', { class: 'item-text' }, text)) : text);
   }
 
   async function refreshPanel(panelId) {
@@ -595,7 +697,7 @@
 
   // ------------------------------------------------------------ reader view
   function openItem(item, panel) {
-    const readable = item.url && panel.source !== 'github';
+    const readable = item.url && panel.source !== 'github' && !item.video;   // videos play at the source
     if (!readable) return openLink(item.url);
     if (!DEV && state.profile && state.profile.openIn === 'chat') return openInChat(item, panel);
     return openReader(item, panel);

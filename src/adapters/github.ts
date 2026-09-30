@@ -23,6 +23,7 @@ interface Repo {
   stargazers_count: number;
   language: string | null;
   pushed_at: string;
+  owner?: { avatar_url?: string };
 }
 
 interface Release {
@@ -33,7 +34,7 @@ interface Release {
   published_at: string | null;
   draft: boolean;
   prerelease: boolean;
-  author?: { login: string };
+  author?: { login: string; avatar_url?: string };
 }
 
 export function githubEndpoint(config: GithubConfig): string {
@@ -60,6 +61,15 @@ function compact(n: number): string {
   return n >= 1000 ? `${(n / 1000).toFixed(n >= 10_000 ? 0 : 1)}k` : String(n);
 }
 
+/** Owner avatars, requested small. Only GitHub's own avatar host. */
+function avatar(raw: unknown): Item['image'] {
+  const url = safeHttpUrl(raw);
+  if (!url || new URL(url).hostname !== 'avatars.githubusercontent.com') return undefined;
+  const u = new URL(url);
+  u.searchParams.set('s', '64');
+  return { url: u.href, kind: 'avatar' };
+}
+
 export async function fetchGithub(config: GithubConfig, fetcher: Fetcher): Promise<Item[]> {
   const url = githubEndpoint(config);
   if (config.mode === 'releases') {
@@ -73,6 +83,7 @@ export async function fetchGithub(config: GithubConfig, fetcher: Fetcher): Promi
         url: safeHttpUrl(r.html_url),
         meta: [clean(r.tag_name, 60), ...(r.prerelease ? ['pre-release'] : []), ...(r.author ? [`by ${clean(r.author.login, 40)}`] : [])],
         publishedAt: r.published_at ?? undefined,
+        image: avatar(r.author?.avatar_url),
       }));
   }
   const data = await fetchJson<{ items: Repo[] }>(fetcher, url, { headers: headers() });
@@ -85,5 +96,6 @@ export async function fetchGithub(config: GithubConfig, fetcher: Fetcher): Promi
     score: Number(r.stargazers_count) || 0,
     meta: [`★ ${compact(Number(r.stargazers_count) || 0)}`, ...(r.language ? [clean(r.language, 30)] : [])],
     publishedAt: r.pushed_at,
+    image: avatar(r.owner?.avatar_url),
   }));
 }

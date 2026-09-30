@@ -95,7 +95,7 @@ function decoded(res: IncomingMessage): Readable {
   return decoder;
 }
 
-async function readCapped(stream: Readable, maxBytes: number, truncate: boolean): Promise<{ text: string; truncated: boolean }> {
+async function readCapped(stream: Readable, maxBytes: number, truncate: boolean, encoding: BufferEncoding = 'utf8'): Promise<{ text: string; truncated: boolean }> {
   const chunks: Buffer[] = [];
   let total = 0;
   for await (const chunk of stream) {
@@ -104,17 +104,17 @@ async function readCapped(stream: Readable, maxBytes: number, truncate: boolean)
       stream.destroy();
       if (!truncate) throw new BoundaryError(`Response exceeded ${maxBytes} bytes`);
       chunks.push(buf.subarray(0, maxBytes - total));
-      return { text: Buffer.concat(chunks).toString('utf8'), truncated: true };
+      return { text: Buffer.concat(chunks).toString(encoding), truncated: true };
     }
     total += buf.length;
     chunks.push(buf);
   }
-  return { text: Buffer.concat(chunks).toString('utf8'), truncated: false };
+  return { text: Buffer.concat(chunks).toString(encoding), truncated: false };
 }
 
 /** Decode and read a response body within a byte cap. Exported for tests. */
-export function readResponse(res: IncomingMessage, maxBytes: number, truncate = false): Promise<{ text: string; truncated: boolean }> {
-  return readCapped(decoded(res), maxBytes, truncate);
+export function readResponse(res: IncomingMessage, maxBytes: number, truncate = false, binary = false): Promise<{ text: string; truncated: boolean }> {
+  return readCapped(decoded(res), maxBytes, truncate, binary ? 'base64' : 'utf8');
 }
 
 const SENSITIVE = ['authorization', 'cookie', 'proxy-authorization'];
@@ -159,7 +159,7 @@ export const safeFetch: Fetcher = async (target: string, options: FetchOptions =
       url = next;
       continue;
     }
-    const { text, truncated } = await readResponse(res, maxBytes, options.truncate ?? false);
+    const { text, truncated } = await readResponse(res, maxBytes, options.truncate ?? false, options.binary ?? false);
     return { status, url: url.href, contentType: String(res.headers['content-type'] ?? ''), text, truncated };
   }
   throw new BoundaryError(`Too many redirects from ${new URL(target).host}`);

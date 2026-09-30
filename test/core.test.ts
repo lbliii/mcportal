@@ -14,6 +14,7 @@ import { defaultProfile, ProfileError, validateProfile } from '../src/profile.ts
 import { FileProfileStore, MemoryProfileStore } from '../src/store.ts';
 import { WORKSPACE_URI, type ToolContext } from '../src/tools.ts';
 import { pageFeeds, recipesFor } from '../src/discover.ts';
+import { parseFeed } from '../src/adapters/rss.ts';
 
 function ctx(overrides: Partial<ToolContext> = {}): ToolContext {
   return { store: new MemoryProfileStore(), fetcher: createFixtureFetcher(), cache: new TtlCache(), userId: 'test', ...overrides };
@@ -53,7 +54,7 @@ test('notifications get no response; unknown methods get -32601', async () => {
 test('tools/list links open_workspace to the UI and hides app-only tools from the model', async () => {
   const res = await rpc(ctx(), 'tools/list');
   const tools = (res.result as any).tools as any[];
-  assert.deepEqual(tools.map((t) => t.name), ['open_workspace', 'get_profile', 'update_profile', 'read_source', 'refresh_panel', 'read_article', 'find_source', 'add_panel', 'save_item', 'remove_saved', 'list_sources']);
+  assert.deepEqual(tools.map((t) => t.name), ['open_workspace', 'get_profile', 'update_profile', 'read_source', 'refresh_panel', 'read_article', 'get_thumbnails', 'find_source', 'add_panel', 'save_item', 'remove_saved', 'list_sources']);
   assert.equal(tools.find((t) => t.name === 'open_workspace')._meta.ui.resourceUri, WORKSPACE_URI);
   assert.deepEqual(tools.find((t) => t.name === 'refresh_panel')._meta.ui.visibility, ['app']);
   assert.equal(tools.find((t) => t.name === 'read_article')._meta.ui.resourceUri, WORKSPACE_URI, 'reader renders as its own card');
@@ -250,6 +251,32 @@ test('add_panel only adds, places sensibly, and refuses duplicates', async () =>
   const broken = await call(c, 'add_panel', { source: 'rss', config: { url: 'https://nothing.example.org/feed' } });
   assert.equal(broken.isError, true);
   assert.match(broken.content[0]!.text, /didn't load/);
+});
+
+test('feeds: item images from media tags, enclosures and inline <img>; YouTube marked as video', () => {
+  const yt = parseFeed(`<feed xmlns="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/"><title>Chan</title>
+    <entry><id>yt:video:abc</id><title>A video</title><link rel="alternate" href="https://www.youtube.com/watch?v=abc"/>
+    <media:group><media:thumbnail url="https://i2.ytimg.com/vi/abc/hqdefault.jpg" width="480" height="360"/></media:group></entry></feed>`);
+  assert.deepEqual(yt.items[0]!.image, { url: 'https://i2.ytimg.com/vi/abc/mqdefault.jpg', kind: 'thumb' });
+  assert.equal(yt.items[0]!.video, true);
+
+  const rss = parseFeed(`<rss><channel><title>T</title>
+    <item><title>Enclosure</title><link>https://ex.com/1</link><enclosure url="https://ex.com/1.jpg" type="image/jpeg" length="1"/></item>
+    <item><title>Inline</title><link>https://ex.com/2</link><description>&lt;p&gt;&lt;img src="/pics/2.png" alt=""&gt;&lt;/p&gt;</description></item>
+    <item><title>Audio only</title><link>https://ex.com/3</link><enclosure url="https://ex.com/3.mp3" type="audio/mpeg"/></item>
+    <item><title>Script image</title><link>https://ex.com/4</link><media:thumbnail url="javascript:alert(1)"/></item>
+  </channel></rss>`, 10, 'https://ex.com/feed');
+  assert.deepEqual(rss.items.map((i) => i.image?.url), ['https://ex.com/1.jpg', 'https://ex.com/pics/2.png', undefined, undefined]);
+  assert.equal(rss.items[0]!.video, undefined);
+});
+
+test('get_thumbnails returns data URIs only for real raster images', async () => {
+  const res = await call(ctx(), 'get_thumbnails', { urls: ['https://img.example.com/a.png', 'https://img.example.com/evil.svg', 'javascript:alert(1)', 'https://gone.example.org/x.jpg'] });
+  const images = res.structuredContent.images;
+  assert.match(images['https://img.example.com/a.png'], /^data:image\/png;base64,iVBORw0KGgo/);
+  assert.equal(images['https://img.example.com/evil.svg'], null, 'an SVG labeled image/png is refused by its bytes');
+  assert.equal(images['javascript:alert(1)'], null);
+  assert.equal(images['https://gone.example.org/x.jpg'], null);
 });
 
 test('read_article returns fenced plain text with provenance', async () => {
