@@ -40,7 +40,7 @@ Node **22.18+** (or any Node 24). Node runs the `.ts` files directly: no build s
 
 ```bash
 cd ~/Developer/mcportal
-npm test                 # 39 tests, offline
+npm test                 # 50 tests, offline
 npm run smoke            # live check against HN, GitHub and an RSS feed (needs network)
 npm start                # http://127.0.0.1:8787/preview  (bound to 127.0.0.1, no auth)
 npm run demo             # same, with canned data and no network
@@ -113,9 +113,10 @@ The `/preview` page never contains secrets. With a static token it asks for the 
 | `build_portal` | model + app | Build the portal from up to 4 starter packs (replaces the layout; saved items stay) |
 | `find_source` | model + app | Resolve anything the user wants to follow into working, previewed candidates |
 | `add_panel` | model + app | Add one panel without moving anything else; refuses duplicates and sources that don't load |
+| `pin_panel` | model | Show results the agent fetched with another connected tool (Jira, Slack, Confluence, …) as a panel, or refresh one by `panelId`. Stored, never fetched by MCPortal |
 | `save_item` / `remove_saved` | model + app | Bookmark a link (with an optional note), or remove one |
 | `get_profile` | model | Read the saved layout |
-| `update_profile` | model | Save a complete, validated layout (`removePanelIds` for explicit removals; can't touch saved items) |
+| `update_profile` | model | Save a complete, validated layout (`removePanelIds` for explicit removals; can't touch saved or pinned items) |
 | `read_source` | model + app | Preview any source without changing the layout |
 | `read_article` | model + app | Reader view for one URL; renders as its own reader card |
 | `list_sources` | model | Source types and their settings |
@@ -130,8 +131,8 @@ MCPortal is a **reading platform with light social**, driven by your agent. Anyt
 
 **M1.5: public beta.** Done when someone who isn't the author can connect, onboard, and come back the next day to a portal that still works.
 - [x] Hosted server matches local; every starter-pack source checked from Railway (sources that block cloud servers swapped out)
-- [ ] `GITHUB_TOKEN` on the hosted server (shared anonymous GitHub limit is ~60 requests/hour)
-- [ ] Per-user rate limits and daily fetch/thumbnail caps
+- [x] `GITHUB_TOKEN` on the hosted server (fine-grained, public repos read-only; 5,000 requests/hour instead of ~60)
+- [x] Per-user rate limits and daily fetch/thumbnail caps
 - [ ] Sign-in beyond the allowlist: an invite list first, then a non-GitHub option (Google or email link)
 - [ ] Durable storage: volume backups, then Postgres for profiles and auth
 - [ ] Privacy policy, support contact and screenshots; submit to Claude's connector directory
