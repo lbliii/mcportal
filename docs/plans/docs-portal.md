@@ -42,6 +42,25 @@ The route that worked is remembered per site (in memory, alongside the TOC), so 
 
 **Validation, never status alone:** a response counts only if it's 2xx *and* its body looks right. A markdown/`llms.txt` body must not start with `<!doctype` or `<html`; an `llms.txt` must have a `#` title and at least three links; `objects.inv` must start with `# Sphinx inventory version 2`. Everything goes through `safeFetch`, as today.
 
+## GitHub docs folders
+
+Any repo's markdown docs, browsable like a docs site: "open the docs folder of astral-sh/ruff" gives the same panel and viewer. For plain-markdown projects that never built a site, this is the biggest upgrade: their docs get a table of contents, search and a clean reader, in the agent.
+
+Checked 2026-09-30:
+- **Pages already work.** Raw files on `raw.githubusercontent.com` read through the page ladder as markdown. Astro's `routing.mdx` comes out as 26 headings, 30 code blocks and 3 callouts. GitHub-flavoured markdown (tables, `> [!NOTE]` alerts, fences) is what phase 2 parses.
+- **The table of contents is one API call:** `GET /repos/{owner}/{repo}/git/trees/HEAD?recursive=1` lists every file (Astro's docs repo: 3,294 entries, 422 English pages, not truncated). Raw files are fetched from `raw.githubusercontent.com/{owner}/{repo}/HEAD/{path}`, which doesn't count against the API's rate limit.
+- **Bug found:** today `resolveDocs('github.com/astral-sh/ruff/tree/main/docs')` walks up to `github.com/llms.txt` and returns *GitHub's own* docs. GitHub URLs must never go through the generic ladder, and path-scoped hosts (`*.github.io`, `*.gitlab.io`) must not walk above the project's first path segment.
+
+Design, a fourth TOC kind `github` (`toc.url` = `https://github.com/{owner}/{repo}/tree/{ref}/{path}`):
+- **Accepted input:** `owner/repo`, `github.com/owner/repo`, `…/tree/{ref}/{path}`, or `…/blob/{ref}/{file}.md` (opens that page).
+- **Which folder:** the path given; else `docs/`, `doc/`, `documentation/` or `book/src` if one exists; else the repo's top-level markdown (README first).
+- **Order and titles:** an outline file if the folder has one: `SUMMARY.md` (mdBook, GitBook), `_sidebar.md` (docsify) or `mkdocs.yml` `nav`. The markdown ones are link lists that the `llms.txt` parser already reads; the Rust book's `src/SUMMARY.md` is one. Otherwise sections by subfolder, `README.md`/`index.md` first, titles from file names until a page is opened (then its H1).
+- **Pages:** `.md`, `.mdx`, `.markdown`; skips `node_modules`, `vendor`, dot-folders, and other languages' folders when an `en/` exists. Relative links between files resolve to raw URLs that are in the TOC, so they open in the viewer; "Open the original" goes to the `github.com/…/blob/…` page.
+- **Limits:** trees over the cap (or truncated by GitHub) fall back to listing only the chosen folder. The tree is cached 24 hours; the server's `GITHUB_TOKEN` (already used by the GitHub source) raises the API limit from 60 to 5,000 requests an hour.
+- **find_source:** `owner/repo` already means "the GitHub source" (releases). When the repo has a docs folder, `find_source` offers the docs panel as a second candidate.
+
+This goes into phase 3, alongside the tools.
+
 ## Data model
 
 ```ts
