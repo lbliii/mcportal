@@ -7,7 +7,7 @@ import { HN_FEEDS, type HnConfig } from './adapters/hn.ts';
 import { REPO_PATTERN, type GithubConfig } from './adapters/github.ts';
 import type { RssConfig } from './adapters/rss.ts';
 import { clean } from './lib/text.ts';
-import type { SourceKind } from './types.ts';
+import type { Item, SourceKind } from './types.ts';
 
 export interface PanelSpec {
   id: string;
@@ -38,6 +38,20 @@ export interface SavedItem {
   savedAt: string;
 }
 
+/** The items of one pinned panel, as the agent last passed them. Untrusted, plain text. */
+export interface PinnedData {
+  items: Item[];
+  pinnedAt: string;
+}
+
+export interface PinnedConfig {
+  /** Where the items came from, e.g. "Jira". */
+  from: string;
+  /** How the agent fetches them again, in plain words: which tool, which arguments. */
+  recipe: string;
+  limit: number;
+}
+
 export interface Profile {
   version: 1;
   name: string;
@@ -46,6 +60,8 @@ export interface Profile {
   columns: ColumnSpec[];
   /** Newest first. Only save_item / remove_saved change it; update_profile carries it over. */
   saved: SavedItem[];
+  /** Items of pinned panels, by panel id. Only pin_panel changes them; update_profile carries them over. */
+  pins: Record<string, PinnedData>;
   /** False only for a brand-new user who hasn't picked their portal yet (shows the welcome). */
   onboarded: boolean;
   updatedAt: string;
@@ -53,7 +69,7 @@ export interface Profile {
 
 /** Columns scroll sideways, so there can be more than fit on screen. */
 export const LIMITS = { columns: 8, panelsPerColumn: 4, items: 30, saved: 200 } as const;
-export const SOURCES: SourceKind[] = ['hn', 'rss', 'github', 'saved'];
+export const SOURCES: SourceKind[] = ['hn', 'rss', 'github', 'saved', 'pinned'];
 
 export class ProfileError extends Error {
   override name = 'ProfileError';
@@ -66,6 +82,7 @@ export function defaultProfile(now = new Date()): Profile {
     layout: 'columns',
     openIn: 'card',
     saved: [],
+    pins: {},
     onboarded: false,
     updatedAt: now.toISOString(),
     columns: [
@@ -109,9 +126,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-export function normalizeSourceConfig(source: SourceKind, raw: unknown, where: string): HnConfig | RssConfig | GithubConfig | { limit: number } {
+export function normalizeSourceConfig(source: SourceKind, raw: unknown, where: string): HnConfig | RssConfig | GithubConfig | PinnedConfig | { limit: number } {
   const config = isRecord(raw) ? raw : {};
   if (source === 'saved') return { limit: clampInt(config.limit, 1, LIMITS.items, LIMITS.items) };
+  if (source === 'pinned') {
+    const from = clean(config.from, 40);
+    const recipe = clean(config.recipe, 500);
+    if (!from || !recipe) throw new ProfileError(`${where}: pinned needs "from" (where the items came from) and "recipe" (how to fetch them again)`);
+    return { from, recipe, limit: clampInt(config.limit, 1, LIMITS.items, LIMITS.items) };
+  }
   const limit = clampInt(config.limit, 1, LIMITS.items, 10);
   if (source === 'hn') {
     const feed = (config.feed ?? 'top') as string;
@@ -176,7 +199,45 @@ export function validateProfile(input: unknown, now = new Date()): Profile {
   const openIn = (OPEN_IN as readonly unknown[]).includes(input.openIn) ? (input.openIn as OpenIn) : 'card';
   // Profiles saved before onboarding existed belong to people who are already set up.
   const onboarded = input.onboarded !== false;
-  return { version: 1, name, layout, openIn, columns, saved: normalizeSaved(input.saved, now), onboarded, updatedAt: now.toISOString() };
+  const pinnedIds = columns.flatMap((c) => c.panels).filter((p) => p.source === 'pinned').map((p) => p.id);
+  const pins = normalizePins(input.pins, pinnedIds, now);
+  return { version: 1, name, layout, openIn, columns, saved: normalizeSaved(input.saved, now), pins, onboarded, updatedAt: now.toISOString() };
+}
+
+/** Keep pinned items only for pinned panels that exist; an unknown id gets none. */
+export function normalizePins(raw: unknown, panelIds: string[], now = new Date()): Record<string, PinnedData> {
+  const pins: Record<string, PinnedData> = {};
+  const all = isRecord(raw) ? raw : {};
+  for (const id of panelIds) {
+    const entry = Object.hasOwn(all, id) && isRecord(all[id]) ? all[id] : {};
+    const pinnedAt = typeof entry.pinnedAt === 'string' && !Number.isNaN(Date.parse(entry.pinnedAt)) ? new Date(entry.pinnedAt).toISOString() : now.toISOString();
+    pins[id] = { items: normalizePinnedItems(entry.items), pinnedAt };
+  }
+  return pins;
+}
+
+/**
+ * Items from another tool, as the agent passed them: plain text, http(s) links only,
+ * capped. The shape is our own Item, so every panel renders the same way.
+ */
+export function normalizePinnedItems(raw: unknown): Item[] {
+  if (!Array.isArray(raw)) return [];
+  const items: Item[] = [];
+  for (const entry of raw) {
+    if (!isRecord(entry)) continue;
+    const title = clean(entry.title, 200);
+    if (!title) continue;
+    const url = httpUrl(entry.url) ?? undefined;
+    const item: Item = { id: url ?? `pin-${items.length}`, title, meta: [] };
+    if (url) item.url = url;
+    const summary = clean(entry.summary, 280);
+    if (summary) item.summary = summary;
+    if (Array.isArray(entry.meta)) item.meta = entry.meta.map((m) => clean(m, 40)).filter(Boolean).slice(0, 4);
+    if (typeof entry.publishedAt === 'string' && !Number.isNaN(Date.parse(entry.publishedAt))) item.publishedAt = new Date(entry.publishedAt).toISOString();
+    items.push(item);
+    if (items.length >= LIMITS.items) break;
+  }
+  return items;
 }
 
 export function httpUrl(value: unknown): string | null {

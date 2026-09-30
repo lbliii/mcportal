@@ -1,12 +1,12 @@
 import { randomBytes } from 'node:crypto';
 import { clean } from './lib/text.ts';
 import {
-  describeDiff, describeLayout, diffProfiles, findPanel, findSavedPanel, httpUrl, LIMITS, ProfileError, SOURCES, validateProfile,
-  type PanelSpec, type Profile, type SavedItem,
+  describeDiff, describeLayout, diffProfiles, findPanel, findSavedPanel, httpUrl, LIMITS, normalizePinnedItems, normalizePins, ProfileError, SOURCES,
+  validateProfile, type PanelSpec, type PinnedConfig, type Profile, type SavedItem,
 } from './profile.ts';
 import { discover } from './discover.ts';
 import { MAX_PACKS, packSummaries, STARTER_PACKS } from './packs.ts';
-import { loadArticle, loadPanel, savedPanel, SOURCE_DOCS, type SourceDeps } from './sources.ts';
+import { loadArticle, loadPanel, pinnedPanel, savedPanel, SOURCE_DOCS, type SourceDeps } from './sources.ts';
 import type { ProfileStore } from './store.ts';
 import type { UsageBudget } from './lib/budget.ts';
 import type { PanelResult, SourceKind } from './types.ts';
@@ -68,8 +68,13 @@ function slugId(value: string): string {
 }
 
 function panelFor(spec: PanelSpec, profile: Profile, ctx: ToolContext, force = false): Promise<PanelResult> {
-  return spec.source === 'saved' ? Promise.resolve(savedPanel(spec, profile.saved)) : loadPanel(spec, ctx, force);
+  if (spec.source === 'saved') return Promise.resolve(savedPanel(spec, profile.saved));
+  if (spec.source === 'pinned') return Promise.resolve(pinnedPanel(spec, profile.pins));
+  return loadPanel(spec, ctx, force);
 }
+
+/** Sources MCPortal fetches (or, for saved, reads) itself. Pinned panels only come from pin_panel. */
+const ADDABLE: SourceKind[] = SOURCES.filter((s) => s !== 'pinned');
 
 /**
  * Put a Saved panel in the layout the first time something is saved, so the item
@@ -180,7 +185,9 @@ function summarizePanels(profile: Profile, panels: PanelResult[], notice?: strin
       lines.push(`\n[${panel.panelId}] could not load: ${clean(panel.error, 200)}`);
       continue;
     }
-    lines.push(`\n[${panel.panelId}] ${panel.items.length} items`);
+    if (panel.pin) {
+      lines.push(`\n[${panel.panelId}] ${panel.items.length} items pinned from ${panel.pin.from}, updated ${panel.provenance.fetchedAt}. To refresh: ${panel.pin.recipe}; then pin_panel with panelId ${panel.panelId}.`);
+    } else lines.push(`\n[${panel.panelId}] ${panel.items.length} items`);
     lines.push(untrusted(panel.provenance.endpoint, [`panel title: ${panel.title}`, ...panel.items.slice(0, 5).map(itemLine)].join('\n')));
   }
   return lines.join('\n');
@@ -202,7 +209,7 @@ export const TOOLS: ToolDef[] = [
     name: 'open_workspace',
     title: 'Open MCPortal workspace',
     description:
-      "Open the user's MCPortal workspace: a multi-panel view of their sources (Hacker News, GitHub, RSS) laid out according to their saved preferences. Use this when the user asks to open their portal, dashboard, or morning view, or asks what's new across their sources.",
+      "Open the user's MCPortal workspace: a multi-panel view of their sources (Hacker News, GitHub, RSS, and data pinned from their other tools) laid out according to their saved preferences. Use this when the user asks to open their portal, dashboard, or morning view, or asks what's new across their sources.",
     inputSchema: {
       type: 'object',
       additionalProperties: false,
@@ -278,7 +285,9 @@ export const TOOLS: ToolDef[] = [
     async handler(_args, ctx) {
       const profile = await ctx.store.get(ctx.userId);
       const notice = ctx.store.takeNotice?.(ctx.userId);
-      return ok(`${notice ? `Notice for the user: ${notice}\n\n` : ''}${describeLayout(profile)}\n\n${JSON.stringify(profile, null, 2)}`, { profile });
+      // Pinned items stay out of the text: update_profile carries them over, and they can be long.
+      const pins = Object.fromEntries(Object.entries(profile.pins).map(([id, p]) => [id, `${p.items.length} items, pinned ${p.pinnedAt}`]));
+      return ok(`${notice ? `Notice for the user: ${notice}\n\n` : ''}${describeLayout(profile)}\n\n${JSON.stringify({ ...profile, pins }, null, 2)}`, { profile });
     },
   },
   {
@@ -290,6 +299,7 @@ export const TOOLS: ToolDef[] = [
       'layout "columns" shows columns side by side; "shelves" shows each panel as a horizontally scrolling row, in column order. openIn "card" opens stories in a reader inside the workspace; "chat" opens each as its own reader card in the conversation.',
       "Never move, retitle, or remove panels the user did not mention: their stated layout is a fixed rule. Removing a panel is refused unless its id is listed in removePanelIds, which you may only do when the user explicitly asked to remove it.",
       'Saved items (bookmarks) are not part of this tool: they are kept as they are; use save_item and remove_saved for them. A panel with source "saved" shows them.',
+      'Likewise the items of "pinned" panels are kept; use pin_panel to add or refresh those.',
       'After saving, tell the user what changed (the result lists it) and call open_workspace to show it.',
     ].join(' '),
     inputSchema: {
@@ -333,7 +343,9 @@ export const TOOLS: ToolDef[] = [
         throw error;
       }
       const before = await ctx.store.get(ctx.userId);
-      next = { ...next, saved: before.saved };   // bookmarks are never edited through the layout
+      // Bookmarks and pinned items are never edited through the layout.
+      const pinnedIds = next.columns.flatMap((c) => c.panels).filter((p) => p.source === 'pinned').map((p) => p.id);
+      next = { ...next, saved: before.saved, pins: normalizePins(before.pins, pinnedIds) };
       ctx.store.takeNotice?.(ctx.userId);
       const diff = diffProfiles(before, next);
       const allowed = new Set(Array.isArray(args.removePanelIds) ? args.removePanelIds.map(String) : []);
@@ -356,12 +368,12 @@ export const TOOLS: ToolDef[] = [
       type: 'object',
       required: ['source'],
       additionalProperties: false,
-      properties: { source: { type: 'string', enum: SOURCES }, config: { type: 'object' } },
+      properties: { source: { type: 'string', enum: ADDABLE }, config: { type: 'object' } },
     },
     annotations: { readOnlyHint: true, openWorldHint: true },
     async handler(args, ctx) {
       const source = args.source as SourceKind;
-      if (!SOURCES.includes(source)) return toolError(`source must be one of ${SOURCES.join(', ')}`);
+      if (!ADDABLE.includes(source)) return toolError(`source must be one of ${ADDABLE.join(', ')}`);
       let panel: PanelResult;
       try {
         const spec = { id: `preview-${source}`, source, config: (args.config as Record<string, unknown>) ?? {} };
@@ -482,7 +494,7 @@ export const TOOLS: ToolDef[] = [
       required: ['source', 'config'],
       additionalProperties: false,
       properties: {
-        source: { type: 'string', enum: SOURCES },
+        source: { type: 'string', enum: ADDABLE },
         config: { type: 'object' },
         title: { type: 'string' },
         column: { type: 'integer', minimum: 1, maximum: 8 },
@@ -491,7 +503,8 @@ export const TOOLS: ToolDef[] = [
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     async handler(args, ctx) {
       const source = args.source as SourceKind;
-      if (!SOURCES.includes(source)) return toolError(`source must be one of ${SOURCES.join(', ')}`);
+      if (source === 'pinned') return toolError('Pinned panels are added with pin_panel.');
+      if (!ADDABLE.includes(source)) return toolError(`source must be one of ${ADDABLE.join(', ')}`);
       const title = clean(args.title, 80) || undefined;
       const config = (args.config as Record<string, unknown>) ?? {};
       const before = await ctx.store.get(ctx.userId);
@@ -518,6 +531,89 @@ export const TOOLS: ToolDef[] = [
       const where = added.profile.columns.findIndex((c) => c.panels.some((p) => p.id === added.panelId)) + 1;
       return ok(`Added "${panel.title}" (id ${added.panelId}) in column ${where}.\nLayout now: ${describeLayout(added.profile)}`,
         { profile: added.profile, panel, panelId: added.panelId });
+    },
+  },
+  {
+    name: 'pin_panel',
+    title: 'Pin results from another tool',
+    description: [
+      "Show results from another tool the user has connected (Jira, Slack, Confluence, Drive, GitLab, a database, …) as a panel in their MCPortal.",
+      'You fetch the data with that tool, then pass the items here: MCPortal stores and shows them and never contacts the other service.',
+      'Keep each item short: a title, its link if there is one, a one-line summary, and up to 4 meta tags (status, assignee, priority).',
+      '"recipe" says how to fetch the items again in plain words (tool name and arguments), so the panel can be refreshed.',
+      'To refresh a pinned panel (e.g. the user asks, or presses its refresh button), read its recipe from get_profile (config.recipe), run it,',
+      'and call pin_panel with its panelId and the new items. A new panel only adds: nothing else moves, and it refuses duplicates.',
+    ].join(' '),
+    inputSchema: {
+      type: 'object',
+      required: ['items'],
+      additionalProperties: false,
+      properties: {
+        panelId: { type: 'string', description: 'Refresh this pinned panel instead of adding one.' },
+        title: { type: 'string', description: 'Panel title, e.g. "My open bugs". Required for a new panel.' },
+        from: { type: 'string', description: 'Where the items come from, e.g. "Jira". Required for a new panel.' },
+        recipe: {
+          type: 'string',
+          description: 'How to fetch the items again, e.g. "jira_search with jql: assignee = currentUser() AND resolution = Unresolved ORDER BY updated DESC". Required for a new panel.',
+        },
+        items: {
+          type: 'array',
+          maxItems: LIMITS.items,
+          items: {
+            type: 'object',
+            required: ['title'],
+            additionalProperties: false,
+            properties: {
+              title: { type: 'string' },
+              url: { type: 'string', description: 'http(s) link to the item' },
+              summary: { type: 'string', description: 'One line' },
+              meta: { type: 'array', maxItems: 4, items: { type: 'string' }, description: 'Short tags: status, assignee, priority' },
+              publishedAt: { type: 'string', description: 'ISO date the item was created or last updated' },
+            },
+          },
+        },
+        column: { type: 'integer', minimum: 1, maximum: 8, description: 'New panels only; pass it only if the user said where.' },
+      },
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
+    async handler(args, ctx) {
+      if (!Array.isArray(args.items)) return toolError('pin_panel needs "items" (an empty list is fine)');
+      const items = normalizePinnedItems(args.items);
+      const pin = { items, pinnedAt: new Date().toISOString() };
+      const before = await ctx.store.get(ctx.userId);
+      let profile: Profile;
+      let panelId: string;
+      try {
+        if (args.panelId !== undefined) {
+          panelId = String(args.panelId);
+          const spec = findPanel(before, panelId);
+          if (!spec || spec.source !== 'pinned') return toolError(`No pinned panel with id "${clean(args.panelId, 60)}". Leave out panelId to add a new one.`);
+          const config = { ...spec.config, ...(clean(args.from, 40) ? { from: args.from } : {}), ...(clean(args.recipe, 500) ? { recipe: args.recipe } : {}) };
+          const title = clean(args.title, 80) || spec.title;
+          const columns = before.columns.map((c) => ({ ...c, panels: c.panels.map((p) => (p.id === panelId ? { ...p, title, config } : p)) }));
+          profile = { ...validateProfile({ ...before, columns, pins: { ...before.pins, [panelId]: pin } }), saved: before.saved };
+        } else {
+          const title = clean(args.title, 80);
+          const from = clean(args.from, 40);
+          const recipe = clean(args.recipe, 500);
+          if (!title || !from || !recipe) return toolError('A new pinned panel needs "title", "from" and "recipe". To refresh one, pass its panelId.');
+          const added = addPanelTo(before, { id: slugId(title), source: 'pinned', title, config: { from, recipe } }, typeof args.column === 'number' ? args.column : undefined);
+          if ('error' in added) return toolError(`Not pinned: ${added.error}${/already in the portal/.test(added.error) ? ' To refresh it, pass that panelId.' : ''}`);
+          panelId = added.panelId;
+          profile = { ...added.profile, pins: { ...added.profile.pins, [panelId]: pin } };
+        }
+      } catch (error) {
+        if (error instanceof ProfileError) return toolError(`Not pinned: ${error.message}`);
+        throw error;
+      }
+      await ctx.store.put(ctx.userId, profile);
+      const panel = pinnedPanel(findPanel(profile, panelId)!, profile.pins);
+      const { from } = findPanel(profile, panelId)!.config as unknown as PinnedConfig;
+      const dropped = args.items.length - items.length;
+      const text = args.panelId !== undefined
+        ? `Refreshed "${panel.title}" (id ${panelId}): ${items.length} items from ${from}.`
+        : `Pinned "${panel.title}" (id ${panelId}) in column ${profile.columns.findIndex((c) => c.panels.some((p) => p.id === panelId)) + 1}: ${items.length} items from ${from}.\nLayout now: ${describeLayout(profile)}`;
+      return ok(`${text}${dropped > 0 ? `\n${dropped} item(s) were left out (no title, or over ${LIMITS.items}).` : ''}`, { profile, panel, panelId });
     },
   },
   {

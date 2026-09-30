@@ -4,12 +4,13 @@ import { fetchArticle } from './adapters/reader.ts';
 import { fetchRss, type RssConfig } from './adapters/rss.ts';
 import type { TtlCache } from './lib/cache.ts';
 import { clean } from './lib/text.ts';
-import { normalizeSourceConfig, type PanelSpec, type SavedItem } from './profile.ts';
+import { normalizeSourceConfig, type PanelSpec, type PinnedConfig, type PinnedData, type SavedItem } from './profile.ts';
 import type { Article, Fetcher, Item, PanelResult, SourceKind } from './types.ts';
 
 /** Declared freshness per source, in seconds (Orrery-style freshness policy). */
 export const FRESHNESS: Record<SourceKind | 'reader', number> = {
   saved: 0,
+  pinned: 0,
   hn: 120,
   github: 300,
   rss: 600,
@@ -21,7 +22,7 @@ export interface SourceDeps {
   cache: TtlCache;
 }
 
-const DEFAULT_TITLES: Record<SourceKind, string> = { hn: 'Hacker News', rss: 'Feed', github: 'GitHub', saved: 'Saved' };
+const DEFAULT_TITLES: Record<SourceKind, string> = { hn: 'Hacker News', rss: 'Feed', github: 'GitHub', saved: 'Saved', pinned: 'Pinned' };
 
 /** Saved items come from the profile, not the network. */
 export function savedPanel(panel: PanelSpec, saved: SavedItem[]): PanelResult {
@@ -40,8 +41,22 @@ export function savedPanel(panel: PanelSpec, saved: SavedItem[]): PanelResult {
   };
 }
 
+/** Pinned items come from the profile too: the agent fetched them with another tool. */
+export function pinnedPanel(panel: PanelSpec, pins: Record<string, PinnedData>): PanelResult {
+  const { from, recipe, limit } = normalizeSourceConfig('pinned', panel.config, panel.id) as PinnedConfig;
+  const pin = Object.hasOwn(pins, panel.id) ? pins[panel.id] : undefined;
+  return {
+    panelId: panel.id,
+    source: 'pinned',
+    title: panel.title ?? from,
+    items: (pin?.items ?? []).slice(0, limit),
+    pin: { from, recipe },
+    provenance: { source: 'pinned', endpoint: `pinned from ${from}`, fetchedAt: pin?.pinnedAt ?? new Date().toISOString(), cached: false, ttlSeconds: 0 },
+  };
+}
+
 export async function loadPanel(panel: PanelSpec, deps: SourceDeps, force = false): Promise<PanelResult> {
-  if (panel.source === 'saved') throw new Error('saved panels are built from the profile; use savedPanel');
+  if (panel.source === 'saved' || panel.source === 'pinned') throw new Error(`${panel.source} panels are built from the profile, not fetched`);
   const config = normalizeSourceConfig(panel.source, panel.config, panel.id);
   let endpoint = '';
   let title = panel.title ?? DEFAULT_TITLES[panel.source];
@@ -112,4 +127,8 @@ export const SOURCE_DOCS = {
   },
   rss: { description: 'Any RSS or Atom feed: blogs, release feeds, podcasts, YouTube channels.', config: { url: 'feed URL (http/https)', limit: '1-30' } },
   saved: { description: "The user's saved items (bookmarks), newest first. Items are added with save_item and removed with remove_saved.", config: { limit: '1-30 (default 30)' } },
+  pinned: {
+    description: 'Items you fetched with another tool the user has connected (Jira, Slack, Confluence, a database, …). Created and refreshed only with pin_panel; MCPortal never fetches them.',
+    config: { from: 'where they came from, e.g. "Jira"', recipe: 'how to fetch them again: tool name and arguments, in plain words', limit: '1-30 (default 30)' },
+  },
 } as const;

@@ -16,6 +16,8 @@ MCPortal is the user's workspace. They decide what's in it and where it goes. Yo
 | "add <source>" | `list_sources` if unsure of settings, `read_source` to preview it, then add it as above |
 | "what's on Hacker News?" (no layout change) | `read_source` |
 | "read this", "summarize that article" | `read_article` with the URL, then answer from its text |
+| "pin my open Jira bugs", "put #releases from Slack in my portal" | Fetch it with that connector's tool, then `pin_panel` with a title, `from`, a `recipe` (the tool and arguments you used) and short items |
+| "refresh my pinned panel (id X)" | `get_profile` for its `config.recipe`, run that recipe, then `pin_panel` with `panelId` and the new items |
 
 ## Layout rules
 
@@ -30,6 +32,7 @@ MCPortal is the user's workspace. They decide what's in it and where it goes. Yo
 
 - `hn`: `{ "feed": "top" | "new" | "best" | "ask" | "show", "limit": 10 }`
 - `github`: `{ "mode": "search", "query": "topic:mcp stars:>500", "sort": "stars" | "updated", "limit": 10 }` or `{ "mode": "releases", "repo": "owner/name" }`
+- `pinned`: created only by `pin_panel`, never fetched by MCPortal. Items you pass are shown as-is; keep them short (title, link, one-line summary, up to 4 meta tags).
 - `rss`: `{ "url": "https://…/feed.xml", "limit": 10 }`. Most blogs, news sites, YouTube channels (`https://www.youtube.com/feeds/videos.xml?channel_id=…`) and GitHub release feeds (`https://github.com/owner/repo/releases.atom`) work. If you only know a site's homepage, try common feed paths (`/feed`, `/rss.xml`, `/atom.xml`, `/index.xml`) with `read_source` before adding.
 
 ## Safety

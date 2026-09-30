@@ -1,5 +1,8 @@
-/** 'saved' is the user's own bookmarks: stored in their profile, never fetched. */
-export type SourceKind = 'hn' | 'rss' | 'github' | 'saved';
+/**
+ * 'saved' is the user's own bookmarks and 'pinned' is data the agent brought from
+ * another tool (Jira, Slack, …): both live in the profile and are never fetched.
+ */
+export type SourceKind = 'hn' | 'rss' | 'github' | 'saved' | 'pinned';
 
 /** One row in a panel. Everything here is untrusted data from a source. */
 export interface Item {
@@ -33,6 +36,8 @@ export interface PanelResult {
   items: Item[];
   provenance: Provenance;
   error?: string;
+  /** Pinned panels: where the items came from and how the agent fetches them again. */
+  pin?: { from: string; recipe: string };
 }
 
 export interface ArticleBlock {

@@ -29,7 +29,7 @@
     --hover: var(--d-hover);
     --accent: #2563eb;
     --radius: var(--border-radius-lg, 10px);
-    --src-hn: #f26522; --src-github: #7c5cff; --src-rss: #0f9d8a; --src-reader: #2563eb; --src-saved: #d97706;
+    --src-hn: #f26522; --src-github: #7c5cff; --src-rss: #0f9d8a; --src-reader: #2563eb; --src-saved: #d97706; --src-pinned: #db2777;
   }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
@@ -539,7 +539,7 @@
       el('span', { class: 'tools' },
         iconButton('left', `Scroll ${panel.title} left`, () => page(-1)),
         iconButton('right', `Scroll ${panel.title} right`, () => page(1)),
-        iconButton('refresh', `Refresh ${panel.title}`, () => refreshPanel(panelId)))));
+        refreshButton(panel))));
     if (panel.error) wrap.append(el('div', { class: 'error' }, `Couldn't load: ${panel.error}`));
     else if (!panel.items.length) wrap.append(el('div', { class: 'empty' }, 'Nothing here yet.'));
     else {
@@ -550,7 +550,8 @@
       wrap.append(row);
     }
     const p = panel.provenance;
-    wrap.append(el('div', { class: 'panel-foot' }, `${p.source} · ${p.endpoint} · fetched ${new Date(p.fetchedAt).toLocaleTimeString()}${p.cached ? ' (cached)' : ''}`));
+    wrap.append(el('div', { class: 'panel-foot' }, panel.pin ? pinnedFoot(panel)
+      : `${p.source} · ${p.endpoint} · fetched ${new Date(p.fetchedAt).toLocaleTimeString()}${p.cached ? ' (cached)' : ''}`));
     primePictures(wrap);
     return wrap;
   }
@@ -581,7 +582,7 @@
     const wrap = el('section', { class: 'panel', 'data-panel': panelId });
     if (!panel) { wrap.append(el('div', { class: 'empty' }, 'Loading…')); return wrap; }
     const color = `var(--src-${panel.source})`;
-    const refresh = el('span', { class: 'tools' }, iconButton('refresh', `Refresh ${panel.title}`, () => refreshPanel(panelId)));
+    const refresh = el('span', { class: 'tools' }, refreshButton(panel));
     wrap.append(el('div', { class: 'panel-head' },
       el('span', { class: 'dot', style: `background:${color}` }),
       el('span', { class: 'panel-title', title: panel.title }, panel.title),
@@ -591,8 +592,8 @@
     else if (!panel.items.length) wrap.append(el('div', { class: 'empty' }, 'Nothing here yet.'));
     else wrap.append(el('ul', { class: 'items' }, panel.items.map((item) => el('li', null, renderItem(item, panel)))));
     const p = panel.provenance;
-    wrap.append(el('div', { class: 'panel-foot' },
-      `${p.source} · ${p.endpoint} · fetched ${new Date(p.fetchedAt).toLocaleTimeString()}${p.cached ? ' (cached)' : ''} · fresh for ${p.ttlSeconds}s`));
+    wrap.append(el('div', { class: 'panel-foot' }, panel.pin ? pinnedFoot(panel)
+      : `${p.source} · ${p.endpoint} · fetched ${new Date(p.fetchedAt).toLocaleTimeString()}${p.cached ? ' (cached)' : ''} · fresh for ${p.ttlSeconds}s`));
     primePictures(wrap);
     return wrap;
   }
@@ -744,10 +745,30 @@
     const thumb = item.image && item.image.kind === 'thumb';
     return el('div', {
       class: 'item', role: 'button', tabindex: '0',
-      title: [item.url && panel.source !== 'github' ? 'Open in reader view' : 'Open', byline].filter(Boolean).join(' · '),
+      title: [item.url && panel.source !== 'github' && panel.source !== 'pinned' ? 'Open in reader view' : 'Open', byline].filter(Boolean).join(' · '),
       onclick: () => openItem(item, panel),
       onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) openItem(item, panel); },
     }, thumb ? el('div', { class: 'item-row' }, thumbBox(item, `var(--src-${panel.source})`), el('div', { class: 'item-text' }, text)) : text);
+  }
+
+  // Pinned panels hold data the agent fetched with another tool, so only the agent can
+  // refresh them: the button asks it in the conversation. Only the panel id goes into
+  // the message (ids are [a-z0-9-] slugs); the agent reads the recipe from get_profile.
+  function refreshButton(panel) {
+    if (!panel.pin) return iconButton('refresh', `Refresh ${panel.title}`, () => refreshPanel(panel.panelId));
+    return iconButton('refresh', `Ask your assistant to refresh ${panel.title} from ${panel.pin.from}`, () => refreshPinned(panel));
+  }
+  function pinnedFoot(panel) {
+    return `pinned from ${panel.pin.from} · updated ${ago(panel.provenance.fetchedAt)} · refresh asks your assistant`;
+  }
+  async function refreshPinned(panel) {
+    if (DEV) { toast(`Ask your assistant to refresh "${panel.title}"`); return; }
+    try {
+      await hostRequest('ui/message', { role: 'user', content: [{ type: 'text', text: `Refresh my pinned MCPortal panel (id ${panel.panelId}).` }] }, 10000);
+      toast('Asked your assistant to refresh it…');
+    } catch {
+      toast(`This host can't post to the chat. Ask your assistant to refresh "${panel.title}".`);
+    }
   }
 
   async function refreshPanel(panelId) {
@@ -798,7 +819,8 @@
 
   // ------------------------------------------------------------ reader view
   function openItem(item, panel) {
-    const readable = item.url && panel.source !== 'github' && !item.video;   // videos play at the source
+    // Videos play at the source; pinned items are often internal pages reader view can't reach.
+    const readable = item.url && panel.source !== 'github' && panel.source !== 'pinned' && !item.video;
     if (!readable) return openLink(item.url);
     if (!DEV && state.profile && state.profile.openIn === 'chat') return openInChat(item, panel);
     return openReader(item, panel);
@@ -971,7 +993,7 @@
   $('btnRefresh').addEventListener('click', async () => {
     if (!state.profile) return loadWorkspace();
     setStatus('Refreshing…');
-    await Promise.all([...state.panels.keys()].map(refreshPanel));
+    await Promise.all([...state.panels.values()].filter((p) => !p.pin).map((p) => refreshPanel(p.panelId)));
     setUpdated();
   });
   $('btnExpand').addEventListener('click', async () => {
