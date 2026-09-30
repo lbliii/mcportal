@@ -4,3 +4,7 @@ node_modules/
 snapshot.html
 *.tmp
 .DS_Store
+
+# Claude Code: session worktrees and machine-specific launch configs
+.claude/worktrees/
+.claude/launch.json
