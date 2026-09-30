@@ -9,6 +9,9 @@ export type SourceKind = 'hn' | 'rss' | 'github' | 'saved' | 'pinned' | 'clips' 
 export const CLIP_KINDS = ['quote', 'exchange', 'note', 'table', 'image', 'link'] as const;
 export type ClipKind = (typeof CLIP_KINDS)[number];
 
+/** Largest picture get_thumbnails will fetch. Feed adapters use it to skip renditions they know are bigger. */
+export const MAX_THUMB_BYTES = 350_000;
+
 /** One row in a panel. Everything here is untrusted data from a source. */
 export interface Item {
   id: string;

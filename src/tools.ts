@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { BoundaryError } from './lib/safe-fetch.ts';
 import { clean } from './lib/text.ts';
 import {
   describeDiff, describeLayout, normalizeSourceConfig, diffProfiles, findPanel, findSavedPanel, httpUrl, LIMITS, normalizePinnedItems, normalizePins, ProfileError, SOURCES,
@@ -15,7 +16,7 @@ import type { Social } from './social.ts';
 import type { ProfileStore } from './store.ts';
 import type { Actor } from './access.ts';
 import type { UsageBudget } from './lib/budget.ts';
-import type { PanelResult, SourceKind } from './types.ts';
+import { MAX_THUMB_BYTES, type PanelResult, type SourceKind } from './types.ts';
 
 export const WORKSPACE_URI = 'ui://mcportal/workspace.html';
 
@@ -154,30 +155,49 @@ const IMAGE_TYPES: Record<string, (b: Buffer) => boolean> = {
   'image/gif': (b) => b.subarray(0, 4).toString('latin1') === 'GIF8',
   'image/webp': (b) => b.subarray(0, 4).toString('latin1') === 'RIFF' && b.subarray(8, 12).toString('latin1') === 'WEBP',
 };
-const MAX_IMAGE_BYTES = 350_000;
+
+/** A failure worth retrying soon (timeout, network, 5xx): not cached like a missing or unusable image. */
+class TransientImageError extends Error {}
 
 /**
  * Fetch one image through the guarded fetcher and return it as a data: URI, so the
  * UI never contacts third parties and needs no CSP exceptions. Only JPEG, PNG, GIF
- * and WebP whose bytes match their type; no SVG. Cached for a day (failures too).
+ * and WebP whose bytes match their type; no SVG. Cached for a day, as are permanent
+ * failures; a timeout or server error isn't cached, so the next load tries again.
  */
 async function thumbnail(url: string, ctx: ToolContext): Promise<string | null> {
-  const result = await ctx.cache.get(`img:${url}`, 86_400, async () => {
-    // Feeds often link full-size originals. Many image CDNs resize on request, so an
-    // oversized picture is retried at thumbnail width; the byte cap still applies.
-    const small = resized(url);
-    const tries = RESIZING_HOSTS.test(new URL(url).hostname) ? [small, url] : [url, small];
-    for (const attempt of tries) {
-      const got = await fetchImage(attempt, ctx);
-      if (got !== 'too-big') return got;
-    }
-    return null;
-  });
-  return result.value;
+  try {
+    const result = await ctx.cache.get(`img:${url}`, 86_400, async () => {
+      // Feeds often link full-size originals. Many image CDNs resize on request, so an
+      // oversized picture is retried at thumbnail width; the byte cap still applies.
+      for (const attempt of resizeAttempts(url)) {
+        const got = await fetchImage(attempt, ctx);
+        if (got === 'retry') throw new TransientImageError();
+        if (got !== 'too-big') return got;
+      }
+      return null;
+    });
+    return result.value;
+  } catch (error) {
+    if (error instanceof TransientImageError) return null;
+    throw error;
+  }
 }
 
 /** Hosts known to resize with ?w= (Valnet's *images.com CDNs, WordPress Photon, imgix). */
 const RESIZING_HOSTS = /(^|\.)([a-z]+images\.com|i\d\.wp\.com|imgix\.net)$/;
+
+/**
+ * URLs to try in order. Other hosts get the original, then ?w=480. A WordPress upload
+ * that is still too big (Colossal posts multi-MB originals and ignores ?w=) then goes
+ * through WordPress's public resizer, Photon, which serves any public image by path.
+ */
+function resizeAttempts(url: string): string[] {
+  const small = resized(url);
+  if (RESIZING_HOSTS.test(new URL(url).hostname)) return [small, url];
+  const photon = wordpressPhoton(url);
+  return photon ? [url, small, photon] : [url, small];
+}
 
 function resized(url: string): string {
   const u = new URL(url);
@@ -185,16 +205,25 @@ function resized(url: string): string {
   return u.href;
 }
 
+function wordpressPhoton(url: string): string | undefined {
+  const u = new URL(url);
+  if (u.protocol !== 'https:' || u.port || u.search || !u.pathname.startsWith('/wp-content/uploads/')) return undefined;
+  return `https://i0.wp.com/${u.hostname}${u.pathname}?w=480`;
+}
+
 // Accept lists only formats we keep: some CDNs serve AVIF whenever it's mentioned, even at q=0.
-async function fetchImage(url: string, ctx: ToolContext): Promise<string | null | 'too-big'> {
+async function fetchImage(url: string, ctx: ToolContext): Promise<string | null | 'too-big' | 'retry'> {
   try {
-    const res = await ctx.fetcher(url, { binary: true, maxBytes: MAX_IMAGE_BYTES, timeoutMs: 6000, headers: { accept: 'image/webp,image/jpeg,image/png,image/gif' } });
+    const res = await ctx.fetcher(url, { binary: true, maxBytes: MAX_THUMB_BYTES, timeoutMs: 6000, headers: { accept: 'image/webp,image/jpeg,image/png,image/gif' } });
+    if (res.status >= 500 || res.status === 429) return 'retry';
     if (res.status < 200 || res.status >= 300) return null;
     const bytes = Buffer.from(res.text, 'base64');
     const type = Object.keys(IMAGE_TYPES).find((t) => IMAGE_TYPES[t]!(bytes));
     return type ? `data:${type};base64,${res.text}` : null;
   } catch (error) {
-    return /exceeded/.test((error as Error).message) ? 'too-big' : null;   // timed out, blocked address: no picture
+    if (/exceeded/.test((error as Error).message)) return 'too-big';
+    if (error instanceof BoundaryError && !/Timed out/.test(error.message)) return null;   // blocked address or redirect: no picture
+    return 'retry';   // timed out, or couldn't connect
   }
 }
 

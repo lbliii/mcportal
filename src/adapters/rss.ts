@@ -5,7 +5,7 @@
  */
 import { parseAttrs } from '../lib/html.ts';
 import { clean, decodeEntities, hostOf, htmlToText, safeHttpUrl, stripCdata, truncate } from '../lib/text.ts';
-import type { Fetcher, Item } from '../types.ts';
+import { MAX_THUMB_BYTES, type Fetcher, type Item } from '../types.ts';
 
 export interface RssConfig {
   url: string;
@@ -88,24 +88,37 @@ const IMAGE_EXT = /\.(jpe?g|png|webp|gif)(\?|$)/i;
 
 /**
  * A thumbnail for an item: media:thumbnail, an image media:content or enclosure,
- * itunes:image, else the first <img> in the item's HTML. YouTube thumbnails are
- * swapped for the 320x180 size.
+ * itunes:image, else the first <img> in the item's HTML. A rendition the feed says
+ * is over MAX_THUMB_BYTES (enclosure length, media:content fileSize) is skipped when
+ * there's another candidate: /Film's enclosures are multi-MB originals while its
+ * inline <img> is a smaller cut. YouTube thumbnails are swapped for the 320x180 size.
  */
 function itemImage(block: string, lower: string, baseUrl?: string): string | undefined {
   const candidates: Array<string | undefined> = [];
+  const tooBig = new Set<string>();
+  const noteSize = (url: string | undefined, bytes: string | undefined) => {
+    if (url && Number(bytes) > MAX_THUMB_BYTES) tooBig.add(url);
+  };
   candidates.push(tagAttrs(block, lower, 'media:thumbnail')?.url);
   const content = tagAttrs(block, lower, 'media:content');
-  if (content && (content.medium === 'image' || /^image\//.test(content.type ?? '') || IMAGE_EXT.test(content.url ?? ''))) candidates.push(content.url);
+  if (content && (content.medium === 'image' || /^image\//.test(content.type ?? '') || IMAGE_EXT.test(content.url ?? ''))) {
+    candidates.push(content.url);
+    noteSize(content.url, content.filesize);
+  }
   const enclosure = tagAttrs(block, lower, 'enclosure');
-  if (enclosure && /^image\//.test(enclosure.type ?? '')) candidates.push(enclosure.url);
+  if (enclosure && /^image\//.test(enclosure.type ?? '')) {
+    candidates.push(enclosure.url);
+    noteSize(enclosure.url, enclosure.length);
+  }
   candidates.push(tagAttrs(block, lower, 'itunes:image')?.href);
-  if (!candidates.some(Boolean)) {
+  if (!candidates.some((c) => c && !tooBig.has(c))) {
     // First <img> inside the (usually entity-escaped) HTML content.
     const html = decodeEntities(stripCdata(block.slice(0, 200_000)));
     const img = html.match(/<img\b[^>]*?\ssrc\s*=\s*["']([^"']+)["']/i)?.[1];
     candidates.push(img ? decodeEntities(img) : undefined);
   }
-  for (const raw of candidates) {
+  const usable = candidates.filter((c) => c && !tooBig.has(c));
+  for (const raw of usable.length ? usable : candidates) {
     const url = safeHttpUrl(raw ? decodeEntities(raw) : undefined, baseUrl);
     if (!url || url.startsWith('data:')) continue;
     const u = new URL(url);

@@ -28,6 +28,7 @@ const INSTRUCTIONS = [
 ].join(' ');
 
 const WORKSPACE_HTML_PATH = fileURLToPath(new URL('./ui/workspace.html', import.meta.url));
+const ART_JS_PATH = fileURLToPath(new URL('./ui/art.js', import.meta.url));
 
 /** JSON that is safe to embed inside a <script> element. */
 export function scriptJson(value: unknown): string {
@@ -44,7 +45,8 @@ export function scriptJson(value: unknown): string {
  * (the /preview page). No secrets are ever embedded.
  */
 export async function workspaceHtml(options: { dev?: boolean; needsToken?: boolean } = {}): Promise<string> {
-  const html = await readFile(WORKSPACE_HTML_PATH, 'utf8');
+  const [page, art] = await Promise.all([readFile(WORKSPACE_HTML_PATH, 'utf8'), readFile(ART_JS_PATH, 'utf8')]);
+  const html = page.replace('/*MCPORTAL_ART*/', () => art);
   if (!options.dev) return html;
   const boot = `<script>window.__MCPORTAL_DEV__=${scriptJson({ needsToken: Boolean(options.needsToken) })};</script>`;
   return html.replace('<!--MCPORTAL_BOOT-->', () => boot);

@@ -122,8 +122,15 @@
   .cand-sub, .cand-prev { color: var(--fg2); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .cand-prev { font-size: 12px; margin-top: 2px; }
   /* pictures: fetched by the server as data: URIs, loaded as they scroll into view */
-  .thumb { position: relative; flex: none; overflow: hidden; border-radius: 6px; background: color-mix(in srgb, var(--c, var(--fg2)) 14%, transparent); }
-  .thumb img { display: block; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .2s; }
+  .thumb { position: relative; flex: none; overflow: hidden; border-radius: 6px; }
+  .thumb img { position: relative; display: block; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .2s; }
+  /* fallback art (art.js): shown until the picture loads, and instead of it when there's none.
+     Ink colours are per source; dark mode swaps the paper for the darkest ink. */
+  .thumb .art { position: absolute; inset: 0; width: 100%; height: 100%; --art-p: var(--ink-p); --art-c: var(--ink-c); }
+  :root[data-theme="dark"] .art { --art-p: var(--ink-c); --art-c: var(--ink-p); }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme]) .art { --art-p: var(--ink-c); --art-c: var(--ink-p); } }
+  .art .ap { fill: var(--art-p); } .art .aa { fill: var(--ink-a); } .art .ab { fill: var(--ink-b); } .art .ac { fill: var(--art-c); } .art .ax { fill: var(--ink-x); }
+  .art .sb { stroke: var(--ink-b); } .art .sc { stroke: var(--art-c); }
   .thumb img.on { opacity: 1; }
   .thumb .play { position: absolute; right: 6px; bottom: 6px; width: 24px; height: 24px; border-radius: 50%; background: rgba(0,0,0,.62); color: #fff; display: flex; align-items: center; justify-content: center; }
   .thumb .play svg { width: 12px; height: 12px; fill: currentColor; stroke: none; margin-left: 2px; }
@@ -134,8 +141,6 @@
   .avatar.gone { display: none; }
   .card.media { height: 214px; padding: 0; gap: 0; }
   .card.media .thumb { height: 118px; border-radius: 0; }
-  .card.media .thumb .ph { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--fg2); font-size: 11.5px; padding: 0 10px; text-align: center; }
-  .card.media .thumb img.on + .ph { display: none; }
   .card-body { display: flex; flex-direction: column; gap: 4px; flex: 1; min-height: 0; padding: 8px 11px 9px; }
   .card.media .item-title { -webkit-line-clamp: 2; }
   .card.media .item-summary { display: none; }
@@ -274,6 +279,7 @@
   const root = document.documentElement;
   if (DEV) root.classList.add('framed');
   const $ = (id) => document.getElementById(id);
+  /*MCPORTAL_ART*/
 
   // MCPortal icon set: 24px grid, 1.75px round strokes, 1.5px corner radius, drawn in currentColor.
   const ICONS = {
@@ -448,7 +454,7 @@
   }).observe(document.body);
 
   // ------------------------------------------------------------ state + rendering
-  const state = { profile: null, panels: new Map(), saved: new Set() };
+  const state = { profile: null, panels: new Map(), saved: new Set(), art: new Map() };   // art: panel id -> fallback art style
 
   function el(tag, attrs, ...children) {
     const node = document.createElement(tag);
@@ -574,6 +580,7 @@
 
   function drawLayout() {
     const p = state.profile;
+    assignArt(p);
     const shelves = p.layout === 'shelves';
     const grid = $('grid');
     grid.classList.toggle('shelves', shelves);
@@ -626,13 +633,11 @@
       media ? null : item.summary ? el('div', { class: 'item-summary' }, item.summary) : null,
       meta.length ? el('div', { class: 'item-meta' }, meta) : null,
     ];
-    let host = '';
-    try { host = item.url ? new URL(item.url).hostname.replace(/^www\./, '') : ''; } catch { host = ''; }
     return el('div', {
       class: media ? 'card media' : 'card', role: 'button', tabindex: '0', style: `--c:${color}`, title: item.title,
       onclick: () => openItem(item, panel),
       onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) openItem(item, panel); },
-    }, media ? [thumbBox(item.image && item.image.kind === 'thumb' ? item : { ...item, image: undefined }, color, host), el('div', { class: 'card-body' }, body)] : body);
+    }, media ? [thumbBox(item.image && item.image.kind === 'thumb' ? item : { ...item, image: undefined }, panel), el('div', { class: 'card-body' }, body)] : body);
   }
 
   function renderPanel(panelId) {
@@ -709,11 +714,23 @@
     if (!showPicture(node)) seen.observe(node);
     return node;
   }
-  function thumbBox(item, color, placeholder) {
-    const box = el('div', { class: 'thumb', style: `--c:${color}` },
+  // Each panel gets its own fallback art style, in layout order, so no two sources on
+  // screen look alike. Keyed by feed URL where there is one, so a feed keeps its look.
+  function assignArt(profile) {
+    const specs = profile.columns.flatMap((col) => col.panels);
+    const keys = specs.map((spec) => (spec.config && typeof spec.config.url === 'string' ? spec.config.url : `${spec.source}:${spec.id}`));
+    const styles = portalArt.styles(keys);
+    state.art = new Map(specs.map((spec, i) => [spec.id, styles[i]]));
+  }
+
+  // The picture area starts as the source's fallback art; a loaded picture fades in over it.
+  function thumbBox(item, panel) {
+    const box = el('div', { class: 'thumb' },
       el('img', { alt: '', loading: 'lazy', decoding: 'async' }),
-      placeholder ? el('div', { class: 'ph' }, placeholder) : null,
       item.video ? el('span', { class: 'play', 'aria-hidden': 'true' }, icon('play')) : null);
+    const style = state.art.has(panel.panelId) ? state.art.get(panel.panelId) : portalArt.styles([panel.provenance.endpoint])[0];
+    const art = portalArt.draw(style, item.id || item.url || item.title);
+    box.prepend(document.importNode(new DOMParser().parseFromString(art, 'image/svg+xml').documentElement, true));
     if (!item.image) return box;
     box.dataset.img = item.image.url;
     return watchPicture(box);
@@ -808,7 +825,7 @@
       title: [item.clip || (item.share && item.share.kind === 'clip') ? 'Open the clip' : item.url && panel.source !== 'github' && panel.source !== 'pinned' ? 'Open in reader view' : 'Open', byline].filter(Boolean).join(' · '),
       onclick: () => openItem(item, panel),
       onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) openItem(item, panel); },
-    }, thumb ? el('div', { class: 'item-row' }, thumbBox(item, `var(--src-${panel.source})`), el('div', { class: 'item-text' }, text)) : text);
+    }, thumb ? el('div', { class: 'item-row' }, thumbBox(item, panel), el('div', { class: 'item-text' }, text)) : text);
   }
 
   // Pinned panels hold data the agent fetched with another tool, so only the agent can

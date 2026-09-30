@@ -3,11 +3,12 @@ import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
+import vm from 'node:vm';
 import { REPO_PATTERN } from '../src/adapters/github.ts';
 import { TtlCache } from '../src/lib/cache.ts';
 import { createFixtureFetcher } from '../src/lib/fixture-fetch.ts';
 import { isPublicAddress, parseV6 } from '../src/lib/ip.ts';
-import { assertPublicUrl, guardedLookup } from '../src/lib/safe-fetch.ts';
+import { assertPublicUrl, BoundaryError, guardedLookup } from '../src/lib/safe-fetch.ts';
 import { clean } from '../src/lib/text.ts';
 import { handleMessage, MCP_APP_MIME, scriptJson } from '../src/mcp.ts';
 import { defaultProfile, ProfileError, validateProfile } from '../src/profile.ts';
@@ -18,6 +19,7 @@ import { parseFeed } from '../src/adapters/rss.ts';
 import { STARTER_PACKS } from '../src/packs.ts';
 import { buildOpml, parseOpml } from '../src/opml.ts';
 import { toolCost, UsageBudget } from '../src/lib/budget.ts';
+import type { Fetcher } from '../src/types.ts';
 
 /** A user who has already set up their portal (the sample layout). Use newUser() for onboarding. */
 function ctx(overrides: Partial<ToolContext> = {}): ToolContext {
@@ -335,6 +337,85 @@ test('get_thumbnails returns data URIs only for real raster images', async () =>
   assert.equal(images['https://img.example.com/evil.svg'], null, 'an SVG labeled image/png is refused by its bytes');
   assert.equal(images['javascript:alert(1)'], null);
   assert.equal(images['https://gone.example.org/x.jpg'], null);
+});
+
+test('feeds: a rendition the feed says is over the thumbnail cap gives way to a smaller one', async () => {
+  const xml = await readFile(new URL('./fixtures/big-images.rss', import.meta.url), 'utf8');
+  const feed = parseFeed(xml, 10, 'https://www.slashfilm.com/feed/');
+  assert.deepEqual(feed.items.map((i) => i.image?.url), [
+    'https://www.slashfilm.com/img/gallery/slow-horses/intro-1787231738.jpg',   // enclosure length 411459: use the inline <img>
+    'https://www.slashfilm.com/img/gallery/ted-lasso/l-intro-1790789740.jpg',   // under the cap: keep the feed's pick
+    'https://www.thisiscolossal.com/wp-content/uploads/2026/09/roy-3.jpg',
+  ]);
+  const only = parseFeed('<rss><channel><item><title>T</title><enclosure url="https://ex.com/huge.jpg" type="image/jpeg" length="9000000"/></item></channel></rss>');
+  assert.equal(only.items[0]!.image?.url, 'https://ex.com/huge.jpg', 'with nothing smaller, the big one is still offered');
+});
+
+test('get_thumbnails: oversized WordPress uploads go through Photon; timeouts are retried, not cached', async () => {
+  const png = await readFile(new URL('./fixtures/thumb.png', import.meta.url));
+  const calls: string[] = [];
+  let down = true;
+  const fetcher: Fetcher = async (target, options = {}) => {
+    calls.push(target);
+    const u = new URL(target);
+    if (u.hostname === 'www.thisiscolossal.com') throw new BoundaryError(`Response exceeded ${options.maxBytes} bytes`);   // ignores ?w=
+    if (u.hostname === 'i0.wp.com') return { status: 200, url: target, contentType: 'image/png', text: png.toString('base64'), truncated: false };
+    if (u.hostname === 'slow.example.org') {
+      if (down) throw new BoundaryError('Timed out fetching slow.example.org');
+      return { status: 200, url: target, contentType: 'image/png', text: png.toString('base64'), truncated: false };
+    }
+    return { status: 404, url: target, contentType: 'text/plain', text: '', truncated: false };
+  };
+  const c = ctx({ fetcher });
+  const big = 'https://www.thisiscolossal.com/wp-content/uploads/2026/09/roy-3.jpg';
+  const slow = 'https://slow.example.org/new-post.jpg';
+  const first = (await call(c, 'get_thumbnails', { urls: [big, slow, 'https://gone.example.org/x.jpg'] })).structuredContent.images;
+  assert.match(first[big], /^data:image\/png;base64,/);
+  assert.ok(calls.includes('https://i0.wp.com/www.thisiscolossal.com/wp-content/uploads/2026/09/roy-3.jpg?w=480'));
+  assert.equal(first[slow], null);
+
+  down = false;
+  calls.length = 0;
+  const second = (await call(c, 'get_thumbnails', { urls: [big, slow, 'https://gone.example.org/x.jpg'] })).structuredContent.images;
+  assert.match(second[slow], /^data:image\/png;base64,/, 'a timed-out picture loads on the next try');
+  assert.deepEqual(calls, [slow], 'successes and permanent failures come from the cache');
+});
+
+test('fallback art: distinct styles per source, varied placement per item, inlined into the app', async () => {
+  const src = await readFile(new URL('../src/ui/art.js', import.meta.url), 'utf8');
+  type Art = { styles(keys: string[]): number[]; draw(style: number, item: string): string; motifOf(style: number): string; inkOf(style: number): number };
+  const art = vm.runInNewContext(`${src}; portalArt`) as Art;
+  const noIds = (svg: string) => svg.replace(/pa\d+/g, 'pa');
+
+  // Styles: stable, distinct, fresh ink sets first, and adding a panel never restyles earlier ones.
+  const feeds = Array.from({ length: 12 }, (_, i) => `https://feed${i}.example/rss`);
+  const styles = art.styles(feeds);
+  assert.deepEqual(art.styles(feeds), styles);
+  assert.equal(new Set(styles).size, 12);
+  assert.equal(new Set(styles.slice(0, 8).map(art.inkOf)).size, 8, 'the first eight sources get eight different ink sets');
+  assert.equal(new Set(styles.slice(0, 5).map(art.motifOf)).size, 5, 'the first five sources get all five motifs');
+  assert.ok(styles.every((st, i) => i === 0 || art.motifOf(st) !== art.motifOf(styles[i - 1]!)), 'neighbours never share a motif');
+  assert.deepEqual(art.styles([...feeds, 'https://late.example/rss']).slice(0, 12), styles);
+  assert.equal(new Set(art.styles(Array.from({ length: 40 }, (_, i) => `k${i}`))).size, 40);
+  assert.deepEqual([...new Set(Array.from({ length: 40 }, (_, i) => art.motifOf(i)))].sort(), ['arches', 'doorway', 'gravity', 'orbits', 'portal']);
+
+  // Drawing: deterministic, and neighbouring items land in visibly different places.
+  const style = Array.from({ length: 40 }, (_, i) => i).find((i) => art.motifOf(i) === 'arches')!;
+  assert.equal(noIds(art.draw(style, 'item-1')), noIds(art.draw(style, 'item-1')));
+  const lefts = Array.from({ length: 10 }, (_, i) => Number(art.draw(style, `item-${i}`).match(/<path class="aa" d="M([\d.-]+)/)![1]));
+  assert.ok(Math.max(...lefts) - Math.min(...lefts) > 30, `arches spread across the card: ${lefts}`);
+
+  for (let i = 0; i < 40; i++) {
+    const svg = art.draw(i, `<script>alert(${i})</script>`);
+    assert.match(svg, /^<svg xmlns="http:\/\/www.w3.org\/2000\/svg" class="art" [^>]*aria-hidden="true"/);
+    assert.ok(!/script|NaN|undefined|Infinity/.test(svg), 'only numbers and constants reach the markup');
+    const ids = [...svg.matchAll(/id="(pa\d+)"/g)].map((m) => m[1]);
+    assert.equal(new Set(ids).size, ids.length);
+  }
+
+  const read = await rpc(ctx(), 'resources/read', { uri: WORKSPACE_URI });
+  const html = (read.result as any).contents[0].text as string;
+  assert.ok(html.includes('const portalArt = (() => {') && !html.includes('/*MCPORTAL_ART*/'));
 });
 
 test('onboarding: a new user gets the welcome, build_portal assembles packs, and it sticks', async () => {

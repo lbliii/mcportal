@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Trimmed from /Film and Colossal feeds (2026-09-30): originals over the thumbnail cap. -->
+<rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+<channel>
+  <title>Big pictures</title>
+  <item>
+    <title>Slow Horses Season 6 Resurrects A Dead Character</title>
+    <link>https://www.slashfilm.com/1987231/slow-horses-season-6-resurrects/</link>
+    <media:thumbnail url="https://www.slashfilm.com/img/gallery/slow-horses/l-intro-1787231738.jpg"/>
+    <enclosure url="https://www.slashfilm.com/img/gallery/slow-horses/l-intro-1787231738.jpg" type="image/jpg" length="411459"/>
+    <description><![CDATA[<img src="https://www.slashfilm.com/img/gallery/slow-horses/intro-1787231738.jpg" /><p>Spoilers ahead.</p>]]></description>
+  </item>
+  <item>
+    <title>Ted Lasso's Anthony Head Tribute Explained</title>
+    <link>https://www.slashfilm.com/1990000/ted-lasso/</link>
+    <media:thumbnail url="https://www.slashfilm.com/img/gallery/ted-lasso/l-intro-1790789740.jpg"/>
+    <enclosure url="https://www.slashfilm.com/img/gallery/ted-lasso/l-intro-1790789740.jpg" type="image/jpg" length="221986"/>
+    <description><![CDATA[<img src="https://www.slashfilm.com/img/gallery/ted-lasso/intro-1790789740.jpg" /><p>A tribute.</p>]]></description>
+  </item>
+  <item>
+    <title>Joana Roy's Dreamlike Paintings</title>
+    <link>https://www.thisiscolossal.com/2026/09/joana-roy-paintings/</link>
+    <description><![CDATA[<img src="https://www.thisiscolossal.com/wp-content/uploads/2026/09/roy-3.jpg" alt="" /><p>Paintings.</p>]]></description>
+    <content:encoded><![CDATA[<p><img width="2000" height="1333" src="https://www.thisiscolossal.com/wp-content/uploads/2026/09/roy-3.jpg" alt="" /></p>]]></content:encoded>
+  </item>
+</channel>
+</rss>
