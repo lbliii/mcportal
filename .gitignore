@@ -1,0 +1,6 @@
+node_modules/
+.env
+.demo-data/
+snapshot.html
+*.tmp
+.DS_Store

@@ -1,0 +1,13 @@
+{
+  "name": "mcportal",
+  "owner": {
+    "name": "Lawrence Lane"
+  },
+  "plugins": [
+    {
+      "name": "mcportal",
+      "source": "./",
+      "description": "Your personal, agent-composed workspace: Hacker News, GitHub and RSS in one multi-panel view."
+    }
+  ]
+}

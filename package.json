@@ -1,0 +1,24 @@
+{
+  "name": "mcportal",
+  "version": "0.1.0",
+  "description": "MCPortal: a personal, agent-composed workspace delivered as an MCP server with an MCP Apps UI.",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "start": "node src/server.ts",
+    "stdio": "node src/server.ts --stdio",
+    "dev": "node --watch src/server.ts",
+    "test": "node --test \"test/**/*.test.ts\"",
+    "smoke": "node scripts/smoke.ts",
+    "snapshot": "node scripts/snapshot.ts snapshot.html",
+    "demo": "MCPORTAL_FIXTURES=1 MCPORTAL_DATA_DIR=.demo-data node src/server.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0"
+  }
+}

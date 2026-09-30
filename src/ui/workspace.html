@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MCPortal</title>
+<!--MCPORTAL_BOOT-->
+<style>
+  :root {
+    --d-bg: #ffffff; --d-bg2: #f5f5f2; --d-fg: #1b1b1a; --d-fg2: #6a6a66; --d-border: #e3e3de; --d-hover: #efefeb;
+    color-scheme: light;
+  }
+  :root[data-theme="dark"] {
+    --d-bg: #161616; --d-bg2: #1d1d1c; --d-fg: #ececea; --d-fg2: #9b9b96; --d-border: #2c2c2a; --d-hover: #242423;
+    color-scheme: dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme]) {
+      --d-bg: #161616; --d-bg2: #1d1d1c; --d-fg: #ececea; --d-fg2: #9b9b96; --d-border: #2c2c2a; --d-hover: #242423;
+      color-scheme: dark;
+    }
+  }
+  :root {
+    --bg: var(--color-background-primary, var(--d-bg));
+    --bg2: var(--color-background-secondary, var(--d-bg2));
+    --fg: var(--color-text-primary, var(--d-fg));
+    --fg2: var(--color-text-secondary, var(--d-fg2));
+    --border: var(--color-border-primary, var(--d-border));
+    --hover: var(--d-hover);
+    --accent: #2563eb;
+    --radius: var(--border-radius-lg, 10px);
+    --src-hn: #f26522; --src-github: #7c5cff; --src-rss: #0f9d8a; --src-reader: #2563eb;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; background: var(--bg2); color: var(--fg); font: 13.5px/1.45 var(--font-sans, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif); }
+  button { font: inherit; color: inherit; }
+
+  .bar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--bg); border-bottom: 1px solid var(--border); }
+  .brand { font-weight: 650; letter-spacing: -0.01em; }
+  .brand span { color: var(--accent); }
+  .ws-name { color: var(--fg2); font-size: 12px; }
+  .spacer { flex: 1; }
+  .status { color: var(--fg2); font-size: 12px; }
+  .btn { border: 1px solid var(--border); background: var(--bg); border-radius: 7px; padding: 4px 10px; font-size: 12px; cursor: pointer; }
+  .btn:hover { background: var(--hover); }
+  .btn[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+
+  .grid { display: flex; gap: 12px; padding: 12px; align-items: flex-start; overflow-x: auto; }
+  .col { display: flex; flex-direction: column; gap: 12px; min-width: 240px; flex-basis: 0; }
+  .panel { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); display: flex; flex-direction: column; overflow: hidden; }
+  .panel-head { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-bottom: 1px solid var(--border); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .panel-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .panel-count { color: var(--fg2); font-size: 12px; }
+  .icon-btn { margin-left: auto; border: 0; background: none; cursor: pointer; color: var(--fg2); padding: 2px 6px; border-radius: 6px; }
+  .icon-btn:hover { background: var(--hover); color: var(--fg); }
+  .items { list-style: none; margin: 0; padding: 4px; max-height: 480px; overflow-y: auto; }
+  :root.fullscreen .items { max-height: calc(100vh - 170px); }
+  .item { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 8px 9px; border-radius: 7px; cursor: pointer; }
+  .item:hover, .item:focus-visible { background: var(--hover); outline: none; }
+  .item-title { font-weight: 500; }
+  .item-meta { color: var(--fg2); font-size: 12px; margin-top: 2px; display: flex; flex-wrap: wrap; gap: 4px 10px; }
+  .item-summary { color: var(--fg2); font-size: 12.5px; margin-top: 3px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .item-links { display: flex; gap: 10px; margin-top: 4px; }
+  .link { font-size: 12px; color: var(--accent); background: none; border: 0; padding: 0; cursor: pointer; }
+  .link:hover { text-decoration: underline; }
+  .panel-foot { display: none; padding: 7px 12px; border-top: 1px solid var(--border); color: var(--fg2); font-size: 11.5px; word-break: break-all; }
+  :root.show-sources .panel-foot { display: block; }
+  .empty, .error { padding: 16px 12px; color: var(--fg2); }
+  .error { color: #c2410c; }
+  .skeleton { height: 12px; margin: 12px; border-radius: 4px; background: var(--hover); }
+
+  .reader { max-width: 740px; margin: 0 auto; padding: 16px 20px 40px; }
+  .reader[hidden] { display: none; }
+  .reader-top { display: flex; gap: 8px; align-items: center; margin-bottom: 14px; }
+  .reader h1 { font-size: 24px; line-height: 1.25; margin: 6px 0 6px; letter-spacing: -0.01em; }
+  .reader .byline { color: var(--fg2); margin-bottom: 18px; }
+  .reader .body p, .reader .body li { font-size: 15px; line-height: 1.65; margin: 0 0 14px; }
+  .reader .body h2 { font-size: 17px; margin: 22px 0 8px; }
+  .reader .body pre { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; overflow-x: auto; font: 12.5px/1.5 var(--font-mono, ui-monospace, "SF Mono", Menlo, monospace); }
+  .reader .body blockquote { margin: 0 0 14px; padding-left: 12px; border-left: 3px solid var(--border); color: var(--fg2); }
+  .reader .prov { margin-top: 28px; padding-top: 10px; border-top: 1px solid var(--border); color: var(--fg2); font-size: 12px; word-break: break-all; }
+  .toast { position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%); background: var(--fg); color: var(--bg); padding: 7px 12px; border-radius: 8px; font-size: 12.5px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  .toast.show { opacity: .92; }
+</style>
+</head>
+<body>
+<header class="bar">
+  <div class="brand">MC<span>Portal</span></div>
+  <div class="ws-name" id="wsName"></div>
+  <div class="spacer"></div>
+  <span class="status" id="status">Connecting…</span>
+  <button class="btn" id="btnSources" aria-pressed="false" title="Show where each panel's data came from">Sources</button>
+  <button class="btn" id="btnRefresh" title="Refresh all panels">Refresh</button>
+  <button class="btn" id="btnExpand" title="Toggle fullscreen">Expand</button>
+</header>
+<main id="grid" class="grid" aria-live="polite">
+  <div class="col" style="flex-grow:1"><div class="panel"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div></div>
+</main>
+<article id="reader" class="reader" hidden></article>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+  'use strict';
+  const APP_INFO = { name: 'mcportal-workspace', version: '0.1.0' };
+  const DEV = window.__MCPORTAL_DEV__ || null;   // set by /preview: talk to /mcp directly
+  const root = document.documentElement;
+  const $ = (id) => document.getElementById(id);
+
+  // ------------------------------------------------------------ host bridge (MCP Apps, postMessage JSON-RPC)
+  const pending = new Map();
+  let nextId = 1;
+  let displayMode = 'inline';
+  let canFullscreen = !DEV;
+  let gotInitialResult = false;
+
+  function hostRequest(method, params, timeoutMs = 30000) {
+    const id = nextId++;
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => { pending.delete(id); reject(new Error(`${method} timed out`)); }, timeoutMs);
+      pending.set(id, { resolve, reject, timer });
+      window.parent.postMessage({ jsonrpc: '2.0', id, method, params }, '*');
+    });
+  }
+  function hostNotify(method, params) {
+    if (!DEV) window.parent.postMessage({ jsonrpc: '2.0', method, params }, '*');
+  }
+  window.addEventListener('message', (event) => {
+    if (DEV || event.source !== window.parent) return;
+    const msg = event.data;
+    if (!msg || msg.jsonrpc !== '2.0') return;
+    if (msg.method === undefined && msg.id !== undefined) {
+      const p = pending.get(msg.id);
+      if (!p) return;
+      pending.delete(msg.id); clearTimeout(p.timer);
+      msg.error ? p.reject(new Error(msg.error.message || 'Host error')) : p.resolve(msg.result);
+      return;
+    }
+    if (msg.id !== undefined) {   // request from host
+      const ok = msg.method === 'ping' || msg.method === 'ui/resource-teardown';
+      window.parent.postMessage(ok ? { jsonrpc: '2.0', id: msg.id, result: {} }
+        : { jsonrpc: '2.0', id: msg.id, error: { code: -32601, message: 'Method not found' } }, '*');
+      return;
+    }
+    onHostNotification(msg.method, msg.params || {});
+  });
+
+  function onHostNotification(method, params) {
+    if (method === 'ui/notifications/tool-result') {
+      const data = params.structuredContent;
+      if (data && data.profile && data.panels) { gotInitialResult = true; renderWorkspace(data); }
+    } else if (method === 'ui/notifications/host-context-changed') {
+      applyHostContext(params);
+    } else if (method === 'ui/notifications/tool-cancelled') {
+      setStatus('Cancelled');
+    }
+  }
+
+  async function callTool(name, args = {}) {
+    let result;
+    if (DEV) {
+      const qs = DEV.token ? `?token=${encodeURIComponent(DEV.token)}` : '';
+      const res = await fetch(`/mcp${qs}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: nextId++, method: 'tools/call', params: { name, arguments: args } }),
+      });
+      const json = await res.json();
+      if (json.error) throw new Error(json.error.message);
+      result = json.result;
+    } else {
+      result = await hostRequest('tools/call', { name, arguments: args });
+    }
+    if (result && result.isError) {
+      const text = (result.content || []).map((c) => c.text).filter(Boolean).join(' ');
+      throw new Error(text || `${name} failed`);
+    }
+    return result || {};
+  }
+
+  async function openLink(url) {
+    if (DEV) { window.open(url, '_blank', 'noopener'); return; }
+    try { await hostRequest('ui/open-link', { url }); } catch { toast('The host did not open the link'); }
+  }
+
+  function applyHostContext(ctx) {
+    if (!ctx) return;
+    if (ctx.theme === 'dark' || ctx.theme === 'light') root.dataset.theme = ctx.theme;
+    const vars = ctx.styles && ctx.styles.variables;
+    if (vars) for (const [k, v] of Object.entries(vars)) if (k.startsWith('--') && typeof v === 'string') root.style.setProperty(k, v);
+    if (Array.isArray(ctx.availableDisplayModes)) canFullscreen = ctx.availableDisplayModes.includes('fullscreen');
+    if (ctx.displayMode) setDisplayMode(ctx.displayMode);
+    $('btnExpand').hidden = !canFullscreen;
+  }
+
+  function setDisplayMode(mode) {
+    displayMode = mode;
+    root.classList.toggle('fullscreen', mode === 'fullscreen');
+    $('btnExpand').textContent = mode === 'fullscreen' ? 'Collapse' : 'Expand';
+  }
+
+  // Tell the host how tall we are so the inline frame fits the content.
+  let lastHeight = 0, sizeTimer = 0;
+  new ResizeObserver(() => {
+    clearTimeout(sizeTimer);
+    sizeTimer = setTimeout(() => {
+      const height = Math.ceil(document.documentElement.scrollHeight);
+      if (Math.abs(height - lastHeight) > 2) { lastHeight = height; hostNotify('ui/notifications/size-changed', { width: Math.ceil(window.innerWidth), height }); }
+    }, 60);
+  }).observe(document.body);
+
+  // ------------------------------------------------------------ state + rendering
+  const state = { profile: null, panels: new Map() };
+
+  function el(tag, attrs, ...children) {
+    const node = document.createElement(tag);
+    if (attrs) for (const [k, v] of Object.entries(attrs)) {
+      if (v === undefined || v === null || v === false) continue;
+      if (k === 'class') node.className = v;
+      else if (k === 'style') node.setAttribute('style', v);
+      else if (k.startsWith('on')) node.addEventListener(k.slice(2), v);
+      else node.setAttribute(k, v === true ? '' : v);
+    }
+    for (const child of children.flat()) {
+      if (child === null || child === undefined || child === false) continue;
+      node.append(child instanceof Node ? child : document.createTextNode(String(child)));  // text only, never HTML
+    }
+    return node;
+  }
+
+  function ago(iso) {
+    if (!iso) return '';
+    const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+    if (s < 60) return 'just now';
+    if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+    if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+    if (s < 86400 * 30) return `${Math.floor(s / 86400)}d ago`;
+    return new Date(iso).toLocaleDateString();
+  }
+  function setStatus(text) { $('status').textContent = text; }
+  let toastTimer = 0;
+  function toast(text) {
+    const t = $('toast'); t.textContent = text; t.classList.add('show');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
+  }
+
+  function renderWorkspace(data) {
+    state.profile = data.profile;
+    state.panels = new Map(data.panels.map((p) => [p.panelId, p]));
+    $('wsName').textContent = `· ${data.profile.name}`;
+    const grid = $('grid');
+    grid.replaceChildren(...data.profile.columns.map((col) =>
+      el('div', { class: 'col', style: `flex-grow:${col.width}` }, col.panels.map((spec) => renderPanel(spec.id)))));
+    setStatus(`Updated ${new Date(data.generatedAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
+  }
+
+  function renderPanel(panelId) {
+    const panel = state.panels.get(panelId);
+    const wrap = el('section', { class: 'panel', 'data-panel': panelId });
+    if (!panel) { wrap.append(el('div', { class: 'empty' }, 'Loading…')); return wrap; }
+    const color = `var(--src-${panel.source})`;
+    const refresh = el('button', { class: 'icon-btn', title: 'Refresh panel', 'aria-label': `Refresh ${panel.title}`, onclick: () => refreshPanel(panelId) }, '↻');
+    wrap.append(el('div', { class: 'panel-head' },
+      el('span', { class: 'dot', style: `background:${color}` }),
+      el('span', { class: 'panel-title', title: panel.title }, panel.title),
+      el('span', { class: 'panel-count' }, panel.error ? '' : String(panel.items.length)),
+      refresh));
+    if (panel.error) wrap.append(el('div', { class: 'error' }, `Couldn't load: ${panel.error}`));
+    else if (!panel.items.length) wrap.append(el('div', { class: 'empty' }, 'Nothing here yet.'));
+    else wrap.append(el('ul', { class: 'items' }, panel.items.map((item) => el('li', null, renderItem(item, panel)))));
+    const p = panel.provenance;
+    wrap.append(el('div', { class: 'panel-foot' },
+      `${p.source} · ${p.endpoint} · fetched ${new Date(p.fetchedAt).toLocaleTimeString()}${p.cached ? ' (cached)' : ''} · fresh for ${p.ttlSeconds}s`));
+    return wrap;
+  }
+
+  function renderItem(item, panel) {
+    const meta = [...item.meta];
+    if (item.publishedAt) meta.push(ago(item.publishedAt));
+    const links = [];
+    if (item.url) links.push(el('button', { class: 'link', onclick: (e) => { e.stopPropagation(); openLink(item.url); } }, 'Open ↗'));
+    if (item.discussionUrl && item.discussionUrl !== item.url) {
+      links.push(el('button', { class: 'link', onclick: (e) => { e.stopPropagation(); openLink(item.discussionUrl); } }, 'Discussion'));
+    }
+    const readable = item.url && panel.source !== 'github';
+    return el('div', {
+      class: 'item', role: 'button', tabindex: '0',
+      title: readable ? 'Open in reader view' : 'Open',
+      onclick: () => (readable ? openReader(item, panel) : openLink(item.url)),
+      onkeydown: (e) => { if (e.key === 'Enter') (readable ? openReader(item, panel) : openLink(item.url)); },
+    },
+      el('div', { class: 'item-title' }, item.title),
+      meta.length ? el('div', { class: 'item-meta' }, meta.map((m) => el('span', null, m))) : null,
+      item.summary ? el('div', { class: 'item-summary' }, item.summary) : null,
+      links.length ? el('div', { class: 'item-links' }, links) : null);
+  }
+
+  async function refreshPanel(panelId) {
+    const node = document.querySelector(`[data-panel="${CSS.escape(panelId)}"]`);
+    if (node) node.style.opacity = '0.55';
+    try {
+      const result = await callTool('refresh_panel', { panelId });
+      state.panels.set(panelId, result.structuredContent.panel);
+    } catch (error) {
+      toast(error.message);
+    }
+    const fresh = renderPanel(panelId);
+    const current = document.querySelector(`[data-panel="${CSS.escape(panelId)}"]`);
+    if (current) current.replaceWith(fresh);
+  }
+
+  async function loadWorkspace() {
+    setStatus('Loading…');
+    try {
+      const result = await callTool('open_workspace');
+      renderWorkspace(result.structuredContent);
+    } catch (error) {
+      setStatus('');
+      $('grid').replaceChildren(el('div', { class: 'panel', style: 'flex:1' }, el('div', { class: 'error' }, `Couldn't open the workspace: ${error.message}`)));
+    }
+  }
+
+  // ------------------------------------------------------------ reader view
+  async function openReader(item, panel) {
+    const reader = $('reader');
+    $('grid').hidden = true; reader.hidden = false; window.scrollTo(0, 0);
+    reader.replaceChildren(readerTop(item.url), el('h1', null, item.title), el('div', { class: 'byline' }, 'Loading reader view…'));
+    try {
+      const result = await callTool('read_article', { url: item.url });
+      const a = result.structuredContent.article;
+      const body = el('div', { class: 'body' }, a.blocks.map((b) =>
+        b.type === 'h' ? el('h2', null, b.text)
+        : b.type === 'pre' ? el('pre', null, b.text)
+        : b.type === 'quote' ? el('blockquote', null, b.text)
+        : b.type === 'li' ? el('p', null, `• ${b.text}`)
+        : el('p', null, b.text)));
+      const site = a.siteName && a.siteName !== a.byline ? a.siteName : null;
+      const by = [a.byline, site, `${Math.max(1, Math.round(a.wordCount / 230))} min read`].filter(Boolean).join(' · ');
+      const p = a.provenance;
+      reader.replaceChildren(readerTop(a.url), el('h1', null, a.title), el('div', { class: 'byline' }, by), body,
+        el('div', { class: 'prov' }, `Reader view of ${p.endpoint} · via ${panel.title} · fetched ${new Date(p.fetchedAt).toLocaleString()}${p.cached ? ' (cached)' : ''}. Text only; scripts, trackers and ads removed.`));
+      hostRequest('ui/update-model-context', {
+        content: [{ type: 'text', text: `The user is reading "${a.title}" (${a.url}) in MCPortal's reader view.` }],
+        structuredContent: { reading: { title: a.title, url: a.url } },
+      }, 5000).catch(() => {});
+    } catch (error) {
+      reader.replaceChildren(readerTop(item.url), el('h1', null, item.title),
+        el('div', { class: 'error' }, `Reader view isn't available for this page (${error.message}).`),
+        el('button', { class: 'btn', onclick: () => openLink(item.url) }, 'Open the original'));
+    }
+  }
+  function readerTop(url) {
+    return el('div', { class: 'reader-top' },
+      el('button', { class: 'btn', onclick: closeReader }, '← Back'),
+      el('button', { class: 'btn', onclick: () => openLink(url) }, 'Open original ↗'));
+  }
+  function closeReader() { $('reader').hidden = true; $('grid').hidden = false; }
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('reader').hidden) closeReader(); });
+
+  // ------------------------------------------------------------ toolbar
+  $('btnSources').addEventListener('click', (e) => {
+    const on = !root.classList.contains('show-sources');
+    root.classList.toggle('show-sources', on); e.currentTarget.setAttribute('aria-pressed', String(on));
+  });
+  $('btnRefresh').addEventListener('click', async () => {
+    if (!state.profile) return loadWorkspace();
+    setStatus('Refreshing…');
+    await Promise.all([...state.panels.keys()].map(refreshPanel));
+    setStatus(`Updated ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
+  });
+  $('btnExpand').addEventListener('click', async () => {
+    const want = displayMode === 'fullscreen' ? 'inline' : 'fullscreen';
+    try { const r = await hostRequest('ui/request-display-mode', { mode: want }, 5000); setDisplayMode((r && r.mode) || want); }
+    catch { toast('Fullscreen is not available here'); }
+  });
+
+  // ------------------------------------------------------------ boot
+  async function boot() {
+    if (DEV) {
+      $('btnExpand').hidden = true;
+      await loadWorkspace();
+      return;
+    }
+    try {
+      const init = await hostRequest('ui/initialize', {
+        protocolVersion: '2026-01-26',
+        appInfo: APP_INFO,
+        clientInfo: APP_INFO,
+        appCapabilities: { availableDisplayModes: ['inline', 'fullscreen'] },
+        capabilities: {},
+      }, 10000);
+      applyHostContext(init && init.hostContext);
+    } catch (error) {
+      console.warn('[mcportal] ui/initialize failed', error);
+    }
+    hostNotify('ui/notifications/initialized', {});
+    // If the host opened us without pushing a tool result, fetch the workspace ourselves.
+    setTimeout(() => { if (!gotInitialResult) loadWorkspace(); }, 2500);
+  }
+  boot();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "name": "mcportal",
+  "version": "0.1.0",
+  "description": "Your personal, agent-composed workspace: Hacker News, GitHub and any RSS feed in one multi-panel view, arranged the way you ask, with reader view and no ads.",
+  "author": {
+    "name": "Lawrence Lane"
+  },
+  "keywords": ["workspace", "dashboard", "rss", "hacker-news", "github", "reader", "mcp-apps"]
+}

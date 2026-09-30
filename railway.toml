@@ -1,0 +1,14 @@
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5
+
+# Also in the Railway dashboard:
+#   1. Attach a volume mounted at /data (profiles live there).
+#   2. Set MCPORTAL_TOKEN to a long random string (Phase 1 is single-user).
+#   3. Optionally set GITHUB_TOKEN (raises GitHub API rate limits).
