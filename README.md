@@ -139,10 +139,11 @@ The `/preview` page never contains secrets. With a static token it asks for the 
 | `search_clips` | model | Find clips by words, kind or tag, newest first |
 | `get_clip` | model + app | One clip in full; renders as its own clip card |
 | `update_clip` / `delete_clip` | model | Change a clip's title, note or tags, or delete it |
-| `get_public_profile` / `set_public_profile` / `remove_public_profile` | model | Your opt-in public profile (handle, name, bio), or someone else's by handle. Hosted only |
+| `get_public_profile` / `set_public_profile` / `remove_public_profile` | model | Your opt-in public profile and space (handle, name, bio, space title, accent, featured sources), or someone else's by handle. Hosted only |
 | `export_data` | model | Everything as an MCPortal export, saved items as bookmarks, clips as Markdown, or sources as OPML: a one-time download link (hosted) or a file (local) |
 | `import_portal` | model | Add an MCPortal export to the portal; only adds. Hosted: returns a one-time upload link, so the file never passes through the model (up to 60 MB). Local: reads a `.json` path |
 | `account_settings` | model | Link to `/account`, where people download everything or delete their account (never a tool) |
+| `open_space` | model + app | Someone's space (or yours): title, bio, Follow, "Sources I read" (one-click add) and their posts as a grid; renders as a card |
 | `share` / `unshare` | model | Share a saved link or clip with a note, to followers (default) or everyone on MCPortal; needs a public profile |
 | `get_share` | model + app | One share in full; renders as a card |
 | `list_shares` | model | Your shares, or what someone shared that you may see |

@@ -1,14 +1,17 @@
 /**
  * Write a self-contained demo of the workspace UI with canned data baked in.
  *
- *   node scripts/snapshot.ts [out.html] [--reader] [--packs=developer,ai] [--layout=shelves]
+ *   node scripts/snapshot.ts [out.html] [--reader] [--packs=developer,ai] [--layout=shelves] [--profile=~/.mcportal/default.json]
  *
  * Uses fixtures by default (no network). Set MCPORTAL_LIVE=1 to snapshot live data.
  * --reader opens the PS5 article (or with --packs, the first article) in reader view on load.
  * --packs builds the portal from starter packs; --layout picks columns or shelves.
+ * --profile renders a saved profile (read only; the file is never written).
  * Thumbnails are baked in, so shelves show pictures.
  */
-import { writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
+import { homedir } from 'node:os';
+import { validateProfile } from '../src/profile.ts';
 import { TtlCache } from '../src/lib/cache.ts';
 import { createFixtureFetcher } from '../src/lib/fixture-fetch.ts';
 import { safeFetch } from '../src/lib/safe-fetch.ts';
@@ -22,8 +25,9 @@ const openReader = process.argv.includes('--reader');
 const flag = (name: string) => process.argv.find((a) => a.startsWith(`--${name}=`))?.split('=')[1];
 const packs = flag('packs')?.split(',').filter(Boolean);
 const layout = flag('layout');
+const profileFile = process.argv.find((a) => a.startsWith('--profile='))?.slice('--profile='.length).replace(/^~(?=\/)/, homedir());
 const ctx: ToolContext = {
-  store: new MemoryProfileStore(),
+  store: new MemoryProfileStore(profileFile ? { snapshot: validateProfile(JSON.parse(await readFile(profileFile, 'utf8'))) } : {}),
   clips: new MemoryClipStore(),
   fetcher: process.env.MCPORTAL_LIVE === '1' ? safeFetch : createFixtureFetcher(),
   cache: new TtlCache(),

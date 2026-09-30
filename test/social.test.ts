@@ -135,3 +135,44 @@ test('tools: share a saved item or a clip, the Following panel appears on first 
   const local = { ...ctx('a'), social: undefined };
   assert.match((await call(local, 'share', { savedUrl: 'https://example.com/a' })).content[0]!.text, /hosted MCPortal/);
 });
+
+test('spaces: title, accent and featured sources; visitors see what the rules allow; big posts are trimmed', async () => {
+  const { ctx, social, clips, portals } = await world();
+  const layout = validateProfile({ ...defaultProfile(), onboarded: true, columns: [{ panels: [{ id: 'simonw', source: 'rss', title: 'Simon', config: { url: 'https://simonwillison.net/atom/everything/' } }, { id: 'saved', source: 'saved', config: {} }] }] });
+  await portals.put('a', layout);
+  assert.match((await call(ctx('a'), 'set_public_profile', { featuredPanelIds: ['nope'] })).content[0]!.text, /no panel with id nope/);
+  assert.ok((await call(ctx('a'), 'set_public_profile', { accent: 'neon' })).isError);
+  const set = await call(ctx('a'), 'set_public_profile', { spaceTitle: 'liminal webspace', accent: 'violet', bio: 'edges of the web', featuredPanelIds: ['simonw', 'saved'] });
+  assert.match(set.content[0]!.text, /1 panel\(s\) weren't featured/);
+  assert.deepEqual(set.structuredContent.profile.sources, [{ title: 'Simon', source: 'rss', config: { url: 'https://simonwillison.net/atom/everything/', limit: 10 } }]);
+
+  const big = Buffer.alloc(300_000, 1);
+  big.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  const image = buildClip({ kind: 'image', image: `data:image/png;base64,${big.toString('base64')}`, title: 'Big' });
+  const table = buildClip({ kind: 'table', columns: ['n'], rows: Array.from({ length: 40 }, (_, i) => [String(i)]) });
+  await social.share('a', { kind: 'clip', title: 'Big', clip: image, audience: 'mcportal' });
+  await social.share('a', { kind: 'clip', title: 'Rows', clip: table, audience: 'mcportal' });
+  await social.share('a', { kind: 'link', title: 'Friends only', url: 'https://example.com/f' });
+
+  const visit = await call(ctx('c'), 'open_space', { handle: '@alice' });
+  const space = visit.structuredContent.space;
+  assert.equal(space.spaceTitle, 'liminal webspace');
+  assert.equal(space.accountId, undefined);
+  assert.equal(space.mine, false);
+  assert.equal(space.following, false);
+  assert.deepEqual(space.posts.map((p: any) => p.title), ['Rows', 'Big'], 'followers-only posts stay hidden from a visitor');
+  assert.equal(space.posts[0].clip.data.rows.length, 8, 'tables are cut for the grid');
+  assert.equal(space.posts[1].clip.data.data, '', 'big images are left for get_share');
+  assert.equal(space.sources.length, 1);
+  assert.match(visit.content[0]!.text, /<untrusted-content/);
+  await call(ctx('c'), 'relationship', { handle: 'alice', action: 'follow' });
+  assert.equal((await call(ctx('c'), 'open_space', { handle: 'alice' })).structuredContent.space.posts.length, 3, 'following shows followers-only posts');
+
+  const own = (await call(ctx('a'), 'open_space')).structuredContent.space;
+  assert.equal(own.mine, true);
+  assert.equal(own.followers, 1);
+  assert.match((await call(ctx('d'), 'open_space')).content[0]!.text, /no space yet/);
+  await call(ctx('a'), 'relationship', { handle: 'carol', action: 'block' });
+  assert.match((await call(ctx('c'), 'open_space', { handle: 'alice' })).content[0]!.text, /No MCPortal profile/, 'blocked people can\'t visit');
+  assert.equal(clips instanceof Object, true);
+});

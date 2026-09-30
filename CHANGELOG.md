@@ -16,6 +16,8 @@
 - **Public profiles (opt-in):** claim a handle (suggested from your GitHub login) with a display name and bio. Other signed-in users can look you up. A handle you give up is held for you for 30 days.
 
 ### Sharing
+- **Your space:** a public profile is also a space people visit and follow. It has a title (say “liminal webspace”), a bio and an accent colour, your posts as a picture-rich grid (images, quotes and tables inline), and “Sources I read”: feeds you feature from your portal, which visitors add to their own with one click. `open_space` shows anyone's space, or yours, as a card, and the toolbar has a My space button.
+- **Share from the portal:** a share button on saved items and in the clip viewer. You write the note and pick the audience yourself.
 - **Share** a saved link or a clip with a note, to your followers (the default) or everyone on MCPortal. It needs a public profile. What you share is copied as it is, and Claude asks you to approve any note it writes.
 - **Follow** people by handle. Their shares appear in a **Following** panel, which your first follow adds. **Mute** hides someone from that panel. **Block** hides you from each other and removes follows both ways.
 - **Report** a share or a person. Admins see reports on `/admin` and can hide a share (only its author still sees it, marked hidden), dismiss the report or suspend the author. Every action is audited.

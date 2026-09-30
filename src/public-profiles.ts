@@ -13,6 +13,7 @@
  */
 import type { AuthPersistence } from './auth/store.ts';
 import { clean } from './lib/text.ts';
+import { normalizeSourceConfig, ProfileError } from './profile.ts';
 import { KeyedMutex } from './store.ts';
 
 export const HANDLE_HOLD_MS = 30 * 24 * 3600 * 1000;
@@ -23,11 +24,29 @@ export const RESERVED_HANDLES = new Set([
   'root', 'security', 'settings', 'share', 'shares', 'staff', 'support', 'system', 'undefined', 'you',
 ]);
 
+/** Accent colours a space can use; the UI maps names to colours, so no CSS comes from users. */
+export const ACCENTS = ['blue', 'teal', 'green', 'amber', 'orange', 'rose', 'violet', 'slate'] as const;
+export type Accent = (typeof ACCENTS)[number];
+
+/** A source someone features in their space, so visitors can add it to their own portal. */
+export interface FeaturedSource {
+  title: string;
+  source: 'rss' | 'hn' | 'github';
+  config: Record<string, unknown>;
+}
+
+export const MAX_FEATURED = 12;
+
 export interface PublicProfile {
   accountId: string;
   handle: string;
   displayName?: string;
   bio?: string;
+  /** The space's name, e.g. "liminal webspace". */
+  spaceTitle?: string;
+  accent?: Accent;
+  /** Sources from their portal they recommend. Copies: visitors never read anyone's portal. */
+  sources?: FeaturedSource[];
   createdAt: string;
   updatedAt: string;
 }
@@ -36,6 +55,32 @@ export interface PublicProfileInput {
   handle?: string;
   displayName?: string;
   bio?: string;
+  spaceTitle?: string;
+  accent?: string;
+  /** Replaces the featured list; [] clears it. */
+  sources?: Array<{ title?: string; source: string; config: unknown }>;
+}
+
+/** Only sources MCPortal fetches itself can be featured; configs are re-validated. */
+export function normalizeFeatured(raw: PublicProfileInput['sources']): FeaturedSource[] {
+  const out: FeaturedSource[] = [];
+  const seen = new Set<string>();
+  for (const entry of raw ?? []) {
+    if (entry.source !== 'rss' && entry.source !== 'hn' && entry.source !== 'github') continue;
+    let config: Record<string, unknown>;
+    try {
+      config = normalizeSourceConfig(entry.source, entry.config, 'featured source') as unknown as Record<string, unknown>;
+    } catch (error) {
+      if (error instanceof ProfileError) continue;
+      throw error;
+    }
+    const key = `${entry.source}:${JSON.stringify({ ...config, limit: undefined })}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ title: clean(entry.title, 80) || entry.source, source: entry.source, config });
+    if (out.length >= MAX_FEATURED) break;
+  }
+  return out;
 }
 
 interface Doc {
@@ -157,8 +202,15 @@ export class PublicProfiles {
       const profile: PublicProfile = { accountId, handle, createdAt: current?.createdAt ?? at, updatedAt: at };
       const displayName = input.displayName !== undefined ? clean(input.displayName, 50) : current?.displayName;
       const bio = input.bio !== undefined ? clean(input.bio, 160) : current?.bio;
+      const spaceTitle = input.spaceTitle !== undefined ? clean(input.spaceTitle, 60) : current?.spaceTitle;
+      if (input.accent !== undefined && input.accent !== '' && !(ACCENTS as readonly string[]).includes(input.accent)) throw new HandleError(`accent must be one of ${ACCENTS.join(', ')}`);
+      const accent = input.accent !== undefined ? ((input.accent || undefined) as Accent | undefined) : current?.accent;
+      const sources = input.sources !== undefined ? normalizeFeatured(input.sources) : current?.sources;
       if (displayName) profile.displayName = displayName;
       if (bio) profile.bio = bio;
+      if (spaceTitle) profile.spaceTitle = spaceTitle;
+      if (accent) profile.accent = accent;
+      if (sources?.length) profile.sources = sources;
       doc.profiles[accountId] = profile;
       return { profile: { ...profile }, created: !current, ...(released ? { released } : {}) };
     });

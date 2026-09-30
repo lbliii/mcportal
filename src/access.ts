@@ -69,6 +69,7 @@ export const TOOL_ACTIONS: Record<string, Action> = {
   export_data: 'read',
   import_portal: 'write',
   account_settings: 'read',
+  open_space: 'read',
   share: 'write',
   unshare: 'write',
   get_share: 'read',

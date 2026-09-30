@@ -182,6 +182,36 @@
   .reader .body blockquote { margin: 0 0 14px; padding-left: 12px; border-left: 3px solid var(--border); color: var(--fg2); }
   .clip-tags { display: flex; flex-wrap: wrap; gap: 6px; margin: -10px 0 16px; }
   .clip-tags span { font-size: 12px; color: var(--fg2); background: var(--hover); padding: 1px 8px; border-radius: 10px; }
+  .reader.space { max-width: 1120px; }
+  :root:not(.fullscreen) .reader.space { max-height: 860px; }
+  .space-head { border-top: 4px solid var(--sp); padding-top: 14px; margin-bottom: 18px; }
+  .space-head h1 { margin: 0 0 2px; }
+  .space-head .who { color: var(--fg2); }
+  .space-head .bio { font-size: 15px; margin: 8px 0; max-width: 640px; }
+  .space-head .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; color: var(--fg2); font-size: 12.5px; }
+  .space-head .btn.follow { border-color: var(--sp); color: var(--sp); font-weight: 600; }
+  .space-head .btn.follow[aria-pressed="true"] { background: var(--sp); color: #fff; }
+  .space h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--fg2); margin: 22px 0 10px; }
+  .posts { columns: 3 250px; column-gap: 12px; }
+  .post { break-inside: avoid; margin: 0 0 12px; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--bg); cursor: pointer; }
+  .post:hover, .post:focus-visible { border-color: var(--sp); outline: none; }
+  .post .pc { padding: 10px 12px; }
+  .post img { display: block; width: 100%; background: #fff; }
+  .post .pq { font-size: 16px; line-height: 1.45; white-space: pre-wrap; border-left: 3px solid var(--sp); padding-left: 10px; margin: 0 0 6px; display: -webkit-box; -webkit-line-clamp: 8; -webkit-box-orient: vertical; overflow: hidden; }
+  .post .pt { font-weight: 600; line-height: 1.3; margin: 0 0 4px; }
+  .post .pn { color: var(--fg); margin: 6px 0 0; white-space: pre-wrap; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }
+  .post .pm { color: var(--fg2); font-size: 11.5px; margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .post .mini { font-size: 12px; border-collapse: collapse; width: 100%; }
+  .post .mini td, .post .mini th { border-bottom: 1px solid var(--border); padding: 3px 5px; text-align: left; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .post .body-lines p { margin: 0 0 4px; }
+  .sources { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+  .source { border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; display: flex; gap: 8px; align-items: center; }
+  .source .st { flex: 1; min-width: 0; }
+  .source .st div:first-child { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .source .st div:last-child { color: var(--fg2); font-size: 11.5px; }
+  .composer { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin: 16px 0; }
+  .composer textarea { width: 100%; min-height: 70px; font: inherit; padding: 6px 8px; border: 1px solid var(--border); border-radius: 7px; background: var(--bg); color: var(--fg); resize: vertical; }
+  .composer .row { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
   .reader .share-note { margin: 0 0 18px; padding: 10px 14px; border-left: 3px solid var(--src-following); background: var(--hover); border-radius: 0 8px 8px 0; white-space: pre-wrap; }
   .reader .clip-note { margin: 0 0 18px; color: var(--fg2); font-style: italic; white-space: pre-wrap; }
   .reader .clip-quote { font-size: 18px; line-height: 1.55; white-space: pre-wrap; margin: 0 0 10px; padding-left: 14px; border-left: 3px solid var(--src-clips); }
@@ -212,6 +242,7 @@
     <button class="ib" data-layout="columns" data-icon="columns" aria-pressed="true" title="Columns: scroll sideways, then down each column" aria-label="Columns layout"></button>
     <button class="ib" data-layout="shelves" data-icon="shelves" aria-pressed="false" title="Shelves: one sideways row per source" aria-label="Shelves layout"></button>
   </div>
+  <button class="ib ws-only" id="btnSpace" data-icon="space" title="Your space: what people who follow you see" aria-label="Open your space"></button>
   <button class="ib ws-only" id="btnAdd" data-icon="plus" aria-pressed="false" title="Add a source: any site, feed, subreddit, YouTube channel or repo" aria-label="Add a source"></button>
   <button class="ib ws-only" id="btnOpenIn" data-icon="chat" aria-pressed="false" title="Open stories as their own card in the conversation" aria-label="Open stories in chat" hidden></button>
   <button class="ib ws-only" id="btnSources" data-icon="sources" aria-pressed="false" title="Show where each panel's data came from" aria-label="Show sources"></button>
@@ -264,6 +295,8 @@
     check: 'M5 12.5l4.5 4.5L19 7.5',
     play: 'M8 5.5v13l10.5-6.5z',
     bookmark: 'M7 4.5h10a1 1 0 0 1 1 1v14l-6-4-6 4v-14a1 1 0 0 1 1-1z',
+    share: 'M12 15V4.5 M8 8.5l4-4 4 4 M6 12.5v5.5a1.5 1.5 0 0 0 1.5 1.5h9a1.5 1.5 0 0 0 1.5-1.5v-5.5',
+    space: 'M12 12a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z M5 19.5c1.2-3.2 3.9-5 7-5s5.8 1.8 7 5',
   };
   function icon(name) {
     const NS = 'http://www.w3.org/2000/svg';
@@ -290,6 +323,7 @@
   try { devToken = DEV && DEV.needsToken ? sessionStorage.getItem('mcportal-token') : null; } catch { devToken = null; }
   let loading = null;
   let articleUrl = null;   // set when this view belongs to a read_article call (a reader card)
+  let spaceHandle = null;  // set when this view belongs to an open_space call; '' for your own
   let clipId = null;       // set when this view belongs to a get_clip or get_share call (a card); share ids start with "s"
 
   function hostRequest(method, params, timeoutMs = 30000) {
@@ -329,11 +363,13 @@
       const args = params.arguments || {};
       if (typeof args.url === 'string') { articleUrl = args.url; root.classList.add('article-view'); }
       else if (typeof args.id === 'string') { clipId = args.id; root.classList.add('article-view'); }
+      else if (typeof args.handle === 'string') { spaceHandle = args.handle; root.classList.add('article-view'); }
       setStatus('Loading…');
     } else if (method === 'ui/notifications/tool-result') {
       toolRunning = false;
       const data = params.structuredContent;
-      if (data && data.share && data.share.id) { gotInitialResult = true; showShareCard(data.share); }
+      if (data && data.space && data.space.handle) { gotInitialResult = true; showSpaceCard(data.space); }
+      else if (data && data.share && data.share.id) { gotInitialResult = true; showShareCard(data.share); }
       else if (data && data.clip && data.clip.data) { gotInitialResult = true; showClipCard(data.clip); }
       else if (data && data.article) { gotInitialResult = true; showArticleCard(data.article, data.saved); }
       else if (data && data.profile && data.panels) { gotInitialResult = true; renderWorkspace(data); }
@@ -759,6 +795,7 @@
     const { out, byline } = compactMeta(item);
     if (item.url) out.push(el('button', { class: 'mi go', title: 'Open the original', 'aria-label': 'Open the original', onclick: (e) => { e.stopPropagation(); openLink(item.url); } }, icon('external')));
     out.push(saveButton(item, panel.source));
+    if (panel.source === 'saved' && item.url) out.push(el('button', { class: 'mi go', title: 'Share to your space', 'aria-label': 'Share to your space', onclick: (e) => { e.stopPropagation(); openComposer(item); } }, icon('share')));
     const avatar = item.image && item.image.kind === 'avatar' ? avatarImg(item) : null;
     const text = [
       el('div', { class: 'item-title' }, avatar, item.title),
@@ -931,7 +968,7 @@
       iconButton('external', 'Open the original', () => openLink(url), 'ib'),
       title ? saveButton({ url, title }, 'reader', 'ib save') : null);
   }
-  function closeReader() { if (articleUrl || clipId) return; $('reader').hidden = true; $('grid').hidden = false; }
+  function closeReader() { if (articleUrl || clipId) return; $('reader').classList.remove('space'); $('reader').hidden = true; $('grid').hidden = false; }
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('reader').hidden) closeReader(); });
 
   // ------------------------------------------------------------ clips
@@ -966,7 +1003,8 @@
       clip.tags.length ? el('div', { class: 'clip-tags' }, clip.tags.map((t) => el('span', null, `#${t}`))) : null,
       clip.note ? el('p', { class: 'clip-note' }, clip.note) : null,
       el('div', { class: 'body' }, clipBody(clip.data)),
-      el('div', { class: 'prov' }, `Your clip ${clip.id}. Only you can see it.`)].filter(Boolean);
+      el('div', { class: 'row' }, el('button', { class: 'btn', onclick: (e) => { e.currentTarget.parentNode.replaceWith(composer({ clipId: clip.id }, clip.title)); } }, icon('share'), ' Share to your space')),
+      el('div', { class: 'prov' }, `Your clip ${clip.id}. Only you can see it until you share it.`)].filter(Boolean);
   }
 
   // This view belongs to a get_clip call: it is a clip card, not a workspace.
@@ -1011,6 +1049,125 @@
     }
   }
 
+  // ------------------------------------------------------------ sharing into your space
+  // The user writes the note here themselves, so nothing is posted in their name without them.
+  function composer(target, title) {
+    const note = el('textarea', { placeholder: 'Add a note (optional): why it\'s worth a look', maxlength: '500' });
+    const audience = el('select', { class: 'btn' }, el('option', { value: 'followers' }, 'Followers'), el('option', { value: 'mcportal' }, 'Everyone on MCPortal'));
+    const go = el('button', { class: 'btn', style: 'font-weight:600' }, 'Share');
+    const box = el('div', { class: 'composer' }, el('div', { class: 'byline', style: 'margin:0 0 6px' }, `Share “${title}” to your space`), note,
+      el('div', { class: 'row' }, el('span', null, 'Who sees it:'), audience, el('span', { class: 'spacer' }), go));
+    go.addEventListener('click', async () => {
+      go.disabled = true;
+      try {
+        await callTool('share', { ...target, note: note.value, audience: audience.value });
+        box.replaceChildren(el('div', null, `Shared to your space${audience.value === 'mcportal' ? ' for everyone on MCPortal' : ' for your followers'}.`));
+      } catch (error) {
+        toast(error.message);
+        go.disabled = false;
+      }
+    });
+    return box;
+  }
+
+  function openComposer(item) {
+    const reader = $('reader');
+    $('grid').hidden = true; reader.hidden = false; reader.scrollTop = 0; window.scrollTo(0, 0);
+    reader.replaceChildren(el('div', { class: 'reader-top' }, iconButton('back', 'Back to the workspace', closeReader, 'ib')),
+      el('h1', null, item.title), el('div', { class: 'byline' }, item.url), composer({ savedUrl: item.url }, item.title));
+  }
+
+  // ------------------------------------------------------------ spaces
+  const ACCENT = { blue: '#2563eb', teal: '#0d9488', green: '#16a34a', amber: '#d97706', orange: '#ea580c', rose: '#e11d48', violet: '#7c3aed', slate: '#475569' };
+
+  function postPreview(post) {
+    const c = post.clip ? post.clip.data : null;
+    let hostName = '';
+    try { hostName = post.url ? new URL(post.url).hostname.replace(/^www\./, '') : ''; } catch { hostName = ''; }
+    let top = null;
+    if (c && c.kind === 'image' && c.data && /^image\/(png|jpeg|webp|svg\+xml)$/.test(c.mime) && /^[A-Za-z0-9+/=]+$/.test(c.data)) top = el('img', { alt: '', loading: 'lazy', src: `data:${c.mime};base64,${c.data}` });
+    const body = [];
+    if (c && c.kind === 'quote') body.push(el('p', { class: 'pq' }, c.text), c.attribution ? el('div', { class: 'pm' }, `— ${c.attribution}`) : null);
+    else if (c && c.kind === 'table') body.push(el('div', { class: 'pt' }, post.title), el('table', { class: 'mini' }, el('tr', null, c.columns.slice(0, 4).map((x) => el('th', null, x))), c.rows.slice(0, 5).map((r) => el('tr', null, r.slice(0, 4).map((x) => el('td', null, x))))));
+    else if (c && c.kind === 'note') body.push(el('div', { class: 'pt' }, post.title), el('div', { class: 'body-lines' }, c.blocks.slice(1, 4).map((b) => el('p', null, b.type === 'li' ? `• ${b.text}` : b.text))));
+    else if (c && c.kind === 'exchange') body.push(el('div', { class: 'pt' }, post.title), el('div', { class: 'body-lines' }, c.turns.slice(0, 2).map((t) => el('p', null, el('b', null, `${t.speaker}: `), t.text.slice(0, 160)))));
+    else if (c && c.kind === 'image') body.push(el('div', { class: 'pt' }, post.title));
+    else body.push(el('div', { class: 'pt' }, post.title), hostName ? el('div', { class: 'pm', style: 'margin-top:0' }, hostName) : null);
+    const meta = [ago(post.createdAt), post.mine && post.audience === 'followers' ? 'followers only' : null, post.hiddenAt ? 'hidden by an admin' : null].filter(Boolean);
+    return [top, el('div', { class: 'pc' }, body, post.note ? el('p', { class: 'pn' }, post.note) : null, el('div', { class: 'pm' }, meta.join(' · ')))];
+  }
+
+  function spaceNodes(space, withBack, back) {
+    const name = space.spaceTitle || space.displayName || `@${space.handle}`;
+    const follow = space.mine ? null : el('button', { class: 'btn follow', 'aria-pressed': String(space.following) }, space.following ? 'Following' : 'Follow');
+    if (follow) follow.addEventListener('click', async () => {
+      const action = space.following ? 'unfollow' : 'follow';
+      follow.disabled = true;
+      try {
+        await callTool('relationship', { handle: space.handle, action });
+        space.following = !space.following;
+        space.followers += space.following ? 1 : -1;
+        showSpace(space, withBack, back);
+      } catch (error) { toast(error.message); follow.disabled = false; }
+    });
+    const reShow = (scroll) => { showSpace(space, withBack, back); $('reader').scrollTop = scroll || 0; };
+    const posts = space.posts.map((post) => el('div', {
+      class: 'post', role: 'button', tabindex: '0', title: 'Open',
+      onclick: () => openShare({ title: post.title, share: { id: post.id, kind: post.kind } }, reShow),
+      onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) openShare({ title: post.title, share: { id: post.id, kind: post.kind } }, reShow); },
+    }, postPreview(post)));
+    const sources = space.sources.map((src) => {
+      const add = space.mine ? null : el('button', { class: 'btn' }, 'Add');
+      if (add) add.addEventListener('click', async () => {
+        add.disabled = true;
+        try { await callTool('add_panel', { source: src.source, config: src.config, title: src.title }); add.textContent = 'Added'; }
+        catch (error) { toast(error.message); add.disabled = false; }
+      });
+      return el('div', { class: 'source' }, el('span', { class: 'dot', style: `background:var(--src-${src.source})` }),
+        el('div', { class: 'st' }, el('div', null, src.title), el('div', null, src.source === 'rss' ? (() => { try { return new URL(src.config.url).hostname.replace(/^www\./, ''); } catch { return 'feed'; } })() : src.source === 'hn' ? 'Hacker News' : 'GitHub')), add);
+    });
+    return [
+      withBack ? el('div', { class: 'reader-top' }, iconButton('back', 'Back to the workspace', back || closeReader, 'ib')) : null,
+      el('div', { class: 'space-head' },
+        el('h1', null, name),
+        el('div', { class: 'who' }, [`@${space.handle}`, space.spaceTitle && space.displayName ? space.displayName : null].filter(Boolean).join(' · ')),
+        space.bio ? el('p', { class: 'bio' }, space.bio) : null,
+        el('div', { class: 'row' }, follow, el('span', null, `${space.followers} follower${space.followers === 1 ? '' : 's'}`), el('span', null, `· ${space.posts.length} post${space.posts.length === 1 ? '' : 's'}`),
+          space.mine ? el('span', null, '· this is what visitors see (followers-only posts show only to followers)') : null)),
+      space.sources.length ? el('h2', null, 'Sources I read') : null,
+      space.sources.length ? el('div', { class: 'sources' }, sources) : null,
+      el('h2', null, 'Posts'),
+      posts.length ? el('div', { class: 'posts' }, posts) : el('div', { class: 'empty' }, space.mine ? 'Nothing here yet. Share a saved item or a clip to start your space.' : 'Nothing shared that you can see yet.'),
+    ].filter(Boolean);
+  }
+
+  function showSpace(space, withBack, back) {
+    const reader = $('reader');
+    reader.style.setProperty('--sp', ACCENT[space.accent] || 'var(--accent)');
+    reader.classList.add('space');
+    $('grid').hidden = true; reader.hidden = false;
+    reader.replaceChildren(...spaceNodes(space, withBack, back));
+    setStatus('');
+  }
+
+  // This view belongs to an open_space call: it is a space card.
+  function showSpaceCard(space) {
+    root.classList.add('article-view');
+    $('wsName').textContent = `· @${space.handle}`;
+    showSpace(space, false);
+  }
+
+  async function loadSpace(handle, asCard) {
+    setStatus('Loading…');
+    try {
+      const space = (await callTool('open_space', handle ? { handle } : {})).structuredContent.space;
+      asCard ? showSpaceCard(space) : showSpace(space, true);
+    } catch (error) {
+      setStatus('');
+      toast(error.message);
+    }
+  }
+
   // ------------------------------------------------------------ shares
   // Other people's words: built as text like everything else, and labeled with who wrote them.
   function shareNodes(share, withBack) {
@@ -1050,12 +1207,16 @@
     }
   }
 
-  async function openShare(item) {
+  async function openShare(item, back) {
     const reader = $('reader');
+    const scroll = reader.scrollTop;
+    reader.classList.remove('space');
     $('grid').hidden = true; reader.hidden = false; reader.scrollTop = 0; window.scrollTo(0, 0);
-    reader.replaceChildren(el('div', { class: 'reader-top' }, iconButton('back', 'Back to the workspace', closeReader, 'ib')), el('h1', null, item.title), el('div', { class: 'byline' }, 'Loading…'));
+    reader.replaceChildren(el('div', { class: 'reader-top' }, iconButton('back', 'Back', back || closeReader, 'ib')), el('h1', null, item.title), el('div', { class: 'byline' }, 'Loading…'));
     try {
-      reader.replaceChildren(...shareNodes((await callTool('get_share', { id: item.share.id })).structuredContent.share, true));
+      const nodes = shareNodes((await callTool('get_share', { id: item.share.id })).structuredContent.share, true);
+      if (back) nodes[0].replaceChildren(iconButton('back', 'Back to the space', () => back(scroll), 'ib'), ...[...nodes[0].children].slice(1));
+      reader.replaceChildren(...nodes);
     } catch (error) {
       reader.replaceChildren(el('div', { class: 'reader-top' }, iconButton('back', 'Back to the workspace', closeReader, 'ib')), el('h1', null, item.title),
         el('div', { class: 'error' }, `That share isn't available (${error.message}).`));
@@ -1173,6 +1334,7 @@
   $('btnOpenIn').addEventListener('click', () => {
     if (state.profile) saveSettings({ openIn: state.profile.openIn === 'chat' ? 'card' : 'chat' });
   });
+  $('btnSpace').addEventListener('click', () => loadSpace('', false));
   $('btnRefresh').addEventListener('click', async () => {
     if (!state.profile) return loadWorkspace();
     setStatus('Refreshing…');
@@ -1212,7 +1374,7 @@
     const check = () => {
       if (gotInitialResult) return;
       if (toolRunning && Date.now() - started < 45000) { setTimeout(check, 1000); return; }
-      articleUrl ? loadArticleCard(articleUrl) : clipId ? (clipId[0] === 's' ? loadShareCard(clipId) : loadClipCard(clipId)) : loadWorkspace();
+      spaceHandle !== null ? loadSpace(spaceHandle, true) : articleUrl ? loadArticleCard(articleUrl) : clipId ? (clipId[0] === 's' ? loadShareCard(clipId) : loadClipCard(clipId)) : loadWorkspace();
     };
     setTimeout(check, 3000);
   }

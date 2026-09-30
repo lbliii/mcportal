@@ -98,7 +98,7 @@ function privacy(site: SiteConfig): string {
 <tr><td><b>Saved items:</b> the link, title, source, date and any note you add</td><td>To show your Saved panel</td><td>Until you remove them</td></tr>
 <tr><td><b>Clips:</b> quotes, parts of a conversation, notes, tables, images and links you ask Claude to keep, with any title, note and tags</td><td>To show your Clips panel and find them again in later chats</td><td>Until you delete them</td></tr>
 <tr><td><b>Pinned results:</b> if you ask Claude to pin results from another connected tool (for example, a list of issues), the titles, links, short summaries and details it copies in, and the request needed to refresh them</td><td>To show that panel</td><td>Until you remove the panel</td></tr>
-<tr><td><b>Public profile (only if you create one):</b> your handle, display name and bio, which other signed-in MCPortal users can see</td><td>So people can find you</td><td>Until you remove it; a handle you give up stays reserved for you for 30 days</td></tr>
+<tr><td><b>Public profile and space (only if you create one):</b> your handle, display name, bio, space title and colour, and the sources you choose to feature, which other signed-in MCPortal users can see</td><td>So people can find you</td><td>Until you remove it; a handle you give up stays reserved for you for 30 days</td></tr>
 <tr><td><b>Shares:</b> links and clips you choose to share, with your note, a copy of what you shared, and who it's for (your followers or everyone on MCPortal)</td><td>To show them to the people you shared them with</td><td>Until you remove them</td></tr>
 <tr><td><b>Follows, mutes and blocks:</b> who you follow, mute and block</td><td>To build your Following panel and keep blocked people apart</td><td>Until you change them. People see how many followers you have, never who</td></tr>
 <tr><td><b>Reports:</b> what you reported, why, and when</td><td>So admins can act on abuse</td><td>Kept after they're resolved; if you delete your account, your name is removed from them</td></tr>
@@ -115,7 +115,7 @@ function privacy(site: SiteConfig): string {
 <p>When you use MCPortal in Claude, what you see in your portal is also available to Claude, and Anthropic's privacy policy covers your conversations.</p>
 
 <h2>What other people see</h2>
-<p>Nothing, unless you choose. With a public profile, signed-in MCPortal users can see your handle, display name, bio, follower count, and the shares you made for them (your followers, or everyone). Shares are never published to the open web. Admins can see reported shares and profiles, and can hide a share or suspend an account.</p>
+<p>Nothing, unless you choose. With a public profile, you have a space: signed-in MCPortal users can open it to see your handle, name, bio, space title, the sources you chose to feature, your follower count, and the shares you made for them (your followers, or everyone). Shares are never published to the open web. Admins can see reported shares and profiles, and can hide a share or suspend an account.</p>
 
 <h2>Logs</h2>
 <p>Server logs record which tool ran, whether it worked, and how long it took. They don't record your user ID, your IP address, what you read or what you asked for. An error message can occasionally include the name of a site that failed to load. Separately, the hosting provider (Railway) keeps request logs, which include IP addresses and the pages requested, for a limited time.</p>

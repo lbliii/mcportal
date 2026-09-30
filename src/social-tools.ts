@@ -7,6 +7,7 @@
 import { clipText } from './clip-tools.ts';
 import { clean } from './lib/text.ts';
 import { httpUrl } from './profile.ts';
+import type { ClipData } from './clips.ts';
 import { AUDIENCES, SocialError, type SharedItem } from './social.ts';
 import { ensurePanel, toolError, untrusted, WORKSPACE_URI, type CallToolResult, type ToolContext, type ToolDef } from './tools.ts';
 
@@ -29,7 +30,62 @@ function fail(error: unknown): CallToolResult {
 
 const handleProp = { type: 'string', description: 'e.g. "@someone"' };
 
+const GRID_POSTS = 60;
+const GRID_IMAGES = 12;
+const GRID_IMAGE_B64 = 270_000;   // ~200 KB of image
+
+/** A post as the space grid shows it: long content cut, big images left for get_share. */
+export function forGrid(posts: SharedItem[]): SharedItem[] {
+  let images = 0;
+  return posts.map((p) => {
+    if (!p.clip) return p;
+    const d = p.clip.data;
+    let data: ClipData = d;
+    if (d.kind === 'table') data = { ...d, rows: d.rows.slice(0, 8) };
+    else if (d.kind === 'note') data = { ...d, blocks: d.blocks.slice(0, 6) };
+    else if (d.kind === 'exchange') data = { ...d, turns: d.turns.slice(0, 4) };
+    else if (d.kind === 'image') data = d.data.length <= GRID_IMAGE_B64 && images++ < GRID_IMAGES ? d : { ...d, data: '' };
+    return { ...p, clip: { ...p.clip, data } };
+  });
+}
+
 export const SOCIAL_TOOLS: ToolDef[] = [
+  {
+    name: 'open_space',
+    title: 'Open a space',
+    description: [
+      "Open someone's MCPortal space by handle, or the user's own space without one: their name, bio and space title, what they shared (as a grid), and the sources they recommend, which the user can add to their own portal.",
+      'Use it when the user asks to see someone\'s space, page or profile, or their own ("what does my space look like").',
+    ].join(' '),
+    inputSchema: { type: 'object', additionalProperties: false, properties: { handle: handleProp } },
+    annotations: { readOnlyHint: true },
+    _meta: { ui: { resourceUri: WORKSPACE_URI } },
+    async handler(args, ctx) {
+      if (!ctx.social || !ctx.publicProfiles) return toolError(HOSTED_ONLY);
+      try {
+        const handle = typeof args.handle === 'string' && args.handle.trim() ? args.handle : undefined;
+        const profile = handle ? await ctx.social.resolve(ctx.userId, handle) : await ctx.publicProfiles.get(ctx.userId);
+        if (!profile) return toolError('You have no space yet: it starts with a public profile. Create one with set_public_profile (a handle, and optionally a space title and featured sources), then share things into it.');
+        const mine = profile.accountId === ctx.userId;
+        const posts = await ctx.social.sharesOf(ctx.userId, profile.accountId, { limit: GRID_POSTS });
+        const stats = await ctx.social.stats(ctx.userId, profile.accountId);
+        const { accountId: _id, ...pub } = profile;
+        const space = { ...pub, mine, followers: stats.followers, following: stats.following, posts: forGrid(posts), sources: profile.sources ?? [] };
+        const title = profile.spaceTitle ?? `@${profile.handle}`;
+        const text = [
+          `Showing ${mine ? 'your space' : `@${profile.handle}'s space`} "${title}" in a card: ${posts.length} post(s)${mine ? '' : ' you can see'}, ${stats.followers} follower(s), ${space.sources.length} featured source(s).${!mine && !stats.following ? ' The user doesn\'t follow them yet.' : ''}`,
+          untrusted(mine ? 'your space' : `@${profile.handle}'s space`, [
+            profile.bio ? `bio: ${profile.bio}` : '',
+            ...space.sources.map((s) => `source: ${s.title} (${s.source})`),
+            ...posts.slice(0, 10).map(shareLine),
+          ].filter(Boolean).join('\n')),
+        ].join('\n');
+        return ok(text, { space });
+      } catch (error) {
+        return fail(error);
+      }
+    },
+  },
   {
     name: 'share',
     title: 'Share with followers',

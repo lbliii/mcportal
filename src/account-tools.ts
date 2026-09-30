@@ -9,7 +9,7 @@ import { readFile, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { clean } from './lib/text.ts';
 import { describeImport, EXPORT_FORMATS, importExport, parseExport, type ExportFormat } from './portability.ts';
-import { HandleError, suggestHandle, type PublicProfile } from './public-profiles.ts';
+import { ACCENTS, HandleError, MAX_FEATURED, suggestHandle, type PublicProfile } from './public-profiles.ts';
 import { ProfileError } from './profile.ts';
 import { toolError, untrusted, type CallToolResult, type ToolDef } from './tools.ts';
 
@@ -20,7 +20,13 @@ function ok(text: string, structuredContent: Record<string, unknown>): CallToolR
 const HOSTED_ONLY = 'Public profiles are part of the hosted MCPortal. This one runs on your machine, so it has no handle to claim.';
 
 function describeProfile(p: PublicProfile): string {
-  return [`@${p.handle}`, p.displayName ? `name: ${p.displayName}` : '', p.bio ? `bio: ${p.bio}` : ''].filter(Boolean).join('\n');
+  return [
+    `@${p.handle}`,
+    p.displayName ? `name: ${p.displayName}` : '',
+    p.bio ? `bio: ${p.bio}` : '',
+    p.spaceTitle ? `space: ${p.spaceTitle}` : '',
+    p.sources?.length ? `featured sources: ${p.sources.map((s) => s.title).join(', ')}` : '',
+  ].filter(Boolean).join('\n');
 }
 
 const FORMAT_DOCS: Record<ExportFormat, string> = {
@@ -59,10 +65,11 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
   },
   {
     name: 'set_public_profile',
-    title: 'Set your public profile',
+    title: 'Set your public profile and space',
     description: [
-      "Create or change the user's public profile: a handle (2-30 letters, digits or underscores), a display name and a short bio.",
-      'Only when the user asks for a profile or handle; it is how other MCPortal users will find them. Nothing in their portal becomes public by this.',
+      "Create or change the user's public profile and space: a handle (2-30 letters, digits or underscores), a display name, a short bio,",
+      `the space's title (e.g. "liminal webspace"), an accent colour (${ACCENTS.join(', ')}), and featuredPanelIds: up to ${MAX_FEATURED} panels from their portal (ids from get_profile) to recommend as "Sources I read" (feeds, Hacker News, GitHub; [] clears).`,
+      'Only when the user asks. It is how other MCPortal users find them; nothing else in their portal becomes public.',
       'A changed handle keeps pointing to them for 30 days and nobody else can take it meanwhile.',
     ].join(' '),
     inputSchema: {
@@ -72,19 +79,34 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
         handle: { type: 'string', description: 'Required the first time' },
         displayName: { type: 'string', maxLength: 50 },
         bio: { type: 'string', maxLength: 160 },
+        spaceTitle: { type: 'string', maxLength: 60 },
+        accent: { type: 'string', enum: [...ACCENTS, ''] },
+        featuredPanelIds: { type: 'array', maxItems: MAX_FEATURED, items: { type: 'string' } },
       },
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
     async handler(args, ctx) {
       if (!ctx.publicProfiles) return toolError(HOSTED_ONLY);
       try {
+        let sources: Array<{ title?: string; source: string; config: unknown }> | undefined;
+        if (Array.isArray(args.featuredPanelIds)) {
+          const panels = (await ctx.store.get(ctx.userId)).columns.flatMap((c) => c.panels);
+          const ids = args.featuredPanelIds.map(String);
+          const unknown = ids.filter((id) => !panels.some((p) => p.id === id));
+          if (unknown.length) return toolError(`Not saved: no panel with id ${unknown.map((u) => clean(u, 40)).join(', ')} (see get_profile).`);
+          sources = ids.map((id) => panels.find((p) => p.id === id)!).map((p) => ({ title: p.title ?? p.id, source: p.source, config: p.config }));
+        }
         const { profile, created, released } = await ctx.publicProfiles.set(ctx.userId, {
           handle: typeof args.handle === 'string' ? args.handle : undefined,
           displayName: typeof args.displayName === 'string' ? args.displayName : undefined,
           bio: typeof args.bio === 'string' ? args.bio : undefined,
+          spaceTitle: typeof args.spaceTitle === 'string' ? args.spaceTitle : undefined,
+          accent: typeof args.accent === 'string' ? args.accent : undefined,
+          sources,
         });
+        const skipped = sources ? sources.length - (profile.sources?.length ?? 0) : 0;
         const head = created ? `Created your public profile as @${profile.handle}.` : released ? `Changed your handle from @${released} to @${profile.handle}. @${released} points to you for 30 days.` : 'Updated your public profile.';
-        return ok(`${head}\n${describeProfile(profile)}`, { profile });
+        return ok(`${head}\n${describeProfile(profile)}${skipped > 0 ? `\n${skipped} panel(s) weren't featured: only feeds, Hacker News and GitHub can be.` : ''}`, { profile });
       } catch (error) {
         if (error instanceof HandleError) return toolError(`Not saved: ${error.message}.`);
         throw error;
