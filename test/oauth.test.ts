@@ -344,3 +344,65 @@ test('invite-only: admins and invited logins get in and get accounts; others are
     await app.close();
   }
 });
+
+test('admin page: browser-bound GitHub sign-in, admins only, CSRF and same-origin on every change', async () => {
+  const { Accounts, makeBootstrap, memoryPersistence } = await import('../src/accounts.ts');
+  const users = { 'gh-code-lawrence': { id: 42, login: 'Lawrence' }, 'gh-code-mallory': { id: 666, login: 'mallory' } };
+  const accounts = new Accounts(memoryPersistence(), makeBootstrap(['lawrence'], []));
+  const app = await startApp({ github: { clientId: 'gh-client', clientSecret: 'gh-secret' } }, fakeUpstreams(users).fetcher, { accounts });
+  const cookieOf = (res: { headers: Record<string, string | string[] | undefined> }, name: string) => {
+    const all = ([] as string[]).concat(res.headers['set-cookie'] ?? []);
+    return all.map((c) => c.split(';')[0]!).find((c) => c.startsWith(`${name}=`) && c.length > name.length + 1);
+  };
+  const signIn = async (ghCode: string, withBrowserCookie = true) => {
+    const start = await raw(app.port, { path: '/admin/login' });
+    assert.equal(start.status, 302);
+    const gh = new URL(String(start.headers.location));
+    assert.match(gh.searchParams.get('state')!, /^pg_/);
+    const browser = cookieOf(start, 'mcportal_page')!;
+    return raw(app.port, { path: `/oauth/callback?code=${ghCode}&state=${gh.searchParams.get('state')}`, headers: withBrowserCookie ? { cookie: browser } : {} });
+  };
+  try {
+    assert.match((await raw(app.port, { path: '/admin' })).body, /Sign in with GitHub/);
+    assert.equal((await raw(app.port, { path: '/admin/api/state' })).status, 401);
+    assert.equal((await signIn('gh-code-lawrence', false)).status, 400, 'a callback without the starting browser cookie is refused');
+
+    const done = await signIn('gh-code-lawrence');
+    assert.equal(done.status, 302);
+    assert.equal(done.headers.location, '/admin');
+    const session = cookieOf(done, 'mcportal_admin')!;
+    assert.ok(session);
+    const page = await raw(app.port, { path: '/admin', headers: { cookie: session } });
+    assert.match(String(page.headers['content-security-policy']), /script-src 'nonce-/);
+    assert.match(page.body, /Invite someone/);
+
+    const state = JSON.parse((await raw(app.port, { path: '/admin/api/state', headers: { cookie: session } })).body);
+    assert.equal(state.me.login, 'Lawrence');
+    const post = (path: string, body: unknown, headers: Record<string, string> = {}) =>
+      raw(app.port, { method: 'POST', path, headers: { 'content-type': 'application/json', cookie: session, ...headers }, body: JSON.stringify(body) });
+
+    assert.equal((await post('/admin/api/invite', { who: 'mallory' }, sameOrigin(app.port))).status, 403, 'CSRF token required');
+    assert.equal((await post('/admin/api/invite', { who: 'mallory' }, { 'x-csrf': state.csrf, origin: 'https://evil.example' })).status, 403, 'same origin required');
+    const invited = await post('/admin/api/invite', { who: 'mallory' }, { ...sameOrigin(app.port), 'x-csrf': state.csrf });
+    assert.equal(invited.status, 200);
+    assert.deepEqual(JSON.parse(invited.body).invites.map((i: { login: string }) => i.login), ['mallory']);
+
+    // Mallory can now sign in to MCPortal, but not to the admin page.
+    const mallory = await signIn('gh-code-mallory');
+    assert.equal(mallory.status, 403);
+    assert.match(mallory.body, /isn.t an admin/);
+    assert.equal(cookieOf(mallory, 'mcportal_admin'), undefined);
+
+    const self = await post('/admin/api/suspend', { who: 'lawrence' }, { ...sameOrigin(app.port), 'x-csrf': state.csrf });
+    assert.equal(self.status, 400, "can't suspend yourself");
+    const suspended = await post('/admin/api/suspend', { who: 'mallory', reason: 'spam' }, { ...sameOrigin(app.port), 'x-csrf': state.csrf });
+    assert.equal(JSON.parse(suspended.body).accounts.find((a: { login: string }) => a.login === 'mallory').status, 'suspended');
+    assert.equal(JSON.parse(suspended.body).audit[0].action, 'account.suspended');
+
+    const out = await raw(app.port, { method: 'POST', path: '/admin/logout', headers: { cookie: session, ...sameOrigin(app.port) } });
+    assert.equal(out.status, 302);
+    assert.equal((await raw(app.port, { path: '/admin/api/state', headers: { cookie: session } })).status, 401, 'session ended');
+  } finally {
+    await app.close();
+  }
+});

@@ -81,7 +81,7 @@ args = ["/Users/llane/Developer/mcportal/bin/mcportal.mjs", "--stdio"]
 
 Each person gets an account (`github-<id>`, which survives GitHub renames) and their own profile. Tokens are opaque, stored hashed, and bound to this server's `/mcp` resource. Access tokens last 1 hour; refresh tokens rotate on use. Every tool call passes one access gate: suspended accounts can't act, and tools only ever act on the caller's own portal.
 
-**Managing who's in** (never exposed as MCP tools, so nothing a model reads can use them). On Railway, run them in the service with `railway ssh --service mcportal -- node bin/mcportal.mjs admin …`:
+**Managing who's in** (never exposed as MCP tools, so nothing a model reads can use them): sign in at **`/admin`** with GitHub (admins only) to invite people, suspend or reinstate accounts, and read the audit log. The same actions work from the command line; on Railway run them in the service with `railway ssh --service mcportal -- node bin/mcportal.mjs admin …`:
 
 ```bash
 node bin/mcportal.mjs admin list                   # accounts and pending invites
@@ -149,7 +149,7 @@ MCPortal is a **reading platform with light social**, driven by your agent. Anyt
 - [x] Durable storage: Postgres for profiles and sign-in state, point-in-time recovery on ([plan](docs/plans/postgres-storage.md))
 - [ ] Scheduled backups (daily + weekly) on the Postgres service
 - [x] Accounts, invites and suspension replacing the allowlist; one `authorize()` gate for every tool; admins from `MCPORTAL_ADMINS`; `mcportal admin` commands ([plan](docs/plans/identity-and-access.md), phase 1)
-- [ ] Small admin page: invites, suspensions, audit log (phase 2)
+- [x] Admin page at `/admin`: invites, suspensions, audit log (phase 2)
 - [x] OPML import (bring subscriptions from another reader) and OPML export (phase 1b)
 - [ ] Migrate `railway.toml` to Railway's infrastructure-as-code format (old format works until 2026-12-01)
 - [ ] Privacy policy, support contact and screenshots; submit to Claude's connector directory

@@ -13,6 +13,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { OAuthServer } from './auth/oauth.ts';
 import { AuthStore, fileAuthPersistence, type AuthPersistence } from './auth/store.ts';
 import { Accounts, bootstrapFromEnv } from './accounts.ts';
+import { AdminPanel } from './admin.ts';
 import { limitsFromEnv, UsageBudget, type BudgetLimits } from './lib/budget.ts';
 import type { TtlCache } from './lib/cache.ts';
 import { isLoopbackHost } from './lib/ip.ts';
@@ -147,6 +148,8 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
       )
     : undefined;
 
+  // The admin page needs GitHub sign-in; without it, admins use the `mcportal admin` CLI.
+  const admin = oauth ? new AdminPanel(accounts, oauth, config.publicUrl, deps.now) : undefined;
   const budget = deps.budget ?? new UsageBudget(config.limits ?? {}, deps.now);
   const context = (userId: string): ToolContext => ({ store: deps.store, fetcher: deps.fetcher, cache: deps.cache, userId, budget, actor: accounts.actor(userId) });
 
@@ -197,6 +200,7 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
       }
     }
     if (oauth && (await oauth.handle(req, res, url))) return;
+    if (admin && (await admin.handle(req, res, url))) return;
 
     if (url.pathname === '/' && req.method === 'GET') return send(res, 200, ABOUT(config.publicUrl, Boolean(oauth)), 'text/html; charset=utf-8');
 

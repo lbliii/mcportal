@@ -82,7 +82,7 @@ export function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 }
 
-function page(title: string, body: string): string {
+export function page(title: string, body: string): string {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)}</title>
 <style>body{font:15px/1.5 system-ui,-apple-system,sans-serif;max-width:460px;margin:12vh auto;padding:0 20px;color:#1b1b1a}h1{font-size:20px}
 .card{border:1px solid #e3e3de;border-radius:12px;padding:20px 22px}.muted{color:#6a6a66;font-size:13px}code{background:#f3f3ef;padding:1px 5px;border-radius:4px;word-break:break-all}
@@ -105,7 +105,7 @@ export function isAllowedRedirectUri(value: string): boolean {
 
 const sha256 = (value: string) => createHash('sha256').update(value).digest('base64url');
 
-function safeEqual(a: string, b: string): boolean {
+export function safeEqual(a: string, b: string): boolean {
   const x = Buffer.from(a);
   const y = Buffer.from(b);
   return x.length === y.length && timingSafeEqual(x, y);
@@ -163,7 +163,7 @@ async function readForm(req: IncomingMessage, limit = 32 * 1024): Promise<Record
   return Object.fromEntries(new URLSearchParams(raw));
 }
 
-function cookies(req: IncomingMessage): Record<string, string> {
+export function cookies(req: IncomingMessage): Record<string, string> {
   const out: Record<string, string> = {};
   for (const part of String(req.headers.cookie ?? '').split(';')) {
     const i = part.indexOf('=');
@@ -172,12 +172,12 @@ function cookies(req: IncomingMessage): Record<string, string> {
   return out;
 }
 
-function sendJson(res: ServerResponse, status: number, body: unknown, extra: Record<string, string> = {}): void {
+export function sendJson(res: ServerResponse, status: number, body: unknown, extra: Record<string, string> = {}): void {
   res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store', pragma: 'no-cache', ...extra });
   res.end(JSON.stringify(body));
 }
 
-function sendHtml(res: ServerResponse, status: number, html: string, extra: Record<string, string> = {}): void {
+export function sendHtml(res: ServerResponse, status: number, html: string, extra: Record<string, string> = {}): void {
   res.writeHead(status, {
     'content-type': 'text/html; charset=utf-8',
     'cache-control': 'no-store',
@@ -190,10 +190,13 @@ function sendHtml(res: ServerResponse, status: number, html: string, extra: Reco
   res.end(html);
 }
 
-function redirect(res: ServerResponse, location: string, extra: Record<string, string> = {}): void {
+export function redirect(res: ServerResponse, location: string, extra: Record<string, string> = {}): void {
   res.writeHead(302, { location, 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', ...extra });
   res.end();
 }
+
+/** Called with the GitHub identity (or an error) when a page sign-in completes; must send the response. */
+export type PageSignInHandler = (who: { githubId: number; login: string } | { error: string }, res: ServerResponse, clearCookie: Record<string, string>) => Promise<void>;
 
 const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'authorization, content-type, mcp-protocol-version', 'access-control-allow-methods': 'GET, POST, OPTIONS' };
 
@@ -205,6 +208,8 @@ export class OAuthServer {
   private now: () => number;
   private txns = new Map<string, Txn>();
   private githubStates = new Map<string, string>();
+  /** Sign-ins started by server pages (e.g. /admin), keyed by GitHub state. */
+  private pageSignIns = new Map<string, { browser: string; expiresAt: number; done: PageSignInHandler }>();
   private codes = new Map<string, Code>();
   private cimdCache = new Map<string, { info: ClientInfo; expiresAt: number }>();
   private limits: { register: RateLimiter; registerGlobal: RateLimiter; authorize: RateLimiter; token: RateLimiter };
@@ -483,8 +488,47 @@ export class OAuthServer {
     redirect(res, gh.href);
   }
 
+  /**
+   * Sign in with GitHub for one of the server's own pages (not an MCP client).
+   * The GitHub state is bound to this browser with a short-lived cookie, so a
+   * callback started in someone else's browser is refused (login CSRF).
+   */
+  beginPageSignIn(req: IncomingMessage, res: ServerResponse, done: PageSignInHandler): void {
+    if (!this.config.github) return sendHtml(res, 404, page('Not available', '<p>GitHub sign-in is not configured.</p>'));
+    if (!this.limits.authorize.take(this.clientIp(req))) return sendHtml(res, 429, page('Slow down', '<p>Too many sign-in attempts. Try again in a few minutes.</p>'));
+    const now = this.now();
+    for (const [k, v] of this.pageSignIns) if (v.expiresAt <= now) this.pageSignIns.delete(k);
+    const ghState = `pg_${randomBytes(24).toString('base64url')}`;
+    const browser = randomBytes(24).toString('base64url');
+    setLimited(this.pageSignIns, ghState, { browser: sha256(browser), expiresAt: now + TXN_TTL_MS, done }, MAX_TXNS);
+    const gh = new URL('https://github.com/login/oauth/authorize');
+    gh.searchParams.set('client_id', this.config.github.clientId);
+    gh.searchParams.set('redirect_uri', `${this.config.publicUrl}/oauth/callback`);
+    gh.searchParams.set('state', ghState);
+    gh.searchParams.set('scope', 'read:user');
+    redirect(res, gh.href, { 'set-cookie': `${this.pageCookieName}=${browser}; Path=/oauth/callback; HttpOnly; SameSite=Lax; Max-Age=${TXN_TTL_MS / 1000}${this.secure ? '; Secure' : ''}` });
+  }
+
+  private get pageCookieName(): string {
+    return this.secure ? '__Secure-mcportal_page' : 'mcportal_page';
+  }
+
+  private async pageCallback(req: IncomingMessage, res: ServerResponse, url: URL, ghState: string): Promise<void> {
+    const pending = this.pageSignIns.get(ghState);
+    this.pageSignIns.delete(ghState);
+    const browser = cookies(req)[this.pageCookieName] ?? '';
+    const clear = { 'set-cookie': `${this.pageCookieName}=; Path=/oauth/callback; HttpOnly; SameSite=Lax; Max-Age=0${this.secure ? '; Secure' : ''}` };
+    if (!pending || pending.expiresAt <= this.now() || !browser || !safeEqual(sha256(browser), pending.browser)) {
+      return sendHtml(res, 400, page('Sign-in expired', '<p>This sign-in link expired or was started in another browser. Start again.</p>'), clear);
+    }
+    const ghCode = url.searchParams.get('code');
+    const who = ghCode ? await this.githubIdentity(ghCode) : { error: 'GitHub sign-in was cancelled' };
+    await pending.done(who, res, clear);
+  }
+
   private async githubCallback(req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {
     const ghState = url.searchParams.get('state') ?? '';
+    if (ghState.startsWith('pg_')) return this.pageCallback(req, res, url, ghState);
     const txnId = this.githubStates.get(ghState);
     this.githubStates.delete(ghState);
     const txn = txnId ? this.txns.get(txnId) : undefined;
@@ -501,7 +545,28 @@ export class OAuthServer {
     };
     const ghCode = url.searchParams.get('code');
     if (!ghCode) return toClient({ error: 'access_denied', error_description: 'GitHub sign-in was cancelled' });
+    const who = await this.githubIdentity(ghCode);
+    if ('error' in who) return toClient({ error: 'access_denied', error_description: who.error });
+    const user = { id: who.githubId, login: who.login };
+    const identity: Identity = { userId: `github-${user.id}`, githubId: user.id, login: user.login };
+    const admission = await this.accounts.admit({ githubId: user.id, login: user.login });
+    if (!admission.ok) {
+      const why = admission.reason === 'suspended' ? 'This account is suspended' : 'This MCPortal server is invite-only. Ask its owner for an invite.';
+      return toClient({ error: 'access_denied', error_description: why });
+    }
+    const code = randomBytes(32).toString('base64url');
+    setLimited(
+      this.codes,
+      code,
+      { ...identity, clientId: txn.clientId, redirectUri: txn.redirectUri, codeChallenge: txn.codeChallenge, resource: txn.resource, expiresAt: this.now() + CODE_TTL_MS },
+      MAX_CODES,
+    );
+    toClient({ code });
+  }
 
+  /** Exchange a GitHub OAuth code for the user's numeric id and login. Never echoes upstream content. */
+  private async githubIdentity(ghCode: string): Promise<{ githubId: number; login: string } | { error: string }> {
+    if (!this.config.github) return { error: 'GitHub sign-in is not configured' };
     const exchange = await this.fetcher('https://github.com/login/oauth/access_token', {
       method: 'POST',
       headers: { accept: 'application/json', 'content-type': 'application/x-www-form-urlencoded' },
@@ -520,27 +585,14 @@ export class OAuthServer {
     } catch {
       ghToken = undefined;
     }
-    if (exchange.status !== 200 || !ghToken) return toClient({ error: 'access_denied', error_description: 'GitHub sign-in failed' });
+    if (exchange.status !== 200 || !ghToken) return { error: 'GitHub sign-in failed' };
     const user = await fetchJson<{ id?: number; login?: string }>(this.fetcher, 'https://api.github.com/user', {
       headers: { authorization: `Bearer ${ghToken}`, accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28' },
       maxBytes: 64 * 1024,
       maxRedirects: 0,
     });
-    if (typeof user.id !== 'number' || typeof user.login !== 'string') return toClient({ error: 'access_denied', error_description: 'Could not read GitHub profile' });
-    const identity: Identity = { userId: `github-${user.id}`, githubId: user.id, login: user.login };
-    const admission = await this.accounts.admit({ githubId: user.id, login: user.login });
-    if (!admission.ok) {
-      const why = admission.reason === 'suspended' ? 'This account is suspended' : 'This MCPortal server is invite-only. Ask its owner for an invite.';
-      return toClient({ error: 'access_denied', error_description: why });
-    }
-    const code = randomBytes(32).toString('base64url');
-    setLimited(
-      this.codes,
-      code,
-      { ...identity, clientId: txn.clientId, redirectUri: txn.redirectUri, codeChallenge: txn.codeChallenge, resource: txn.resource, expiresAt: this.now() + CODE_TTL_MS },
-      MAX_CODES,
-    );
-    toClient({ code });
+    if (typeof user.id !== 'number' || typeof user.login !== 'string') return { error: 'Could not read GitHub profile' };
+    return { githubId: user.id, login: user.login };
   }
 
   private async token(req: IncomingMessage, res: ServerResponse): Promise<void> {
