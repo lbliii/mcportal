@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { escapeHtml } from './auth/oauth.ts';
 
 export const DEFAULT_SUPPORT_URL = 'https://github.com/lbliii/mcportal/issues';
-const POLICY_UPDATED = '2026-09-30';
+const POLICY_UPDATED = '2026-09-30';   // bump when what's stored changes
 const IMAGES = new Set(['columns.png', 'shelves.png', 'reader.png']);
 const IMAGE_DIR = fileURLToPath(new URL('./site/', import.meta.url));
 
@@ -67,7 +67,7 @@ function landing(site: SiteConfig): string {
 <ul class="steps">
   <li><b>Ask for what you read.</b> “Add Simon Willison's blog and r/LocalLLaMA.” Paste a site, a feed, <code>r/subreddit</code>, <code>owner/repo</code>, or a YouTube, Bluesky or Mastodon address. MCPortal finds a feed that works.</li>
   <li><b>Arrange it by talking.</b> “Put GitHub on the left.” “Show pictures.” Starter packs (developer, AI, news, games, art, science, music, film) fill a new portal in seconds, and OPML import brings your subscriptions from another reader.</li>
-  <li><b>Read and keep things.</b> Stories open in a clean reader view with no ads. Save the good ones to a Saved panel, and ask Claude about any of them.</li>
+  <li><b>Read and keep things.</b> Stories open in a clean reader view with no ads. Save the good ones to a Saved panel, and ask Claude about any of them. Say “clip that” to keep a quote, an explanation, a table or a chart from the conversation, and find it again in any later chat.</li>
 </ul>
 <figure><img src="/site/shelves.png" alt="Picture shelves: one row of thumbnails per source" width="1600" height="626"><figcaption>Shelves: one row of pictures per source.</figcaption></figure>
 <figure><img src="/site/reader.png" alt="An article open in MCPortal's reader view" width="1600" height="1013"><figcaption>Reader view: just the article.</figcaption></figure>
@@ -88,7 +88,7 @@ function privacy(site: SiteConfig): string {
 <h1>Privacy policy</h1>
 <p class="muted">Last updated ${POLICY_UPDATED}. This policy covers the MCPortal service at <code>${escapeHtml(site.publicUrl)}</code>, which is run by ${who}.</p>
 
-<p>Here's the short version. MCPortal stores your GitHub user ID and login, your portal (layout, sources and saved items), and short-lived sign-in tokens. It doesn't store your email, your name or your GitHub password. It has no ads, trackers or analytics, and it doesn't sell or share your data.</p>
+<p>Here's the short version. MCPortal stores your GitHub user ID and login, your portal (layout, sources, saved items and clips), and short-lived sign-in tokens. It doesn't store your email, your name or your GitHub password. It has no ads, trackers or analytics, and it doesn't sell or share your data.</p>
 
 <h2>What MCPortal stores</h2>
 <table>
@@ -96,6 +96,7 @@ function privacy(site: SiteConfig): string {
 <tr><td><b>Account:</b> your GitHub numeric user ID and login, your role, how you joined (for example, by invite), and dates</td><td>To know who you are and whether you're allowed in</td><td>Until your account is deleted</td></tr>
 <tr><td><b>Your portal:</b> its name, layout, the sources you add (feed addresses, subreddits, repos, searches), and settings</td><td>To show you your portal</td><td>Until you change it or your account is deleted</td></tr>
 <tr><td><b>Saved items:</b> the link, title, source, date and any note you add</td><td>To show your Saved panel</td><td>Until you remove them</td></tr>
+<tr><td><b>Clips:</b> quotes, parts of a conversation, notes, tables, images and links you ask Claude to keep, with any title, note and tags</td><td>To show your Clips panel and find them again in later chats</td><td>Until you delete them</td></tr>
 <tr><td><b>Pinned results:</b> if you ask Claude to pin results from another connected tool (for example, a list of issues), the titles, links, short summaries and details it copies in, and the request needed to refresh them</td><td>To show that panel</td><td>Until you remove the panel</td></tr>
 <tr><td><b>Sign-in tokens:</b> stored only as one-way hashes, with the app that asked for them (for example, Claude)</td><td>To keep you signed in</td><td>Access tokens 1 hour; refresh tokens 30 days</td></tr>
 <tr><td><b>Invites and the admin audit log:</b> who invited whom, and suspensions or reinstatements with a short reason</td><td>To run an invite-only service and keep a record of admin actions</td><td>The newest 2,000 log entries are kept</td></tr>
@@ -122,7 +123,8 @@ function privacy(site: SiteConfig): string {
 <ul>
   <li><b>See and change your data:</b> ask Claude to show your portal settings, change them, or remove saved items at any time.</li>
   <li><b>Take it with you:</b> ask Claude to export your subscriptions as OPML.</li>
-  <li><b>Delete your account:</b> ask through <a href="${support}">support</a>, and your account, portal and saved items will be deleted within 30 days. A self-serve option is coming.</li>
+  <li><b>Delete clips:</b> ask Claude to delete any clip.</li>
+  <li><b>Delete your account:</b> ask through <a href="${support}">support</a>, and your account, portal, saved items and clips will be deleted within 30 days. A self-serve option is coming.</li>
   <li><b>Disconnect:</b> remove MCPortal from Claude's connectors. You can also revoke it on GitHub under Settings → Applications.</li>
 </ul>
 

@@ -7,7 +7,7 @@ import { HN_FEEDS, type HnConfig } from './adapters/hn.ts';
 import { REPO_PATTERN, type GithubConfig } from './adapters/github.ts';
 import type { RssConfig } from './adapters/rss.ts';
 import { clean } from './lib/text.ts';
-import type { Item, SourceKind } from './types.ts';
+import { CLIP_KINDS, type ClipKind, type Item, type SourceKind } from './types.ts';
 
 export interface PanelSpec {
   id: string;
@@ -52,6 +52,13 @@ export interface PinnedConfig {
   limit: number;
 }
 
+/** A clips panel: optionally only one kind or one tag. */
+export interface ClipsConfig {
+  kind?: ClipKind;
+  tag?: string;
+  limit: number;
+}
+
 export interface Profile {
   version: 1;
   name: string;
@@ -69,7 +76,7 @@ export interface Profile {
 
 /** Columns scroll sideways, so there can be more than fit on screen. */
 export const LIMITS = { columns: 8, panelsPerColumn: 4, items: 30, saved: 200 } as const;
-export const SOURCES: SourceKind[] = ['hn', 'rss', 'github', 'saved', 'pinned'];
+export const SOURCES: SourceKind[] = ['hn', 'rss', 'github', 'saved', 'pinned', 'clips'];
 
 export class ProfileError extends Error {
   override name = 'ProfileError';
@@ -126,9 +133,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-export function normalizeSourceConfig(source: SourceKind, raw: unknown, where: string): HnConfig | RssConfig | GithubConfig | PinnedConfig | { limit: number } {
+export function normalizeSourceConfig(source: SourceKind, raw: unknown, where: string): HnConfig | RssConfig | GithubConfig | PinnedConfig | ClipsConfig | { limit: number } {
   const config = isRecord(raw) ? raw : {};
   if (source === 'saved') return { limit: clampInt(config.limit, 1, LIMITS.items, LIMITS.items) };
+  if (source === 'clips') {
+    if (config.kind !== undefined && !(CLIP_KINDS as readonly unknown[]).includes(config.kind)) throw new ProfileError(`${where}: clips kind must be one of ${CLIP_KINDS.join(', ')}`);
+    const tag = typeof config.tag === 'string' ? config.tag.toLowerCase().replace(/^#/, '').replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 30) : '';
+    return { ...(config.kind ? { kind: config.kind as ClipKind } : {}), ...(tag ? { tag } : {}), limit: clampInt(config.limit, 1, LIMITS.items, LIMITS.items) };
+  }
   if (source === 'pinned') {
     const from = clean(config.from, 40);
     const recipe = clean(config.recipe, 500);

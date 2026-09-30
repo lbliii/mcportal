@@ -1,6 +1,6 @@
 # Plan: clips — save what we talk about
 
-**Status:** proposed (2026-09-30). **Milestone:** first piece of M2. Useful alone now; shareable once M2 sharing lands.
+**Status:** phases 1–3 shipped (2026-09-30); phase 4 next. Open questions were settled as proposed: the first clip adds a Clips panel, exchanges are verbatim, and Markdown export comes with the portability work. **Milestone:** first piece of M2. Useful alone now; shareable once M2 sharing lands.
 
 ## Goal
 

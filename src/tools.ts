@@ -7,7 +7,8 @@ import {
 import { discover } from './discover.ts';
 import { buildOpml, OPML_LIMITS, parseOpml } from './opml.ts';
 import { MAX_PACKS, packSummaries, STARTER_PACKS } from './packs.ts';
-import { loadArticle, loadPanel, pinnedPanel, savedPanel, SOURCE_DOCS, type SourceDeps } from './sources.ts';
+import { clipsPanel, clipsQuery, loadArticle, loadPanel, pinnedPanel, savedPanel, SOURCE_DOCS, type SourceDeps } from './sources.ts';
+import type { ClipStore } from './clips.ts';
 import type { ProfileStore } from './store.ts';
 import type { Actor } from './access.ts';
 import type { UsageBudget } from './lib/budget.ts';
@@ -17,6 +18,8 @@ export const WORKSPACE_URI = 'ui://mcportal/workspace.html';
 
 export interface ToolContext extends SourceDeps {
   store: ProfileStore;
+  /** The user's clips. Absent where clips aren't set up; the clip tools then refuse. */
+  clips?: ClipStore;
   userId: string;
   /** Hosted server only: charged per tool call. Local stdio has none (unlimited). */
   budget?: UsageBudget;
@@ -71,9 +74,10 @@ function slugId(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'panel';
 }
 
-function panelFor(spec: PanelSpec, profile: Profile, ctx: ToolContext, force = false): Promise<PanelResult> {
-  if (spec.source === 'saved') return Promise.resolve(savedPanel(spec, profile.saved));
-  if (spec.source === 'pinned') return Promise.resolve(pinnedPanel(spec, profile.pins));
+async function panelFor(spec: PanelSpec, profile: Profile, ctx: ToolContext, force = false): Promise<PanelResult> {
+  if (spec.source === 'saved') return savedPanel(spec, profile.saved);
+  if (spec.source === 'pinned') return pinnedPanel(spec, profile.pins);
+  if (spec.source === 'clips') return clipsPanel(spec, ctx.clips ? await ctx.clips.list(ctx.userId, clipsQuery(spec)) : []);
   return loadPanel(spec, ctx, force);
 }
 
@@ -81,12 +85,12 @@ function panelFor(spec: PanelSpec, profile: Profile, ctx: ToolContext, force = f
 const ADDABLE: SourceKind[] = SOURCES.filter((s) => s !== 'pinned');
 
 /**
- * Put a Saved panel in the layout the first time something is saved, so the item
- * visibly lands somewhere. Only adds; never moves or removes the user's panels.
+ * Put a Saved (or Clips) panel in the layout the first time something is saved, so
+ * it visibly lands somewhere. Only adds; never moves or removes the user's panels.
  */
-function ensureSavedPanel(profile: Profile): { profile: Profile; added: boolean } {
-  if (findSavedPanel(profile)) return { profile, added: false };
-  const panel: PanelSpec = { id: 'saved', source: 'saved', title: 'Saved', config: { limit: LIMITS.items } };
+export function ensurePanel(profile: Profile, source: 'saved' | 'clips', title: string): { profile: Profile; added: boolean } {
+  if (profile.columns.some((c) => c.panels.some((p) => p.source === source))) return { profile, added: false };
+  const panel: PanelSpec = { id: source, source, title, config: { limit: LIMITS.items } };
   while (findPanel(profile, panel.id)) panel.id += '-2';
   const columns = profile.columns.map((c) => ({ ...c, panels: [...c.panels] }));
   if (columns.length < LIMITS.columns) columns.push({ width: 1, panels: [panel] });
@@ -735,7 +739,7 @@ export const TOOLS: ToolDef[] = [
         savedAt: existing?.savedAt ?? new Date().toISOString(),
       };
       const withItem = validateProfile({ ...before, saved: [entry, ...before.saved.filter((s) => s.url !== url)] });
-      const { profile, added } = ensureSavedPanel(withItem);
+      const { profile, added } = ensurePanel(withItem, 'saved', 'Saved');
       await ctx.store.put(ctx.userId, profile);
       const item = profile.saved[0] as SavedItem;
       const text = [
@@ -774,6 +778,6 @@ export const TOOLS: ToolDef[] = [
   },
 ];
 
-export function publicToolList(): Array<Omit<ToolDef, 'handler'>> {
-  return TOOLS.map(({ handler: _handler, ...tool }) => tool);
+export function publicToolList(tools: ToolDef[] = TOOLS): Array<Omit<ToolDef, 'handler'>> {
+  return tools.map(({ handler: _handler, ...tool }) => tool);
 }

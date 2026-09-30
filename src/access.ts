@@ -56,6 +56,11 @@ export const TOOL_ACTIONS: Record<string, Action> = {
   pin_panel: 'write',
   save_item: 'write',
   remove_saved: 'write',
+  clip: 'write',
+  search_clips: 'read',
+  get_clip: 'read',
+  update_clip: 'write',
+  delete_clip: 'write',
 };
 
 export function toolAction(name: string): Action {

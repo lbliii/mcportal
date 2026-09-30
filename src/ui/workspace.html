@@ -29,7 +29,7 @@
     --hover: var(--d-hover);
     --accent: #2563eb;
     --radius: var(--border-radius-lg, 10px);
-    --src-hn: #f26522; --src-github: #7c5cff; --src-rss: #0f9d8a; --src-reader: #2563eb; --src-saved: #d97706; --src-pinned: #db2777;
+    --src-hn: #f26522; --src-github: #7c5cff; --src-rss: #0f9d8a; --src-reader: #2563eb; --src-saved: #d97706; --src-pinned: #db2777; --src-clips: #0891b2;
   }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
@@ -180,6 +180,21 @@
   .reader .body h2 { font-size: 17px; margin: 22px 0 8px; }
   .reader .body pre { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; overflow-x: auto; font: 12.5px/1.5 var(--font-mono, ui-monospace, "SF Mono", Menlo, monospace); }
   .reader .body blockquote { margin: 0 0 14px; padding-left: 12px; border-left: 3px solid var(--border); color: var(--fg2); }
+  .clip-tags { display: flex; flex-wrap: wrap; gap: 6px; margin: -10px 0 16px; }
+  .clip-tags span { font-size: 12px; color: var(--fg2); background: var(--hover); padding: 1px 8px; border-radius: 10px; }
+  .reader .clip-note { margin: 0 0 18px; color: var(--fg2); font-style: italic; white-space: pre-wrap; }
+  .reader .clip-quote { font-size: 18px; line-height: 1.55; white-space: pre-wrap; margin: 0 0 10px; padding-left: 14px; border-left: 3px solid var(--src-clips); }
+  .reader .clip-attr { color: var(--fg2); margin: 0 0 14px; }
+  .reader .turn { margin: 0 0 14px; }
+  .reader .turn .speaker { font-size: 12px; font-weight: 600; color: var(--fg2); margin-bottom: 3px; }
+  .reader .turn .said { font-size: 15px; line-height: 1.6; white-space: pre-wrap; }
+  .reader .turn.user .said { background: var(--hover); border-radius: 10px; padding: 8px 12px; }
+  .table-wrap { overflow: auto; max-height: 480px; border: 1px solid var(--border); border-radius: 8px; }
+  .table-wrap table { border-collapse: collapse; font-size: 13px; min-width: 100%; }
+  .table-wrap th, .table-wrap td { padding: 6px 10px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; max-width: 360px; }
+  .table-wrap th { position: sticky; top: 0; background: var(--bg); font-weight: 600; }
+  .clip-img { display: block; max-width: 100%; max-height: 420px; margin: 0 auto; background: #fff; border-radius: 8px; cursor: zoom-in; }
+  .clip-img.zoom { max-height: none; cursor: zoom-out; }
   .reader .prov { margin-top: 28px; padding-top: 10px; border-top: 1px solid var(--border); color: var(--fg2); font-size: 12px; word-break: break-all; }
   .toast { position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%); background: var(--fg); color: var(--bg); padding: 7px 12px; border-radius: 8px; font-size: 12.5px; opacity: 0; transition: opacity .2s; pointer-events: none; }
   .toast.show { opacity: .92; }
@@ -274,6 +289,7 @@
   try { devToken = DEV && DEV.needsToken ? sessionStorage.getItem('mcportal-token') : null; } catch { devToken = null; }
   let loading = null;
   let articleUrl = null;   // set when this view belongs to a read_article call (a reader card)
+  let clipId = null;       // set when this view belongs to a get_clip call (a clip card)
 
   function hostRequest(method, params, timeoutMs = 30000) {
     const id = nextId++;
@@ -311,11 +327,13 @@
       toolRunning = true;   // the host is running our tool: wait for its result
       const args = params.arguments || {};
       if (typeof args.url === 'string') { articleUrl = args.url; root.classList.add('article-view'); }
+      else if (typeof args.id === 'string') { clipId = args.id; root.classList.add('article-view'); }
       setStatus('Loading…');
     } else if (method === 'ui/notifications/tool-result') {
       toolRunning = false;
       const data = params.structuredContent;
-      if (data && data.article) { gotInitialResult = true; showArticleCard(data.article, data.saved); }
+      if (data && data.clip && data.clip.data) { gotInitialResult = true; showClipCard(data.clip); }
+      else if (data && data.article) { gotInitialResult = true; showArticleCard(data.article, data.saved); }
       else if (data && data.profile && data.panels) { gotInitialResult = true; renderWorkspace(data); }
       else if (params.isError) setStatus('The workspace could not load');
     } else if (method === 'ui/notifications/host-context-changed') {
@@ -748,7 +766,7 @@
     const thumb = item.image && item.image.kind === 'thumb';
     return el('div', {
       class: 'item', role: 'button', tabindex: '0',
-      title: [item.url && panel.source !== 'github' && panel.source !== 'pinned' ? 'Open in reader view' : 'Open', byline].filter(Boolean).join(' · '),
+      title: [item.clip ? 'Open the clip' : item.url && panel.source !== 'github' && panel.source !== 'pinned' ? 'Open in reader view' : 'Open', byline].filter(Boolean).join(' · '),
       onclick: () => openItem(item, panel),
       onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) openItem(item, panel); },
     }, thumb ? el('div', { class: 'item-row' }, thumbBox(item, `var(--src-${panel.source})`), el('div', { class: 'item-text' }, text)) : text);
@@ -822,6 +840,7 @@
 
   // ------------------------------------------------------------ reader view
   function openItem(item, panel) {
+    if (item.clip) return openClip(item, panel);
     // Videos play at the source; pinned items are often internal pages reader view can't reach.
     const readable = item.url && panel.source !== 'github' && panel.source !== 'pinned' && !item.video;
     if (!readable) return openLink(item.url);
@@ -909,8 +928,85 @@
       iconButton('external', 'Open the original', () => openLink(url), 'ib'),
       title ? saveButton({ url, title }, 'reader', 'ib save') : null);
   }
-  function closeReader() { if (articleUrl) return; $('reader').hidden = true; $('grid').hidden = false; }
+  function closeReader() { if (articleUrl || clipId) return; $('reader').hidden = true; $('grid').hidden = false; }
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('reader').hidden) closeReader(); });
+
+  // ------------------------------------------------------------ clips
+  // Clips are structured data from our own server; every piece is still built as
+  // DOM text. Images are <img src="data:…">, so nothing inside an SVG can run.
+  function clipBody(data) {
+    if (data.kind === 'quote') return [el('p', { class: 'clip-quote' }, data.text), data.attribution ? el('p', { class: 'clip-attr' }, `— ${data.attribution}`) : null];
+    if (data.kind === 'exchange') return data.turns.map((t) => el('div', { class: `turn ${t.speaker === 'user' ? 'user' : ''}` }, el('div', { class: 'speaker' }, t.speaker), el('div', { class: 'said' }, t.text)));
+    if (data.kind === 'note') return data.blocks.map((b) =>
+      b.type === 'h' ? el('h2', null, b.text) : b.type === 'pre' ? el('pre', null, b.text) : b.type === 'quote' ? el('blockquote', null, b.text)
+      : b.type === 'li' ? el('p', null, `• ${b.text}`) : el('p', null, b.text));
+    if (data.kind === 'table') return [el('div', { class: 'table-wrap' }, el('table', null,
+      el('thead', null, el('tr', null, data.columns.map((c) => el('th', null, c)))),
+      el('tbody', null, data.rows.map((r) => el('tr', null, r.map((c) => el('td', null, c)))))))];
+    if (data.kind === 'image' && /^image\/(png|jpeg|webp|svg\+xml)$/.test(data.mime) && /^[A-Za-z0-9+/=]+$/.test(data.data)) {
+      const img = el('img', { class: 'clip-img', alt: '', src: `data:${data.mime};base64,${data.data}` });
+      img.addEventListener('click', () => img.classList.toggle('zoom'));
+      return [img];
+    }
+    if (data.kind === 'link' && isHttpUrl(data.url)) return [el('p', null, el('button', { class: 'btn', onclick: () => openLink(data.url) }, data.url))];
+    return [el('div', { class: 'error' }, 'This clip can\'t be shown.')];
+  }
+
+  function clipNodes(clip, withBack) {
+    const src = clip.source || {};
+    const from = src.url ? (src.title || new URL(src.url).hostname) : src.kind === 'conversation' ? 'a conversation' : (src.title || '');
+    const top = el('div', { class: 'reader-top' },
+      withBack ? iconButton('back', 'Back to the workspace', closeReader, 'ib') : null,
+      src.url && isHttpUrl(src.url) ? iconButton('external', 'Open where it came from', () => openLink(src.url), 'ib') : null);
+    return [top, el('h1', null, clip.title),
+      el('div', { class: 'byline' }, [`${clip.kind[0].toUpperCase()}${clip.kind.slice(1)}`, from ? `from ${from}` : '', `clipped ${ago(clip.createdAt)}`].filter(Boolean).join(' · ')),
+      clip.tags.length ? el('div', { class: 'clip-tags' }, clip.tags.map((t) => el('span', null, `#${t}`))) : null,
+      clip.note ? el('p', { class: 'clip-note' }, clip.note) : null,
+      el('div', { class: 'body' }, clipBody(clip.data)),
+      el('div', { class: 'prov' }, `Your clip ${clip.id}. Only you can see it.`)].filter(Boolean);
+  }
+
+  // This view belongs to a get_clip call: it is a clip card, not a workspace.
+  function showClipCard(clip) {
+    root.classList.add('article-view');
+    $('wsName').textContent = '· clip';
+    $('grid').hidden = true;
+    const reader = $('reader');
+    reader.hidden = false; reader.scrollTop = 0;
+    reader.replaceChildren(...clipNodes(clip, false));
+    setStatus('');
+  }
+
+  async function loadClipCard(id) {
+    setStatus('Loading…');
+    try {
+      showClipCard((await callTool('get_clip', { id })).structuredContent.clip);
+    } catch (error) {
+      setStatus('');
+      $('grid').hidden = true;
+      $('reader').hidden = false;
+      $('reader').replaceChildren(el('div', { class: 'error' }, `That clip isn't available (${error.message}).`));
+    }
+  }
+
+  async function openClip(item) {
+    const reader = $('reader');
+    $('grid').hidden = true; reader.hidden = false; reader.scrollTop = 0; window.scrollTo(0, 0);
+    reader.replaceChildren(el('div', { class: 'reader-top' }, iconButton('back', 'Back to the workspace', closeReader, 'ib')), el('h1', null, item.title), el('div', { class: 'byline' }, 'Loading…'));
+    try {
+      const clip = (await callTool('get_clip', { id: item.clip.id })).structuredContent.clip;
+      reader.replaceChildren(...clipNodes(clip, true));
+      if (!DEV) {
+        hostRequest('ui/update-model-context', {
+          content: [{ type: 'text', text: `The user opened their clip ${clip.id} (${clip.kind}) in MCPortal. Use get_clip with that id if they ask about it.` }],
+          structuredContent: { viewingClip: { id: clip.id } },
+        }, 5000).catch(() => {});
+      }
+    } catch (error) {
+      reader.replaceChildren(el('div', { class: 'reader-top' }, iconButton('back', 'Back to the workspace', closeReader, 'ib')), el('h1', null, item.title),
+        el('div', { class: 'error' }, `That clip isn't available (${error.message}).`));
+    }
+  }
 
   // ------------------------------------------------------------ add a source
   function toggleAdd(open = $('addSheet').hidden) {
@@ -1062,7 +1158,7 @@
     const check = () => {
       if (gotInitialResult) return;
       if (toolRunning && Date.now() - started < 45000) { setTimeout(check, 1000); return; }
-      articleUrl ? loadArticleCard(articleUrl) : loadWorkspace();
+      articleUrl ? loadArticleCard(articleUrl) : clipId ? loadClipCard(clipId) : loadWorkspace();
     };
     setTimeout(check, 3000);
   }

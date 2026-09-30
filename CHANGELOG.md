@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Clips
+- **Keep things from the conversation:** say “clip that” and Claude saves a quote, an exchange (verbatim), a note, a table, an image (an SVG, PNG, JPEG or WebP chart or diagram) or a link, with a title, note and tags (`clip`).
+- **Find them in later chats:** `search_clips` by words, kind or tag, and `get_clip` shows one as its own clip card. `update_clip` and `delete_clip` edit and remove them.
+- **A Clips panel:** the first clip adds one. Clips open in a viewer with a renderer for each kind. `add_panel` can add filtered panels, such as only tables or only one tag.
+- **Safe by construction:** clip text is always fenced as untrusted for the model and built as text in the UI. Images are checked by their bytes, and an SVG is only ever shown as an image, so nothing in it runs.
+- **Storage:** files locally (`<data dir>/clips/`) and a new `mcportal_clips` table on the hosted server (schema version 2, upgraded in place).
+
+### Hosted service
+- **Public pages:** a landing page at `/` with screenshots, a privacy policy at `/privacy` and support at `/support`. `MCPORTAL_SUPPORT_URL` and `MCPORTAL_OPERATOR` configure them.
+- **Railway infrastructure as code:** `.railway/railway.ts` replaces `railway.toml`.
+
 ## v0.3.0 — 2026-09-30
 
 MCPortal becomes a reading platform that lives in your agent, and a hosted service ready for a small invite-only beta.

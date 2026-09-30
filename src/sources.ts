@@ -4,13 +4,15 @@ import { fetchArticle } from './adapters/reader.ts';
 import { fetchRss, type RssConfig } from './adapters/rss.ts';
 import type { TtlCache } from './lib/cache.ts';
 import { clean } from './lib/text.ts';
-import { normalizeSourceConfig, type PanelSpec, type PinnedConfig, type PinnedData, type SavedItem } from './profile.ts';
+import type { ClipSummary } from './clips.ts';
+import { normalizeSourceConfig, type ClipsConfig, type PanelSpec, type PinnedConfig, type PinnedData, type SavedItem } from './profile.ts';
 import type { Article, Fetcher, Item, PanelResult, SourceKind } from './types.ts';
 
 /** Declared freshness per source, in seconds (Orrery-style freshness policy). */
 export const FRESHNESS: Record<SourceKind | 'reader', number> = {
   saved: 0,
   pinned: 0,
+  clips: 0,
   hn: 120,
   github: 300,
   rss: 600,
@@ -22,7 +24,7 @@ export interface SourceDeps {
   cache: TtlCache;
 }
 
-const DEFAULT_TITLES: Record<SourceKind, string> = { hn: 'Hacker News', rss: 'Feed', github: 'GitHub', saved: 'Saved', pinned: 'Pinned' };
+const DEFAULT_TITLES: Record<SourceKind, string> = { hn: 'Hacker News', rss: 'Feed', github: 'GitHub', saved: 'Saved', pinned: 'Pinned', clips: 'Clips' };
 
 /** Saved items come from the profile, not the network. */
 export function savedPanel(panel: PanelSpec, saved: SavedItem[]): PanelResult {
@@ -55,8 +57,35 @@ export function pinnedPanel(panel: PanelSpec, pins: Record<string, PinnedData>):
   };
 }
 
+/** The query a clips panel runs against the clip store. */
+export function clipsQuery(panel: PanelSpec): ClipsConfig {
+  return normalizeSourceConfig('clips', panel.config, panel.id) as ClipsConfig;
+}
+
+/** Clips come from the clip store: the caller runs clipsQuery and passes the result. */
+export function clipsPanel(panel: PanelSpec, clips: ClipSummary[]): PanelResult {
+  const { kind, tag } = clipsQuery(panel);
+  const items: Item[] = clips.map((c) => ({
+    id: c.id,
+    title: c.title,
+    // A title taken from the first line would otherwise repeat at the start of the preview.
+    summary: c.note ? clean(c.note, 280) : c.preview.startsWith(c.title) ? c.preview.slice(c.title.length).trim() || undefined : c.preview,
+    meta: [c.kind, ...c.tags.slice(0, 3).map((t) => `#${t}`)],
+    publishedAt: c.createdAt,
+    ...(c.source.url ? { url: c.source.url } : {}),
+    clip: { id: c.id, kind: c.kind },
+  }));
+  return {
+    panelId: panel.id,
+    source: 'clips',
+    title: panel.title ?? (kind ? `Clips: ${kind}` : tag ? `Clips #${tag}` : DEFAULT_TITLES.clips),
+    items,
+    provenance: { source: 'clips', endpoint: 'your clips', fetchedAt: new Date().toISOString(), cached: false, ttlSeconds: 0 },
+  };
+}
+
 export async function loadPanel(panel: PanelSpec, deps: SourceDeps, force = false): Promise<PanelResult> {
-  if (panel.source === 'saved' || panel.source === 'pinned') throw new Error(`${panel.source} panels are built from the profile, not fetched`);
+  if (panel.source === 'saved' || panel.source === 'pinned' || panel.source === 'clips') throw new Error(`${panel.source} panels are built from the profile, not fetched`);
   const config = normalizeSourceConfig(panel.source, panel.config, panel.id);
   let endpoint = '';
   let title = panel.title ?? DEFAULT_TITLES[panel.source];
@@ -127,6 +156,10 @@ export const SOURCE_DOCS = {
   },
   rss: { description: 'Any RSS or Atom feed: blogs, release feeds, podcasts, YouTube channels.', config: { url: 'feed URL (http/https)', limit: '1-30' } },
   saved: { description: "The user's saved items (bookmarks), newest first. Items are added with save_item and removed with remove_saved.", config: { limit: '1-30 (default 30)' } },
+  clips: {
+    description: "The user's clips: quotes, exchanges, notes, tables, images and links they asked to keep, newest first. Added with clip; found with search_clips.",
+    config: { kind: 'only one kind: quote | exchange | note | table | image | link (optional)', tag: 'only clips with this tag (optional)', limit: '1-30 (default 30)' },
+  },
   pinned: {
     description: 'Items you fetched with another tool the user has connected (Jira, Slack, Confluence, a database, …). Created and refreshed only with pin_panel; MCPortal never fetches them.',
     config: { from: 'where they came from, e.g. "Jira"', recipe: 'how to fetch them again: tool name and arguments, in plain words', limit: '1-30 (default 30)' },

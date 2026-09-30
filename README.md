@@ -135,8 +135,12 @@ The `/preview` page never contains secrets. With a static token it asks for the 
 | `get_thumbnails` | app only | Fetch item pictures through the guarded fetcher as data URIs |
 | `import_opml` | model + app | Bring subscriptions from another reader: test-load each feed, build a new user's portal from their folders or add to an existing one |
 | `export_opml` | model | Sources as OPML for any feed reader (GitHub searches, saved and pinned panels have no feed and are listed as skipped) |
+| `clip` | model | Keep a quote, exchange, note, table, image (SVG, PNG, JPEG, WebP) or link from the conversation; the first clip adds a Clips panel |
+| `search_clips` | model | Find clips by words, kind or tag, newest first |
+| `get_clip` | model + app | One clip in full; renders as its own clip card |
+| `update_clip` / `delete_clip` | model | Change a clip's title, note or tags, or delete it |
 
-Limits: 8 columns, 4 panels per column, 30 items per panel, 200 saved items, 350 KB per picture. Freshness: HN 2 min, GitHub 5 min, RSS 10 min, reader 1 h, pictures 1 day.
+Limits: 8 columns, 4 panels per column, 30 items per panel, 200 saved items, 350 KB per picture. Clips: 32 KB of text, 500 KB per image, tables up to 50 × 500, and 1,000 clips or 50 MB per user. Freshness: HN 2 min, GitHub 5 min, RSS 10 min, reader 1 h, pictures 1 day.
 
 ## Next
 
@@ -147,7 +151,7 @@ MCPortal is a **reading platform with light social**, driven by your agent. Anyt
 - [x] `GITHUB_TOKEN` on the hosted server (fine-grained, public repos read-only; 5,000 requests/hour instead of ~60)
 - [x] Per-user rate limits and daily fetch/thumbnail caps
 - [x] Durable storage: Postgres for profiles and sign-in state, point-in-time recovery on ([plan](docs/plans/postgres-storage.md))
-- [ ] Scheduled backups (daily + weekly) on the Postgres service
+- [ ] Scheduled backups (daily + weekly) on the Postgres service: needs Railway Pro; do before public launch (PITR covers the beta)
 - [x] Accounts, invites and suspension replacing the allowlist; one `authorize()` gate for every tool; admins from `MCPORTAL_ADMINS`; `mcportal admin` commands ([plan](docs/plans/identity-and-access.md), phase 1)
 - [x] Admin page at `/admin`: invites, suspensions, audit log (phase 2)
 - [x] OPML import (bring subscriptions from another reader) and OPML export (phase 1b)
@@ -157,7 +161,7 @@ MCPortal is a **reading platform with light social**, driven by your agent. Anyt
 - [ ] Show HN
 
 **M2: your portal, everywhere, and light social**
-- **Clips:** save quotes, exchanges, explanations, tables and images from the conversation; a Clips panel; the agent can search them across chats ([plan](docs/plans/clips.md))
+- [x] **Clips:** save quotes, exchanges, explanations, tables and images from the conversation; a Clips panel; the agent can search them across chats ([plan](docs/plans/clips.md)). Next: clip a quote from a reader selection, Postgres full-text search
 - **Devices:** link a local MCPortal to your hosted account; state syncs, fetching stays local with a hosted fallback ([plan](docs/plans/local-hosted-hybrid.md))
 - **Portability:** full MCPortal export and import, saved items as bookmarks, clips as Markdown, delete account ([plan](docs/plans/identity-and-access.md#data-rights-and-portability))
 - **Public profile (opt-in):** claim a handle (e.g. `@lbliii`); nothing is public until you choose

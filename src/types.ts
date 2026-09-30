@@ -1,8 +1,12 @@
 /**
  * 'saved' is the user's own bookmarks and 'pinned' is data the agent brought from
  * another tool (Jira, Slack, …): both live in the profile and are never fetched.
+ * 'clips' come from the clip store (src/clips.ts), also never fetched.
  */
-export type SourceKind = 'hn' | 'rss' | 'github' | 'saved' | 'pinned';
+export type SourceKind = 'hn' | 'rss' | 'github' | 'saved' | 'pinned' | 'clips';
+
+export const CLIP_KINDS = ['quote', 'exchange', 'note', 'table', 'image', 'link'] as const;
+export type ClipKind = (typeof CLIP_KINDS)[number];
 
 /** One row in a panel. Everything here is untrusted data from a source. */
 export interface Item {
@@ -18,6 +22,8 @@ export interface Item {
   image?: { url: string; kind: 'thumb' | 'avatar' };
   /** The link is a video (YouTube). */
   video?: boolean;
+  /** Items of a clips panel: open with get_clip. */
+  clip?: { id: string; kind: ClipKind };
 }
 
 /** "Show your work": where a block's data came from and how fresh it is. */

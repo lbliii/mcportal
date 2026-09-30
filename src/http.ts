@@ -19,6 +19,7 @@ import { limitsFromEnv, UsageBudget, type BudgetLimits } from './lib/budget.ts';
 import type { TtlCache } from './lib/cache.ts';
 import { isLoopbackHost } from './lib/ip.ts';
 import { handleMessage, RPC, rpcError, SERVER_INFO, workspaceHtml, type JsonRpcResponse, type Log } from './mcp.ts';
+import { FileClipStore, type ClipStore } from './clips.ts';
 import type { ProfileStore } from './store.ts';
 import type { ToolContext } from './tools.ts';
 import type { Fetcher } from './types.ts';
@@ -48,6 +49,8 @@ export interface AppConfig {
 
 export interface AppDeps {
   store: ProfileStore;
+  /** Clips; defaults to files under the data directory. */
+  clips?: ClipStore;
   fetcher: Fetcher;
   cache: TtlCache;
   log?: Log;
@@ -149,7 +152,8 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
   const admin = oauth ? new AdminPanel(accounts, oauth, config.publicUrl, deps.now) : undefined;
   const budget = deps.budget ?? new UsageBudget(config.limits ?? {}, deps.now);
   const site: SiteConfig = { supportUrl: DEFAULT_SUPPORT_URL, ...config.site, publicUrl: config.publicUrl, inviteOnly: Boolean(oauth) && !accounts.openSignup };
-  const context = (userId: string): ToolContext => ({ store: deps.store, fetcher: deps.fetcher, cache: deps.cache, userId, budget, actor: accounts.actor(userId) });
+  const clips = deps.clips ?? new FileClipStore(config.dataDir);
+  const context = (userId: string): ToolContext => ({ store: deps.store, clips, fetcher: deps.fetcher, cache: deps.cache, userId, budget, actor: accounts.actor(userId) });
 
   /** The user for a request, or undefined if it isn't authenticated. */
   async function authenticate(req: IncomingMessage): Promise<string | undefined> {

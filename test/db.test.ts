@@ -101,3 +101,48 @@ test('pg import: copies file profiles and auth.json once, never overwrites, skip
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test('pg clips: round-trip, search, tags, paging, isolation, limits, schema v2', { skip }, async () => {
+  const { buildClip, ClipError, CLIP_LIMITS } = await import('../src/clips.ts');
+  const { PgClipStore } = await import('../src/db.ts');
+  const store = new PgClipStore(db);
+  // A v1 database (what production had) is upgraded in place.
+  await db.query(`UPDATE mcportal_meta SET value = '1' WHERE key = 'schema_version'`);
+  await ensureSchema(db);
+  const version = await db.query<{ value: string }>(`SELECT value FROM mcportal_meta WHERE key = 'schema_version'`);
+  assert.equal(version.rows[0]!.value, '2');
+
+  const t0 = new Date('2026-09-01T00:00:00Z');
+  const a = buildClip({ kind: 'quote', text: 'Point-in-time recovery, 100% of the time', tags: ['infra'] }, t0);
+  const b = buildClip({ kind: 'table', table: '| a | b |\n|---|---|\n| 1 | 2 |' }, new Date('2026-09-02T00:00:00Z'));
+  await store.add('u1', a);
+  await store.add('u1', b);
+  await store.add('u2', buildClip({ kind: 'quote', text: 'recovery for someone else' }));
+
+  assert.deepEqual((await store.get('u1', b.id))?.data, b.data);
+  assert.equal(await store.get('u2', a.id), undefined, 'scoped by user');
+  assert.deepEqual((await store.list('u1')).map((c) => c.id), [b.id, a.id], 'newest first');
+  assert.equal((await store.list('u1'))[0]!.hasOwnProperty('data'), false, 'lists carry no content');
+  assert.deepEqual((await store.list('u1', { query: 'RECOVERY time' })).map((c) => c.id), [a.id]);
+  assert.deepEqual((await store.list('u1', { query: '100%' })).map((c) => c.id), [a.id], 'wildcards match literally');
+  assert.equal((await store.list('u1', { query: '_' })).length, 0);
+  assert.deepEqual((await store.list('u1', { tag: '#Infra' })).map((c) => c.id), [a.id]);
+  assert.deepEqual((await store.list('u1', { kind: 'table' })).map((c) => c.id), [b.id]);
+  assert.deepEqual((await store.list('u1', { before: b.createdAt })).map((c) => c.id), [a.id]);
+
+  const updated = await store.update('u1', a.id, { title: 'PITR', tags: ['ops'] });
+  assert.equal(updated?.title, 'PITR');
+  assert.deepEqual((await store.list('u1', { tag: 'ops' })).map((c) => c.title), ['PITR']);
+  assert.equal(await store.update('u2', a.id, { title: 'stolen' }), undefined);
+  assert.equal(await store.delete('u2', a.id), false);
+  assert.deepEqual(await store.usage('u1'), { count: 2, bytes: updated!.bytes + b.bytes });
+  assert.equal(await store.delete('u1', a.id), true);
+
+  const cap = CLIP_LIMITS.bytesPerUser;
+  (CLIP_LIMITS as any).bytesPerUser = 10;
+  try {
+    await assert.rejects(store.add('u1', buildClip({ kind: 'quote', text: 'over' })), ClipError);
+  } finally {
+    (CLIP_LIMITS as any).bytesPerUser = cap;
+  }
+});

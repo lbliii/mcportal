@@ -13,6 +13,7 @@ import { TtlCache } from '../src/lib/cache.ts';
 import { createFixtureFetcher } from '../src/lib/fixture-fetch.ts';
 import { safeFetch } from '../src/lib/safe-fetch.ts';
 import { handleMessage, workspaceHtml } from '../src/mcp.ts';
+import { MemoryClipStore } from '../src/clips.ts';
 import { MemoryProfileStore } from '../src/store.ts';
 import type { ToolContext } from '../src/tools.ts';
 
@@ -23,6 +24,7 @@ const packs = flag('packs')?.split(',').filter(Boolean);
 const layout = flag('layout');
 const ctx: ToolContext = {
   store: new MemoryProfileStore(),
+  clips: new MemoryClipStore(),
   fetcher: process.env.MCPORTAL_LIVE === '1' ? safeFetch : createFixtureFetcher(),
   cache: new TtlCache(),
   userId: 'snapshot',
