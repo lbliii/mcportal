@@ -39,6 +39,9 @@
 - **Fallback art:** items without a picture, or whose picture is still loading, show a small portal scene printed like a mid-century sci-fi paperback: flat inks on paper, halftone dots and an off-register keyline. Five motifs (arches, orbits, a doorway with a ring through it, a grid bent by gravity, a starfield through a door) and eight ink sets. Every source on screen gets its own style, and each item its own placement. Dark mode prints on the darkest ink.
 - **More thumbnails load:** when a feed says an image is over the size cap, the thumbnail comes from a smaller one in the post (/Film). Oversized WordPress uploads are resized by WordPress's image service (Colossal). A timed-out or failed fetch is retried on the next load instead of staying blank for a day.
 
+### Reader view
+- **No more share bars:** articles no longer open with "Share • Pin • Email" (Colossal), a "Share" heading over "Comments" and "Read Later" (Quanta), or "x.com / Facebook / LinkedIn / Mail" twice (Google blog). A list is dropped only when every item is a short share or utility link, so real lists stay, even ones that name Facebook or LinkedIn.
+
 ### Hosted service
 - **Public pages:** a landing page at `/` with screenshots, a privacy policy at `/privacy` and support at `/support`. `MCPORTAL_SUPPORT_URL` and `MCPORTAL_OPERATOR` configure them.
 - **Railway infrastructure as code:** `.railway/railway.ts` replaces `railway.toml`.
