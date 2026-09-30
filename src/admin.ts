@@ -141,7 +141,7 @@ export class AdminPanel {
     const mcp = escapeHtml(`${this.publicUrl}/mcp`);
     sendHtml(res, 200, page('You\'re invited to MCPortal', `
 <h1>You're invited to MCPortal</h1>
-<p>${inviter} invited <b>@${login}</b> to MCPortal, a reading portal that lives inside Claude: the sites, channels and feeds you follow, laid out the way you like.</p>
+<p>${inviter} invited <b>@${login}</b> to MCPortal, your liminal webspace: a reading portal that lives in your agent, with the sites, channels and feeds you follow one door away.</p>
 <ol>
   <li>In Claude, open <b>Settings → Connectors</b> and choose <b>Add custom connector</b>.</li>
   <li>Name it <b>MCPortal</b> and use this URL:<br><code>${mcp}</code></li>

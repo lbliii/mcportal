@@ -1,4 +1,6 @@
-# MCPortal
+# <picture><source media="(prefers-color-scheme: dark)" srcset="brand/lockup-on-dark.svg"><img src="brand/lockup.svg" alt="MCPortal" height="56"></picture>
+
+*Your liminal webspace.*
 
 **A reading platform that lives in your agent.** MCPortal is a personal, agent-composed portal: live panels from sources you choose (Hacker News, GitHub, YouTube channels, subreddits, Bluesky, Mastodon, and any site with a feed), laid out the way you ask, with a clean reader view and no ads. It ships as an MCP server with an [MCP Apps](https://modelcontextprotocol.io/extensions/apps/overview) UI, so it renders inline in the agent hosts you already use.
 

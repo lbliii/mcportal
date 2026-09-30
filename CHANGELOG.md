@@ -24,6 +24,12 @@
 - **Safe by default:** other people's notes and shares always reach Claude fenced as untrusted text, and account ids never leave the server. Deleting your account removes your shares, follows, mutes and blocks, and anonymizes the reports you filed.
 - **Storage:** new Postgres tables for shares, follows, mutes, blocks and reports (schema version 3, upgraded in place).
 
+### Brand
+- **A new look:** the Portal mark (a door with an orbit through it), a Line version for the interface, and a Jost wordmark, in a mid-century sci-fi print style. The workspace header, the onboarding screen and the public pages use them.
+- **Your liminal webspace:** the new tagline. MCPortal works in any MCP agent, so the pages and invite messages no longer say it lives "inside Claude".
+- **Icons everywhere:** a favicon, an app icon and a social card for link previews. MCP clients that show server icons get the mark too (`serverInfo.icons`).
+- **One source:** `npm run brand` draws every brand file from one script, and a test keeps the committed files in step with it. See `brand/README.md`.
+
 ### Pictures
 - **Fallback art:** items without a picture, or whose picture is still loading, show a small portal scene printed like a mid-century sci-fi paperback: flat inks on paper, halftone dots and an off-register keyline. Five motifs (arches, orbits, a doorway with a ring through it, a grid bent by gravity, a starfield through a door) and eight ink sets. Every source on screen gets its own style, and each item its own placement. Dark mode prints on the darkest ink.
 - **More thumbnails load:** when a feed says an image is over the size cap, the thumbnail comes from a smaller one in the post (/Film). Oversized WordPress uploads are resized by WordPress's image service (Colossal). A timed-out or failed fetch is retried on the next load instead of staying blank for a day.

@@ -135,7 +135,7 @@ test('config: loopback by default; refuses a public bind without auth', () => {
   assert.equal(token.allowUnauthenticated, false, 'a token means auth is required even on loopback');
 });
 
-test('public pages: landing, privacy and support render without scripts; screenshots only from the allowlist', async () => {
+test('public pages: landing, privacy and support render without scripts; images and brand files only from the allowlist', async () => {
   const app = await startApp({ staticToken: 't', site: { supportUrl: 'mailto:help@example.com', operator: 'A <b>Person</b>' } });
   try {
     for (const path of ['/', '/privacy', '/support']) {
@@ -149,6 +149,24 @@ test('public pages: landing, privacy and support render without scripts; screens
     assert.match((await raw(app.port, { path: '/support' })).body, /mailto:help@example\.com/);
     assert.match((await raw(app.port, { path: '/' })).body, /http:\/\/localhost\/mcp/);
     assert.equal((await raw(app.port, { path: '/site/columns.png' })).status, 200);
+    const landing = (await raw(app.port, { path: '/' })).body;
+    assert.match(landing, /<h1>Your liminal webspace\.<\/h1>/);
+    assert.match(landing, /<meta property="og:image" content="http:\/\/localhost\/site\/og\.png">/, 'link previews get an absolute image URL');
+    assert.match(landing, /<link rel="icon" href="\/favicon\.svg" type="image\/svg\+xml">/);
+    assert.doesNotMatch(landing, /inside Claude/);
+    const types: Record<string, RegExp> = {
+      '/favicon.ico': /^image\/x-icon$/, '/favicon.svg': /^image\/svg\+xml$/, '/apple-touch-icon.png': /^image\/png$/,
+      '/site/og.png': /^image\/png$/, '/site/icon-512.png': /^image\/png$/, '/site/lockup.svg': /^image\/svg\+xml$/,
+    };
+    for (const [path, type] of Object.entries(types)) {
+      const file = await raw(app.port, { path });
+      assert.equal(file.status, 200, path);
+      assert.match(file.headers['content-type'] as string, type, path);
+      assert.match(file.headers['content-security-policy'] as string, /default-src 'none'/, `${path} can't run anything`);
+    }
+    assert.ok((await raw(app.port, { path: '/favicon.ico' })).body.startsWith('\0\0\u0001\0'), 'an ICO header');
+    assert.equal((await raw(app.port, { path: '/site/favicon.svg' })).status, 404, 'each file has exactly one URL');
+    assert.equal((await raw(app.port, { path: '/site/toString' })).status, 404);
     assert.equal((await raw(app.port, { path: '/site/..%2Fhttp.ts' })).status, 404);
     assert.equal((await raw(app.port, { path: '/site/other.png' })).status, 404);
     assert.equal((await raw(app.port, { method: 'POST', path: '/privacy' })).status, 404);

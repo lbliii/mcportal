@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>MCPortal admin</title>
+<link rel="icon" href="/favicon.ico" sizes="48x48"><link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <style>
   :root { --fg: #1b1b1a; --fg2: #6a6a66; --border: #e3e3de; --bg2: #f7f7f4; --accent: #2563eb; --warn: #b45309; --bad: #b91c1c; }
   @media (prefers-color-scheme: dark) { :root { --fg: #ececea; --fg2: #a3a39e; --border: #34342f; --bg2: #1f1f1d; --accent: #6b9bff; --warn: #f59e0b; --bad: #f87171; } body { background: #161615; } }
@@ -104,7 +105,7 @@
 
   // ---- invite links and ready-to-send messages
   const linkFor = (i) => (i.code ? `${location.origin}/join/${i.code}` : '');
-  const messageFor = (i) => `Hi @${i.login}! I've invited you to MCPortal, a reading portal that lives inside Claude. Set it up here (sign in with GitHub as @${i.login}): ${linkFor(i)}`;
+  const messageFor = (i) => `Hi @${i.login}! I've invited you to MCPortal, your liminal webspace: a reading portal that lives in your agent. Set it up here (sign in with GitHub as @${i.login}): ${linkFor(i)}`;
   async function copy(text, what) {
     try { await navigator.clipboard.writeText(text); say(`Copied the ${what}.`); }
     catch { showShare(null, text); say(`Couldn't use the clipboard; select the ${what} below and copy it.`, true); }

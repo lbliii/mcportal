@@ -10,7 +10,8 @@ import { createFixtureFetcher } from '../src/lib/fixture-fetch.ts';
 import { isPublicAddress, parseV6 } from '../src/lib/ip.ts';
 import { assertPublicUrl, BoundaryError, guardedLookup } from '../src/lib/safe-fetch.ts';
 import { clean } from '../src/lib/text.ts';
-import { handleMessage, MCP_APP_MIME, scriptJson } from '../src/mcp.ts';
+import { handleMessage, MCP_APP_MIME, scriptJson, SERVER_INFO } from '../src/mcp.ts';
+import { buildBrand } from '../scripts/brand.ts';
 import { defaultProfile, ProfileError, validateProfile } from '../src/profile.ts';
 import { FileProfileStore, MemoryProfileStore } from '../src/store.ts';
 import { WORKSPACE_URI, type ToolContext } from '../src/tools.ts';
@@ -51,6 +52,14 @@ test('initialize negotiates version and advertises the MCP Apps extension', asyn
   assert.deepEqual(result.capabilities.extensions['io.modelcontextprotocol/ui'].mimeTypes, [MCP_APP_MIME]);
   const unknown = await rpc(ctx(), 'initialize', { protocolVersion: '1999-01-01' });
   assert.equal((unknown.result as any).protocolVersion, '2025-11-25');
+
+  // Icons (2025-11-25 Implementation.icons): a real PNG that every client can show, plus the SVG.
+  const [png, svg] = result.serverInfo.icons as Array<{ src: string; mimeType: string; sizes: string[] }>;
+  assert.equal(png!.mimeType, 'image/png');
+  assert.ok(Buffer.from(png!.src.replace(/^data:image\/png;base64,/, ''), 'base64').subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])));
+  assert.equal(svg!.mimeType, 'image/svg+xml');
+  assert.doesNotMatch(Buffer.from(svg!.src.split(',')[1]!, 'base64').toString(), /<script|href=/i);
+  assert.equal('icons' in SERVER_INFO, false, '/health reports SERVER_INFO and stays small');
 });
 
 test('notifications get no response; unknown methods get -32601', async () => {
@@ -415,7 +424,20 @@ test('fallback art: distinct styles per source, varied placement per item, inlin
 
   const read = await rpc(ctx(), 'resources/read', { uri: WORKSPACE_URI });
   const html = (read.result as any).contents[0].text as string;
-  assert.ok(html.includes('const portalArt = (() => {') && !html.includes('/*MCPORTAL_ART*/'));
+  assert.ok(html.includes('const portalArt = (() => {'));
+  assert.ok(html.includes('<svg class="brand-line"') && html.includes('<svg class="brand-word"') && html.includes('<svg class="brand-badge"'), 'brand marks inlined');
+  assert.doesNotMatch(html, /include:/, 'every include resolved');
+});
+
+test('brand: committed assets match what scripts/brand.ts draws', async () => {
+  // Rebuilds every SVG from the geometry and the Jost outlines; PNGs are rendered from these.
+  const { text, png } = buildBrand();
+  for (const [file, contents] of Object.entries(text)) {
+    assert.equal(await readFile(new URL(`../${file}`, import.meta.url), 'utf8'), contents, `${file} is stale: run npm run brand`);
+    assert.doesNotMatch(contents, /NaN|undefined|<script|on\w+=/, file);
+  }
+  for (const file of Object.keys(png)) assert.ok((await readFile(new URL(`../${file}`, import.meta.url))).length > 0, file);
+  assert.match(text['src/ui/brand/wordmark.svg']!, /aria-label="MCPortal"/);
 });
 
 test('onboarding: a new user gets the welcome, build_portal assembles packs, and it sticks', async () => {
