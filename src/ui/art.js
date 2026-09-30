@@ -188,5 +188,8 @@ const portalArt = (() => {
     return `<svg xmlns="http://www.w3.org/2000/svg" class="art" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false" style="--ink-p:${p};--ink-a:${a};--ink-b:${b};--ink-c:${c};--ink-x:${accent}">${body}</svg>`;
   }
 
-  return { styles, draw, motifOf: (style) => parts(style).motif, inkOf: (style) => style % INKS.length };
+  /** A style's lead ink (its set's first ink after paper): the source's colour in the workspace. */
+  const leadOf = (style) => INKS[style % INKS.length][1];
+
+  return { styles, draw, leadOf, motifOf: (style) => parts(style).motif, inkOf: (style) => style % INKS.length };
 })();

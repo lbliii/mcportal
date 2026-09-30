@@ -392,7 +392,7 @@ test('get_thumbnails: oversized WordPress uploads go through Photon; timeouts ar
 
 test('fallback art: distinct styles per source, varied placement per item, inlined into the app', async () => {
   const src = await readFile(new URL('../src/ui/art.js', import.meta.url), 'utf8');
-  type Art = { styles(keys: string[]): number[]; draw(style: number, item: string): string; motifOf(style: number): string; inkOf(style: number): number };
+  type Art = { styles(keys: string[]): number[]; draw(style: number, item: string): string; motifOf(style: number): string; inkOf(style: number): number; leadOf(style: number): string };
   const art = vm.runInNewContext(`${src}; portalArt`) as Art;
   const noIds = (svg: string) => svg.replace(/pa\d+/g, 'pa');
 
@@ -407,6 +407,9 @@ test('fallback art: distinct styles per source, varied placement per item, inlin
   assert.deepEqual(art.styles([...feeds, 'https://late.example/rss']).slice(0, 12), styles);
   assert.equal(new Set(art.styles(Array.from({ length: 40 }, (_, i) => `k${i}`))).size, 40);
   assert.deepEqual([...new Set(Array.from({ length: 40 }, (_, i) => art.motifOf(i)))].sort(), ['arches', 'doorway', 'gravity', 'orbits', 'portal']);
+  // A source's colour in the workspace is its art's lead ink, so the first eight sources get eight colours.
+  assert.equal(new Set(styles.slice(0, 8).map(art.leadOf)).size, 8);
+  assert.ok(styles.every((st) => /^#[0-9A-F]{6}$/.test(art.leadOf(st)) && art.draw(st, 'x').includes(`--ink-a:${art.leadOf(st)}`)), 'the lead ink is the one the art prints with');
 
   // Drawing: deterministic, and neighbouring items land in visibly different places.
   const style = Array.from({ length: 40 }, (_, i) => i).find((i) => art.motifOf(i) === 'arches')!;
@@ -427,6 +430,7 @@ test('fallback art: distinct styles per source, varied placement per item, inlin
   assert.ok(html.includes('const portalArt = (() => {'));
   assert.ok(html.includes('<svg class="brand-line"') && html.includes('<svg class="brand-word"') && html.includes('<svg class="brand-badge"'), 'brand marks inlined');
   assert.doesNotMatch(html, /include:/, 'every include resolved');
+  assert.doesNotMatch(html, /\bClaude\b|your assistant/, 'the workspace talks about "your agent": MCPortal runs in any MCP host');
 });
 
 test('brand: committed assets match what scripts/brand.ts draws', async () => {
@@ -438,6 +442,22 @@ test('brand: committed assets match what scripts/brand.ts draws', async () => {
   }
   for (const file of Object.keys(png)) assert.ok((await readFile(new URL(`../${file}`, import.meta.url))).length > 0, file);
   assert.match(text['src/ui/brand/wordmark.svg']!, /aria-label="MCPortal"/);
+});
+
+test('brand: every icon the workspace asks for is in the generated set, drawn on the 24-unit grid', async () => {
+  const { text } = buildBrand();
+  const { ICONS, ICON_STROKE } = vm.runInNewContext(`${text['src/ui/brand/icons.js']}; ({ ICONS, ICON_STROKE })`);
+  assert.equal(ICON_STROKE, 1.75);
+  assert.match(text['brand/mark-line.svg']!, /stroke-width="1\.75"/, 'the Line mark shares the icon stroke');
+  const page = await readFile(new URL('../src/ui/workspace.html', import.meta.url), 'utf8');
+  const used = new Set([...page.matchAll(/(?:icon|iconButton)\('(\w+)'|data-icon="(\w+)"|icon\(full \? '(\w+)' : '(\w+)'\)/g)].flatMap((m) => m.slice(1).filter(Boolean)));
+  assert.ok(used.size >= 19, `found the icon names in workspace.html (${used.size})`);
+  for (const name of used) assert.ok(Object.hasOwn(ICONS, name), `icon "${name}" is missing from scripts/brand.ts`);
+  for (const [name, { d, dot }] of Object.entries(ICONS) as [string, { d: string; dot?: number[] }][]) {
+    const numbers = d.match(/-?\d*\.?\d+/g)!.map(Number);
+    assert.ok(numbers.every((n) => n >= -24 && n <= 24), `${name} stays on the grid`);
+    if (dot) assert.equal(dot.length, 3, name);
+  }
 });
 
 test('onboarding: a new user gets the welcome, build_portal assembles packs, and it sticks', async () => {

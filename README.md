@@ -24,7 +24,7 @@ agent: get_profile → update_profile → open_workspace
 | Tools | `src/tools.ts` | See the tool reference below |
 | Workspace app | `src/ui/workspace.html` | Columns lane and picture shelves, welcome and starter packs, add-a-source sheet, saved items, reader view and reader cards, lazy thumbnails, provenance toggle, fullscreen. Self-contained; its icon set is inline |
 | Discovery | `src/discover.ts` | Turns a site, feed URL, `r/subreddit`, `owner/repo`, YouTube/Bluesky/Mastodon profile and more into sources that load |
-| Starter packs | `src/packs.ts` | Eight interest packs of four live-checked sources each, for a new user's first portal |
+| Starter packs | `src/packs.ts` | Eight interest packs of four live-checked sources each, for a new user's first room |
 | Adapters | `src/adapters/` | Hacker News, GitHub (search, releases), RSS/Atom, reader view |
 | OAuth | `src/auth/` | Authorization server + resource server per the MCP auth spec, GitHub sign-in |
 | Boundaries | `src/lib/safe-fetch.ts`, `src/lib/ip.ts` | Outbound fetches can only connect to public IPs; size, time and redirect caps |
@@ -135,7 +135,7 @@ The `/preview` page never contains secrets. With a static token it asks for the 
 | `list_sources` | model | Source types and their settings |
 | `refresh_panel` | app only | Reload one portal, bypassing cache |
 | `get_thumbnails` | app only | Fetch item pictures through the guarded fetcher as data URIs |
-| `import_opml` | model + app | Bring subscriptions from another reader: test-load each feed, build a new user's portal from their folders or add to an existing one |
+| `import_opml` | model + app | Bring subscriptions from another reader: test-load each feed, build a new user's room from their folders or add to an existing one |
 | `export_opml` | model | Sources as OPML for any feed reader (GitHub searches, saved and pinned portals have no feed and are listed as skipped) |
 | `clip` | model | Keep a quote, exchange, note, table, image (SVG, PNG, JPEG, WebP) or link from the conversation; the first clip adds a Clips portal |
 | `search_clips` | model | Find clips by words, kind or tag, newest first |
@@ -157,9 +157,9 @@ Limits: 8 columns, 4 portals per column, 30 items per portal, 200 saved items, 3
 
 ## Next
 
-MCPortal is a **reading platform with light social**, driven by your agent. Anything people share lives natively in MCPortal, not as public feeds. Your portal is yours: it works without an account, and it exports in standard formats. Detailed plans live in [`docs/plans/`](docs/plans/).
+MCPortal is a **reading platform with light social**, driven by your agent. Anything people share lives natively in MCPortal, not as public feeds. Your room is yours: it works without an account, and it exports in standard formats. Detailed plans live in [`docs/plans/`](docs/plans/).
 
-**M1.5: public beta.** Done when someone who isn't the author can connect, onboard, and come back the next day to a portal that still works.
+**M1.5: public beta.** Done when someone who isn't the author can connect, onboard, and come back the next day to a room that still works.
 - [x] Hosted server matches local; every starter-pack source checked from Railway (sources that block cloud servers swapped out)
 - [x] `GITHUB_TOKEN` on the hosted server (fine-grained, public repos read-only; 5,000 requests/hour instead of ~60)
 - [x] Per-user rate limits and daily fetch/thumbnail caps
@@ -187,5 +187,5 @@ MCPortal is a **reading platform with light social**, driven by your agent. Anyt
 - Built-in views of your own reading (what you read and save, by topic and source)
 - Pictures in the reader view; clearer handling of paywalled articles
 - More sign-in options (Google, email link, passkeys) as extra identities on the same account
-- Link cards for sites without feeds (e.g. TikTok via oEmbed), shared portals for groups
+- Link cards for sites without feeds (e.g. TikTok via oEmbed), shared rooms for groups
 - Postgres row-level security as a third access layer
