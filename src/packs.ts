@@ -1,8 +1,10 @@
 /**
  * Starter packs: a first portal for a new user, picked by interest. Every source
  * here was resolved with find_source and checked live (loads, recent, pictures
- * where possible); each pack leads with a picture-rich source. No Reddit: its
- * feeds rate-limit servers (429), which would make a first portal look broken.
+ * where possible), from a laptop and from the Railway server; each pack leads
+ * with a picture-rich source. Some sources treat cloud servers differently: no
+ * Reddit (rate-limits servers, 429), no nasa.gov (429 from Railway), and
+ * www.dezeen.com (the bare domain returns 403 to servers).
  */
 import type { PanelSpec } from './profile.ts';
 
@@ -68,7 +70,7 @@ export const STARTER_PACKS: StarterPack[] = [
     panels: [
       feed('colossal', 'https://www.thisiscolossal.com/feed/', 'Colossal'),
       yt('proko', 'UClM2LuQ1q5WEc23462tQzBg', 'Proko'),
-      feed('dezeen', 'https://dezeen.com/feed', 'Dezeen'),
+      feed('dezeen', 'https://www.dezeen.com/feed/', 'Dezeen'),
       feed('its-nice-that', 'http://feeds2.feedburner.com/itsnicethat/SlXC', "It's Nice That"),
     ],
   },
@@ -80,7 +82,7 @@ export const STARTER_PACKS: StarterPack[] = [
       yt('kurzgesagt', 'UCsXVk37bltHxD1rDPwtNM8Q', 'Kurzgesagt'),
       yt('veritasium', 'UCHnyfMqiRRG1u-2MsSQLbXA', 'Veritasium'),
       feed('quanta', 'https://www.quantamagazine.org/feed/', 'Quanta Magazine'),
-      feed('nasa', 'https://www.nasa.gov/news-release/feed/', 'NASA'),
+      feed('science-news', 'https://www.sciencenews.org/feed', 'Science News'),
     ],
   },
   {
