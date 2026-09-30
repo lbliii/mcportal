@@ -5,12 +5,13 @@
  *   node bin/mcportal.mjs --stdio    stdio transport (used by the local plugin)
  */
 import { createInterface } from 'node:readline';
+import type { AuthPersistence } from './auth/store.ts';
 import { createApp, configFromEnv, type AppConfig } from './http.ts';
 import { TtlCache } from './lib/cache.ts';
 import { createFixtureFetcher } from './lib/fixture-fetch.ts';
 import { safeFetch } from './lib/safe-fetch.ts';
 import { handleMessage, RPC, rpcError, type JsonRpcResponse } from './mcp.ts';
-import { defaultDataDir, FileProfileStore } from './store.ts';
+import { defaultDataDir, FileProfileStore, type ProfileStore } from './store.ts';
 import type { ToolContext } from './tools.ts';
 
 const log = (message: string) => process.stderr.write(`[mcportal] ${message}\n`);
@@ -42,19 +43,38 @@ function runStdio(ctx: ToolContext): void {
   log(`stdio ready (data: ${defaultDataDir()})`);
 }
 
+/** Postgres when DATABASE_URL is set (hosted), otherwise files in the data directory. */
+async function openStorage(dataDir: string): Promise<{ store: ProfileStore; authPersistence?: AuthPersistence; storage: 'files' | 'postgres' }> {
+  const url = process.env.DATABASE_URL;
+  if (!url) return { store: new FileProfileStore(dataDir), storage: 'files' };
+  const { connect, ensureSchema, importFiles, PgProfileStore, pgAuthPersistence } = await import('./db.ts');
+  const db = await connect(url);
+  await ensureSchema(db);
+  const imported = await importFiles(db, dataDir);
+  if (!imported.skipped) log(`imported from ${dataDir}: ${imported.profiles} profile(s)${imported.auth ? ', OAuth state' : ''}`);
+  return { store: new PgProfileStore(db), authPersistence: pgAuthPersistence(db), storage: 'postgres' };
+}
+
 export function main(argv = process.argv): void {
+  void start(argv).catch((error) => {
+    log(`startup failed: ${(error as Error).stack ?? error}`);
+    process.exitCode = 1;
+  });
+}
+
+async function start(argv: string[]): Promise<void> {
   process.on('unhandledRejection', (error) => log(`unhandled rejection: ${(error as Error)?.stack ?? error}`));
   process.on('uncaughtException', (error) => log(`uncaught exception: ${error.stack ?? error}`));
 
   const fixtures = process.env.MCPORTAL_FIXTURES === '1';
   if (fixtures) log('fixtures mode: serving canned data from test/fixtures (no network)');
   const dataDir = defaultDataDir();
-  const store = new FileProfileStore(dataDir);
   const fetcher = fixtures ? createFixtureFetcher() : safeFetch;
   const cache = new TtlCache();
 
   if (argv.includes('--stdio')) {
-    runStdio({ store, fetcher, cache, userId: process.env.MCPORTAL_USER || 'default' });
+    // Local, single user: always files, never the hosted database.
+    runStdio({ store: new FileProfileStore(dataDir), fetcher, cache, userId: process.env.MCPORTAL_USER || 'default' });
     return;
   }
 
@@ -66,10 +86,11 @@ export function main(argv = process.argv): void {
     process.exitCode = 1;
     return;
   }
-  const server = createApp(config, { store, fetcher, cache, log });
+  const { store, authPersistence, storage } = await openStorage(dataDir);
+  const server = createApp(config, { store, fetcher, cache, log, authPersistence, storage });
   server.listen(config.port, config.host, () => {
     const mode = config.github ? `GitHub OAuth${config.allowedGithubUsers.length ? ` (allowed: ${config.allowedGithubUsers.join(', ')})` : ' (any GitHub user)'}` : config.staticToken ? 'static token' : 'no auth (loopback only)';
-    log(`http on ${config.host}:${config.port}  public URL: ${config.publicUrl}  auth: ${mode}  data: ${dataDir}`);
+    log(`http on ${config.host}:${config.port}  public URL: ${config.publicUrl}  auth: ${mode}  storage: ${storage === 'postgres' ? 'postgres' : dataDir}`);
     if (config.allowUnauthenticated) log(`preview: ${config.publicUrl}/preview`);
   });
 }

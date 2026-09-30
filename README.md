@@ -18,7 +18,7 @@ agent: get_profile → update_profile → open_workspace
 
 | Piece | Where | What it does |
 |---|---|---|
-| MCP server | `src/http.ts`, `src/mcp.ts`, `src/server.ts`, `bin/mcportal.mjs` | Streamable HTTP (`/mcp`) and stdio. Zero runtime dependencies. |
+| MCP server | `src/http.ts`, `src/mcp.ts`, `src/server.ts`, `bin/mcportal.mjs` | Streamable HTTP (`/mcp`) and stdio. No runtime dependencies locally; the hosted server adds `pg` for Postgres. |
 | Tools | `src/tools.ts` | See the tool reference below |
 | Workspace app | `src/ui/workspace.html` | Columns lane and picture shelves, welcome and starter packs, add-a-source sheet, saved items, reader view and reader cards, lazy thumbnails, provenance toggle, fullscreen. Self-contained; its icon set is inline |
 | Discovery | `src/discover.ts` | Turns a site, feed URL, `r/subreddit`, `owner/repo`, YouTube/Bluesky/Mastodon profile and more into sources that load |
@@ -34,13 +34,13 @@ agent: get_profile → update_profile → open_workspace
 
 ## Requirements
 
-Node **22.18+** (or any Node 24). Node runs the `.ts` files directly: no build step and no `npm install` needed to run. The `bin/mcportal.mjs` launcher prints a clear message on older Node. `npm install` only adds TypeScript for `npm run typecheck`.
+Node **22.18+** (or any Node 24). Node runs the `.ts` files directly: no build step and no `npm install` needed to run locally. The `bin/mcportal.mjs` launcher prints a clear message on older Node. `npm install` adds `pg` (used only when `DATABASE_URL` is set, i.e. hosted) and TypeScript for `npm run typecheck`.
 
 ## Try it locally
 
 ```bash
 cd ~/Developer/mcportal
-npm test                 # 50 tests, offline
+npm test                 # offline test suite
 npm run smoke            # live check against HN, GitHub and an RSS feed (needs network)
 npm start                # http://127.0.0.1:8787/preview  (bound to 127.0.0.1, no auth)
 npm run demo             # same, with canned data and no network
@@ -72,7 +72,7 @@ args = ["/Users/llane/Developer/mcportal/bin/mcportal.mjs", "--stdio"]
 ## Host it on Railway (remote connector)
 
 1. Create a service from this repo. It picks up `railway.toml` and the `Dockerfile`.
-2. Generate a public domain. Attach a **volume at `/data`**.
+2. Generate a public domain. Add a **Postgres** service and set `DATABASE_URL=${{Postgres.DATABASE_URL}}` on MCPortal (profiles and sign-in state live there; turn on point-in-time recovery and scheduled backups). Without a database, attach a **volume at `/data`** and MCPortal uses files; with both, files found on the volume are imported once.
 3. Create a **GitHub OAuth App** (GitHub → Settings → Developer settings → OAuth Apps):
    - Homepage URL: `https://<your-domain>`
    - Authorization callback URL: `https://<your-domain>/oauth/callback`

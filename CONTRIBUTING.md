@@ -61,5 +61,10 @@ Install the repo as a local plugin, which includes the `/portal` command and ski
 ## Before opening a PR
 
 - `npm test` passes, and `npm run typecheck` passes if you touched types.
+- If you touched storage (`src/db.ts`, `src/store.ts`, `src/auth/store.ts`), run the Postgres tests too. They're skipped unless `TEST_DATABASE_URL` is set, and each run uses its own schema:
+
+  ```bash
+  TEST_DATABASE_URL=postgres://localhost:5432/postgres node --test test/db.test.ts
+  ```
 - `npm run smoke` passes if you touched an adapter or `safe-fetch` (needs network).
 - Changes to the fetch or OAuth boundaries stay consistent with the security model in the [README](README.md#security-model).

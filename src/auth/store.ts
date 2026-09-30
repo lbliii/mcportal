@@ -3,8 +3,9 @@
  * Tokens are stored only as SHA-256 hashes. Each sign-in is a "grant"; a grant
  * holds at most one live access token and one live refresh token, so refresh
  * loops can't grow the file. Reusing a spent refresh token revokes the whole
- * grant (theft detection). One JSON file on the data volume is enough for a
- * single Railway instance; this class is the seam for Postgres later.
+ * grant (theft detection). The document is kept in memory and persisted
+ * whole on every write, to a file (default) or a Postgres row (see db.ts); both
+ * assume a single server instance.
  */
 import { createHash, randomBytes } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
@@ -51,6 +52,27 @@ interface Data {
   tokens: Record<string, TokenRecord>;
 }
 
+/** Where the OAuth document lives. `read` returns undefined when nothing is stored yet. */
+export interface AuthPersistence {
+  read(): Promise<string | undefined>;
+  write(json: string): Promise<void>;
+}
+
+export function fileAuthPersistence(dataDir: string): AuthPersistence {
+  const file = path.join(dataDir, 'auth.json');
+  return {
+    async read() {
+      try {
+        return await readFile(file, 'utf8');
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+        throw error;
+      }
+    },
+    write: (json) => atomicWrite(file, json),
+  };
+}
+
 export function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
 }
@@ -60,25 +82,25 @@ export function randomToken(prefix: string): string {
 }
 
 export class AuthStore {
-  private file: string;
+  private persistence: AuthPersistence;
   private data: Data | null = null;
   private mutex = new KeyedMutex();
   now: () => number;
 
-  constructor(dataDir: string, now: () => number = Date.now) {
-    this.file = path.join(dataDir, 'auth.json');
+  /** `where` is a data directory (file persistence) or an AuthPersistence (e.g. Postgres). */
+  constructor(where: string | AuthPersistence, now: () => number = Date.now) {
+    this.persistence = typeof where === 'string' ? fileAuthPersistence(where) : where;
     this.now = now;
   }
 
   private async load(): Promise<Data> {
     if (this.data) return this.data;
     try {
-      const parsed = JSON.parse(await readFile(this.file, 'utf8')) as Partial<Data>;
+      const raw = await this.persistence.read();
+      const parsed = (raw ? JSON.parse(raw) : {}) as Partial<Data>;
       this.data = { clients: parsed.clients ?? {}, tokens: parsed.tokens ?? {} };
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-        process.stderr.write(`[mcportal] auth store unreadable, starting empty: ${(error as Error).message}\n`);
-      }
+      process.stderr.write(`[mcportal] auth store unreadable, starting empty: ${(error as Error).message}\n`);
       this.data = { clients: {}, tokens: {} };
     }
     return this.data;
@@ -96,7 +118,7 @@ export class AuthStore {
         clients.sort((a, b) => a.last_used_at - b.last_used_at);
         for (const c of clients.slice(0, clients.length - CLIENT_LIMITS.clients)) delete data.clients[c.client_id];
       }
-      await atomicWrite(this.file, JSON.stringify(data));
+      await this.persistence.write(JSON.stringify(data));
       return result;
     });
   }

@@ -11,7 +11,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { OAuthServer } from './auth/oauth.ts';
-import { AuthStore } from './auth/store.ts';
+import { AuthStore, type AuthPersistence } from './auth/store.ts';
 import { limitsFromEnv, UsageBudget, type BudgetLimits } from './lib/budget.ts';
 import type { TtlCache } from './lib/cache.ts';
 import { isLoopbackHost } from './lib/ip.ts';
@@ -38,7 +38,7 @@ export interface AppConfig {
   trustProxy: boolean;
   dataDir: string;
   /** Per-user tool budget (MCPORTAL_LIMIT_PER_MINUTE / _PER_DAY / _GLOBAL_PER_DAY). */
-  limits: Partial<BudgetLimits>;
+  limits?: Partial<BudgetLimits>;
 }
 
 export interface AppDeps {
@@ -48,6 +48,10 @@ export interface AppDeps {
   log?: Log;
   now?: () => number;
   budget?: UsageBudget;
+  /** Where OAuth state persists; defaults to auth.json in the data directory. */
+  authPersistence?: AuthPersistence;
+  /** Reported by /health. */
+  storage?: 'files' | 'postgres';
 }
 
 function list(value: string | undefined): string[] {
@@ -131,13 +135,13 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
   const oauth = config.github
     ? new OAuthServer(
         { publicUrl: config.publicUrl, github: config.github, allowedGithubUsers: config.allowedGithubUsers, trustProxy: config.trustProxy },
-        new AuthStore(config.dataDir, deps.now),
+        new AuthStore(deps.authPersistence ?? config.dataDir, deps.now),
         deps.fetcher,
         deps.now,
       )
     : undefined;
 
-  const budget = deps.budget ?? new UsageBudget(config.limits, deps.now);
+  const budget = deps.budget ?? new UsageBudget(config.limits ?? {}, deps.now);
   const context = (userId: string): ToolContext => ({ store: deps.store, fetcher: deps.fetcher, cache: deps.cache, userId, budget });
 
   /** The user for a request, or undefined if it isn't authenticated. */
@@ -175,7 +179,7 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
       return send(res, 400, JSON.stringify({ error: 'bad request' }));
     }
     // Health checks come from the platform with its own Host header.
-    if (url.pathname === '/health') return send(res, 200, JSON.stringify({ ok: true, ...SERVER_INFO }));
+    if (url.pathname === '/health') return send(res, 200, JSON.stringify({ ok: true, ...SERVER_INFO, storage: deps.storage ?? 'files' }));
     if (!hostname || !config.allowedHosts.includes(hostname)) {
       return send(res, 421, JSON.stringify({ error: 'unknown host; set MCPORTAL_PUBLIC_URL or MCPORTAL_ALLOWED_HOSTS' }));
     }

@@ -1,8 +1,10 @@
-# MCPortal MCP server. No dependencies to install: Node runs the TypeScript directly.
+# MCPortal MCP server. Node runs the TypeScript directly (no build step). The only
+# runtime dependency is `pg`, for Postgres storage when DATABASE_URL is set.
 FROM node:24-alpine
 
 WORKDIR /app
-COPY package.json ./
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 COPY bin ./bin
 COPY src ./src
 COPY test/fixtures ./test/fixtures
