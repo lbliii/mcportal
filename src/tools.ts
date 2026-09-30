@@ -1,16 +1,17 @@
 import { randomBytes } from 'node:crypto';
 import { clean } from './lib/text.ts';
 import {
-  describeDiff, describeLayout, diffProfiles, findPanel, findSavedPanel, httpUrl, LIMITS, normalizePinnedItems, normalizePins, ProfileError, SOURCES,
+  describeDiff, describeLayout, normalizeSourceConfig, diffProfiles, findPanel, findSavedPanel, httpUrl, LIMITS, normalizePinnedItems, normalizePins, ProfileError, SOURCES,
   validateProfile, type PanelSpec, type PinnedConfig, type Profile, type SavedItem,
 } from './profile.ts';
 import { discover } from './discover.ts';
 import { buildOpml, OPML_LIMITS, parseOpml } from './opml.ts';
 import { MAX_PACKS, packSummaries, STARTER_PACKS } from './packs.ts';
-import { clipsPanel, clipsQuery, loadArticle, loadPanel, pinnedPanel, savedPanel, SOURCE_DOCS, type SourceDeps } from './sources.ts';
+import { clipsPanel, clipsQuery, followingPanel, loadArticle, loadPanel, pinnedPanel, savedPanel, SOURCE_DOCS, type SourceDeps } from './sources.ts';
 import type { ClipStore } from './clips.ts';
 import type { ExportFormat } from './portability.ts';
 import type { PublicProfiles } from './public-profiles.ts';
+import type { Social } from './social.ts';
 import type { ProfileStore } from './store.ts';
 import type { Actor } from './access.ts';
 import type { UsageBudget } from './lib/budget.ts';
@@ -24,6 +25,8 @@ export interface ToolContext extends SourceDeps {
   clips?: ClipStore;
   /** Handles and public profiles: hosted only (local MCPortal has no social layer). */
   publicProfiles?: PublicProfiles;
+  /** Shares, follows, mutes, blocks and reports: hosted only. */
+  social?: Social;
   /** Hand an export to the user: a one-time download link (HTTP) or a file on disk (local). */
   deliver?: (format: ExportFormat) => Promise<{ kind: 'link' | 'file'; where: string; summary: string }>;
   /** The account page (download everything, delete the account), when the server has one. */
@@ -90,6 +93,10 @@ async function panelFor(spec: PanelSpec, profile: Profile, ctx: ToolContext, for
   if (spec.source === 'saved') return savedPanel(spec, profile.saved);
   if (spec.source === 'pinned') return pinnedPanel(spec, profile.pins);
   if (spec.source === 'clips') return clipsPanel(spec, ctx.clips ? await ctx.clips.list(ctx.userId, clipsQuery(spec)) : []);
+  if (spec.source === 'following') {
+    const { limit } = normalizeSourceConfig('following', spec.config, spec.id) as { limit: number };
+    return followingPanel(spec, ctx.social ? await ctx.social.feed(ctx.userId, { limit }) : []);
+  }
   return loadPanel(spec, ctx, force);
 }
 
@@ -100,7 +107,7 @@ const ADDABLE: SourceKind[] = SOURCES.filter((s) => s !== 'pinned');
  * Put a Saved (or Clips) panel in the layout the first time something is saved, so
  * it visibly lands somewhere. Only adds; never moves or removes the user's panels.
  */
-export function ensurePanel(profile: Profile, source: 'saved' | 'clips', title: string): { profile: Profile; added: boolean } {
+export function ensurePanel(profile: Profile, source: 'saved' | 'clips' | 'following', title: string): { profile: Profile; added: boolean } {
   if (profile.columns.some((c) => c.panels.some((p) => p.source === source))) return { profile, added: false };
   const panel: PanelSpec = { id: source, source, title, config: { limit: LIMITS.items } };
   while (findPanel(profile, panel.id)) panel.id += '-2';

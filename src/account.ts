@@ -26,6 +26,7 @@ import { boundaryOf, parseMultipart } from './lib/multipart.ts';
 import { ProfileError } from './profile.ts';
 import { buildExport, describeImport, EXPORT_FORMATS, importExport, parseExport, type ExportFile, type ExportFormat } from './portability.ts';
 import type { PublicProfiles } from './public-profiles.ts';
+import type { Social } from './social.ts';
 import type { ProfileStore } from './store.ts';
 
 const SESSION_MS = 3600 * 1000;
@@ -41,6 +42,7 @@ export interface AccountDeps {
   store: ProfileStore;
   clips?: ClipStore;
   publicProfiles?: PublicProfiles;
+  social?: Social;
   publicUrl: string;
   log?: (message: string) => void;
   now?: () => number;
@@ -118,11 +120,13 @@ function sendFile(res: ServerResponse, file: ExportFile): void {
 
 /**
  * Delete an account and everything it owns: portal, saved items, clips, public
- * profile (its handle stays held for 30 days), sign-in tokens, and the account.
+ * profile (its handle stays held for 30 days), shares, follows, mutes and blocks
+ * (reports they filed stay, anonymized), sign-in tokens, and the account.
  */
-export async function deleteAccountData(accountId: string, deps: Pick<AccountDeps, 'accounts' | 'oauth' | 'store' | 'clips' | 'publicProfiles'>, by = accountId): Promise<{ clips: number; tokens: number }> {
+export async function deleteAccountData(accountId: string, deps: Pick<AccountDeps, 'accounts' | 'oauth' | 'store' | 'clips' | 'publicProfiles' | 'social'>, by = accountId): Promise<{ clips: number; tokens: number }> {
   await deps.store.delete(accountId);
   const clips = deps.clips ? await deps.clips.deleteAll(accountId) : 0;
+  await deps.social?.forget(accountId);
   await deps.publicProfiles?.remove(accountId);
   const tokens = await deps.oauth.revokeUser(accountId);
   await deps.accounts.deleteAccount(accountId, by);
@@ -163,6 +167,10 @@ export class AccountPage {
     const token = randomBytes(24).toString('base64url');
     this.downloads.set(hash(token), { userId, format, expiresAt: this.now() + DOWNLOAD_MS });
     return `${this.deps.publicUrl}/download/${token}`;
+  }
+
+  private async exportSources(userId: string) {
+    return { ...this.deps, publicProfile: await this.deps.publicProfiles?.get(userId), social: this.deps.social };
   }
 
   /** A one-time upload page for import_portal, so the file never passes through the model. */
@@ -222,7 +230,7 @@ export class AccountPage {
 <p>Add an MCPortal export from another server or your own machine. It only adds: nothing in your portal is removed or moved.</p>
 ${uploadForm('/account/import', s.csrf)}
 <h2 style="font-size:16px">Delete your account</h2>
-<p>This deletes your portal, saved items, clips and public profile, and signs you out everywhere. It can't be undone, so download your data first.</p>
+<p>This deletes your portal, saved items, clips, public profile, shares and follows, and signs you out everywhere. It can't be undone, so download your data first.</p>
 <form method="post" action="/account/delete">
   <input type="hidden" name="csrf" value="${escapeHtml(s.csrf)}">
   <p><label>Type <code>delete @${login}</code> to confirm:<br><input name="confirm" autocomplete="off" style="font:inherit;padding:6px 8px;width:100%;box-sizing:border-box;margin-top:6px"></label></p>
@@ -244,7 +252,7 @@ ${uploadForm('/account/import', s.csrf)}
         sendHtml(res, 410, page('Link expired', '<p>This download link has expired or was already used. Ask for a new export, or download from your <a href="/account">account page</a>.</p>'));
         return true;
       }
-      sendFile(res, await buildExport(entry.format, entry.userId, { ...this.deps, publicProfile: await this.deps.publicProfiles?.get(entry.userId) }));
+      sendFile(res, await buildExport(entry.format, entry.userId, await this.exportSources(entry.userId)));
       return true;
     }
 
@@ -304,7 +312,7 @@ ${uploadForm('/account/import', s.csrf)}
     const format = route.match(/^\/account\/export\/([a-z]+)$/)?.[1] as ExportFormat | undefined;
     if (format && req.method === 'GET') {
       if (!EXPORT_FORMATS.includes(format)) return sendHtml(res, 404, page('Not found', '<p>No such export.</p>')), true;
-      sendFile(res, await buildExport(format, current.session.accountId, { ...this.deps, publicProfile: await this.deps.publicProfiles?.get(current.session.accountId) }));
+      sendFile(res, await buildExport(format, current.session.accountId, await this.exportSources(current.session.accountId)));
       return true;
     }
 
@@ -348,7 +356,7 @@ ${uploadForm('/account/import', s.csrf)}
       for (const [k, u] of this.uploads) if (u.userId === accountId) this.uploads.delete(k);
       this.deps.log?.(`account deleted (${done.clips} clips, ${done.tokens} token records)`);
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'set-cookie': this.cookie('', 0), 'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'" });
-      res.end(page('Account deleted', '<h1>Your account is deleted</h1><p>Your portal, saved items, clips and public profile are gone, and you\'re signed out everywhere. Remove MCPortal from your Claude connectors too.</p>'));
+      res.end(page('Account deleted', '<h1>Your account is deleted</h1><p>Your portal, saved items, clips, public profile, shares and follows are gone, and you\'re signed out everywhere. Remove MCPortal from your Claude connectors too.</p>'));
       return true;
     }
 

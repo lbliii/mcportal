@@ -29,7 +29,7 @@
     --hover: var(--d-hover);
     --accent: #2563eb;
     --radius: var(--border-radius-lg, 10px);
-    --src-hn: #f26522; --src-github: #7c5cff; --src-rss: #0f9d8a; --src-reader: #2563eb; --src-saved: #d97706; --src-pinned: #db2777; --src-clips: #0891b2;
+    --src-hn: #f26522; --src-github: #7c5cff; --src-rss: #0f9d8a; --src-reader: #2563eb; --src-saved: #d97706; --src-pinned: #db2777; --src-clips: #0891b2; --src-following: #16a34a;
   }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
@@ -182,6 +182,7 @@
   .reader .body blockquote { margin: 0 0 14px; padding-left: 12px; border-left: 3px solid var(--border); color: var(--fg2); }
   .clip-tags { display: flex; flex-wrap: wrap; gap: 6px; margin: -10px 0 16px; }
   .clip-tags span { font-size: 12px; color: var(--fg2); background: var(--hover); padding: 1px 8px; border-radius: 10px; }
+  .reader .share-note { margin: 0 0 18px; padding: 10px 14px; border-left: 3px solid var(--src-following); background: var(--hover); border-radius: 0 8px 8px 0; white-space: pre-wrap; }
   .reader .clip-note { margin: 0 0 18px; color: var(--fg2); font-style: italic; white-space: pre-wrap; }
   .reader .clip-quote { font-size: 18px; line-height: 1.55; white-space: pre-wrap; margin: 0 0 10px; padding-left: 14px; border-left: 3px solid var(--src-clips); }
   .reader .clip-attr { color: var(--fg2); margin: 0 0 14px; }
@@ -289,7 +290,7 @@
   try { devToken = DEV && DEV.needsToken ? sessionStorage.getItem('mcportal-token') : null; } catch { devToken = null; }
   let loading = null;
   let articleUrl = null;   // set when this view belongs to a read_article call (a reader card)
-  let clipId = null;       // set when this view belongs to a get_clip call (a clip card)
+  let clipId = null;       // set when this view belongs to a get_clip or get_share call (a card); share ids start with "s"
 
   function hostRequest(method, params, timeoutMs = 30000) {
     const id = nextId++;
@@ -332,7 +333,8 @@
     } else if (method === 'ui/notifications/tool-result') {
       toolRunning = false;
       const data = params.structuredContent;
-      if (data && data.clip && data.clip.data) { gotInitialResult = true; showClipCard(data.clip); }
+      if (data && data.share && data.share.id) { gotInitialResult = true; showShareCard(data.share); }
+      else if (data && data.clip && data.clip.data) { gotInitialResult = true; showClipCard(data.clip); }
       else if (data && data.article) { gotInitialResult = true; showArticleCard(data.article, data.saved); }
       else if (data && data.profile && data.panels) { gotInitialResult = true; renderWorkspace(data); }
       else if (params.isError) setStatus('The workspace could not load');
@@ -766,7 +768,7 @@
     const thumb = item.image && item.image.kind === 'thumb';
     return el('div', {
       class: 'item', role: 'button', tabindex: '0',
-      title: [item.clip ? 'Open the clip' : item.url && panel.source !== 'github' && panel.source !== 'pinned' ? 'Open in reader view' : 'Open', byline].filter(Boolean).join(' · '),
+      title: [item.clip || (item.share && item.share.kind === 'clip') ? 'Open the clip' : item.url && panel.source !== 'github' && panel.source !== 'pinned' ? 'Open in reader view' : 'Open', byline].filter(Boolean).join(' · '),
       onclick: () => openItem(item, panel),
       onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) openItem(item, panel); },
     }, thumb ? el('div', { class: 'item-row' }, thumbBox(item, `var(--src-${panel.source})`), el('div', { class: 'item-text' }, text)) : text);
@@ -841,6 +843,7 @@
   // ------------------------------------------------------------ reader view
   function openItem(item, panel) {
     if (item.clip) return openClip(item, panel);
+    if (item.share && item.share.kind === 'clip') return openShare(item);
     // Videos play at the source; pinned items are often internal pages reader view can't reach.
     const readable = item.url && panel.source !== 'github' && panel.source !== 'pinned' && !item.video;
     if (!readable) return openLink(item.url);
@@ -1008,6 +1011,57 @@
     }
   }
 
+  // ------------------------------------------------------------ shares
+  // Other people's words: built as text like everything else, and labeled with who wrote them.
+  function shareNodes(share, withBack) {
+    const who = share.mine ? 'You' : `@${share.author.handle}`;
+    const to = share.audience === 'mcportal' ? 'everyone on MCPortal' : 'followers';
+    const top = el('div', { class: 'reader-top' },
+      withBack ? iconButton('back', 'Back to the workspace', closeReader, 'ib') : null,
+      share.url && isHttpUrl(share.url) ? iconButton('external', 'Open the original', () => openLink(share.url), 'ib') : null);
+    const body = share.clip ? clipBody(share.clip.data)
+      : share.url && isHttpUrl(share.url) ? [el('p', null, el('button', { class: 'btn', onclick: () => openLink(share.url) }, share.url))] : [];
+    return [top, el('h1', null, share.title),
+      el('div', { class: 'byline' }, [`${who} shared ${share.kind === 'clip' ? `a ${share.clip ? share.clip.kind : 'clip'}` : 'a link'}`, `with ${to}`, ago(share.createdAt)].join(' · ')),
+      share.note ? el('p', { class: 'share-note' }, share.note) : null,
+      el('div', { class: 'body' }, body),
+      el('div', { class: 'prov' }, share.hiddenAt ? 'An admin hid this share; only you can see it.' : `Shared on MCPortal. ${share.mine ? '' : 'Written by another user.'}`)].filter(Boolean);
+  }
+
+  function showShareCard(share) {
+    root.classList.add('article-view');
+    $('wsName').textContent = '· shared';
+    $('grid').hidden = true;
+    const reader = $('reader');
+    reader.hidden = false; reader.scrollTop = 0;
+    reader.replaceChildren(...shareNodes(share, false));
+    setStatus('');
+  }
+
+  async function loadShareCard(id) {
+    setStatus('Loading…');
+    try {
+      showShareCard((await callTool('get_share', { id })).structuredContent.share);
+    } catch (error) {
+      setStatus('');
+      $('grid').hidden = true;
+      $('reader').hidden = false;
+      $('reader').replaceChildren(el('div', { class: 'error' }, `That share isn't available (${error.message}).`));
+    }
+  }
+
+  async function openShare(item) {
+    const reader = $('reader');
+    $('grid').hidden = true; reader.hidden = false; reader.scrollTop = 0; window.scrollTo(0, 0);
+    reader.replaceChildren(el('div', { class: 'reader-top' }, iconButton('back', 'Back to the workspace', closeReader, 'ib')), el('h1', null, item.title), el('div', { class: 'byline' }, 'Loading…'));
+    try {
+      reader.replaceChildren(...shareNodes((await callTool('get_share', { id: item.share.id })).structuredContent.share, true));
+    } catch (error) {
+      reader.replaceChildren(el('div', { class: 'reader-top' }, iconButton('back', 'Back to the workspace', closeReader, 'ib')), el('h1', null, item.title),
+        el('div', { class: 'error' }, `That share isn't available (${error.message}).`));
+    }
+  }
+
   // ------------------------------------------------------------ add a source
   function toggleAdd(open = $('addSheet').hidden) {
     $('addSheet').hidden = !open;
@@ -1158,7 +1212,7 @@
     const check = () => {
       if (gotInitialResult) return;
       if (toolRunning && Date.now() - started < 45000) { setTimeout(check, 1000); return; }
-      articleUrl ? loadArticleCard(articleUrl) : clipId ? loadClipCard(clipId) : loadWorkspace();
+      articleUrl ? loadArticleCard(articleUrl) : clipId ? (clipId[0] === 's' ? loadShareCard(clipId) : loadClipCard(clipId)) : loadWorkspace();
     };
     setTimeout(check, 3000);
   }

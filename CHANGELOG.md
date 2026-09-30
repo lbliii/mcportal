@@ -15,6 +15,13 @@
 - **Account page** at `/account`: sign in with GitHub to download everything, import an export, or delete your account. Deletion needs the typed confirmation, and it removes the portal, clips and public profile, revokes every sign-in token and removes the account. It is never an MCP tool.
 - **Public profiles (opt-in):** claim a handle (suggested from your GitHub login) with a display name and bio. Other signed-in users can look you up. A handle you give up is held for you for 30 days.
 
+### Sharing
+- **Share** a saved link or a clip with a note, to your followers (the default) or everyone on MCPortal. It needs a public profile. What you share is copied as it is, and Claude asks you to approve any note it writes.
+- **Follow** people by handle. Their shares appear in a **Following** panel, which your first follow adds. **Mute** hides someone from that panel. **Block** hides you from each other and removes follows both ways.
+- **Report** a share or a person. Admins see reports on `/admin` and can hide a share (only its author still sees it, marked hidden), dismiss the report or suspend the author. Every action is audited.
+- **Safe by default:** other people's notes and shares always reach Claude fenced as untrusted text, and account ids never leave the server. Deleting your account removes your shares, follows, mutes and blocks, and anonymizes the reports you filed.
+- **Storage:** new Postgres tables for shares, follows, mutes, blocks and reports (schema version 3, upgraded in place).
+
 ### Hosted service
 - **Public pages:** a landing page at `/` with screenshots, a privacy policy at `/privacy` and support at `/support`. `MCPORTAL_SUPPORT_URL` and `MCPORTAL_OPERATOR` configure them.
 - **Railway infrastructure as code:** `.railway/railway.ts` replaces `railway.toml`.

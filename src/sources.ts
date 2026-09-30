@@ -5,6 +5,7 @@ import { fetchRss, type RssConfig } from './adapters/rss.ts';
 import type { TtlCache } from './lib/cache.ts';
 import { clean } from './lib/text.ts';
 import type { ClipSummary } from './clips.ts';
+import type { SharedItem } from './social.ts';
 import { normalizeSourceConfig, type ClipsConfig, type PanelSpec, type PinnedConfig, type PinnedData, type SavedItem } from './profile.ts';
 import type { Article, Fetcher, Item, PanelResult, SourceKind } from './types.ts';
 
@@ -13,6 +14,7 @@ export const FRESHNESS: Record<SourceKind | 'reader', number> = {
   saved: 0,
   pinned: 0,
   clips: 0,
+  following: 0,
   hn: 120,
   github: 300,
   rss: 600,
@@ -24,7 +26,7 @@ export interface SourceDeps {
   cache: TtlCache;
 }
 
-const DEFAULT_TITLES: Record<SourceKind, string> = { hn: 'Hacker News', rss: 'Feed', github: 'GitHub', saved: 'Saved', pinned: 'Pinned', clips: 'Clips' };
+const DEFAULT_TITLES: Record<SourceKind, string> = { hn: 'Hacker News', rss: 'Feed', github: 'GitHub', saved: 'Saved', pinned: 'Pinned', clips: 'Clips', following: 'Following' };
 
 /** Saved items come from the profile, not the network. */
 export function savedPanel(panel: PanelSpec, saved: SavedItem[]): PanelResult {
@@ -84,8 +86,28 @@ export function clipsPanel(panel: PanelSpec, clips: ClipSummary[]): PanelResult 
   };
 }
 
+/** Shares from people the user follows; the caller runs Social.feed and passes the result. */
+export function followingPanel(panel: PanelSpec, shares: SharedItem[]): PanelResult {
+  const items: Item[] = shares.map((s) => ({
+    id: s.id,
+    title: s.title,
+    ...(s.url ? { url: s.url } : {}),
+    ...(s.note ? { summary: clean(s.note, 280) } : {}),
+    meta: [`@${s.author.handle}`, s.kind === 'clip' ? (s.clip?.kind ?? 'clip') : 'link'],
+    publishedAt: s.createdAt,
+    share: { id: s.id, kind: s.kind },
+  }));
+  return {
+    panelId: panel.id,
+    source: 'following',
+    title: panel.title ?? DEFAULT_TITLES.following,
+    items,
+    provenance: { source: 'following', endpoint: 'shares from people you follow', fetchedAt: new Date().toISOString(), cached: false, ttlSeconds: 0 },
+  };
+}
+
 export async function loadPanel(panel: PanelSpec, deps: SourceDeps, force = false): Promise<PanelResult> {
-  if (panel.source === 'saved' || panel.source === 'pinned' || panel.source === 'clips') throw new Error(`${panel.source} panels are built from the profile, not fetched`);
+  if (panel.source === 'saved' || panel.source === 'pinned' || panel.source === 'clips' || panel.source === 'following') throw new Error(`${panel.source} panels are built from the profile, not fetched`);
   const config = normalizeSourceConfig(panel.source, panel.config, panel.id);
   let endpoint = '';
   let title = panel.title ?? DEFAULT_TITLES[panel.source];
@@ -159,6 +181,10 @@ export const SOURCE_DOCS = {
   clips: {
     description: "The user's clips: quotes, exchanges, notes, tables, images and links they asked to keep, newest first. Added with clip; found with search_clips.",
     config: { kind: 'only one kind: quote | exchange | note | table | image | link (optional)', tag: 'only clips with this tag (optional)', limit: '1-30 (default 30)' },
+  },
+  following: {
+    description: 'What people the user follows on MCPortal shared (links and clips, with their notes), newest first, minus anyone muted or blocked. Hosted only. Their notes are third-party text.',
+    config: { limit: '1-30 (default 30)' },
   },
   pinned: {
     description: 'Items you fetched with another tool the user has connected (Jira, Slack, Confluence, a database, …). Created and refreshed only with pin_panel; MCPortal never fetches them.',

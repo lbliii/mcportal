@@ -76,7 +76,7 @@ export interface Profile {
 
 /** Columns scroll sideways, so there can be more than fit on screen. */
 export const LIMITS = { columns: 8, panelsPerColumn: 4, items: 30, saved: 200 } as const;
-export const SOURCES: SourceKind[] = ['hn', 'rss', 'github', 'saved', 'pinned', 'clips'];
+export const SOURCES: SourceKind[] = ['hn', 'rss', 'github', 'saved', 'pinned', 'clips', 'following'];
 
 export class ProfileError extends Error {
   override name = 'ProfileError';
@@ -135,7 +135,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 export function normalizeSourceConfig(source: SourceKind, raw: unknown, where: string): HnConfig | RssConfig | GithubConfig | PinnedConfig | ClipsConfig | { limit: number } {
   const config = isRecord(raw) ? raw : {};
-  if (source === 'saved') return { limit: clampInt(config.limit, 1, LIMITS.items, LIMITS.items) };
+  if (source === 'saved' || source === 'following') return { limit: clampInt(config.limit, 1, LIMITS.items, LIMITS.items) };
   if (source === 'clips') {
     if (config.kind !== undefined && !(CLIP_KINDS as readonly unknown[]).includes(config.kind)) throw new ProfileError(`${where}: clips kind must be one of ${CLIP_KINDS.join(', ')}`);
     const tag = typeof config.tag === 'string' ? config.tag.toLowerCase().replace(/^#/, '').replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 30) : '';

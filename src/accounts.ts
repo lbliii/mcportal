@@ -311,6 +311,13 @@ export class Accounts {
     return Object.values(this.doc!.invites).find((i) => i.code === code);
   }
 
+  /** Record an admin action taken elsewhere (moderation) in the audit log. */
+  record(actor: string, action: string, target: string, detail?: string): Promise<void> {
+    return this.write((doc) => {
+      doc.audit.push({ at: this.now(), actor, action, target, detail: clean(detail, 200) || undefined });
+    });
+  }
+
   async auditLog(limit = 50): Promise<AuditEntry[]> {
     await this.load(true);
     return this.doc!.audit.slice(-limit).reverse();

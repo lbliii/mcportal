@@ -102,7 +102,7 @@ test('pg import: copies file profiles and auth.json once, never overwrites, skip
   }
 });
 
-test('pg clips: round-trip, search, tags, paging, isolation, limits, schema v2', { skip }, async () => {
+test('pg clips: round-trip, search, tags, paging, isolation, limits; v1 upgrades in place', { skip }, async () => {
   const { buildClip, ClipError, CLIP_LIMITS } = await import('../src/clips.ts');
   const { PgClipStore } = await import('../src/db.ts');
   const store = new PgClipStore(db);
@@ -110,7 +110,7 @@ test('pg clips: round-trip, search, tags, paging, isolation, limits, schema v2',
   await db.query(`UPDATE mcportal_meta SET value = '1' WHERE key = 'schema_version'`);
   await ensureSchema(db);
   const version = await db.query<{ value: string }>(`SELECT value FROM mcportal_meta WHERE key = 'schema_version'`);
-  assert.equal(version.rows[0]!.value, '2');
+  assert.equal(version.rows[0]!.value, '3');
 
   const t0 = new Date('2026-09-01T00:00:00Z');
   const a = buildClip({ kind: 'quote', text: 'Point-in-time recovery, 100% of the time', tags: ['infra'] }, t0);
@@ -165,4 +165,42 @@ test('pg deletion: a profile (and its kept corrupt copies) and all clips of one 
   assert.equal((await clips.list('keep')).length, 1);
   const kv = await db.query<{ key: string }>(`SELECT key FROM mcportal_kv WHERE key LIKE 'corrupt-profile:del%' ORDER BY key`);
   assert.deepEqual(kv.rows.map((r) => r.key), ['corrupt-profile:del%1:1'], 'the LIKE pattern is escaped: only del_1\'s copies go');
+});
+
+test('pg social: shares, feed rules, relations, hiding, reports, forget; schema v3', { skip }, async () => {
+  const { PgSocialStore } = await import('../src/db.ts');
+  const { Social } = await import('../src/social.ts');
+  const { PublicProfiles } = await import('../src/public-profiles.ts');
+  const { memoryPersistence } = await import('../src/accounts.ts');
+  const version = await db.query<{ value: string }>(`SELECT value FROM mcportal_meta WHERE key = 'schema_version'`);
+  assert.equal(version.rows[0]!.value, '3');
+  let now = Date.parse('2026-10-01T00:00:00Z');
+  const profiles = new PublicProfiles(memoryPersistence());
+  for (const [id, handle] of [['pa', 'pg_alice'], ['pb', 'pg_bob'], ['pc', 'pg_carol']]) await profiles.set(id!, { handle });
+  const store = new PgSocialStore(db);
+  const social = new Social({ store, profiles, now: () => (now += 1000) });
+  for (let i = 0; i < 45; i++) await social.share('pa', { kind: 'link', title: `f${i}`, url: `https://example.com/${i}` });
+  const pub = await social.share('pa', { kind: 'link', title: 'public', url: 'https://example.com/p', audience: 'mcportal' });
+  await social.follow('pb', 'pg_alice');
+  const first = await social.feed('pb', { limit: 30 });
+  assert.equal(first.length, 30);
+  assert.equal(first[0]!.title, 'public');
+  const second = await social.feed('pb', { limit: 30, before: first[29]!.createdAt });
+  assert.equal(second.length, 16, 'paging reaches the rest');
+  assert.equal(await social.get('pc', first[1]!.id), undefined);
+  assert.equal((await social.get('pc', pub.id))?.title, 'public');
+  await store.setHidden(pub.id, new Date(now).toISOString());
+  assert.equal(await social.get('pc', pub.id), undefined);
+  assert.ok((await social.get('pa', pub.id))?.hiddenAt);
+  assert.equal(await store.relate('follows', 'pb', 'pa'), false, 'follows are unique');
+  await social.block('pa', 'pg_bob', true);
+  assert.deepEqual(await store.outgoing('follows', 'pb'), []);
+  const r = await social.report('pc', { shareId: (await social.sharesOf('pc', 'pa'))[0]?.id ?? pub.id }, 'x').catch(() => social.report('pc', { handle: 'pg_alice' }, 'x'));
+  const resolved = await social.resolveReport(r.id, 'admin:t', 'dismissed');
+  assert.equal(resolved?.status, 'resolved');
+  await social.forget('pc');
+  assert.equal((await store.reports())[0]!.reporterId, 'deleted');
+  await social.forget('pa');
+  assert.equal(await store.countShares('pa'), 0);
+  assert.deepEqual(await store.outgoing('blocks', 'pa'), []);
 });

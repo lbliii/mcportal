@@ -7,6 +7,8 @@
  *   POST /admin/logout
  *   GET  /admin/api/state    accounts, invites, audit log, CSRF token
  *   POST /admin/api/{invite,uninvite,suspend,reinstate}
+ *   POST /admin/api/report          { id, action: hide | dismiss }: resolve a report
+ *   POST /admin/api/unhide          { id }: show a hidden share again
  *   GET  /join/<code>        public: how an invited person connects (no script)
  *
  * Sessions live in memory (sign in again after a deploy), in an HttpOnly,
@@ -18,6 +20,8 @@ import { readFile } from 'node:fs/promises';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { fileURLToPath } from 'node:url';
 import type { Accounts } from './accounts.ts';
+import type { PublicProfiles } from './public-profiles.ts';
+import type { Social } from './social.ts';
 import { cookies, escapeHtml, page, redirect, safeEqual, sendHtml, sendJson, type OAuthServer } from './auth/oauth.ts';
 
 const SESSION_MS = 8 * 3600 * 1000;
@@ -52,12 +56,38 @@ export class AdminPanel {
   private oauth: OAuthServer;
   private publicUrl: string;
   private now: () => number;
+  private social?: Social;
+  private profiles?: PublicProfiles;
 
-  constructor(accounts: Accounts, oauth: OAuthServer, publicUrl: string, now: () => number = Date.now) {
+  constructor(accounts: Accounts, oauth: OAuthServer, publicUrl: string, now: () => number = Date.now, moderation: { social?: Social; profiles?: PublicProfiles } = {}) {
     this.accounts = accounts;
     this.oauth = oauth;
     this.publicUrl = publicUrl;
     this.now = now;
+    this.social = moderation.social;
+    this.profiles = moderation.profiles;
+  }
+
+  /** Open reports and the last few resolved ones, with what they're about. */
+  private async reportsView(): Promise<unknown[]> {
+    if (!this.social) return [];
+    const reports = [...(await this.social.reports('open')), ...(await this.social.reports('resolved')).slice(0, 20)];
+    const who = async (accountId: string) => ({ accountId, login: this.accounts.actor(accountId).login ?? null, handle: (await this.profiles?.get(accountId))?.handle ?? null });
+    return Promise.all(reports.map(async (r) => {
+      const share = r.targetKind === 'share' ? await this.social!.getShareForAdmin(r.targetId) : undefined;
+      const targetAccount = share?.accountId ?? (r.targetKind === 'profile' ? r.targetId : undefined);
+      return {
+        ...r,
+        reporter: r.reporterId === 'deleted' ? { accountId: 'deleted', login: null, handle: null } : await who(r.reporterId),
+        target: {
+          kind: r.targetKind,
+          id: r.targetId,
+          exists: r.targetKind === 'profile' || Boolean(share),
+          account: targetAccount ? await who(targetAccount) : null,
+          ...(share ? { title: share.title, note: share.note ?? '', url: share.url ?? '', hidden: Boolean(share.hiddenAt), kind: share.kind } : {}),
+        },
+      };
+    }));
   }
 
   private get secure(): boolean {
@@ -179,7 +209,41 @@ export class AdminPanel {
     if (route === '/admin/api/state' && req.method === 'GET') {
       await this.accounts.load(true);
       const { accounts, invites } = await this.accounts.list();
-      sendJson(res, 200, { me: { login: current.session.login, accountId: current.session.accountId }, csrf: current.session.csrf, accounts, invites, audit: await this.accounts.auditLog(100) });
+      sendJson(res, 200, { me: { login: current.session.login, accountId: current.session.accountId }, csrf: current.session.csrf, accounts, invites, audit: await this.accounts.auditLog(100), reports: await this.reportsView() });
+      return true;
+    }
+
+    const moderation = route.match(/^\/admin\/api\/(report|unhide)$/)?.[1];
+    if (moderation && req.method === 'POST') {
+      if (!this.sameOrigin(req)) return sendJson(res, 403, { error: 'Cross-site request refused' }), true;
+      const csrf = String(req.headers['x-csrf'] ?? '');
+      if (!csrf || !safeEqual(csrf, current.session.csrf)) return sendJson(res, 403, { error: 'Missing or stale CSRF token; reload the page' }), true;
+      if (!this.social) return sendJson(res, 404, { error: 'Sharing is not enabled on this server' }), true;
+      let body: Record<string, unknown>;
+      try {
+        body = await readJson(req);
+      } catch {
+        return sendJson(res, 400, { error: 'Send a small JSON body' }), true;
+      }
+      const id = String(body.id ?? '');
+      const by = `admin:${current.session.login}`;
+      if (moderation === 'unhide') {
+        if (!(await this.social.hideShare(id, false))) return sendJson(res, 404, { error: 'No such share' }), true;
+        await this.accounts.record(by, 'share.unhidden', id);
+      } else {
+        const report = (await this.social.reports()).find((r) => r.id === id);
+        if (!report) return sendJson(res, 404, { error: 'No such report' }), true;
+        if (body.action === 'hide') {
+          if (report.targetKind !== 'share' || !(await this.social.hideShare(report.targetId, true))) return sendJson(res, 400, { error: 'That report is not about a share that still exists' }), true;
+          await this.social.resolveReport(id, by, 'share hidden');
+          await this.accounts.record(by, 'share.hidden', report.targetId, `report ${id}`);
+        } else if (body.action === 'dismiss') {
+          await this.social.resolveReport(id, by, 'dismissed');
+          await this.accounts.record(by, 'report.dismissed', id);
+        } else return sendJson(res, 400, { error: 'action must be hide or dismiss' }), true;
+      }
+      const { accounts, invites } = await this.accounts.list();
+      sendJson(res, 200, { ok: true, accounts, invites, audit: await this.accounts.auditLog(100), reports: await this.reportsView() });
       return true;
     }
 
@@ -209,7 +273,7 @@ export class AdminPanel {
         return sendJson(res, 400, { error: (error as Error).message }), true;
       }
       const { accounts, invites } = await this.accounts.list();
-      sendJson(res, 200, { ok: true, accounts, invites, audit: await this.accounts.auditLog(100) });
+      sendJson(res, 200, { ok: true, accounts, invites, audit: await this.accounts.auditLog(100), reports: await this.reportsView() });
       return true;
     }
 

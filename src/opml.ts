@@ -72,7 +72,7 @@ export function buildOpml(profile: Profile, now = new Date()): { opml: string; c
     const lines = column.panels.flatMap((panel) => {
       const url = feedUrlFor(panel);
       const name = panel.title ?? panel.id;
-      if (!url) { if (panel.source !== 'saved' && panel.source !== 'pinned') skipped.push(name); return []; }
+      if (!url) { if (!['saved', 'pinned', 'clips', 'following'].includes(panel.source)) skipped.push(name); return []; }
       count++;
       return [`      <outline type="rss" text="${xmlAttr(name)}" title="${xmlAttr(name)}" xmlUrl="${xmlAttr(url)}"/>`];
     });

@@ -88,7 +88,7 @@ function privacy(site: SiteConfig): string {
 <h1>Privacy policy</h1>
 <p class="muted">Last updated ${POLICY_UPDATED}. This policy covers the MCPortal service at <code>${escapeHtml(site.publicUrl)}</code>, which is run by ${who}.</p>
 
-<p>Here's the short version. MCPortal stores your GitHub user ID and login, your portal (layout, sources, saved items and clips), a public profile only if you create one, and short-lived sign-in tokens. It doesn't store your email, your name or your GitHub password. It has no ads, trackers or analytics, and it doesn't sell or share your data.</p>
+<p>Here's the short version. MCPortal stores your GitHub user ID and login, your portal (layout, sources, saved items and clips), a public profile, shares and follows only if you use them, and short-lived sign-in tokens. It doesn't store your email, your name or your GitHub password. It has no ads, trackers or analytics, and it doesn't sell or share your data.</p>
 
 <h2>What MCPortal stores</h2>
 <table>
@@ -99,6 +99,9 @@ function privacy(site: SiteConfig): string {
 <tr><td><b>Clips:</b> quotes, parts of a conversation, notes, tables, images and links you ask Claude to keep, with any title, note and tags</td><td>To show your Clips panel and find them again in later chats</td><td>Until you delete them</td></tr>
 <tr><td><b>Pinned results:</b> if you ask Claude to pin results from another connected tool (for example, a list of issues), the titles, links, short summaries and details it copies in, and the request needed to refresh them</td><td>To show that panel</td><td>Until you remove the panel</td></tr>
 <tr><td><b>Public profile (only if you create one):</b> your handle, display name and bio, which other signed-in MCPortal users can see</td><td>So people can find you</td><td>Until you remove it; a handle you give up stays reserved for you for 30 days</td></tr>
+<tr><td><b>Shares:</b> links and clips you choose to share, with your note, a copy of what you shared, and who it's for (your followers or everyone on MCPortal)</td><td>To show them to the people you shared them with</td><td>Until you remove them</td></tr>
+<tr><td><b>Follows, mutes and blocks:</b> who you follow, mute and block</td><td>To build your Following panel and keep blocked people apart</td><td>Until you change them. People see how many followers you have, never who</td></tr>
+<tr><td><b>Reports:</b> what you reported, why, and when</td><td>So admins can act on abuse</td><td>Kept after they're resolved; if you delete your account, your name is removed from them</td></tr>
 <tr><td><b>Sign-in tokens:</b> stored only as one-way hashes, with the app that asked for them (for example, Claude)</td><td>To keep you signed in</td><td>Access tokens 1 hour; refresh tokens 30 days</td></tr>
 <tr><td><b>Invites and the admin audit log:</b> who invited whom, and suspensions or reinstatements with a short reason</td><td>To run an invite-only service and keep a record of admin actions</td><td>The newest 2,000 log entries are kept</td></tr>
 </table>
@@ -110,6 +113,9 @@ function privacy(site: SiteConfig): string {
 <h2>What MCPortal sends to other sites</h2>
 <p>When your portal loads, MCPortal's server fetches the feeds, articles and thumbnails you asked for. Those sites see the server's address, not yours. Fetched content is cached in the server's memory for between two minutes and one day, and is shared across users because it's the same public content. It isn't written to the database. When you choose to open an original story or its discussion, your browser goes to that site directly, and that site's own privacy policy applies.</p>
 <p>When you use MCPortal in Claude, what you see in your portal is also available to Claude, and Anthropic's privacy policy covers your conversations.</p>
+
+<h2>What other people see</h2>
+<p>Nothing, unless you choose. With a public profile, signed-in MCPortal users can see your handle, display name, bio, follower count, and the shares you made for them (your followers, or everyone). Shares are never published to the open web. Admins can see reported shares and profiles, and can hide a share or suspend an account.</p>
 
 <h2>Logs</h2>
 <p>Server logs record which tool ran, whether it worked, and how long it took. They don't record your user ID, your IP address, what you read or what you asked for. An error message can occasionally include the name of a site that failed to load. Separately, the hosting provider (Railway) keeps request logs, which include IP addresses and the pages requested, for a limited time.</p>
@@ -124,8 +130,8 @@ function privacy(site: SiteConfig): string {
 <ul>
   <li><b>See and change your data:</b> ask Claude to show your portal settings, change them, or remove saved items at any time.</li>
   <li><b>Take it with you:</b> ask Claude to export your data, or download it from your <a href="/account">account page</a>: everything as one file another MCPortal can import, saved items as a bookmarks file, clips as Markdown, and sources as OPML.</li>
-  <li><b>Delete clips or your public profile:</b> ask Claude at any time.</li>
-  <li><b>Delete your account:</b> sign in on your <a href="/account">account page</a> and delete it. Your account, portal, saved items, clips and public profile are deleted at once, and you're signed out everywhere. Backups roll over within 30 days.</li>
+  <li><b>Delete clips, shares or your public profile, or block someone:</b> ask Claude at any time. Removing your public profile hides your shares from everyone.</li>
+  <li><b>Delete your account:</b> sign in on your <a href="/account">account page</a> and delete it. Your account, portal, saved items, clips, public profile, shares and follows are deleted at once, and you're signed out everywhere. Backups roll over within 30 days.</li>
   <li><b>Disconnect:</b> remove MCPortal from Claude's connectors. You can also revoke it on GitHub under Settings → Applications.</li>
 </ul>
 
@@ -158,6 +164,8 @@ function support(site: SiteConfig): string {
 <p>MCPortal is invite-only right now. The invite is tied to one GitHub account, so sign in as the account that was invited.</p>
 <h3>How do I bring my subscriptions from another reader?</h3>
 <p>Export OPML from your old reader and ask Claude to import it. To take your subscriptions elsewhere, ask Claude to export OPML.</p>
+<h3>Someone is bothering me.</h3>
+<p>Ask Claude to block them: they can't follow you or see your shares, and you won't see theirs. To tell the admins, ask Claude to report the share or the person.</p>
 <h3>How do I get my data out?</h3>
 <p>Ask Claude to export it, or download it from your <a href="/account">account page</a>. Everything comes as one file another MCPortal can import; saved items also come as a bookmarks file, clips as Markdown and sources as OPML.</p>
 <h3>How do I delete my account?</h3>

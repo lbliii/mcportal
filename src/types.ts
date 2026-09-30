@@ -1,9 +1,10 @@
 /**
  * 'saved' is the user's own bookmarks and 'pinned' is data the agent brought from
  * another tool (Jira, Slack, …): both live in the profile and are never fetched.
- * 'clips' come from the clip store (src/clips.ts), also never fetched.
+ * 'clips' come from the clip store (src/clips.ts) and 'following' from shares of
+ * people the user follows (src/social.ts); neither is fetched.
  */
-export type SourceKind = 'hn' | 'rss' | 'github' | 'saved' | 'pinned' | 'clips';
+export type SourceKind = 'hn' | 'rss' | 'github' | 'saved' | 'pinned' | 'clips' | 'following';
 
 export const CLIP_KINDS = ['quote', 'exchange', 'note', 'table', 'image', 'link'] as const;
 export type ClipKind = (typeof CLIP_KINDS)[number];
@@ -24,6 +25,8 @@ export interface Item {
   video?: boolean;
   /** Items of a clips panel: open with get_clip. */
   clip?: { id: string; kind: ClipKind };
+  /** Items of a following panel: open with get_share. */
+  share?: { id: string; kind: 'link' | 'clip' };
 }
 
 /** "Show your work": where a block's data came from and how fresh it is. */

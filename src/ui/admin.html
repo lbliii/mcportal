@@ -63,6 +63,9 @@
   <h2>Pending invites</h2>
   <div class="wrap"><table><thead><tr><th>GitHub</th><th>Invited by</th><th>When</th><th></th></tr></thead><tbody id="invites"></tbody></table></div>
 
+  <h2>Reports</h2>
+  <div class="wrap"><table><thead><tr><th>When</th><th>About</th><th>Reason</th><th>From</th><th>Status</th><th></th></tr></thead><tbody id="reports"></tbody></table></div>
+
   <h2>Accounts</h2>
   <div class="wrap"><table><thead><tr><th>Account</th><th>GitHub</th><th>Status</th><th>Role</th><th>Joined via</th><th>Since</th><th></th></tr></thead><tbody id="accounts"></tbody></table></div>
 
@@ -135,6 +138,24 @@
         el('td', null, a.via), el('td', null, when(a.createdAt)), el('td', null, action));
     }) : [el('tr', null, el('td', { colspan: '7', class: 'empty' }, 'No accounts yet. People get one when they first sign in.'))]));
 
+    const person = (p) => (p ? (p.handle ? `@${p.handle}` : p.login ? `@${p.login} (GitHub)` : p.accountId) : '?');
+    const reports = data.reports || [];
+    $('reports').replaceChildren(...(reports.length ? reports.map((r) => {
+      const t = r.target;
+      const about = t.kind === 'share'
+        ? (t.exists ? [el('b', null, t.title), t.note ? el('div', { class: 'muted' }, `“${t.note}”`) : null, el('div', { class: 'muted' }, `share by ${person(t.account)}${t.hidden ? ' · hidden' : ''}`)] : el('span', { class: 'muted' }, 'a share that was removed'))
+        : [el('span', null, `profile ${person(t.account)}`)];
+      const author = t.account && t.account.accountId;
+      const actions = r.status === 'open'
+        ? [t.kind === 'share' && t.exists && !t.hidden ? el('button', { class: 'danger', onclick: () => moderate('report', { id: r.id, action: 'hide' }, 'Hide this share from everyone but its author?') }, 'Hide share') : null,
+           el('button', { onclick: () => moderate('report', { id: r.id, action: 'dismiss' }, 'Dismiss this report?') }, 'Dismiss'),
+           author && author !== me.accountId ? el('button', { class: 'danger', onclick: () => act('suspend', author, `Suspend ${person(t.account)}? They lose access within 30 seconds.`, true) }, 'Suspend author') : null]
+        : [t.kind === 'share' && t.hidden ? el('button', { onclick: () => moderate('unhide', { id: t.id }, 'Show this share again?') }, 'Unhide') : null];
+      return el('tr', null, el('td', null, when(Date.parse(r.createdAt))), el('td', null, about), el('td', null, r.reason), el('td', null, person(r.reporter)),
+        el('td', null, el('span', { class: `pill ${r.status === 'open' ? 'suspended' : 'active'}` }, r.status === 'open' ? 'open' : (r.resolution || 'resolved'))),
+        el('td', null, el('span', { class: 'actions' }, actions)));
+    }) : [el('tr', null, el('td', { colspan: '6', class: 'empty' }, 'No reports.'))]));
+
     $('audit').replaceChildren(...(data.audit.length ? data.audit.map((e) => el('tr', null,
       el('td', null, when(e.at)), el('td', null, e.action), el('td', null, e.target), el('td', null, e.actor), el('td', { class: 'muted' }, e.detail || ''))) : [el('tr', null, el('td', { colspan: '5', class: 'empty' }, 'Nothing yet.'))]));
   }
@@ -145,6 +166,14 @@
     try {
       render(await api(`/admin/api/${action}`, { who, reason }));
       say(`Done: ${action} ${who}.`);
+    } catch (error) { say(error.message, true); }
+  }
+
+  async function moderate(path, body, question) {
+    if (!confirm(question)) return;
+    try {
+      render(await api(`/admin/api/${path}`, body));
+      say('Done.');
     } catch (error) { say(error.message, true); }
   }
 

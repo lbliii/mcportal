@@ -69,6 +69,13 @@ export const TOOL_ACTIONS: Record<string, Action> = {
   export_data: 'read',
   import_portal: 'write',
   account_settings: 'read',
+  share: 'write',
+  unshare: 'write',
+  get_share: 'read',
+  list_shares: 'read',
+  relationship: 'write',
+  list_connections: 'read',
+  report: 'write',
 };
 
 export function toolAction(name: string): Action {

@@ -143,6 +143,12 @@ The `/preview` page never contains secrets. With a static token it asks for the 
 | `export_data` | model | Everything as an MCPortal export, saved items as bookmarks, clips as Markdown, or sources as OPML: a one-time download link (hosted) or a file (local) |
 | `import_portal` | model | Add an MCPortal export to the portal; only adds. Hosted: returns a one-time upload link, so the file never passes through the model (up to 60 MB). Local: reads a `.json` path |
 | `account_settings` | model | Link to `/account`, where people download everything or delete their account (never a tool) |
+| `share` / `unshare` | model | Share a saved link or clip with a note, to followers (default) or everyone on MCPortal; needs a public profile |
+| `get_share` | model + app | One share in full; renders as a card |
+| `list_shares` | model | Your shares, or what someone shared that you may see |
+| `relationship` | model | Follow, unfollow, mute, unmute, block, unblock by handle; the first follow adds a Following panel |
+| `list_connections` | model | Who you follow, mute and block; your follower count |
+| `report` | model | Report a share or person to the admins (they hide shares or suspend accounts on `/admin`) |
 
 Limits: 8 columns, 4 panels per column, 30 items per panel, 200 saved items, 350 KB per picture. Clips: 32 KB of text, 500 KB per image, tables up to 50 × 500, and 1,000 clips or 50 MB per user. Freshness: HN 2 min, GitHub 5 min, RSS 10 min, reader 1 h, pictures 1 day.
 
@@ -169,8 +175,8 @@ MCPortal is a **reading platform with light social**, driven by your agent. Anyt
 - **Devices:** link a local MCPortal to your hosted account; state syncs, fetching stays local with a hosted fallback ([plan](docs/plans/local-hosted-hybrid.md))
 - [x] **Portability:** full MCPortal export and import, saved items as bookmarks, clips as Markdown, delete account at `/account` ([plan](docs/plans/identity-and-access.md#data-rights-and-portability))
 - [x] **Public profile (opt-in):** claim a handle (e.g. `@lbliii`); nothing is public until you choose
-- **Share** a saved item or clip with a one-line note (Claude can draft it; you approve it); audience is your followers or everyone on MCPortal
-- **Follow, mute, block, report**; followed shares appear in a **Following** panel
+- [x] **Share** a saved item or clip with a one-line note (Claude can draft it; you approve it); audience is your followers or everyone on MCPortal
+- [x] **Follow, mute, block, report**; followed shares appear in a **Following** panel; reports on the admin page
 - **React** with one lightweight signal, so Following can surface what people liked
 
 **Later**

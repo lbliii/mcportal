@@ -47,7 +47,9 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
         if (!found) return toolError(`No MCPortal profile for @${clean(args.handle, 40).replace(/^@/, '')}.`);
         const { accountId: _id, ...profile } = found.profile;
         const moved = found.movedFrom ? `@${found.movedFrom} is now @${profile.handle}.\n` : '';
-        return ok(`${moved}${untrusted(`@${profile.handle}`, describeProfile(found.profile))}`, { profile, ...(found.movedFrom ? { movedFrom: found.movedFrom } : {}) });
+        const stats = ctx.social && found.profile.accountId !== ctx.userId ? await ctx.social.stats(ctx.userId, found.profile.accountId) : undefined;
+        const counts = stats ? `\n${stats.followers} follower(s), ${stats.shares} share(s) you can see.${stats.following ? ' You follow them.' : ''}` : '';
+        return ok(`${moved}${untrusted(`@${profile.handle}`, describeProfile(found.profile))}${counts}`, { profile, ...(stats ? { stats } : {}), ...(found.movedFrom ? { movedFrom: found.movedFrom } : {}) });
       }
       const mine = await ctx.publicProfiles.get(ctx.userId);
       if (mine) return ok(`Your public profile (visible to signed-in MCPortal users):\n${describeProfile(mine)}`, { profile: mine });

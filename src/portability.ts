@@ -16,6 +16,7 @@ import { clipText } from './clip-tools.ts';
 import { buildOpml } from './opml.ts';
 import { LIMITS, normalizePinnedItems, normalizeSaved, ProfileError, validateProfile, type PanelSpec, type Profile } from './profile.ts';
 import type { PublicProfile } from './public-profiles.ts';
+import type { SharedItem, Social } from './social.ts';
 import type { ProfileStore } from './store.ts';
 import { addPanelTo } from './tools.ts';
 import type { ArticleBlock } from './types.ts';
@@ -39,12 +40,16 @@ export interface PortalExport {
   profile: Profile;
   clips: Clip[];
   publicProfile: Pick<PublicProfile, 'handle' | 'displayName' | 'bio'> | null;
+  /** Your shares (with the content as shared) and who you follow, by handle. Not imported. */
+  shares?: Array<Omit<SharedItem, 'author' | 'mine'>>;
+  following?: string[];
 }
 
 export interface ExportSources {
   store: ProfileStore;
   clips?: ClipStore;
   publicProfile?: PublicProfile;
+  social?: Social;
 }
 
 async function allClips(clips: ClipStore | undefined, userId: string): Promise<Clip[]> {
@@ -78,6 +83,10 @@ export async function buildExport(format: ExportFormat, userId: string, from: Ex
     clips,
     publicProfile: p ? { handle: p.handle, ...(p.displayName ? { displayName: p.displayName } : {}), ...(p.bio ? { bio: p.bio } : {}) } : null,
   };
+  if (from.social) {
+    data.shares = (await from.social.sharesOf(userId, userId, { limit: 100_000 })).map(({ author: _a, mine: _m, ...s }) => s);
+    data.following = (await from.social.connections(userId)).following;
+  }
   const panels = profile.columns.reduce((n, c) => n + c.panels.length, 0);
   return {
     filename: `mcportal-export-${stamp(now)}.json`,

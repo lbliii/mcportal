@@ -565,3 +565,46 @@ test('import uploads: one-time links from import_portal and the account page, CS
     await app.close();
   }
 });
+
+test('admin moderation: reports show on the admin page; hide, unhide and dismiss are CSRF-protected and audited', async () => {
+  const { Accounts, makeBootstrap, memoryPersistence } = await import('../src/accounts.ts');
+  const { PublicProfiles } = await import('../src/public-profiles.ts');
+  const { DocumentSocialStore, Social } = await import('../src/social.ts');
+  const users = { 'gh-code-lawrence': { id: 42, login: 'Lawrence' } };
+  const accounts = new Accounts(memoryPersistence(), makeBootstrap(['lawrence'], []));
+  const publicProfiles = new PublicProfiles(memoryPersistence());
+  const social = new Social({ store: new DocumentSocialStore(), profiles: publicProfiles });
+  await publicProfiles.set('github-7', { handle: 'spammer' });
+  await publicProfiles.set('github-8', { handle: 'reader' });
+  const share = await social.share('github-7', { kind: 'link', title: 'Buy now', url: 'https://spam.example/', note: 'cheap', audience: 'mcportal' });
+  const report = await social.report('github-8', { shareId: share.id }, 'spam');
+  const app = await startApp({ github: { clientId: 'gh-client', clientSecret: 'gh-secret' } }, fakeUpstreams(users).fetcher, { accounts, publicProfiles, social });
+  const cookieOf = (res: { headers: Record<string, string | string[] | undefined> }, name: string) =>
+    ([] as string[]).concat(res.headers['set-cookie'] ?? []).map((c) => c.split(';')[0]!).find((c) => c.startsWith(`${name}=`) && c.length > name.length + 1);
+  try {
+    const start = await raw(app.port, { path: '/admin/login' });
+    const gh = new URL(String(start.headers.location));
+    const done = await raw(app.port, { path: `/oauth/callback?code=gh-code-lawrence&state=${gh.searchParams.get('state')}`, headers: { cookie: cookieOf(start, 'mcportal_page')! } });
+    const session = cookieOf(done, 'mcportal_admin')!;
+    const state = JSON.parse((await raw(app.port, { path: '/admin/api/state', headers: { cookie: session } })).body);
+    assert.equal(state.reports.length, 1);
+    assert.equal(state.reports[0].target.title, 'Buy now');
+    assert.equal(state.reports[0].target.account.handle, 'spammer');
+    assert.equal(state.reports[0].reporter.handle, 'reader');
+    const post = (path: string, body: unknown, headers: Record<string, string> = { ...sameOrigin(app.port), 'x-csrf': state.csrf }) =>
+      raw(app.port, { method: 'POST', path, headers: { 'content-type': 'application/json', cookie: session, ...headers }, body: JSON.stringify(body) });
+    assert.equal((await post('/admin/api/report', { id: report.id, action: 'hide' }, sameOrigin(app.port))).status, 403, 'CSRF');
+    const hidden = JSON.parse((await post('/admin/api/report', { id: report.id, action: 'hide' })).body);
+    assert.equal(hidden.reports[0].status, 'resolved');
+    assert.equal(hidden.reports[0].target.hidden, true);
+    assert.equal(await social.get('github-8', share.id), undefined, 'hidden from everyone else');
+    assert.equal(hidden.audit[0].action, 'share.hidden');
+    assert.equal(hidden.audit[0].actor, 'admin:Lawrence');
+    const shown = JSON.parse((await post('/admin/api/unhide', { id: share.id })).body);
+    assert.equal(shown.audit[0].action, 'share.unhidden');
+    assert.equal((await social.get('github-8', share.id))?.title, 'Buy now');
+    assert.equal((await post('/admin/api/report', { id: 'nope', action: 'dismiss' })).status, 404);
+  } finally {
+    await app.close();
+  }
+});

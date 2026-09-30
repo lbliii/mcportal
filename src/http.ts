@@ -17,6 +17,7 @@ import { AccountPage } from './account.ts';
 import { AdminPanel } from './admin.ts';
 import { deliverToFile } from './portability.ts';
 import type { PublicProfiles } from './public-profiles.ts';
+import type { Social } from './social.ts';
 import { DEFAULT_SUPPORT_URL, serveSite, type SiteConfig } from './site.ts';
 import { limitsFromEnv, UsageBudget, type BudgetLimits } from './lib/budget.ts';
 import type { TtlCache } from './lib/cache.ts';
@@ -56,6 +57,8 @@ export interface AppDeps {
   clips?: ClipStore;
   /** Handles and public profiles (only with GitHub sign-in: a single-token server has no social layer). */
   publicProfiles?: PublicProfiles;
+  /** Shares and follows (also only with GitHub sign-in). */
+  social?: Social;
   fetcher: Fetcher;
   cache: TtlCache;
   log?: Log;
@@ -154,15 +157,16 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
     : undefined;
 
   // The admin page needs GitHub sign-in; without it, admins use the `mcportal admin` CLI.
-  const admin = oauth ? new AdminPanel(accounts, oauth, config.publicUrl, deps.now) : undefined;
+  const admin = oauth ? new AdminPanel(accounts, oauth, config.publicUrl, deps.now, { social: oauth && deps.publicProfiles ? deps.social : undefined, profiles: deps.publicProfiles }) : undefined;
   const budget = deps.budget ?? new UsageBudget(config.limits ?? {}, deps.now);
   const site: SiteConfig = { supportUrl: DEFAULT_SUPPORT_URL, ...config.site, publicUrl: config.publicUrl, inviteOnly: Boolean(oauth) && !accounts.openSignup };
   const clips = deps.clips ?? new FileClipStore(config.dataDir);
   const publicProfiles = oauth ? deps.publicProfiles : undefined;
+  const social = oauth && publicProfiles ? deps.social : undefined;
   // The account page needs GitHub sign-in; without it, exports are written to the data directory.
-  const account = oauth ? new AccountPage({ accounts, oauth, store: deps.store, clips, publicProfiles, publicUrl: config.publicUrl, log, now: deps.now }) : undefined;
+  const account = oauth ? new AccountPage({ accounts, oauth, store: deps.store, clips, publicProfiles, social, publicUrl: config.publicUrl, log, now: deps.now }) : undefined;
   const context = (userId: string): ToolContext => ({
-    store: deps.store, clips, publicProfiles, fetcher: deps.fetcher, cache: deps.cache, userId, budget, actor: accounts.actor(userId),
+    store: deps.store, clips, publicProfiles, social, fetcher: deps.fetcher, cache: deps.cache, userId, budget, actor: accounts.actor(userId),
     accountUrl: account?.url,
     uploadLink: account ? () => account.uploadLink(userId) : undefined,
     localFiles: !account && config.allowUnauthenticated && isLoopbackHost(config.host),
