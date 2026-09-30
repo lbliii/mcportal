@@ -17,6 +17,7 @@ function fixtureFor(url: URL): { file: string; type: string } | undefined {
   if (url.host === 'api.github.com' && url.pathname === '/search/repositories') return { file: 'github-search.json', type: 'application/json' };
   if (url.host === 'simonwillison.net' && url.pathname.startsWith('/atom/')) return { file: 'simonw.atom', type: 'application/xml' };
   if (url.host === 'example.com' && url.pathname === '/feed.xml') return { file: 'sample.rss', type: 'application/rss+xml' };
+  if (url.host === 'example.com' && url.pathname === '/') return { file: 'site.html', type: 'text/html; charset=utf-8' };
   if (url.host === 'yashgarg.dev') return { file: 'article.html', type: 'text/html; charset=utf-8' };
   return undefined;
 }

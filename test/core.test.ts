@@ -13,6 +13,7 @@ import { handleMessage, MCP_APP_MIME, scriptJson } from '../src/mcp.ts';
 import { defaultProfile, ProfileError, validateProfile } from '../src/profile.ts';
 import { FileProfileStore, MemoryProfileStore } from '../src/store.ts';
 import { WORKSPACE_URI, type ToolContext } from '../src/tools.ts';
+import { pageFeeds, recipesFor } from '../src/discover.ts';
 
 function ctx(overrides: Partial<ToolContext> = {}): ToolContext {
   return { store: new MemoryProfileStore(), fetcher: createFixtureFetcher(), cache: new TtlCache(), userId: 'test', ...overrides };
@@ -52,7 +53,7 @@ test('notifications get no response; unknown methods get -32601', async () => {
 test('tools/list links open_workspace to the UI and hides app-only tools from the model', async () => {
   const res = await rpc(ctx(), 'tools/list');
   const tools = (res.result as any).tools as any[];
-  assert.deepEqual(tools.map((t) => t.name), ['open_workspace', 'get_profile', 'update_profile', 'read_source', 'refresh_panel', 'read_article', 'save_item', 'remove_saved', 'list_sources']);
+  assert.deepEqual(tools.map((t) => t.name), ['open_workspace', 'get_profile', 'update_profile', 'read_source', 'refresh_panel', 'read_article', 'find_source', 'add_panel', 'save_item', 'remove_saved', 'list_sources']);
   assert.equal(tools.find((t) => t.name === 'open_workspace')._meta.ui.resourceUri, WORKSPACE_URI);
   assert.deepEqual(tools.find((t) => t.name === 'refresh_panel')._meta.ui.visibility, ['app']);
   assert.equal(tools.find((t) => t.name === 'read_article')._meta.ui.resourceUri, WORKSPACE_URI, 'reader renders as its own card');
@@ -185,6 +186,70 @@ test('saving: save_item adds a Saved panel once, dedupes, fences titles; layout 
   const removed = await call(c, 'remove_saved', { url: 'https://example.com/a' });
   assert.deepEqual(removed.structuredContent.saved.map((s: any) => s.url), ['https://example.com/b']);
   assert.equal((await call(c, 'save_item', { url: 'javascript:alert(1)' })).isError, true);
+});
+
+test('discovery: recipes map known sites to their feeds', () => {
+  const r = (u: string) => recipesFor(new URL(u)).map((c) => (c.source === 'rss' ? c.config.url : `${c.source}:${JSON.stringify(c.config)}`));
+  assert.deepEqual(r('https://www.reddit.com/r/LocalLLaMA/'), ['https://www.reddit.com/r/LocalLLaMA/.rss']);
+  assert.deepEqual(r('https://www.youtube.com/channel/UCsBjURrPoezykLs9EqgamOA'), ['https://www.youtube.com/feeds/videos.xml?channel_id=UCsBjURrPoezykLs9EqgamOA']);
+  assert.deepEqual(r('https://www.youtube.com/playlist?list=PL123'), ['https://www.youtube.com/feeds/videos.xml?playlist_id=PL123']);
+  assert.deepEqual(r('https://www.youtube.com/@fireship'), [], 'handles resolve from the channel page');
+  assert.equal(r('https://github.com/anthropics/claude-code')[0], 'github:{"mode":"releases","repo":"anthropics/claude-code","limit":10}');
+  assert.deepEqual(r('https://news.ycombinator.com/show'), ['hn:{"feed":"show","limit":12}']);
+  assert.deepEqual(r('https://mastodon.social/@Gargron'), ['https://mastodon.social/@Gargron.rss']);
+  assert.deepEqual(r('https://bsky.app/profile/simonwillison.net'), ['https://bsky.app/profile/simonwillison.net/rss']);
+  assert.deepEqual(r('https://medium.com/@someone'), ['https://medium.com/feed/@someone']);
+  assert.deepEqual(r('https://pypi.org/project/Requests/'), ['https://pypi.org/rss/project/requests/releases.xml']);
+  assert.deepEqual(r('https://theverge.com/'), [], 'ordinary sites fall through to page discovery');
+});
+
+test('discovery: page feed links (rss/atom only, anywhere in the page) and find_source end to end', async () => {
+  const html = await readFile(new URL('./fixtures/site.html', import.meta.url), 'utf8');
+  assert.deepEqual(pageFeeds(html, 'https://example.com/'), [
+    { url: 'https://example.com/feed.xml', title: 'Example & Co Blog' },
+    { url: 'https://example.com/comments.atom', title: 'Comments' },   // found after <body> too (YouTube does this)
+  ]);
+
+  const c = ctx();
+  const found = await call(c, 'find_source', { query: 'example.com' });
+  assert.equal(found.structuredContent.candidates.length, 1);
+  const cand = found.structuredContent.candidates[0];
+  assert.equal(cand.config.url, 'https://example.com/feed.xml');
+  assert.equal(cand.via, 'page');
+  assert.equal(cand.title, 'Example & Co Blog');
+  assert.ok(cand.preview.length > 0);
+  assert.match(found.content[0]!.text, /<untrusted-content/);
+
+  assert.match((await call(c, 'find_source', { query: 'youtube' })).structuredContent.hint, /channel/);
+  assert.match((await call(c, 'find_source', { query: 'twitter' })).structuredContent.hint, /doesn't offer feeds/);
+  const none = await call(c, 'find_source', { query: 'https://nothing.example.org/' });
+  assert.equal(none.structuredContent.candidates.length, 0);
+});
+
+test('add_panel only adds, places sensibly, and refuses duplicates', async () => {
+  const c = ctx();
+  const feed = { source: 'rss', config: { url: 'https://example.com/feed.xml' } };
+  const first = await call(c, 'add_panel', feed);
+  assert.equal(first.isError, undefined);
+  assert.match(first.content[0]!.text, /in column 4/);
+  assert.equal(first.structuredContent.panel.title, 'Example & Co Blog');
+  assert.equal(first.structuredContent.panelId, 'example-co-blog', 'named after the feed');
+  const cols = first.structuredContent.profile.columns;
+  assert.equal(cols.length, 4);
+  assert.deepEqual(cols.slice(0, 3).map((col: any) => col.panels[0].id), ['hn-top', 'gh-mcp', 'simonw'], 'nothing else moved');
+
+  const dupe = await call(c, 'add_panel', { ...feed, config: { url: 'https://example.com/feed.xml', limit: 20 } });
+  assert.equal(dupe.isError, true);
+  assert.match(dupe.content[0]!.text, /already in the portal/);
+
+  // With 4 columns, the next panel joins the emptiest column; an explicit column is honored.
+  const next = await call(c, 'add_panel', { source: 'hn', config: { feed: 'show' }, title: 'Show HN', column: 1 });
+  assert.equal(next.structuredContent.profile.columns[0].panels[1].title, 'Show HN');
+  const bad = await call(c, 'add_panel', { source: 'hn', config: { feed: 'ask' }, column: 9 });
+  assert.equal(bad.isError, true);
+  const broken = await call(c, 'add_panel', { source: 'rss', config: { url: 'https://nothing.example.org/feed' } });
+  assert.equal(broken.isError, true);
+  assert.match(broken.content[0]!.text, /didn't load/);
 });
 
 test('read_article returns fenced plain text with provenance', async () => {

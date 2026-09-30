@@ -108,6 +108,19 @@
   .card .item-meta { margin-top: auto; flex-wrap: nowrap; overflow: hidden; white-space: nowrap; }
   :root.fullscreen .card { flex-basis: 264px; width: 264px; height: 176px; }
   .shelf .panel-foot { border: 0; padding: 0 12px 4px; }
+  /* add a source */
+  .add-sheet { margin: 8px 10px 0; padding: 8px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+  .add-row { display: flex; gap: 6px; }
+  .add-row input { flex: 1; min-width: 0; padding: 5px 9px; border: 1px solid var(--border); border-radius: 7px; background: var(--bg); color: var(--fg); font: inherit; }
+  .add-row input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .add-hint { color: var(--fg2); font-size: 12px; margin: 6px 2px 0; }
+  .cands { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+  .cand { display: flex; gap: 9px; align-items: flex-start; padding: 7px 8px 7px 10px; border: 1px solid var(--border); border-radius: 8px; }
+  .cand .dot { margin-top: 6px; }
+  .cand-main { flex: 1; min-width: 0; }
+  .cand-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cand-sub, .cand-prev { color: var(--fg2); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cand-prev { font-size: 12px; margin-top: 2px; }
   .empty, .error { padding: 16px 12px; color: var(--fg2); }
   .error { color: #c2410c; }
   .skeleton { height: 12px; margin: 12px; border-radius: 4px; background: var(--hover); }
@@ -138,11 +151,20 @@
     <button class="ib" data-layout="columns" data-icon="columns" aria-pressed="true" title="Columns: scroll sideways, then down each column" aria-label="Columns layout"></button>
     <button class="ib" data-layout="shelves" data-icon="shelves" aria-pressed="false" title="Shelves: one sideways row per source" aria-label="Shelves layout"></button>
   </div>
+  <button class="ib ws-only" id="btnAdd" data-icon="plus" aria-pressed="false" title="Add a source: any site, feed, subreddit, YouTube channel or repo" aria-label="Add a source"></button>
   <button class="ib ws-only" id="btnOpenIn" data-icon="chat" aria-pressed="false" title="Open stories as their own card in the conversation" aria-label="Open stories in chat" hidden></button>
   <button class="ib ws-only" id="btnSources" data-icon="sources" aria-pressed="false" title="Show where each panel's data came from" aria-label="Show sources"></button>
   <button class="ib ws-only" id="btnRefresh" data-icon="refresh" title="Refresh all panels" aria-label="Refresh all panels"></button>
   <button class="ib" id="btnExpand" data-icon="expand" title="Fullscreen" aria-label="Fullscreen"></button>
 </header>
+<section id="addSheet" class="add-sheet ws-only" hidden>
+  <form class="add-row" id="addForm">
+    <input id="addInput" type="text" autocomplete="off" spellcheck="false" placeholder="theverge.com, r/LocalLLaMA, youtube.com/@channel, owner/repo…" aria-label="Site, feed, subreddit, channel or repo">
+    <button class="btn" type="submit">Find</button>
+  </form>
+  <div class="add-hint" id="addHint">Paste a site or feed and MCPortal finds what it can show. Sites with feeds, Reddit, YouTube, Bluesky, Mastodon, GitHub, Substack and more.</div>
+  <ul class="cands" id="addResults"></ul>
+</section>
 <main id="grid" class="grid" aria-live="polite">
   <div class="col" style="flex-grow:1"><div class="panel"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div></div>
 </main>
@@ -174,6 +196,7 @@
     external: 'M13.5 4.5h6v6 M19.5 4.5l-8 8 M17.5 14v4a2 2 0 0 1-2 2h-9.5a2 2 0 0 1-2-2V8.5a2 2 0 0 1 2-2h4',
     comment: 'M6 5h12a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-6.5l-4.5 3.5v-3.5H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z',
     up: 'M12 19V6.5 M6.5 12L12 6.5l5.5 5.5',
+    plus: 'M12 5v14M5 12h14',
     bookmark: 'M7 4.5h10a1 1 0 0 1 1 1v14l-6-4-6 4v-14a1 1 0 0 1 1-1z',
   };
   function icon(name) {
@@ -660,6 +683,62 @@
   }
   function closeReader() { if (articleUrl) return; $('reader').hidden = true; $('grid').hidden = false; }
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('reader').hidden) closeReader(); });
+
+  // ------------------------------------------------------------ add a source
+  function toggleAdd(open = $('addSheet').hidden) {
+    $('addSheet').hidden = !open;
+    $('btnAdd').setAttribute('aria-pressed', String(open));
+    if (open) $('addInput').focus();
+  }
+
+  async function findSources(query) {
+    const hint = $('addHint'), list = $('addResults');
+    hint.textContent = 'Looking…'; list.replaceChildren();
+    try {
+      const data = (await callTool('find_source', { query })).structuredContent;
+      hint.textContent = data.candidates.length
+        ? (data.candidates.length === 1 ? 'Found one source. Add it?' : `Found ${data.candidates.length} sources. Pick one.`)
+        : (data.hint || 'Nothing found.');
+      list.replaceChildren(...data.candidates.map((c) => {
+        const sub = c.source === 'rss' ? c.config.url : c.source === 'github' ? `GitHub · ${c.config.repo || c.config.query}` : `Hacker News · ${c.config.feed}`;
+        const add = el('button', { class: 'btn', onclick: () => addCandidate(c, add) }, 'Add');
+        return el('li', { class: 'cand' },
+          el('span', { class: 'dot', style: `background:var(--src-${c.source})` }),
+          el('div', { class: 'cand-main' },
+            el('div', { class: 'cand-title', title: c.title }, c.title),
+            el('div', { class: 'cand-sub', title: sub }, sub),
+            c.preview.slice(0, 2).map((i) => el('div', { class: 'cand-prev', title: i.title }, `· ${i.title}`))),
+          add);
+      }));
+    } catch (error) {
+      hint.textContent = `Couldn't look that up: ${error.message}`;
+    }
+  }
+
+  async function addCandidate(c, button) {
+    button.disabled = true; button.textContent = 'Adding…';
+    try {
+      const data = (await callTool('add_panel', { source: c.source, config: c.config, title: c.source === 'rss' ? undefined : c.title })).structuredContent;
+      state.profile = { ...state.profile, ...data.profile };
+      state.panels.set(data.panel.panelId, data.panel);
+      drawLayout();
+      toggleAdd(false); $('addInput').value = ''; $('addResults').replaceChildren();
+      toast(`Added ${data.panel.title}`);
+      const node = document.querySelector(`[data-panel="${CSS.escape(data.panelId)}"]`);
+      if (node) node.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
+    } catch (error) {
+      button.disabled = false; button.textContent = 'Add';
+      toast(error.message.replace(/^Not added: /, ''));
+    }
+  }
+
+  $('btnAdd').addEventListener('click', () => toggleAdd());
+  $('addForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const q = $('addInput').value.trim();
+    if (q) findSources(q);
+  });
+  $('addInput').addEventListener('keydown', (e) => { if (e.key === 'Escape') toggleAdd(false); });
 
   // ------------------------------------------------------------ toolbar
   $('btnSources').addEventListener('click', (e) => {

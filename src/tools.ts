@@ -4,6 +4,7 @@ import {
   describeDiff, describeLayout, diffProfiles, findPanel, findSavedPanel, httpUrl, LIMITS, ProfileError, SOURCES, validateProfile,
   type PanelSpec, type Profile, type SavedItem,
 } from './profile.ts';
+import { discover } from './discover.ts';
 import { loadArticle, loadPanel, savedPanel, SOURCE_DOCS, type SourceDeps } from './sources.ts';
 import type { ProfileStore } from './store.ts';
 import type { PanelResult, SourceKind } from './types.ts';
@@ -58,6 +59,10 @@ function itemLine(item: PanelResult['items'][number]): string {
   return `- ${item.title}${item.meta.length ? ` (${item.meta.join(', ')})` : ''}${item.url ? ` <${item.url}>` : ''}`;
 }
 
+function slugId(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'panel';
+}
+
 function panelFor(spec: PanelSpec, profile: Profile, ctx: ToolContext, force = false): Promise<PanelResult> {
   return spec.source === 'saved' ? Promise.resolve(savedPanel(spec, profile.saved)) : loadPanel(spec, ctx, force);
 }
@@ -75,6 +80,36 @@ function ensureSavedPanel(profile: Profile): { profile: Profile; added: boolean 
   else if (columns[columns.length - 1]!.panels.length < LIMITS.panelsPerColumn) columns[columns.length - 1]!.panels.push(panel);
   else return { profile, added: false };
   return { profile: { ...profile, columns }, added: true };
+}
+
+/**
+ * Add one panel without touching anything else: into `column` (1-based; one past
+ * the last makes a new column), else a new column, else the emptiest column.
+ */
+function addPanelTo(profile: Profile, spec: PanelSpec, column?: number): { profile: Profile; panelId: string } | { error: string } {
+  const key = (p: PanelSpec) => `${p.source}:${JSON.stringify({ ...p.config, limit: undefined })}`;
+  const probe = validateProfile({ ...profile, columns: [{ panels: [spec] }] }).columns[0]!.panels[0]!;
+  const dupe = profile.columns.flatMap((c) => c.panels).find((p) => key(p) === key(probe));
+  if (dupe) return { error: `That source is already in the portal as "${dupe.title ?? dupe.id}" (id ${dupe.id}).` };
+
+  const columns = profile.columns.map((c) => ({ ...c, panels: [...c.panels] }));
+  const n = columns.length;
+  if (column !== undefined) {
+    if (column >= 1 && column <= n) {
+      if (columns[column - 1]!.panels.length >= LIMITS.panelsPerColumn) return { error: `Column ${column} is full (${LIMITS.panelsPerColumn} panels).` };
+      columns[column - 1]!.panels.push(spec);
+    } else if (column === n + 1 && n < LIMITS.columns) columns.push({ width: 1, panels: [spec] });
+    else return { error: `column must be between 1 and ${Math.min(n + 1, LIMITS.columns)}` };
+  } else if (n < LIMITS.columns) columns.push({ width: 1, panels: [spec] });
+  else {
+    const target = columns.reduce((best, c) => (c.panels.length < best.panels.length ? c : best));
+    if (target.panels.length >= LIMITS.panelsPerColumn) return { error: 'The portal is full (4 columns of 4 panels). Remove a panel first.' };
+    target.panels.push(spec);
+  }
+  const before = new Set(profile.columns.flatMap((c) => c.panels).map((p) => p.id));
+  const next = { ...validateProfile({ ...profile, columns }), saved: profile.saved };
+  const panelId = next.columns.flatMap((c) => c.panels).find((p) => !before.has(p.id))!.id;
+  return { profile: next, panelId };
 }
 
 /** What the saving tools return: the model gets a fenced summary, the app gets state to redraw. */
@@ -262,6 +297,92 @@ export const TOOLS: ToolDef[] = [
       } catch (error) {
         return toolError(`Could not open ${clean(url, 200)}: ${clean((error as Error).message, 200)}`);
       }
+    },
+  },
+  {
+    name: 'find_source',
+    title: 'Find a source to add',
+    description: [
+      'Work out what MCPortal can show for something the user wants to follow, and preview it. Accepts a site address ("theverge.com"), a feed URL,',
+      '"r/subreddit", "owner/repo", "hn", or a YouTube channel/playlist, Bluesky, Mastodon ("@name@server"), Medium, Substack, dev.to, PyPI, Lobsters,',
+      'Stack Overflow tag or arXiv URL. For a name ("The Verge"), pass the site\'s domain. For a news topic, pass',
+      'https://news.google.com/rss/search?q=TOPIC. Returns working candidates (each already test-loaded) with a preview; add one with add_panel.',
+      'Doesn\'t change the portal.',
+    ].join(' '),
+    inputSchema: { type: 'object', required: ['query'], additionalProperties: false, properties: { query: { type: 'string' } } },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+    async handler(args, ctx) {
+      const query = clean(args.query, 500);
+      if (!query) return toolError('find_source needs a "query"');
+      const found = await discover(query, ctx.fetcher);
+      const loaded = await Promise.all(found.candidates.slice(0, 5).map(async (c, i) => {
+        try {
+          const panel = await loadPanel({ id: `candidate-${i}`, source: c.source, title: c.source === 'rss' ? undefined : c.title, config: c.config }, ctx);
+          return { ...c, title: panel.error || c.source !== 'rss' ? c.title : panel.title, panel };
+        } catch (error) {
+          return { ...c, panel: { error: clean((error as Error).message, 160), items: [] } as unknown as PanelResult };
+        }
+      }));
+      const working = loaded.filter((c) => !c.panel.error && c.panel.items.length);
+      const candidates = working.map(({ panel, ...c }) => ({ ...c, preview: panel.items.slice(0, 3) }));
+      if (!candidates.length) {
+        const why = found.hint ?? (loaded.length ? `Found ${loaded.length} possible feed(s), but none loaded: ${clean(loaded[0]!.panel.error ?? 'empty feed', 160)}` : 'Nothing found.');
+        return ok(why, { candidates: [], hint: why });
+      }
+      const text = candidates.map((c, i) =>
+        untrusted(String(c.config.url ?? c.config.repo ?? c.source), [`${i + 1}. [${c.source}, via ${c.via}] ${c.title}`, `config: ${JSON.stringify(c.config)}`, ...c.preview.map(itemLine)].join('\n')));
+      return ok([`${candidates.length} working source(s). Add one with add_panel using its source and config.`, ...text].join('\n'), { candidates, hint: found.hint });
+    },
+  },
+  {
+    name: 'add_panel',
+    title: 'Add a panel to the portal',
+    description: [
+      'Add one panel to the user\'s MCPortal. Only adds: nothing else moves. Use a source and config from find_source.',
+      'By default it gets a new column at the end (or joins the emptiest column when there are already 4). Pass column (1-based) only if the user said where.',
+      'Refuses duplicates. After adding, tell the user where it went; call open_workspace if they want to see it.',
+    ].join(' '),
+    inputSchema: {
+      type: 'object',
+      required: ['source', 'config'],
+      additionalProperties: false,
+      properties: {
+        source: { type: 'string', enum: SOURCES },
+        config: { type: 'object' },
+        title: { type: 'string' },
+        column: { type: 'integer', minimum: 1, maximum: 4 },
+      },
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    async handler(args, ctx) {
+      const source = args.source as SourceKind;
+      if (!SOURCES.includes(source)) return toolError(`source must be one of ${SOURCES.join(', ')}`);
+      const title = clean(args.title, 80) || undefined;
+      const config = (args.config as Record<string, unknown>) ?? {};
+      const before = await ctx.store.get(ctx.userId);
+      // Load it first: refuse sources that don't work, and name the panel after what it is.
+      let trial: PanelResult;
+      try {
+        trial = await panelFor({ id: 'new', source, title, config }, before, ctx);
+      } catch (error) {
+        return toolError(`Not added: ${clean((error as Error).message, 200)}`);
+      }
+      if (trial.error) return toolError(`Not added: it didn't load (${clean(trial.error, 160)}). Try find_source for a working address.`);
+      const spec: PanelSpec = { id: slugId(title ?? trial.title), source, title, config };
+      let added: ReturnType<typeof addPanelTo>;
+      try {
+        added = addPanelTo(before, spec, typeof args.column === 'number' ? args.column : undefined);
+      } catch (error) {
+        if (error instanceof ProfileError) return toolError(`Not added: ${error.message}`);
+        throw error;
+      }
+      if ('error' in added) return toolError(`Not added: ${added.error}`);
+      await ctx.store.put(ctx.userId, added.profile);
+      const placed = findPanel(added.profile, added.panelId)!;
+      const panel = await panelFor(placed, added.profile, ctx);
+      const where = added.profile.columns.findIndex((c) => c.panels.some((p) => p.id === added.panelId)) + 1;
+      return ok(`Added "${panel.title}" (id ${added.panelId}) in column ${where}.\nLayout now: ${describeLayout(added.profile)}`,
+        { profile: added.profile, panel, panelId: added.panelId });
     },
   },
   {
