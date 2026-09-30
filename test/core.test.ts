@@ -15,9 +15,15 @@ import { FileProfileStore, MemoryProfileStore } from '../src/store.ts';
 import { WORKSPACE_URI, type ToolContext } from '../src/tools.ts';
 import { pageFeeds, recipesFor } from '../src/discover.ts';
 import { parseFeed } from '../src/adapters/rss.ts';
+import { STARTER_PACKS } from '../src/packs.ts';
 
+/** A user who has already set up their portal (the sample layout). Use newUser() for onboarding. */
 function ctx(overrides: Partial<ToolContext> = {}): ToolContext {
-  return { store: new MemoryProfileStore(), fetcher: createFixtureFetcher(), cache: new TtlCache(), userId: 'test', ...overrides };
+  const store = new MemoryProfileStore({ test: { ...defaultProfile(), onboarded: true } });
+  return { store, fetcher: createFixtureFetcher(), cache: new TtlCache(), userId: 'test', ...overrides };
+}
+function newUser(): ToolContext {
+  return ctx({ store: new MemoryProfileStore() });
 }
 
 async function rpc(c: ToolContext, method: string, params: Record<string, unknown> = {}, id = 1) {
@@ -54,7 +60,7 @@ test('notifications get no response; unknown methods get -32601', async () => {
 test('tools/list links open_workspace to the UI and hides app-only tools from the model', async () => {
   const res = await rpc(ctx(), 'tools/list');
   const tools = (res.result as any).tools as any[];
-  assert.deepEqual(tools.map((t) => t.name), ['open_workspace', 'get_profile', 'update_profile', 'read_source', 'refresh_panel', 'read_article', 'get_thumbnails', 'find_source', 'add_panel', 'save_item', 'remove_saved', 'list_sources']);
+  assert.deepEqual(tools.map((t) => t.name), ['open_workspace', 'build_portal', 'get_profile', 'update_profile', 'read_source', 'refresh_panel', 'read_article', 'get_thumbnails', 'find_source', 'add_panel', 'save_item', 'remove_saved', 'list_sources']);
   assert.equal(tools.find((t) => t.name === 'open_workspace')._meta.ui.resourceUri, WORKSPACE_URI);
   assert.deepEqual(tools.find((t) => t.name === 'refresh_panel')._meta.ui.visibility, ['app']);
   assert.equal(tools.find((t) => t.name === 'read_article')._meta.ui.resourceUri, WORKSPACE_URI, 'reader renders as its own card');
@@ -105,7 +111,7 @@ test('open_workspace caches within the freshness window', async () => {
 
 test('a failing source degrades to an error panel, not a failed workspace', async () => {
   const store = new MemoryProfileStore();
-  const profile = defaultProfile();
+  const profile = { ...defaultProfile(), onboarded: true };
   profile.columns.push({ width: 1, panels: [{ id: 'broken', source: 'rss', config: { url: 'https://nowhere.example.org/feed', limit: 5 } }] });
   await store.put('test', validateProfile(profile));
   const result = await call(ctx({ store }), 'open_workspace');
@@ -243,7 +249,7 @@ test('add_panel only adds, places sensibly, and refuses duplicates', async () =>
   assert.equal(dupe.isError, true);
   assert.match(dupe.content[0]!.text, /already in the portal/);
 
-  // With 4 columns, the next panel joins the emptiest column; an explicit column is honored.
+  // An explicit column is honored; out-of-range columns are refused.
   const next = await call(c, 'add_panel', { source: 'hn', config: { feed: 'show' }, title: 'Show HN', column: 1 });
   assert.equal(next.structuredContent.profile.columns[0].panels[1].title, 'Show HN');
   const bad = await call(c, 'add_panel', { source: 'hn', config: { feed: 'ask' }, column: 9 });
@@ -277,6 +283,53 @@ test('get_thumbnails returns data URIs only for real raster images', async () =>
   assert.equal(images['https://img.example.com/evil.svg'], null, 'an SVG labeled image/png is refused by its bytes');
   assert.equal(images['javascript:alert(1)'], null);
   assert.equal(images['https://gone.example.org/x.jpg'], null);
+});
+
+test('onboarding: a new user gets the welcome, build_portal assembles packs, and it sticks', async () => {
+  const c = newUser();
+  const welcome = await call(c, 'open_workspace');
+  assert.ok(welcome.structuredContent.onboarding, 'new users see the welcome');
+  assert.equal(welcome.structuredContent.panels.length, 0, 'nothing fetched before they choose');
+  assert.ok(welcome.structuredContent.onboarding.packs.some((p: any) => p.id === 'gaming'));
+  assert.match(welcome.content[0]!.text, /new MCPortal user/);
+
+  assert.equal((await call(c, 'build_portal', { packs: ['gaming', 'nope'] })).isError, true);
+  assert.equal((await call(c, 'build_portal', { packs: ['developer', 'ai', 'news', 'gaming', 'art'] })).isError, true);
+
+  await call(c, 'save_item', { url: 'https://example.com/keep' });   // saved before building: must survive
+  const built = await call(c, 'build_portal', { packs: ['gaming', 'science'] });
+  assert.equal(built.isError, undefined);
+  const p = built.structuredContent.profile;
+  assert.equal(p.onboarded, true);
+  assert.equal(p.layout, 'shelves');
+  assert.equal(p.columns.length, 8, 'two packs of four: one source per column');
+  assert.equal(p.columns[0].panels[0].id, 'gmtk', 'packs stay in order, picture-rich source first');
+  assert.equal(p.saved.length, 1);
+
+  // Four packs = 16 sources over 8 columns of 2.
+  const four = (await call(newUser(), 'build_portal', { packs: ['developer', 'ai', 'news', 'music'] })).structuredContent.profile;
+  assert.deepEqual(four.columns.map((col: any) => col.panels.length), [2, 2, 2, 2, 2, 2, 2, 2]);
+
+  const after = await call(c, 'open_workspace');
+  assert.equal(after.structuredContent.onboarding, undefined, 'welcome only until they choose');
+  assert.ok((await call(c, 'open_workspace', { setup: true })).structuredContent.onboarding.rebuilding, 'start over on request');
+
+  const skipped = await call(newUser(), 'build_portal', { packs: [] });
+  assert.equal(skipped.structuredContent.profile.onboarded, true);
+  assert.equal(skipped.structuredContent.profile.columns[0].panels[0].id, 'hn-top', 'skip keeps the sample');
+});
+
+test('starter packs: well-formed, unique ids, valid configs, no Reddit', () => {
+  const ids = new Set<string>();
+  for (const pack of STARTER_PACKS) {
+    assert.equal(pack.panels.length, 4, pack.id);
+    for (const panel of pack.panels) {
+      assert.ok(!ids.has(panel.id), `duplicate panel id ${panel.id}`);
+      ids.add(panel.id);
+      assert.doesNotMatch(JSON.stringify(panel.config), /reddit\.com/, 'Reddit rate-limits servers');
+    }
+    validateProfile({ columns: [{ panels: pack.panels }] });
+  }
 });
 
 test('read_article returns fenced plain text with provenance', async () => {
@@ -319,7 +372,7 @@ test('validateProfile normalizes ids, limits, widths and untrusted titles', () =
   assert.equal(odd.openIn, 'card');
   assert.throws(() => validateProfile({ columns: [] }), ProfileError);
   assert.throws(() => validateProfile({ columns: [{ panels: [{ source: 'github', config: { mode: 'releases', repo: 'nope' } }] }] }), /owner\/name/);
-  assert.throws(() => validateProfile({ columns: [1, 2, 3, 4, 5] }), /At most 4 columns/);
+  assert.throws(() => validateProfile({ columns: [1, 2, 3, 4, 5, 6, 7, 8, 9] }), /At most 8 columns/);
 });
 
 test('FileProfileStore: round-trips, recovers from corruption, serializes concurrent writes', async () => {

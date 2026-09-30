@@ -46,10 +46,13 @@ export interface Profile {
   columns: ColumnSpec[];
   /** Newest first. Only save_item / remove_saved change it; update_profile carries it over. */
   saved: SavedItem[];
+  /** False only for a brand-new user who hasn't picked their portal yet (shows the welcome). */
+  onboarded: boolean;
   updatedAt: string;
 }
 
-export const LIMITS = { columns: 4, panelsPerColumn: 4, items: 30, saved: 200 } as const;
+/** Columns scroll sideways, so there can be more than fit on screen. */
+export const LIMITS = { columns: 8, panelsPerColumn: 4, items: 30, saved: 200 } as const;
 export const SOURCES: SourceKind[] = ['hn', 'rss', 'github', 'saved'];
 
 export class ProfileError extends Error {
@@ -63,6 +66,7 @@ export function defaultProfile(now = new Date()): Profile {
     layout: 'columns',
     openIn: 'card',
     saved: [],
+    onboarded: false,
     updatedAt: now.toISOString(),
     columns: [
       { width: 1, panels: [{ id: 'hn-top', source: 'hn', title: 'Hacker News', config: { feed: 'top', limit: 12 } }] },
@@ -170,7 +174,9 @@ export function validateProfile(input: unknown, now = new Date()): Profile {
   const name = clean(input.name, 60) || 'workspace';
   const layout = (LAYOUTS as readonly unknown[]).includes(input.layout) ? (input.layout as Layout) : 'columns';
   const openIn = (OPEN_IN as readonly unknown[]).includes(input.openIn) ? (input.openIn as OpenIn) : 'card';
-  return { version: 1, name, layout, openIn, columns, saved: normalizeSaved(input.saved, now), updatedAt: now.toISOString() };
+  // Profiles saved before onboarding existed belong to people who are already set up.
+  const onboarded = input.onboarded !== false;
+  return { version: 1, name, layout, openIn, columns, saved: normalizeSaved(input.saved, now), onboarded, updatedAt: now.toISOString() };
 }
 
 export function httpUrl(value: unknown): string | null {

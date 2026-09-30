@@ -62,7 +62,7 @@
   .seg { display: inline-flex; gap: 1px; padding: 1px; border: 1px solid var(--border); border-radius: 7px; }
   .seg .ib { width: 24px; height: 22px; border-radius: 5px; }
   .sep { width: 1px; height: 16px; background: var(--border); margin: 0 3px; }
-  :root.article-view .ws-only { display: none !important; }
+  :root.article-view .ws-only, :root.welcome-view .ws-only { display: none !important; }
 
   /* columns: a lane of fixed-width columns that scrolls sideways; each column scrolls its own items */
   :root { --lane-h: 560px; }
@@ -141,6 +141,31 @@
   .card.media .item-summary { display: none; }
   :root.fullscreen .card.media { height: 246px; }
   :root.fullscreen .card.media .thumb { height: 148px; }
+  /* welcome: first-run starter packs */
+  .welcome { max-width: 760px; margin: 0 auto; padding: 22px 16px 24px; }
+  .welcome .mark { display: inline-flex; color: var(--accent); }
+  .welcome .mark svg { width: 30px; height: 30px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+  .welcome h1 { font-size: 22px; line-height: 1.2; margin: 8px 0 4px; letter-spacing: -0.015em; }
+  .welcome .lede { color: var(--fg2); margin: 0 0 14px; max-width: 560px; }
+  .packs { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; }
+  .pack { position: relative; display: flex; flex-direction: column; gap: 2px; text-align: left; padding: 10px 11px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); cursor: pointer; }
+  .pack:hover, .pack:focus-visible { background: var(--hover); outline: none; }
+  .pack[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  .pack:disabled { opacity: .45; cursor: default; }
+  .pack .pl { font-weight: 650; }
+  .pack .pb { color: var(--fg2); font-size: 12px; line-height: 1.35; }
+  .pack .ps { color: var(--fg2); font-size: 11px; margin-top: 5px; line-height: 1.35; }
+  .pack .tick { position: absolute; top: 8px; right: 8px; width: 18px; height: 18px; border-radius: 50%; background: var(--accent); color: #fff; display: none; align-items: center; justify-content: center; }
+  .pack .tick svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+  .pack[aria-pressed="true"] .tick { display: flex; }
+  .welcome-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 14px; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; padding: 6px 14px; font-weight: 600; }
+  .btn.primary:hover { background: var(--accent); filter: brightness(1.08); }
+  .btn.primary:disabled { opacity: .45; cursor: default; filter: none; }
+  .link-btn { border: 0; padding: 0; background: none; color: var(--fg2); font: inherit; font-size: 12.5px; text-decoration: underline; cursor: pointer; }
+  .ask { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
+  .ask .lede { margin-bottom: 8px; font-size: 12.5px; }
+  .building { color: var(--fg2); margin-top: 14px; }
   .empty, .error { padding: 16px 12px; color: var(--fg2); }
   .error { color: #c2410c; }
   .skeleton { height: 12px; margin: 12px; border-radius: 4px; background: var(--hover); }
@@ -188,6 +213,7 @@
 <main id="grid" class="grid" aria-live="polite">
   <div class="col" style="flex-grow:1"><div class="panel"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div></div>
 </main>
+<section id="welcome" class="welcome" hidden></section>
 <article id="reader" class="reader" hidden></article>
 <div class="toast" id="toast" role="status"></div>
 
@@ -217,6 +243,7 @@
     comment: 'M6 5h12a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-6.5l-4.5 3.5v-3.5H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z',
     up: 'M12 19V6.5 M6.5 12L12 6.5l5.5 5.5',
     plus: 'M12 5v14M5 12h14',
+    check: 'M5 12.5l4.5 4.5L19 7.5',
     play: 'M8 5.5v13l10.5-6.5z',
     bookmark: 'M7 4.5h10a1 1 0 0 1 1 1v14l-6-4-6 4v-14a1 1 0 0 1 1-1z',
   };
@@ -402,7 +429,81 @@
     clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
   }
 
+  // ------------------------------------------------------------ welcome (first run, or "start over")
+  function renderWelcome(data) {
+    const { packs, maxPacks, rebuilding } = data.onboarding;
+    state.profile = { layout: 'columns', openIn: 'card', saved: [], ...data.profile };
+    root.classList.add('welcome-view');
+    $('grid').hidden = true; $('reader').hidden = true;
+    $('wsName').textContent = rebuilding ? '· start over' : '· welcome';
+    setStatus('');
+    const chosen = new Set();
+    const build = el('button', { class: 'btn primary', disabled: true, onclick: () => buildPortal([...chosen]) }, 'Build my portal');
+    const cards = packs.map((p) => el('button', {
+      class: 'pack', 'aria-pressed': 'false', title: p.sources.join(' · '),
+      onclick: (e) => {
+        const card = e.currentTarget;
+        chosen.has(p.id) ? chosen.delete(p.id) : chosen.add(p.id);
+        card.setAttribute('aria-pressed', String(chosen.has(p.id)));
+        for (const c of cards) if (c.getAttribute('aria-pressed') !== 'true') c.disabled = chosen.size >= maxPacks;
+        build.disabled = !chosen.size;
+        build.textContent = chosen.size ? `Build my portal (${chosen.size})` : 'Build my portal';
+      },
+    }, el('span', { class: 'tick', 'aria-hidden': 'true' }, icon('check')),
+      el('span', { class: 'pl' }, p.label), el('span', { class: 'pb' }, p.blurb), el('span', { class: 'ps' }, p.sources.join(' · '))));
+    const describe = el('input', { type: 'text', placeholder: 'woodworking, synthwave, Formula 1, a newsletter I read…', 'aria-label': 'Describe your interests' });
+    const askClaude = async () => {
+      const text = describe.value.trim();
+      if (!text) { describe.focus(); return; }
+      try {
+        await hostRequest('ui/message', { role: 'user', content: [{ type: 'text', text: `Set up my MCPortal around what I'm into: ${text}` }] }, 10000);
+        toast('Asked Claude to build it');
+      } catch { toast('Tell Claude in the chat instead'); }
+    };
+    describe.addEventListener('keydown', (e) => { if (e.key === 'Enter') askClaude(); });
+    $('welcome').replaceChildren(...[
+      el('span', { class: 'mark' }, icon('portal')),
+      el('h1', null, rebuilding ? 'Start over' : 'Make it yours'),
+      el('p', { class: 'lede' }, rebuilding
+        ? `Pick up to ${maxPacks} packs to rebuild your portal. This replaces your current layout; your saved items stay.`
+        : `Pick up to ${maxPacks} things you're into. MCPortal builds your portal from sources that work, and you can change anything later.`),
+      el('div', { class: 'packs' }, cards),
+      el('div', { class: 'welcome-actions' }, build,
+        rebuilding
+          ? el('button', { class: 'link-btn', onclick: () => { loading = null; loadWorkspace(); } }, 'Cancel')
+          : el('button', { class: 'link-btn', onclick: () => buildPortal([]) }, 'Skip, show me a sample')),
+      DEV ? null : el('div', { class: 'ask' },
+        el('p', { class: 'lede' }, 'Into something no pack covers? Describe it and Claude will find the sources.'),
+        el('div', { class: 'add-row' }, describe, el('button', { class: 'btn', onclick: askClaude }, 'Ask Claude'))),
+    ].filter(Boolean));
+    $('welcome').hidden = false;
+  }
+
+  async function buildPortal(packIds) {
+    const note = el('div', { class: 'building' }, packIds.length ? 'Assembling your portal…' : 'Opening the sample…');
+    $('welcome').append(note);
+    for (const b of $('welcome').querySelectorAll('button')) b.disabled = true;
+    try {
+      const built = (await callTool('build_portal', { packs: packIds })).structuredContent;
+      note.textContent = 'Loading your sources…';
+      const result = await callTool('open_workspace');
+      renderWorkspace(result.structuredContent);
+      if (!DEV && packIds.length) {
+        hostRequest('ui/update-model-context', {
+          content: [{ type: 'text', text: `The user just built their MCPortal from starter packs: ${packIds.join(', ')} (${built.profile.columns.flatMap((c) => c.panels).length} sources). Offer to add anything specific they follow.` }],
+        }, 5000).catch(() => {});
+      }
+    } catch (error) {
+      note.textContent = `That didn't work: ${error.message}`;
+      for (const b of $('welcome').querySelectorAll('button')) b.disabled = false;
+    }
+  }
+
   function renderWorkspace(data) {
+    if (data.onboarding) return renderWelcome(data);
+    root.classList.remove('welcome-view');
+    $('welcome').hidden = true;
+    if (articleUrl === null) { $('grid').hidden = false; }
     state.profile = { layout: 'columns', openIn: 'card', saved: [], ...data.profile };
     state.saved = new Set(state.profile.saved.map((s) => s.url));
     state.panels = new Map(data.panels.map((p) => [p.panelId, p]));

@@ -95,7 +95,11 @@ export class FileProfileStore implements ProfileStore {
 }
 
 export class MemoryProfileStore implements ProfileStore {
-  private profiles = new Map<string, Profile>();
+  private profiles: Map<string, Profile>;
+
+  constructor(initial: Record<string, Profile> = {}) {
+    this.profiles = new Map(Object.entries(initial));
+  }
 
   async get(userId: string): Promise<Profile> {
     return structuredClone(this.profiles.get(userId) ?? defaultProfile());

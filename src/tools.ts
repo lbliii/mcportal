@@ -5,6 +5,7 @@ import {
   type PanelSpec, type Profile, type SavedItem,
 } from './profile.ts';
 import { discover } from './discover.ts';
+import { MAX_PACKS, packSummaries, STARTER_PACKS } from './packs.ts';
 import { loadArticle, loadPanel, savedPanel, SOURCE_DOCS, type SourceDeps } from './sources.ts';
 import type { ProfileStore } from './store.ts';
 import type { PanelResult, SourceKind } from './types.ts';
@@ -103,7 +104,7 @@ function addPanelTo(profile: Profile, spec: PanelSpec, column?: number): { profi
   } else if (n < LIMITS.columns) columns.push({ width: 1, panels: [spec] });
   else {
     const target = columns.reduce((best, c) => (c.panels.length < best.panels.length ? c : best));
-    if (target.panels.length >= LIMITS.panelsPerColumn) return { error: 'The portal is full (4 columns of 4 panels). Remove a panel first.' };
+    if (target.panels.length >= LIMITS.panelsPerColumn) return { error: `The portal is full (${LIMITS.columns} columns of ${LIMITS.panelsPerColumn} panels). Remove a panel first.` };
     target.panels.push(spec);
   }
   const before = new Set(profile.columns.flatMap((c) => c.panels).map((p) => p.id));
@@ -127,17 +128,39 @@ const MAX_IMAGE_BYTES = 350_000;
  */
 async function thumbnail(url: string, ctx: ToolContext): Promise<string | null> {
   const result = await ctx.cache.get(`img:${url}`, 86_400, async () => {
-    try {
-      const res = await ctx.fetcher(url, { binary: true, maxBytes: MAX_IMAGE_BYTES, timeoutMs: 6000, headers: { accept: 'image/avif;q=0,image/webp,image/png,image/jpeg,image/gif;q=0.8' } });
-      if (res.status < 200 || res.status >= 300) return null;
-      const bytes = Buffer.from(res.text, 'base64');
-      const type = Object.keys(IMAGE_TYPES).find((t) => IMAGE_TYPES[t]!(bytes));
-      return type ? `data:${type};base64,${res.text}` : null;
-    } catch {
-      return null;   // too big, timed out, blocked address: just no picture
+    // Feeds often link full-size originals. Many image CDNs resize on request, so an
+    // oversized picture is retried at thumbnail width; the byte cap still applies.
+    const small = resized(url);
+    const tries = RESIZING_HOSTS.test(new URL(url).hostname) ? [small, url] : [url, small];
+    for (const attempt of tries) {
+      const got = await fetchImage(attempt, ctx);
+      if (got !== 'too-big') return got;
     }
+    return null;
   });
   return result.value;
+}
+
+/** Hosts known to resize with ?w= (Valnet's *images.com CDNs, WordPress Photon, imgix). */
+const RESIZING_HOSTS = /(^|\.)([a-z]+images\.com|i\d\.wp\.com|imgix\.net)$/;
+
+function resized(url: string): string {
+  const u = new URL(url);
+  u.searchParams.set('w', '480');
+  return u.href;
+}
+
+// Accept lists only formats we keep: some CDNs serve AVIF whenever it's mentioned, even at q=0.
+async function fetchImage(url: string, ctx: ToolContext): Promise<string | null | 'too-big'> {
+  try {
+    const res = await ctx.fetcher(url, { binary: true, maxBytes: MAX_IMAGE_BYTES, timeoutMs: 6000, headers: { accept: 'image/webp,image/jpeg,image/png,image/gif' } });
+    if (res.status < 200 || res.status >= 300) return null;
+    const bytes = Buffer.from(res.text, 'base64');
+    const type = Object.keys(IMAGE_TYPES).find((t) => IMAGE_TYPES[t]!(bytes));
+    return type ? `data:${type};base64,${res.text}` : null;
+  } catch (error) {
+    return /exceeded/.test((error as Error).message) ? 'too-big' : null;   // timed out, blocked address: no picture
+  }
 }
 
 /** What the saving tools return: the model gets a fenced summary, the app gets state to redraw. */
@@ -177,14 +200,70 @@ export const TOOLS: ToolDef[] = [
     title: 'Open MCPortal workspace',
     description:
       "Open the user's MCPortal workspace: a multi-panel view of their sources (Hacker News, GitHub, RSS) laid out according to their saved preferences. Use this when the user asks to open their portal, dashboard, or morning view, or asks what's new across their sources.",
-    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: { setup: { type: 'boolean', description: 'Show the welcome and starter packs, e.g. when the user asks to start over or rebuild their portal.' } },
+    },
     annotations: { readOnlyHint: true, openWorldHint: true },
     _meta: { ui: { resourceUri: WORKSPACE_URI } },
-    async handler(_args, ctx) {
+    async handler(args, ctx) {
       const profile = await ctx.store.get(ctx.userId);
       const notice = ctx.store.takeNotice?.(ctx.userId);
+      if (!profile.onboarded || args.setup === true) {
+        const packs = packSummaries();
+        const text = [
+          profile.onboarded
+            ? 'Showing the portal setup. Building from packs replaces the current layout (saved items stay); confirm with the user before calling build_portal.'
+            : 'This is a new MCPortal user: the welcome screen is showing. Ask what they are into, or let them pick in the UI.',
+          `Starter packs (pick up to ${MAX_PACKS} with build_portal): ${packs.map((p) => `${p.id} (${p.label}: ${p.sources.join(', ')})`).join('; ')}.`,
+          'For interests no pack covers, build from the closest packs (or none), then use find_source and add_panel for specific sites, channels or feeds.',
+        ].join('\n');
+        return ok(text, { profile, panels: [], onboarding: { packs, maxPacks: MAX_PACKS, rebuilding: profile.onboarded }, generatedAt: new Date().toISOString() });
+      }
       const panels = await Promise.all(profile.columns.flatMap((c) => c.panels).map((p) => panelFor(p, profile, ctx)));
       return ok(summarizePanels(profile, panels, notice), { profile, panels, notice, generatedAt: new Date().toISOString() });
+    },
+  },
+  {
+    name: 'build_portal',
+    title: 'Build the portal from starter packs',
+    description: [
+      `Set up the user's portal from up to ${MAX_PACKS} starter packs (ids from open_workspace's setup, e.g. developer, ai, news, gaming, art, science, music, film).`,
+      'Replaces the current layout; saved items stay. Use it for first-time setup, or when the user asks to start over (confirm first if they have a portal they built).',
+      'An empty packs list keeps the sample layout and just finishes setup. Afterwards call open_workspace to show it, and offer to add anything specific with find_source.',
+    ].join(' '),
+    inputSchema: {
+      type: 'object',
+      required: ['packs'],
+      additionalProperties: false,
+      properties: {
+        packs: { type: 'array', maxItems: MAX_PACKS, items: { type: 'string', enum: STARTER_PACKS.map((p) => p.id) } },
+        layout: { type: 'string', enum: ['columns', 'shelves'], description: 'Default shelves (picture rows).' },
+      },
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+    async handler(args, ctx) {
+      const ids = [...new Set((Array.isArray(args.packs) ? args.packs : []).map(String))];
+      const unknown = ids.filter((id) => !STARTER_PACKS.some((p) => p.id === id));
+      if (unknown.length) return toolError(`Unknown pack(s): ${unknown.join(', ')}. Packs: ${STARTER_PACKS.map((p) => p.id).join(', ')}`);
+      if (ids.length > MAX_PACKS) return toolError(`Pick at most ${MAX_PACKS} packs`);
+      const before = await ctx.store.get(ctx.userId);
+      if (!ids.length) {
+        const kept = { ...before, onboarded: true, updatedAt: new Date().toISOString() };
+        await ctx.store.put(ctx.userId, kept);
+        return ok(`Setup finished; kept the current layout: ${describeLayout(kept)}`, { profile: kept });
+      }
+      // Sources in pack order, spread over at most 8 columns, packs kept together.
+      const sources = ids.flatMap((id) => STARTER_PACKS.find((p) => p.id === id)!.panels);
+      const perColumn = Math.ceil(sources.length / LIMITS.columns);
+      const columns = [];
+      for (let i = 0; i < sources.length; i += perColumn) columns.push({ width: 1, panels: sources.slice(i, i + perColumn) });
+      const layout = args.layout === 'columns' ? 'columns' : 'shelves';
+      const profile = { ...validateProfile({ ...before, layout, columns, onboarded: true }), saved: before.saved };
+      await ctx.store.put(ctx.userId, profile);
+      const labels = ids.map((id) => STARTER_PACKS.find((p) => p.id === id)!.label);
+      return ok(`Built the portal from ${labels.join(', ')}: ${sources.length} sources, ${layout} layout. Saved items kept (${profile.saved.length}).`, { profile });
     },
   },
   {
@@ -225,7 +304,7 @@ export const TOOLS: ToolDef[] = [
             columns: {
               type: 'array',
               minItems: 1,
-              maxItems: 4,
+              maxItems: 8,
               items: {
                 type: 'object',
                 required: ['panels'],
@@ -392,7 +471,7 @@ export const TOOLS: ToolDef[] = [
     title: 'Add a panel to the portal',
     description: [
       'Add one panel to the user\'s MCPortal. Only adds: nothing else moves. Use a source and config from find_source.',
-      'By default it gets a new column at the end (or joins the emptiest column when there are already 4). Pass column (1-based) only if the user said where.',
+      'By default it gets a new column at the end (or joins the emptiest column when there are already 8). Pass column (1-based) only if the user said where.',
       'Refuses duplicates. After adding, tell the user where it went; call open_workspace if they want to see it.',
     ].join(' '),
     inputSchema: {
@@ -403,7 +482,7 @@ export const TOOLS: ToolDef[] = [
         source: { type: 'string', enum: SOURCES },
         config: { type: 'object' },
         title: { type: 'string' },
-        column: { type: 'integer', minimum: 1, maximum: 4 },
+        column: { type: 'integer', minimum: 1, maximum: 8 },
       },
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
