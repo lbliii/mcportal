@@ -22,7 +22,7 @@ import { DEFAULT_SUPPORT_URL, serveSite, type SiteConfig } from './site.ts';
 import { limitsFromEnv, UsageBudget, type BudgetLimits } from './lib/budget.ts';
 import type { TtlCache } from './lib/cache.ts';
 import { isLoopbackHost } from './lib/ip.ts';
-import { handleMessage, RPC, rpcError, SERVER_INFO, workspaceHtml, type JsonRpcResponse, type Log } from './mcp.ts';
+import { handleMessage, RPC, rpcError, SERVER_INFO, roomHtml, type JsonRpcResponse, type Log } from './mcp.ts';
 import { FileClipStore, type ClipStore } from './clips.ts';
 import type { ProfileStore } from './store.ts';
 import type { ToolContext } from './tools.ts';
@@ -236,7 +236,7 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
       if (!config.allowUnauthenticated && !config.staticToken) {
         return send(res, 404, 'The preview is available locally or with MCPORTAL_TOKEN set.', 'text/plain; charset=utf-8');
       }
-      const html = await workspaceHtml({ dev: true, needsToken: !config.allowUnauthenticated });
+      const html = await roomHtml({ dev: true, needsToken: !config.allowUnauthenticated });
       return send(res, 200, html, 'text/html; charset=utf-8', {
         'x-frame-options': 'DENY',
         'referrer-policy': 'no-referrer',

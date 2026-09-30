@@ -1,6 +1,6 @@
 /**
  * Offline fetcher backed by test/fixtures. Used by the test suite and by
- * `MCPORTAL_FIXTURES=1` demo mode, so the workspace can be shown without network.
+ * `MCPORTAL_FIXTURES=1` demo mode, so the room can be shown without network.
  */
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';

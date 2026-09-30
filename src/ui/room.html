@@ -31,7 +31,7 @@
     --border: var(--color-border-primary, var(--d-border));
     --hover: var(--d-hover);
     --radius: var(--border-radius-lg, 10px);
-    /* Your own panels take the house inks (brand/README.md); feeds take the lead ink of their
+    /* Your own portals take the house inks (brand/README.md); feeds take the lead ink of their
        fallback art (sourceColor()). Dark mode tints every ink toward paper so dark ones show. */
     --src-saved: color-mix(in srgb, #E0A526 var(--lead-mix), #F2E6CF); --src-clips: color-mix(in srgb, #2A8C82 var(--lead-mix), #F2E6CF);
     --src-following: color-mix(in srgb, #C4452C var(--lead-mix), #F2E6CF); --src-pinned: color-mix(in srgb, #1F2A36 var(--lead-mix), #F2E6CF);
@@ -54,7 +54,7 @@
   .brand-word { height: 10px; width: auto; display: block; }
   .brand-mc { fill: currentColor; }
   .brand-portal { fill: var(--brand-teal); }
-  .ws-name { color: var(--fg2); font-size: 12px; }
+  .room-name { color: var(--fg2); font-size: 12px; }
   .spacer { flex: 1; }
   .status { color: var(--fg2); font-size: 12px; }
   .btn { border: 1px solid var(--border); background: var(--bg); border-radius: 7px; padding: 4px 10px; font-size: 12px; cursor: pointer; }
@@ -70,20 +70,20 @@
   .seg { display: inline-flex; gap: 1px; padding: 1px; border: 1px solid var(--border); border-radius: 7px; }
   .seg .ib { width: 24px; height: 22px; border-radius: 5px; }
   .sep { width: 1px; height: 16px; background: var(--border); margin: 0 3px; }
-  :root.article-view .ws-only, :root.welcome-view .ws-only { display: none !important; }
+  :root.article-view .room-only, :root.welcome-view .room-only { display: none !important; }
 
   /* columns: a lane of fixed-width columns that scrolls sideways; each column scrolls its own items */
   :root { --lane-h: 560px; }
   :root.fullscreen { --lane-h: calc(100vh - 38px); }
   .grid { display: flex; gap: 10px; padding: 10px; height: var(--lane-h); overflow-x: auto; overflow-y: hidden; scroll-snap-type: x proximity; scroll-padding: 0 10px; overscroll-behavior-x: contain; }
   .col { flex: var(--w, 1) 0 calc(var(--w, 1) * 288px); min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 10px; scroll-snap-align: start; }
-  .col .panel { flex: 1 1 0; min-height: 0; }
-  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); display: flex; flex-direction: column; overflow: hidden; }
-  .panel-head { display: flex; align-items: center; gap: 7px; padding: 5px 6px 5px 11px; border-bottom: 1px solid var(--border); }
+  .col .portal { flex: 1 1 0; min-height: 0; }
+  .portal { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); display: flex; flex-direction: column; overflow: hidden; }
+  .portal-head { display: flex; align-items: center; gap: 7px; padding: 5px 6px 5px 11px; border-bottom: 1px solid var(--border); }
   .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
-  .panel-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .panel-count { color: var(--fg2); font-size: 12px; }
-  .panel-head .tools { margin-left: auto; display: flex; gap: 1px; }
+  .portal-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .portal-count { color: var(--fg2); font-size: 12px; }
+  .portal-head .tools { margin-left: auto; display: flex; gap: 1px; }
   .items { list-style: none; margin: 0; padding: 3px; flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
   .item { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 6px 8px; border-radius: 6px; cursor: pointer; }
   .item:hover, .item:focus-visible { background: var(--hover); outline: none; }
@@ -101,9 +101,9 @@
   .item .mi.save:not([aria-pressed="true"]), .card .mi.save:not([aria-pressed="true"]) { opacity: 0; }
   .item:hover .mi.save, .item:focus-within .mi.save, .card:hover .mi.save, .card:focus-within .mi.save { opacity: 1; }
   @media (hover: none) { .item .mi.save, .card .mi.save { opacity: 1; } }
-  .panel-foot { display: none; padding: 7px 12px; border-top: 1px solid var(--border); color: var(--fg2); font-size: 11.5px; word-break: break-all; }
-  :root.show-sources .panel-foot { display: block; }
-  /* shelves: one horizontally scrolling row of cards per panel */
+  .portal-foot { display: none; padding: 7px 12px; border-top: 1px solid var(--border); color: var(--fg2); font-size: 11.5px; word-break: break-all; }
+  :root.show-sources .portal-foot { display: block; }
+  /* shelves: one horizontally scrolling row of cards per portal */
   .grid.shelves { display: block; height: auto; padding: 10px 0 2px; overflow: visible; }
   .shelf { margin-bottom: 12px; }
   .shelf-head { display: flex; align-items: center; gap: 7px; padding: 0 8px 4px 12px; }
@@ -115,7 +115,7 @@
   .card .item-summary { margin-top: 0; }
   .card .item-meta { margin-top: auto; flex-wrap: nowrap; overflow: hidden; white-space: nowrap; }
   :root.fullscreen .card { flex-basis: 264px; width: 264px; height: 176px; }
-  .shelf .panel-foot { border: 0; padding: 0 12px 4px; }
+  .shelf .portal-foot { border: 0; padding: 0 12px 4px; }
   /* add a source */
   .add-sheet { margin: 8px 10px 0; padding: 8px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
   .add-row { display: flex; gap: 6px; }
@@ -247,22 +247,22 @@
 <template id="brandBadge"><!--include:brand/badge.svg--></template>
 <header class="bar">
   <div class="brand"><!--include:brand/mark-line.svg--><!--include:brand/wordmark.svg--></div>
-  <div class="ws-name" id="wsName"></div>
+  <div class="room-name" id="roomName"></div>
   <div class="spacer"></div>
   <span class="status" id="status">Warming up the portal…</span>
-  <span class="sep ws-only"></span>
-  <div class="seg ws-only" role="group" aria-label="Layout">
+  <span class="sep room-only"></span>
+  <div class="seg room-only" role="group" aria-label="Layout">
     <button class="ib" data-layout="columns" data-icon="columns" aria-pressed="true" title="Columns: scroll sideways, then down each column" aria-label="Columns layout"></button>
     <button class="ib" data-layout="shelves" data-icon="shelves" aria-pressed="false" title="Shelves: one sideways row per source" aria-label="Shelves layout"></button>
   </div>
-  <button class="ib ws-only" id="btnSpace" data-icon="space" title="Your space: what people who follow you see" aria-label="Open your space"></button>
-  <button class="ib ws-only" id="btnAdd" data-icon="plus" aria-pressed="false" title="Add a source: any site, feed, subreddit, YouTube channel or repo" aria-label="Add a source"></button>
-  <button class="ib ws-only" id="btnOpenIn" data-icon="chat" aria-pressed="false" title="Open stories as their own card in the conversation" aria-label="Open stories in chat" hidden></button>
-  <button class="ib ws-only" id="btnSources" data-icon="sources" aria-pressed="false" title="Show where each portal's data came from" aria-label="Show sources"></button>
-  <button class="ib ws-only" id="btnRefresh" data-icon="refresh" title="Refresh all portals" aria-label="Refresh all portals"></button>
+  <button class="ib room-only" id="btnSpace" data-icon="space" title="Your space: what people who follow you see" aria-label="Open your space"></button>
+  <button class="ib room-only" id="btnAdd" data-icon="plus" aria-pressed="false" title="Add a source: any site, feed, subreddit, YouTube channel or repo" aria-label="Add a source"></button>
+  <button class="ib room-only" id="btnOpenIn" data-icon="chat" aria-pressed="false" title="Open stories as their own card in the conversation" aria-label="Open stories in chat" hidden></button>
+  <button class="ib room-only" id="btnSources" data-icon="sources" aria-pressed="false" title="Show where each portal's data came from" aria-label="Show sources"></button>
+  <button class="ib room-only" id="btnRefresh" data-icon="refresh" title="Refresh all portals" aria-label="Refresh all portals"></button>
   <button class="ib" id="btnExpand" data-icon="expand" title="Fullscreen: step all the way through" aria-label="Fullscreen"></button>
 </header>
-<section id="addSheet" class="add-sheet ws-only" hidden>
+<section id="addSheet" class="add-sheet room-only" hidden>
   <form class="add-row" id="addForm">
     <input id="addInput" type="text" autocomplete="off" spellcheck="false" placeholder="theverge.com, r/LocalLLaMA, youtube.com/@channel, owner/repo…" aria-label="Site, feed, subreddit, channel or repo">
     <button class="btn" type="submit">Scan</button>
@@ -272,7 +272,7 @@
   <ul class="cands" id="addResults"></ul>
 </section>
 <main id="grid" class="grid" aria-live="polite">
-  <div class="col" style="flex-grow:1"><div class="panel"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div></div>
+  <div class="col" style="flex-grow:1"><div class="portal"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div></div>
 </main>
 <section id="welcome" class="welcome" hidden></section>
 <input type="file" id="opmlFile" accept=".opml,.xml,text/xml,application/xml,text/x-opml" hidden>
@@ -282,7 +282,7 @@
 <script>
 (() => {
   'use strict';
-  const APP_INFO = { name: 'mcportal-workspace', version: '0.1.0' };
+  const APP_INFO = { name: 'mcportal-room', version: '0.1.0' };
   const DEV = window.__MCPORTAL_DEV__ || null;   // set by /preview: talk to /mcp directly
   const root = document.documentElement;
   if (DEV) root.classList.add('framed');
@@ -374,7 +374,7 @@
       else if (data && data.share && data.share.id) { gotInitialResult = true; showShareCard(data.share); }
       else if (data && data.clip && data.clip.data) { gotInitialResult = true; showClipCard(data.clip); }
       else if (data && data.article) { gotInitialResult = true; showArticleCard(data.article, data.saved); }
-      else if (data && data.profile && data.panels) { gotInitialResult = true; renderWorkspace(data); }
+      else if (data && data.profile && data.portals) { gotInitialResult = true; renderRoom(data); }
       else if (params.isError) setStatus("Your room didn't open. Try again, or ask your agent to open it.");
     } else if (method === 'ui/notifications/host-context-changed') {
       applyHostContext(params);
@@ -450,7 +450,7 @@
   }).observe(document.body);
 
   // ------------------------------------------------------------ state + rendering
-  const state = { profile: null, panels: new Map(), saved: new Set(), art: new Map() };   // art: panel id -> fallback art style
+  const state = { profile: null, portals: new Map(), saved: new Set(), art: new Map() };   // art: portal id -> fallback art style
 
   function el(tag, attrs, ...children) {
     const node = document.createElement(tag);
@@ -495,10 +495,10 @@
     state.profile = { layout: 'columns', openIn: 'card', saved: [], ...data.profile };
     root.classList.add('welcome-view');
     $('grid').hidden = true; $('reader').hidden = true;
-    $('wsName').textContent = rebuilding ? '· start over' : '· welcome';
+    $('roomName').textContent = rebuilding ? '· start over' : '· welcome';
     setStatus('');
     const chosen = new Set();
-    const build = el('button', { class: 'btn primary', disabled: true, onclick: () => buildPortal([...chosen]) }, 'Summon my portals!');
+    const build = el('button', { class: 'btn primary', disabled: true, onclick: () => buildRoom([...chosen]) }, 'Summon my portals!');
     const cards = packs.map((p) => el('button', {
       class: 'pack', 'aria-pressed': 'false', title: p.sources.join(' · '),
       onclick: (e) => {
@@ -530,8 +530,8 @@
       el('div', { class: 'packs' }, cards),
       el('div', { class: 'welcome-actions' }, build,
         rebuilding
-          ? el('button', { class: 'link-btn', onclick: () => { loading = null; loadWorkspace(); } }, 'Cancel')
-          : el('button', { class: 'link-btn', onclick: () => buildPortal([]) }, 'Skip. Show me what lurks inside.'),
+          ? el('button', { class: 'link-btn', onclick: () => { loading = null; loadRoom(); } }, 'Cancel')
+          : el('button', { class: 'link-btn', onclick: () => buildRoom([]) }, 'Skip. Show me what lurks inside.'),
         rebuilding ? null : el('button', { class: 'link-btn', onclick: () => pickOpml() }, 'Fleeing another reader? Smuggle your subscriptions in (OPML)')),
       DEV ? null : el('div', { class: 'ask' },
         el('p', { class: 'lede' }, 'Into something stranger? Describe it and your agent will hunt down the sources.'),
@@ -540,15 +540,15 @@
     $('welcome').hidden = false;
   }
 
-  async function buildPortal(packIds) {
+  async function buildRoom(packIds) {
     const note = el('div', { class: 'building' }, packIds.length ? 'Forging your room in the star-furnace…' : 'Cracking open a sample room…');
     $('welcome').append(note);
     for (const b of $('welcome').querySelectorAll('button')) b.disabled = true;
     try {
-      const built = (await callTool('build_portal', { packs: packIds })).structuredContent;
+      const built = (await callTool('build_room', { packs: packIds })).structuredContent;
       note.textContent = 'Receiving transmissions…';
-      const result = await callTool('open_workspace');
-      renderWorkspace(result.structuredContent);
+      const result = await callTool('open_room');
+      renderRoom(result.structuredContent);
       if (!DEV && packIds.length) {
         hostRequest('ui/update-model-context', {
           content: [{ type: 'text', text: `The user just built their MCPortal from starter packs: ${packIds.join(', ')} (${built.profile.columns.flatMap((c) => c.panels).length} sources). Offer to add anything specific they follow.` }],
@@ -560,15 +560,15 @@
     }
   }
 
-  function renderWorkspace(data) {
+  function renderRoom(data) {
     if (data.onboarding) return renderWelcome(data);
     root.classList.remove('welcome-view');
     $('welcome').hidden = true;
     if (articleUrl === null) { $('grid').hidden = false; }
     state.profile = { layout: 'columns', openIn: 'card', saved: [], ...data.profile };
     state.saved = new Set(state.profile.saved.map((s) => s.url));
-    state.panels = new Map(data.panels.map((p) => [p.panelId, p]));
-    $('wsName').textContent = `· ${data.profile.name}`;
+    state.portals = new Map(data.portals.map((p) => [p.portalId, p]));
+    $('roomName').textContent = `· ${data.profile.name}`;
     drawLayout();
     setUpdated(data.generatedAt);
     if (data.notice) toast(data.notice);
@@ -582,46 +582,46 @@
     grid.classList.toggle('shelves', shelves);
     grid.replaceChildren(...(shelves
       ? p.columns.flatMap((col) => col.panels).map((spec) => renderShelf(spec.id))
-      : p.columns.map((col) => el('div', { class: 'col', style: `--w:${col.width}` }, col.panels.map((spec) => renderPanel(spec.id))))));
+      : p.columns.map((col) => el('div', { class: 'col', style: `--w:${col.width}` }, col.panels.map((spec) => renderPortal(spec.id))))));
     for (const b of document.querySelectorAll('[data-layout]')) b.setAttribute('aria-pressed', String(b.dataset.layout === p.layout));
     $('btnOpenIn').setAttribute('aria-pressed', String(p.openIn === 'chat'));
   }
 
-  function renderShelf(panelId) {
-    const panel = state.panels.get(panelId);
-    const wrap = el('section', { class: 'shelf', 'data-panel': panelId });
-    if (!panel) { wrap.append(el('div', { class: 'empty' }, 'Stand by…')); return wrap; }
-    const color = sourceColor(panel.source, artStyle(panel));
+  function renderShelf(portalId) {
+    const portal = state.portals.get(portalId);
+    const wrap = el('section', { class: 'shelf', 'data-portal': portalId });
+    if (!portal) { wrap.append(el('div', { class: 'empty' }, 'Stand by…')); return wrap; }
+    const color = sourceColor(portal.source, artStyle(portal));
     const row = el('div', { class: 'shelf-row' });
     const page = (dir) => row.scrollBy({ left: dir * Math.max(200, row.clientWidth - 60), behavior: 'smooth' });
     wrap.append(el('div', { class: 'shelf-head' },
       el('span', { class: 'dot', style: `background:${color}` }),
-      el('span', { class: 'panel-title', title: panel.title }, panel.title),
-      el('span', { class: 'panel-count' }, panel.error ? '' : String(panel.items.length)),
+      el('span', { class: 'portal-title', title: portal.title }, portal.title),
+      el('span', { class: 'portal-count' }, portal.error ? '' : String(portal.items.length)),
       el('span', { class: 'tools' },
-        iconButton('left', `Scroll ${panel.title} left`, () => page(-1)),
-        iconButton('right', `Scroll ${panel.title} right`, () => page(1)),
-        refreshButton(panel))));
-    if (panel.error) wrap.append(el('div', { class: 'error' }, `Signal lost in the ion storm (${panel.error}). Try refreshing this portal.`));
-    else if (!panel.items.length) wrap.append(el('div', { class: 'empty' }, 'All quiet on this frequency… for now. New posts will show up here.'));
+        iconButton('left', `Scroll ${portal.title} left`, () => page(-1)),
+        iconButton('right', `Scroll ${portal.title} right`, () => page(1)),
+        refreshButton(portal))));
+    if (portal.error) wrap.append(el('div', { class: 'error' }, `Signal lost in the ion storm (${portal.error}). Try refreshing this portal.`));
+    else if (!portal.items.length) wrap.append(el('div', { class: 'empty' }, 'All quiet on this frequency… for now. New posts will show up here.'));
     else {
       // A picture row only when most items have pictures; otherwise it's mostly empty boxes.
-      const withThumbs = panel.items.filter((i) => i.image && i.image.kind === 'thumb').length;
-      const media = withThumbs >= 2 && withThumbs * 2 >= panel.items.length;
-      row.append(...panel.items.map((item) => renderCard(item, panel, color, media)));
+      const withThumbs = portal.items.filter((i) => i.image && i.image.kind === 'thumb').length;
+      const media = withThumbs >= 2 && withThumbs * 2 >= portal.items.length;
+      row.append(...portal.items.map((item) => renderCard(item, portal, color, media)));
       wrap.append(row);
     }
-    const p = panel.provenance;
-    wrap.append(el('div', { class: 'panel-foot' }, panel.pin ? pinnedFoot(panel)
+    const p = portal.provenance;
+    wrap.append(el('div', { class: 'portal-foot' }, portal.pin ? pinnedFoot(portal)
       : `${p.source} · ${p.endpoint} · fetched ${new Date(p.fetchedAt).toLocaleTimeString()}${p.cached ? ' (cached)' : ''}`));
     primePictures(wrap);
     return wrap;
   }
 
   // In a media shelf every card gets a picture area, so the row stays even.
-  function renderCard(item, panel, color, media) {
+  function renderCard(item, portal, color, media) {
     const meta = compactMeta(item).out;
-    const save = saveButton(item, panel.source);
+    const save = saveButton(item, portal.source);
     if (save) { save.classList.add('go'); meta.push(save); }
     const avatar = item.image && item.image.kind === 'avatar' ? avatarImg(item) : null;
     const body = [
@@ -631,28 +631,28 @@
     ];
     return el('div', {
       class: media ? 'card media' : 'card', role: 'button', tabindex: '0', style: `--c:${color}`, title: item.title,
-      onclick: () => openItem(item, panel),
-      onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) openItem(item, panel); },
-    }, media ? [thumbBox(item.image && item.image.kind === 'thumb' ? item : { ...item, image: undefined }, panel), el('div', { class: 'card-body' }, body)] : body);
+      onclick: () => openItem(item, portal),
+      onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) openItem(item, portal); },
+    }, media ? [thumbBox(item.image && item.image.kind === 'thumb' ? item : { ...item, image: undefined }, portal), el('div', { class: 'card-body' }, body)] : body);
   }
 
-  function renderPanel(panelId) {
-    if (state.profile && state.profile.layout === 'shelves') return renderShelf(panelId);
-    const panel = state.panels.get(panelId);
-    const wrap = el('section', { class: 'panel', 'data-panel': panelId });
-    if (!panel) { wrap.append(el('div', { class: 'empty' }, 'Stand by…')); return wrap; }
-    const color = sourceColor(panel.source, artStyle(panel));
-    const refresh = el('span', { class: 'tools' }, refreshButton(panel));
-    wrap.append(el('div', { class: 'panel-head' },
+  function renderPortal(portalId) {
+    if (state.profile && state.profile.layout === 'shelves') return renderShelf(portalId);
+    const portal = state.portals.get(portalId);
+    const wrap = el('section', { class: 'portal', 'data-portal': portalId });
+    if (!portal) { wrap.append(el('div', { class: 'empty' }, 'Stand by…')); return wrap; }
+    const color = sourceColor(portal.source, artStyle(portal));
+    const refresh = el('span', { class: 'tools' }, refreshButton(portal));
+    wrap.append(el('div', { class: 'portal-head' },
       el('span', { class: 'dot', style: `background:${color}` }),
-      el('span', { class: 'panel-title', title: panel.title }, panel.title),
-      el('span', { class: 'panel-count' }, panel.error ? '' : String(panel.items.length)),
+      el('span', { class: 'portal-title', title: portal.title }, portal.title),
+      el('span', { class: 'portal-count' }, portal.error ? '' : String(portal.items.length)),
       refresh));
-    if (panel.error) wrap.append(el('div', { class: 'error' }, `Signal lost in the ion storm (${panel.error}). Try refreshing this portal.`));
-    else if (!panel.items.length) wrap.append(el('div', { class: 'empty' }, 'All quiet on this frequency… for now. New posts will show up here.'));
-    else wrap.append(el('ul', { class: 'items' }, panel.items.map((item) => el('li', null, renderItem(item, panel)))));
-    const p = panel.provenance;
-    wrap.append(el('div', { class: 'panel-foot' }, panel.pin ? pinnedFoot(panel)
+    if (portal.error) wrap.append(el('div', { class: 'error' }, `Signal lost in the ion storm (${portal.error}). Try refreshing this portal.`));
+    else if (!portal.items.length) wrap.append(el('div', { class: 'empty' }, 'All quiet on this frequency… for now. New posts will show up here.'));
+    else wrap.append(el('ul', { class: 'items' }, portal.items.map((item) => el('li', null, renderItem(item, portal)))));
+    const p = portal.provenance;
+    wrap.append(el('div', { class: 'portal-foot' }, portal.pin ? pinnedFoot(portal)
       : `${p.source} · ${p.endpoint} · fetched ${new Date(p.fetchedAt).toLocaleTimeString()}${p.cached ? ' (cached)' : ''} · fresh for ${p.ttlSeconds}s`));
     primePictures(wrap);
     return wrap;
@@ -698,10 +698,10 @@
     if (wanted.size) loadPictures();
   }
 
-  // The first few pictures in each panel are what's on screen: ask for them now,
+  // The first few pictures in each portal are what's on screen: ask for them now,
   // without waiting on visibility (which never fires in a hidden or background frame).
-  function primePictures(panelNode, count = 6) {
-    const urls = [...new Set([...panelNode.querySelectorAll('[data-img]')].map((n) => n.dataset.img))].slice(0, count);
+  function primePictures(portalNode, count = 6) {
+    const urls = [...new Set([...portalNode.querySelectorAll('[data-img]')].map((n) => n.dataset.img))].slice(0, count);
     for (const u of urls) if (!pictures.has(u)) wanted.add(u);
     if (wanted.size) { clearTimeout(pictureTimer); pictureTimer = setTimeout(loadPictures, 30); }
   }
@@ -710,7 +710,7 @@
     if (!showPicture(node)) seen.observe(node);
     return node;
   }
-  // Each panel gets its own fallback art style, in layout order, so no two sources on
+  // Each portal gets its own fallback art style, in layout order, so no two sources on
   // screen look alike. Keyed by feed URL where there is one, so a feed keeps its look.
   function assignArt(profile) {
     const specs = profile.columns.flatMap((col) => col.panels);
@@ -719,13 +719,13 @@
     state.art = new Map(specs.map((spec, i) => [spec.id, styles[i]]));
   }
 
-  /** A panel's art style: its place in the layout, or (outside the layout) the one its feed hashes to. */
-  function artStyle(panel) {
-    return state.art.has(panel.panelId) ? state.art.get(panel.panelId) : portalArt.styles([panel.provenance.endpoint])[0];
+  /** A portal's art style: its place in the layout, or (outside the layout) the one its feed hashes to. */
+  function artStyle(portal) {
+    return state.art.has(portal.portalId) ? state.art.get(portal.portalId) : portalArt.styles([portal.provenance.endpoint])[0];
   }
   const HOUSE_SOURCES = new Set(['saved', 'clips', 'following', 'pinned']);
   /**
-   * A source's colour, for its dot and its cards' top edge. Your own panels take the house
+   * A source's colour, for its dot and its cards' top edge. Your own portals take the house
    * inks; a feed takes the lead ink of its fallback art, so the dot, the cards and the
    * pictures agree and no two sources on screen share a colour.
    */
@@ -736,11 +736,11 @@
   const loneColor = (source, config) => sourceColor(source, portalArt.styles([config && typeof config.url === 'string' ? config.url : `${source}:${JSON.stringify(config || {})}`])[0]);
 
   // The picture area starts as the source's fallback art; a loaded picture fades in over it.
-  function thumbBox(item, panel) {
+  function thumbBox(item, portal) {
     const box = el('div', { class: 'thumb' },
       el('img', { alt: '', loading: 'lazy', decoding: 'async' }),
       item.video ? el('span', { class: 'play', 'aria-hidden': 'true' }, icon('play')) : null);
-    const art = portalArt.draw(artStyle(panel), item.id || item.url || item.title);
+    const art = portalArt.draw(artStyle(portal), item.id || item.url || item.title);
     box.prepend(document.importNode(new DOMParser().parseFromString(art, 'image/svg+xml').documentElement, true));
     if (!item.image) return box;
     box.dataset.img = item.image.url;
@@ -784,11 +784,11 @@
       state.saved = new Set(data.saved.map((s) => s.url));
       if (state.profile) {
         state.profile = { ...state.profile, ...data.profile };
-        if (data.panel) state.panels.set(data.panel.panelId, data.panel);
+        if (data.portal) state.portals.set(data.portal.portalId, data.portal);
         if (data.layoutChanged) { drawLayout(); toast('Saved! A Saved portal has materialized in your room.'); }
-        else if (data.panel) {
-          const node = document.querySelector(`[data-panel="${CSS.escape(data.panel.panelId)}"]`);
-          if (node) node.replaceWith(renderPanel(data.panel.panelId));
+        else if (data.portal) {
+          const node = document.querySelector(`[data-portal="${CSS.escape(data.portal.portalId)}"]`);
+          if (node) node.replaceWith(renderPortal(data.portal.portalId));
         }
       }
       if (!was && !data.layoutChanged) toast('Saved!');
@@ -819,11 +819,11 @@
     return { out, byline };
   }
 
-  function renderItem(item, panel) {
+  function renderItem(item, portal) {
     const { out, byline } = compactMeta(item);
     if (item.url) out.push(el('button', { class: 'mi go', title: 'Open the original', 'aria-label': 'Open the original', onclick: (e) => { e.stopPropagation(); openLink(item.url); } }, icon('external')));
-    out.push(saveButton(item, panel.source));
-    if (panel.source === 'saved' && item.url) out.push(el('button', { class: 'mi go', title: 'Share to your space', 'aria-label': 'Share to your space', onclick: (e) => { e.stopPropagation(); openComposer(item); } }, icon('share')));
+    out.push(saveButton(item, portal.source));
+    if (portal.source === 'saved' && item.url) out.push(el('button', { class: 'mi go', title: 'Share to your space', 'aria-label': 'Share to your space', onclick: (e) => { e.stopPropagation(); openComposer(item); } }, icon('share')));
     const avatar = item.image && item.image.kind === 'avatar' ? avatarImg(item) : null;
     const text = [
       el('div', { class: 'item-title' }, avatar, item.title),
@@ -833,53 +833,53 @@
     const thumb = item.image && item.image.kind === 'thumb';
     return el('div', {
       class: 'item', role: 'button', tabindex: '0',
-      title: [item.clip || (item.share && item.share.kind === 'clip') ? 'Open the clip' : item.url && panel.source !== 'github' && panel.source !== 'pinned' ? 'Open in reader view' : 'Open', byline].filter(Boolean).join(' · '),
-      onclick: () => openItem(item, panel),
-      onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) openItem(item, panel); },
-    }, thumb ? el('div', { class: 'item-row' }, thumbBox(item, panel), el('div', { class: 'item-text' }, text)) : text);
+      title: [item.clip || (item.share && item.share.kind === 'clip') ? 'Open the clip' : item.url && portal.source !== 'github' && portal.source !== 'pinned' ? 'Open in reader view' : 'Open', byline].filter(Boolean).join(' · '),
+      onclick: () => openItem(item, portal),
+      onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) openItem(item, portal); },
+    }, thumb ? el('div', { class: 'item-row' }, thumbBox(item, portal), el('div', { class: 'item-text' }, text)) : text);
   }
 
-  // Pinned panels hold data the agent fetched with another tool, so only the agent can
-  // refresh them: the button asks it in the conversation. Only the panel id goes into
+  // Pinned portals hold data the agent fetched with another tool, so only the agent can
+  // refresh them: the button asks it in the conversation. Only the portal id goes into
   // the message (ids are [a-z0-9-] slugs); the agent reads the recipe from get_profile.
-  function refreshButton(panel) {
-    if (!panel.pin) return iconButton('refresh', `Refresh ${panel.title}`, () => refreshPanel(panel.panelId));
-    return iconButton('refresh', `Ask your agent to refresh ${panel.title} from ${panel.pin.from}`, () => refreshPinned(panel));
+  function refreshButton(portal) {
+    if (!portal.pin) return iconButton('refresh', `Refresh ${portal.title}`, () => refreshPortal(portal.portalId));
+    return iconButton('refresh', `Ask your agent to refresh ${portal.title} from ${portal.pin.from}`, () => refreshPinned(portal));
   }
-  function pinnedFoot(panel) {
-    return `pinned from ${panel.pin.from} · updated ${ago(panel.provenance.fetchedAt)} · refresh asks your agent`;
+  function pinnedFoot(portal) {
+    return `pinned from ${portal.pin.from} · updated ${ago(portal.provenance.fetchedAt)} · refresh asks your agent`;
   }
-  async function refreshPinned(panel) {
-    if (DEV) { toast(`Ask your agent to refresh "${panel.title}"`); return; }
+  async function refreshPinned(portal) {
+    if (DEV) { toast(`Ask your agent to refresh "${portal.title}"`); return; }
     try {
-      await hostRequest('ui/message', { role: 'user', content: [{ type: 'text', text: `Refresh my pinned MCPortal portal (id ${panel.panelId}).` }] }, 10000);
+      await hostRequest('ui/message', { role: 'user', content: [{ type: 'text', text: `Refresh my pinned MCPortal portal (id ${portal.portalId}).` }] }, 10000);
       toast('Your summons has been sent! Your agent is refreshing it…');
     } catch {
-      toast(`The chat is beyond our reach. Ask your agent there to refresh "${panel.title}".`);
+      toast(`The chat is beyond our reach. Ask your agent there to refresh "${portal.title}".`);
     }
   }
 
-  async function refreshPanel(panelId) {
-    const node = document.querySelector(`[data-panel="${CSS.escape(panelId)}"]`);
+  async function refreshPortal(portalId) {
+    const node = document.querySelector(`[data-portal="${CSS.escape(portalId)}"]`);
     if (node) node.style.opacity = '0.55';
     try {
-      const result = await callTool('refresh_panel', { panelId });
-      state.panels.set(panelId, result.structuredContent.panel);
+      const result = await callTool('refresh_portal', { portalId });
+      state.portals.set(portalId, result.structuredContent.portal);
     } catch (error) {
       toast(error.message);
     }
-    const fresh = renderPanel(panelId);
-    const current = document.querySelector(`[data-panel="${CSS.escape(panelId)}"]`);
+    const fresh = renderPortal(portalId);
+    const current = document.querySelector(`[data-portal="${CSS.escape(portalId)}"]`);
     if (current) current.replaceWith(fresh);
   }
 
-  function loadWorkspace() {
+  function loadRoom() {
     if (loading) return loading;   // never run two loads at once
     setStatus('Stand by…');
     loading = (async () => {
       try {
-        const result = await callTool('open_workspace');
-        renderWorkspace(result.structuredContent);
+        const result = await callTool('open_room');
+        renderRoom(result.structuredContent);
       } catch (error) {
         setStatus('');
         if (error.needsToken) {
@@ -888,16 +888,16 @@
             devToken = input.value.trim();
             try { sessionStorage.setItem('mcportal-token', devToken); } catch {}
             loading = null;
-            loadWorkspace();
+            loadRoom();
           };
           input.addEventListener('keydown', (e) => { if (e.key === 'Enter') connect(); });
-          $('grid').replaceChildren(el('div', { class: 'panel', style: 'flex:1;max-width:460px;padding:14px;gap:10px' },
+          $('grid').replaceChildren(el('div', { class: 'portal', style: 'flex:1;max-width:460px;padding:14px;gap:10px' },
             el('div', null, devToken ? 'That token was not accepted. Paste the server\'s access token:' : 'Paste this server\'s access token to open the preview:'),
             el('div', { style: 'display:flex;gap:8px' }, input, el('button', { class: 'btn', onclick: connect }, 'Connect'))));
           input.focus();
           return;
         }
-        $('grid').replaceChildren(el('div', { class: 'panel', style: 'flex:1' }, el('div', { class: 'error' }, `Your room didn't open (${error.message}). Try again, or ask your agent to open it.`)));
+        $('grid').replaceChildren(el('div', { class: 'portal', style: 'flex:1' }, el('div', { class: 'error' }, `Your room didn't open (${error.message}). Try again, or ask your agent to open it.`)));
       } finally {
         loading = null;
       }
@@ -906,27 +906,27 @@
   }
 
   // ------------------------------------------------------------ reader view
-  function openItem(item, panel) {
-    if (item.clip) return openClip(item, panel);
+  function openItem(item, portal) {
+    if (item.clip) return openClip(item, portal);
     if (item.share && item.share.kind === 'clip') return openShare(item);
     // Videos play at the source; pinned items are often internal pages reader view can't reach.
-    const readable = item.url && panel.source !== 'github' && panel.source !== 'pinned' && !item.video;
+    const readable = item.url && portal.source !== 'github' && portal.source !== 'pinned' && !item.video;
     if (!readable) return openLink(item.url);
-    if (!DEV && state.profile && state.profile.openIn === 'chat') return openInChat(item, panel);
-    return openReader(item, panel);
+    if (!DEV && state.profile && state.profile.openIn === 'chat') return openInChat(item, portal);
+    return openReader(item, portal);
   }
 
   // Ask the host to post a message so the model opens the story with read_article,
   // which renders as its own reader card below this one. Only the URL goes into the
   // message: titles are third-party text and must never be spoken in the user's voice.
-  async function openInChat(item, panel) {
-    if (!isHttpUrl(item.url) || item.url.length > 2000) return openReader(item, panel);
+  async function openInChat(item, portal) {
+    if (!isHttpUrl(item.url) || item.url.length > 2000) return openReader(item, portal);
     try {
       await hostRequest('ui/message', { role: 'user', content: [{ type: 'text', text: `Open this in MCPortal's reader view: ${item.url}` }] }, 10000);
       toast('Opening in the conversation…');
     } catch {
       toast("This host can't open a new card, so it's opening here");
-      openReader(item, panel);
+      openReader(item, portal);
     }
   }
 
@@ -944,11 +944,11 @@
       el('div', { class: 'prov' }, `Reader view of ${p.endpoint}${via ? ` · via ${via}` : ''} · fetched ${new Date(p.fetchedAt).toLocaleString()}${p.cached ? ' (cached)' : ''}. Text only; scripts, trackers and ads removed.`)];
   }
 
-  // This view belongs to a read_article call: it is a reader card, not a workspace.
+  // This view belongs to a read_article call: it is a reader card, not a room.
   function showArticleCard(a, saved) {
     if (saved) state.saved.add(a.url);
     root.classList.add('article-view');
-    $('wsName').textContent = '· reader';
+    $('roomName').textContent = '· reader';
     $('grid').hidden = true;
     const reader = $('reader');
     reader.hidden = false; reader.scrollTop = 0;
@@ -969,14 +969,14 @@
     }
   }
 
-  async function openReader(item, panel) {
+  async function openReader(item, portal) {
     const reader = $('reader');
     $('grid').hidden = true; reader.hidden = false; reader.scrollTop = 0; window.scrollTo(0, 0);
     reader.replaceChildren(readerTop(item.url, true), el('h1', null, item.title), el('div', { class: 'byline' }, 'Unrolling the scroll…'));
     try {
       const result = await callTool('read_article', { url: item.url });
       const a = result.structuredContent.article;
-      reader.replaceChildren(...articleNodes(a, panel.title, true));
+      reader.replaceChildren(...articleNodes(a, portal.title, true));
       if (!DEV) {
         const safeTitle = String(a.title).replace(/[\u0000-\u001f\u007f\u2028\u2029"]/g, ' ').slice(0, 160);
         hostRequest('ui/update-model-context', {
@@ -1035,10 +1035,10 @@
       el('div', { class: 'prov' }, `Your clip ${clip.id}. Only you can see it until you share it.`)].filter(Boolean);
   }
 
-  // This view belongs to a get_clip call: it is a clip card, not a workspace.
+  // This view belongs to a get_clip call: it is a clip card, not a room.
   function showClipCard(clip) {
     root.classList.add('article-view');
-    $('wsName').textContent = '· clip';
+    $('roomName').textContent = '· clip';
     $('grid').hidden = true;
     const reader = $('reader');
     reader.hidden = false; reader.scrollTop = 0;
@@ -1148,7 +1148,7 @@
       const add = space.mine ? null : el('button', { class: 'btn' }, 'Add');
       if (add) add.addEventListener('click', async () => {
         add.disabled = true;
-        try { await callTool('add_panel', { source: src.source, config: src.config, title: src.title }); add.textContent = 'Added'; }
+        try { await callTool('add_portal', { source: src.source, config: src.config, title: src.title }); add.textContent = 'Added'; }
         catch (error) { toast(error.message); add.disabled = false; }
       });
       return el('div', { class: 'source' }, el('span', { class: 'dot', style: `background:${loneColor(src.source, src.config)}` }),
@@ -1181,7 +1181,7 @@
   // This view belongs to an open_space call: it is a space card.
   function showSpaceCard(space) {
     root.classList.add('article-view');
-    $('wsName').textContent = `· @${space.handle}`;
+    $('roomName').textContent = `· @${space.handle}`;
     showSpace(space, false);
   }
 
@@ -1215,7 +1215,7 @@
 
   function showShareCard(share) {
     root.classList.add('article-view');
-    $('wsName').textContent = '· shared';
+    $('roomName').textContent = '· shared';
     $('grid').hidden = true;
     const reader = $('reader');
     reader.hidden = false; reader.scrollTop = 0;
@@ -1285,13 +1285,13 @@
   async function addCandidate(c, button) {
     button.disabled = true; button.textContent = 'Adding…';
     try {
-      const data = (await callTool('add_panel', { source: c.source, config: c.config, title: c.source === 'rss' ? undefined : c.title })).structuredContent;
+      const data = (await callTool('add_portal', { source: c.source, config: c.config, title: c.source === 'rss' ? undefined : c.title })).structuredContent;
       state.profile = { ...state.profile, ...data.profile };
-      state.panels.set(data.panel.panelId, data.panel);
+      state.portals.set(data.portal.portalId, data.portal);
       drawLayout();
       toggleAdd(false); $('addInput').value = ''; $('addResults').replaceChildren();
-      toast(`It's alive! ${data.panel.title} has joined your room.`);
-      const node = document.querySelector(`[data-panel="${CSS.escape(data.panelId)}"]`);
+      toast(`It's alive! ${data.portal.title} has joined your room.`);
+      const node = document.querySelector(`[data-portal="${CSS.escape(data.portalId)}"]`);
       if (node) node.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
     } catch (error) {
       button.disabled = false; button.textContent = 'Add';
@@ -1318,9 +1318,9 @@
       const res = await callTool('import_opml', { opml: text });
       const summary = (res.content || []).map((c) => c.text).join(' ').split('\n')[0];
       say('Receiving transmissions…');
-      const result = await callTool('open_workspace');
+      const result = await callTool('open_room');
       toggleAdd(false);
-      renderWorkspace(result.structuredContent);
+      renderRoom(result.structuredContent);
       toast(summary);
     } catch (error) {
       say('');
@@ -1342,7 +1342,7 @@
     const on = !root.classList.contains('show-sources');
     root.classList.toggle('show-sources', on); e.currentTarget.setAttribute('aria-pressed', String(on));
   });
-  // Layout and open-in are saved to the profile, so the next open_workspace keeps them.
+  // Layout and open-in are saved to the profile, so the next open_room keeps them.
   async function saveSettings(change) {
     if (!state.profile) return;
     const before = state.profile;
@@ -1364,9 +1364,9 @@
   });
   $('btnSpace').addEventListener('click', () => loadSpace('', false));
   $('btnRefresh').addEventListener('click', async () => {
-    if (!state.profile) return loadWorkspace();
+    if (!state.profile) return loadRoom();
     setStatus('Scanning the ether for fresh dispatches…');
-    await Promise.all([...state.panels.values()].filter((p) => !p.pin).map((p) => refreshPanel(p.panelId)));
+    await Promise.all([...state.portals.values()].filter((p) => !p.pin).map((p) => refreshPortal(p.portalId)));
     setUpdated();
   });
   $('btnExpand').addEventListener('click', async () => {
@@ -1379,7 +1379,7 @@
   async function boot() {
     if (DEV) {
       $('btnExpand').hidden = true;
-      await loadWorkspace();
+      await loadRoom();
       return;
     }
     try {
@@ -1397,12 +1397,12 @@
     $('btnOpenIn').hidden = false;
     hostNotify('ui/notifications/initialized', {});
     // If the host opened us without running the tool (e.g. a restored view), fetch the
-    // workspace ourselves. If it IS running the tool, wait for that result instead.
+    // room ourselves. If it IS running the tool, wait for that result instead.
     const started = Date.now();
     const check = () => {
       if (gotInitialResult) return;
       if (toolRunning && Date.now() - started < 45000) { setTimeout(check, 1000); return; }
-      spaceHandle !== null ? loadSpace(spaceHandle, true) : articleUrl ? loadArticleCard(articleUrl) : clipId ? (clipId[0] === 's' ? loadShareCard(clipId) : loadClipCard(clipId)) : loadWorkspace();
+      spaceHandle !== null ? loadSpace(spaceHandle, true) : articleUrl ? loadArticleCard(articleUrl) : clipId ? (clipId[0] === 's' ? loadShareCard(clipId) : loadClipCard(clipId)) : loadRoom();
     };
     setTimeout(check, 3000);
   }

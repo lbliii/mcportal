@@ -4,7 +4,7 @@
 // the child whenever a server source file changes. The host's `initialize` is
 // replayed to each new child, so the host never sees the swap.
 //
-// The workspace HTML is read from disk on every resources/read, so UI edits need
+// The room HTML is read from disk on every resources/read, so UI edits need
 // no restart: they show up in the next card the host opens.
 import { spawn } from 'node:child_process';
 import { watch } from 'node:fs';

@@ -55,7 +55,7 @@ export async function fetchHn(config: HnConfig, fetcher: Fetcher): Promise<Item[
       .slice(0, config.limit)
       .map((id) => fetchJson<HnStory>(fetcher, `${HN_API}/item/${id}.json`).catch(() => null)),
   );
-  // One malformed story must never take down the panel.
+  // One malformed story must never take down the portal.
   return stories.flatMap((s) => {
     try {
       const item = s ? toItem(s) : null;

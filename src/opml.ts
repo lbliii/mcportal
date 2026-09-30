@@ -7,7 +7,7 @@
 import { REPO_PATTERN } from './adapters/github.ts';
 import { parseAttrs, tokenize } from './lib/html.ts';
 import { clean, decodeEntities, safeHttpUrl } from './lib/text.ts';
-import type { PanelSpec, Profile } from './profile.ts';
+import type { PortalSpec, Profile } from './profile.ts';
 
 export interface OpmlFeed {
   url: string;
@@ -50,15 +50,15 @@ export function parseOpml(xml: string): { title: string; feeds: OpmlFeed[] } {
 
 const xmlAttr = (s: string) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-/** A feed URL for a panel, if the source has one that other readers can use. */
-export function feedUrlFor(panel: PanelSpec): string | undefined {
-  const c = panel.config as Record<string, unknown>;
-  if (panel.source === 'rss' && typeof c.url === 'string') return c.url;
-  if (panel.source === 'hn') {
+/** A feed URL for a portal, if the source has one that other readers can use. */
+export function feedUrlFor(portal: PortalSpec): string | undefined {
+  const c = portal.config as Record<string, unknown>;
+  if (portal.source === 'rss' && typeof c.url === 'string') return c.url;
+  if (portal.source === 'hn') {
     const feed = String(c.feed ?? 'top');
     return feed === 'top' ? 'https://news.ycombinator.com/rss' : `https://hnrss.org/${feed === 'new' ? 'newest' : feed}`;
   }
-  if (panel.source === 'github' && c.mode === 'releases' && typeof c.repo === 'string' && REPO_PATTERN.test(c.repo)) {
+  if (portal.source === 'github' && c.mode === 'releases' && typeof c.repo === 'string' && REPO_PATTERN.test(c.repo)) {
     return `https://github.com/${c.repo}/releases.atom`;
   }
   return undefined;   // GitHub searches, saved items and pinned results have no feed
@@ -69,10 +69,10 @@ export function buildOpml(profile: Profile, now = new Date()): { opml: string; c
   const skipped: string[] = [];
   let count = 0;
   const body = profile.columns.map((column, i) => {
-    const lines = column.panels.flatMap((panel) => {
-      const url = feedUrlFor(panel);
-      const name = panel.title ?? panel.id;
-      if (!url) { if (!['saved', 'pinned', 'clips', 'following'].includes(panel.source)) skipped.push(name); return []; }
+    const lines = column.panels.flatMap((portal) => {
+      const url = feedUrlFor(portal);
+      const name = portal.title ?? portal.id;
+      if (!url) { if (!['saved', 'pinned', 'clips', 'following'].includes(portal.source)) skipped.push(name); return []; }
       count++;
       return [`      <outline type="rss" text="${xmlAttr(name)}" title="${xmlAttr(name)}" xmlUrl="${xmlAttr(url)}"/>`];
     });

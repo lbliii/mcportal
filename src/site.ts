@@ -164,7 +164,7 @@ function landing(site: SiteConfig): string {
 
 <h2 id="get-it">Get it</h2>
 ${access}
-<div class="card"><p>Add MCPortal to your agent as a custom connector (MCP server) with this URL, and sign in with GitHub. Then ask <i>“open my room”</i>.</p><p><code>${mcp}</code></p><p class="muted">In Claude, that's <b>Settings → Connectors</b>. MCPortal works in any MCP agent; the visual workspace appears in agents that show MCP Apps, and elsewhere you read through the chat.</p></div>
+<div class="card"><p>Add MCPortal to your agent as a custom connector (MCP server) with this URL, and sign in with GitHub. Then ask <i>“open my room”</i>.</p><p><code>${mcp}</code></p><p class="muted">In Claude, that's <b>Settings → Connectors</b>. MCPortal works in any MCP agent; the visual room appears in agents that show MCP Apps, and elsewhere you read through the chat.</p></div>
 <p class="muted">Prefer to run it yourself? MCPortal also runs locally as a Claude Code plugin with no account. See the <a href="https://github.com/lbliii/mcportal">source</a>.</p>`, site, true);
 }
 
@@ -183,7 +183,7 @@ function privacy(site: SiteConfig): string {
 <tr><td><b>Your room:</b> its name, layout, the sources you add (feed addresses, subreddits, repos, searches), and settings</td><td>To show you your room</td><td>Until you change it or your account is deleted</td></tr>
 <tr><td><b>Saved items:</b> the link, title, source, date and any note you add</td><td>To show your Saved portal</td><td>Until you remove them</td></tr>
 <tr><td><b>Clips:</b> quotes, parts of a conversation, notes, tables, images and links you ask your agent to keep, with any title, note and tags</td><td>To show your Clips portal and find them again in later chats</td><td>Until you delete them</td></tr>
-<tr><td><b>Pinned results:</b> if you ask your agent to pin results from another connected tool (for example, a list of issues), the titles, links, short summaries and details it copies in, and the request needed to refresh them</td><td>To show that panel</td><td>Until you remove the panel</td></tr>
+<tr><td><b>Pinned results:</b> if you ask your agent to pin results from another connected tool (for example, a list of issues), the titles, links, short summaries and details it copies in, and the request needed to refresh them</td><td>To show that portal</td><td>Until you remove the portal</td></tr>
 <tr><td><b>Public profile and space (only if you create one):</b> your handle, display name, bio, space title and colour, and the sources you choose to feature, which other signed-in MCPortal users can see</td><td>So people can find you</td><td>Until you remove it; a handle you give up stays reserved for you for 30 days</td></tr>
 <tr><td><b>Shares:</b> links and clips you choose to share, with your note, a copy of what you shared, and who it's for (your followers or everyone on MCPortal)</td><td>To show them to the people you shared them with</td><td>Until you remove them</td></tr>
 <tr><td><b>Follows, mutes and blocks:</b> who you follow, mute and block</td><td>To build your Following portal and keep blocked people apart</td><td>Until you change them. People see how many followers you have, never who</td></tr>
