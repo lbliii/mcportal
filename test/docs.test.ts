@@ -166,7 +166,11 @@ test('pages: a .md link is read as markdown; front matter and the repeated H1 ar
   const page = await fetchDocPage('https://docs.stripe.com/testing.md', mapFetcher({ 'https://docs.stripe.com/testing.md': { body: md, type: 'text/markdown' } }, calls));
   assert.equal(page.title, 'Testing');
   assert.equal(page.route, 'markdown');
-  assert.deepEqual(page.blocks, [{ type: 'p', text: 'Simulate payments.' }, { type: 'h', text: 'Cards' }, { type: 'li', text: 'Use 4242' }]);
+  assert.deepEqual(page.blocks, [
+    { type: 'p', text: 'Simulate payments.' },
+    { type: 'h', level: 2, text: 'Cards', id: 'cards' },
+    { type: 'li', text: 'Use 4242', spans: [{ text: 'Use ' }, { text: '4242', code: true }] },
+  ]);
   assert.equal(calls.length, 1);
   assert.match(calls[0]!.accept!, /^text\/markdown/);
 });
@@ -199,7 +203,7 @@ test('pages: content negotiation, then the .md sibling, then the HTML reader, an
   const calls2: Array<{ url: string; accept?: string }> = [];
   const py = await fetchDocPage('https://docs.python.org/3/library/os.html', mapFetcher({ 'https://docs.python.org/3/library/os.html': { body: sphinxHtml, type: 'text/html' } }, calls2), { title: 'os' });
   assert.equal(py.route, 'html');
-  assert.deepEqual(py.blocks.map((b) => b.text), ['os', 'Portable OS functions.']);
+  assert.deepEqual(py.blocks.map((b) => b.text), ['Portable OS functions.'], 'the H1 repeating the title is dropped');
   assert.deepEqual(calls2.map((c) => c.url), ['https://docs.python.org/3/library/os.html', 'https://docs.python.org/3/library/os.md'], 'the HTML from the first request is reused');
 });
 

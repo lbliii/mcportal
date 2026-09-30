@@ -16,6 +16,7 @@ import type { Social } from './social.ts';
 import type { ProfileStore } from './store.ts';
 import type { Actor } from './access.ts';
 import type { UsageBudget } from './lib/budget.ts';
+import { blocksToText } from './lib/markdown.ts';
 import { MAX_THUMB_BYTES, type PanelResult, type SourceKind } from './types.ts';
 
 export const WORKSPACE_URI = 'ui://mcportal/workspace.html';
@@ -469,7 +470,7 @@ export const TOOLS: ToolDef[] = [
       const url = String(args.url ?? '');
       try {
         const article = await loadArticle(url, ctx);
-        const text = article.blocks.slice(0, 60).map((b) => (b.type === 'h' ? `## ${b.text}` : b.text)).join('\n');
+        const text = blocksToText(article.blocks.slice(0, 60));
         const head = [`title: ${article.title}`, article.byline ? `byline: ${article.byline}` : ''].filter(Boolean).join('\n');
         const { saved } = await ctx.store.get(ctx.userId);
         return ok(untrusted(article.url, `${head}\n\n${text}`), { article, saved: saved.some((s) => s.url === article.url) });

@@ -1,6 +1,6 @@
 # Plan: docs portal — read any docs site without its front end
 
-**Status:** phase 1 shipped (2026-09-30); phase 2 next. **Milestone:** first new portal type after columns and shelves; the developer hook for paid plans.
+**Status:** phases 1–2 shipped (2026-09-30); phase 3 next. **Milestone:** first new portal type after columns and shelves; the developer hook for paid plans.
 
 ## Goal
 
@@ -112,6 +112,7 @@ A third full view, next to the reader and the Space view, built in `workspace.ht
 - **Left:** the TOC, sections collapsible, current page highlighted. A search box on top (`search_docs`, debounced). Under 720px wide it becomes a drawer behind a Contents button.
 - **Middle:** the page, in the reader's typography, with callouts, tables and code blocks. Prev/next at the bottom. Top bar: site title, breadcrumb (section › page), open original, save, share.
 - **Right (wide screens only):** "On this page", from the page's headings.
+- **Lanes (the user's idea, 2026-09-30):** pull callouts and code samples out of the text column into a side lane. A callout inside an H2 section floats beside that section while it's on screen and leaves when the reader scrolls past. The same could work for code samples, as a "just the code" lane, and for lanes with different levels of detail. The block model already supports this: callouts and code blocks are their own blocks, and headings carry levels and anchors, so a section is simply the blocks between two H2s. Build the plain viewer first, then try lanes as a viewer mode on Stripe (many callouts) and Python (signatures, notes, examples).
 - **Clip:** selecting text offers "Clip quote", with the page as the source (the clips phase 4 feature, available here too).
 - **Docs card in chat:** `open_docs` renders the same viewer in `article-view`, like reader and clip cards.
 
@@ -154,11 +155,19 @@ As with the other packs, every source must be checked **from the Railway server*
 | # | Ships | Verifies |
 |---|---|---|
 | 1 ✅ | `src/adapters/docs.ts`: `llms.txt` parser (with nesting), `objects.inv` parser, resolver ladder with body validation, page ladder with learned route; `docs` source kind and config normalisation; `scripts/docs-probe.ts` (the probe as a script, run locally or on the server) | Unit tests against fixtures from Stripe, Railway, Cloudflare (nested), Python (Sphinx), Cursor (fake 200), Docker (empty links); probe output checked in as a report |
-| 2 | `src/lib/markdown.ts` with the richer blocks, MDX and directive cleanup; clips moved onto it; HTML reader gains `role=main`, tables and heading levels | Tests: every MDX component case, tables, callouts, spans reject `javascript:` links; clips tests still pass unchanged |
+| 2 ✅ | `src/lib/markdown.ts` with the richer blocks, MDX and directive cleanup; clips moved onto it; HTML reader gains `role=main`, tables and heading levels | Tests: every MDX component case, tables, callouts, spans reject `javascript:` links; clips tests still pass unchanged |
 | 3 | Tools: `find_source` learns docs, `open_docs`, `read_doc_page`, `search_docs`, `read_source` for docs; server instructions; budget costs | Tool tests: fenced output, fetch scope refuses off-site URLs, section filter, search ranking |
 | 4 | UI: Docs panel in columns and shelves, docs viewer (TOC, search, on-this-page, prev/next, in-docs links), docs card in chat, narrow-screen drawer; the **Developer docs** starter pack | Preview: Stripe, Railway, Python and Next.js end to end; a page with `<Tabs>` and `<Info>`; mobile width; pack checked from the Railway server |
 | 5 | Search inside pages: build an index from `llms-full.txt` when it splits cleanly (the two easy conventions first), else from pages as they're read; Sphinx symbol jump ("`str.split`") | Search quality on Stripe and Python; memory stays inside the cache budget |
 | 6 (later) | Docs sites' own MCP servers (Mintlify, GitBook) as a source; "what changed since you last read it" (the Watch portal idea); docs in Spaces | Separate plan |
+
+## Phase 2 notes
+
+- **Components that real docs use most**, counted across ten `llms-full.txt` files: `Callout`, `Card`, `Tab`, `ParamField`, `Note`, `CodeGroup`, `Step`, `Accordion`, `Warning`, `Tip`, `Info`, plus VitePress `:::` and GitHub `> [!NOTE]` directives. ALL-CAPS tags are placeholders (`<YOUR_API_KEY>`, `<BUCKET>`), so only PascalCase tags count as components.
+- **More agent-directed text:** Mintlify pages open with a "Documentation Index … llms.txt" blockquote and Next.js with "For an index of all docs, see llms.txt". Both are dropped when they appear among a page's first few blocks.
+- **Stripe writes callouts as `> #### Title` blockquotes**; these become callouts too.
+- **The HTML reader keeps structure now:** `role="main"`, heading levels and ids, Sphinx and MkDocs admonitions as callouts (one per admonition, titled), `highlight-<lang>` code languages, tables (layout tables go back to paragraphs), links and inline code as spans. Sphinx `<dt id="os.path.join">` signatures become small headings carrying the ids that `objects.inv` symbols point to, so a symbol jump lands on its signature. Docs pages get larger limits than articles (1,500 blocks, 400k characters): Python's `dis` page is 696 blocks.
+- **The existing reader and note clips render the new blocks** (heading levels, numbered and nested lists, code with a language, label and Copy button, tables, toned callouts, links through the host). Checked in the preview on Python `os.path` and Django "Making queries", in light and dark.
 
 ## Phase 1 results
 
@@ -184,4 +193,10 @@ Still to do before the pack ships: run the probe from the Railway server.
 2. **Versions:** Next.js and MCP publish versioned docs. Show whatever the `llms.txt` points at for now, and add a version picker only when a site's `llms.txt` exposes versions?
 3. **`robots.txt`:** check it for the sitemap and HTML fallbacks only? `llms.txt` and `.md` are published for agents, so they don't need it.
 4. **Sites with nothing machine-readable** (Astro, Tailwind, MDN): the sitemap route may cover some. The GitHub repos behind them (`withastro/docs`, `mdn/content`) are a cleaner source, but each needs a recipe. Worth it for the most popular few?
-5. **Algolia DocSearch:** left out on purpose. Its keys are meant for the site's own search box, and its records are fragments, not pages.
+5. **Context7** (checked 2026-09-30): an index of docs for coding agents (GitHub repos, websites, `llms.txt` files, OpenAPI specs) that answers a question with reranked **snippets**, each with a title, a short description, code and a source link. `GET /api/v3/search?query=…&library=…`; anonymous at low rate limits, or with a key (free: 1,000 calls/month; Pro: 2,000 per seat, then $5 per 1,000). It isn't a reading source: no page list, no whole pages. It fits in three places:
+   - **Search inside docs (phase 5)** and "ask the docs", as snippet cards that link to the page in the viewer.
+   - **Sites with nothing machine-readable.** It covers Astro (`/withastro/docs`) and Tailwind (`/tailwindlabs/tailwindcss.com`), and its source links point at the repo's `.mdx` files, which the page ladder can read. That answers question 4 for the sites it covers.
+   - **A code-samples lane** (the lanes idea above): its snippets are already code with a title and description.
+
+   Per-call pricing doesn't suit an app that charges about $5/month per user, so MCPortal shouldn't call Context7 on a shared key by default. Two cheaper ways in: users who already have the Context7 MCP server connected let their agent fetch snippets and hand them to MCPortal, like pinned panels do; or a user can add their own API key. Recommendation: plan it into phase 5 as optional, agent-side first.
+6. **Algolia DocSearch:** left out on purpose. Its keys are meant for the site's own search box, and its records are fragments, not pages.

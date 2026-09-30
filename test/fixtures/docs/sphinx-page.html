@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>os.path — Common pathname manipulations &#8212; Python 3.14 documentation</title></head>
+<body>
+<div class="related" role="navigation"><ul><li><a href="../index.html">Python</a></li></ul></div>
+<div class="document">
+  <div class="documentwrapper">
+    <div class="body" role="main">
+<section id="module-os.path">
+<h1><code class="xref py py-mod docutils literal notranslate"><span class="pre">os.path</span></code> — Common pathname manipulations<a class="headerlink" href="#module-os.path" title="Link to this heading">¶</a></h1>
+<p><strong>Source code:</strong> <a class="reference external" href="https://github.com/python/cpython/tree/3.14/Lib/posixpath.py">Lib/posixpath.py</a></p>
+<p>This module implements some useful functions on pathnames. To read or write files see <a class="reference internal" href="functions.html#open" title="open"><code class="xref py py-func docutils literal notranslate"><span class="pre">open()</span></code></a>.</p>
+<div class="admonition seealso">
+<p class="admonition-title">See also</p>
+<p>The <a class="reference internal" href="pathlib.html#module-pathlib" title="pathlib"><code>pathlib</code></a> module offers high-level path objects.</p>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>First paragraph.</p>
+<p>Second paragraph.</p>
+</div>
+<dl class="py function">
+<dt class="sig sig-object py" id="os.path.abspath">
+<span class="sig-prename descclassname"><span class="pre">os.path.</span></span><span class="sig-name descname"><span class="pre">abspath</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#os.path.abspath" title="Link to this definition">¶</a></dt>
+<dd><p>Return a normalized absolutized version of the pathname <em>path</em>.</p>
+<div class="highlight-python3 notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="s1">'c:spam'</span><span class="p">)</span>
+<span class="go">'C:\\Temp\\spam'</span>
+</pre></div>
+</div>
+</dd></dl>
+<section id="platform-notes">
+<h2>Platform notes<a class="headerlink" href="#platform-notes" title="Link to this heading">¶</a></h2>
+<table class="docutils align-default">
+<thead><tr class="row-odd"><th class="head"><p>Function</p></th><th class="head"><p>POSIX</p></th><th class="head"><p>Windows</p></th></tr></thead>
+<tbody>
+<tr class="row-even"><td><p><code>isjunction</code></p></td><td><p>False</p></td><td><p>Yes</p></td></tr>
+<tr class="row-odd"><td><p>splitroot</p></td><td><p>Yes</p></td><td><p>Yes<br>with drive</p></td></tr>
+</tbody>
+</table>
+<p><a href="javascript:alert(1)">Evil link</a> and <a href="#os.path.abspath">abspath</a>.</p>
+</section>
+</section>
+    </div>
+  </div>
+  <div class="sphinxsidebar" role="navigation"><h3>Table of Contents</h3><p>Sidebar text</p></div>
+</div>
+<div class="footer">© Copyright 2001 Python Software Foundation.</div>
+</body>
+</html>

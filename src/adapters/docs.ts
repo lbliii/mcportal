@@ -14,7 +14,7 @@
  * Everything here is untrusted third-party text, returned as plain data.
  */
 import { inflateSync } from 'node:zlib';
-import { parseMarkdownLite } from '../lib/markdown.ts';
+import { cleanDocsMarkdown, MARKDOWN_LIMITS, parseMarkdown } from '../lib/markdown.ts';
 import { clean, decodeEntities, safeHttpUrl } from '../lib/text.ts';
 import type { ArticleBlock, Fetcher } from '../types.ts';
 import { extractArticle } from './reader.ts';
@@ -434,8 +434,11 @@ export function learnedRoute(url: string): PageRoute | undefined {
 
 const FRONT_MATTER = /^﻿?---\r?\n([\s\S]*?)\r?\n---\r?\n/;
 
-/** Markdown into blocks: front matter off, the leading H1 used as the title. */
-export function markdownPage(markdown: string, fallbackTitle: string): { title: string; blocks: ArticleBlock[] } {
+/** Notices for agents that generators put at the top of every page ("Fetch the complete documentation index at …/llms.txt"). */
+const AGENT_NOTICE = /\bllms(?:-full)?\.txt\b|^documentation index\b/i;
+
+/** Markdown into blocks: front matter off, MDX cleaned, the leading H1 used as the title. */
+export function markdownPage(markdown: string, fallbackTitle: string, base?: string): { title: string; blocks: ArticleBlock[] } {
   let text = markdown;
   let title = '';
   const front = text.match(FRONT_MATTER);
@@ -444,9 +447,11 @@ export function markdownPage(markdown: string, fallbackTitle: string): { title: 
     text = text.slice(front[0].length);
   }
   const h1 = text.match(/^\s*#\s+(.+)$/m);
-  if (!title && h1) title = clean(h1[1]!.replace(/^\[(.*)\]\(#[^)]*\)$/, '$1'), 200);
-  const blocks = parseMarkdownLite(text);
-  if (blocks[0]?.type === 'h' && (blocks[0].text === title || blocks[0].text.startsWith(`${title} (#`))) blocks.shift();
+  if (!title && h1) title = clean(h1[1]!.replace(/^\[(.*)\]\(#[^)]*\)$/, '$1').replace(/\s*\{#[\w-]+\}\s*$/, ''), 200);
+  const blocks = parseMarkdown(cleanDocsMarkdown(text), base ? { base } : {})
+    .filter((b, i) => i > 3 || !((b.type === 'quote' || b.type === 'callout') && AGENT_NOTICE.test(b.text)));
+  const first = blocks.findIndex((b) => b.type !== 'quote');
+  if (blocks[first]?.type === 'h' && blocks[first].level === 1 && blocks[first].text === title) blocks.splice(first, 1);
   return { title: title || fallbackTitle, blocks };
 }
 
@@ -492,20 +497,22 @@ export async function fetchDocPage(url: string, fetcher: Fetcher, options: { tit
     if (route === 'markdown') {
       const res = await get(url, 'text/markdown, text/x-markdown;q=0.95, text/plain;q=0.9, text/html;q=0.5, */*;q=0.1');
       if (!res) continue;
-      if (looksLikeMarkdown(res.text, res.contentType)) return done('markdown', res.url || url, markdownPage(res.text, fallbackTitle));
+      if (looksLikeMarkdown(res.text, res.contentType)) return done('markdown', res.url || url, markdownPage(res.text, fallbackTitle, res.url || url));
       if (/html/i.test(res.contentType) || HTMLISH.test(res.text)) html = { text: res.text, url: res.url || url };
     } else if (route === 'suffix') {
       const sibling = mdSibling(url);
       const res = sibling && (await get(sibling, 'text/markdown, text/plain;q=0.9'));
-      if (res && looksLikeMarkdown(res.text, res.contentType)) return done('suffix', res.url || sibling!, markdownPage(res.text, fallbackTitle));
+      if (res && looksLikeMarkdown(res.text, res.contentType)) return done('suffix', res.url || sibling!, markdownPage(res.text, fallbackTitle, res.url || sibling!));
     } else {
       if (!html) {
         const res = await get(url, 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.5');
         if (res && (/html|xml/i.test(res.contentType) || HTMLISH.test(res.text))) html = { text: res.text, url: res.url || url };
       }
       if (html) {
-        const article = extractArticle(html.text);
-        if (article.blocks.length) return done('html', html.url, { title: options.title ?? article.title, blocks: article.blocks });
+        const article = extractArticle(html.text, html.url, MARKDOWN_LIMITS);
+        const title = options.title ?? article.title;
+        const blocks = article.blocks[0]?.type === 'h' && article.blocks[0].level === 1 && article.blocks[0].text === title ? article.blocks.slice(1) : article.blocks;
+        if (blocks.length) return done('html', html.url, { title, blocks });
       }
     }
   }

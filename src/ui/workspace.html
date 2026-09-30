@@ -186,7 +186,30 @@
   .reader .body p, .reader .body li { font-size: 15px; line-height: 1.65; margin: 0 0 14px; }
   .reader .body h2 { font-size: 17px; margin: 22px 0 8px; }
   .reader .body pre { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; overflow-x: auto; font: 12.5px/1.5 var(--font-mono, ui-monospace, "SF Mono", Menlo, monospace); }
-  .reader .body blockquote { margin: 0 0 14px; padding-left: 12px; border-left: 3px solid var(--border); color: var(--fg2); }
+  .reader .body blockquote { margin: 0 0 14px; padding-left: 12px; border-left: 3px solid var(--border); color: var(--fg2); white-space: pre-wrap; }
+  /* structured blocks (docs pages, and articles with tables, callouts and code) */
+  .reader .body h3 { font-size: 15.5px; margin: 18px 0 6px; }
+  .reader .body h4 { font-size: 14px; margin: 16px 0 6px; }
+  .reader .body h4.sig { font: 600 13px/1.45 var(--font-mono, ui-monospace, "SF Mono", Menlo, monospace); padding: 6px 10px; background: var(--hover); border-radius: 6px; overflow-wrap: anywhere; }
+  .reader .body .li { position: relative; font-size: 15px; line-height: 1.65; margin: 0 0 6px; padding-left: calc(22px + var(--depth, 0) * 20px); }
+  .reader .body .li::before { content: attr(data-marker); position: absolute; left: calc(var(--depth, 0) * 20px); width: 18px; text-align: right; color: var(--fg2); font-variant-numeric: tabular-nums; }
+  .reader .body .li + :not(.li) { margin-top: 14px; }
+  .reader .body code { font: 0.88em/1.4 var(--font-mono, ui-monospace, "SF Mono", Menlo, monospace); background: var(--hover); border-radius: 4px; padding: 1px 4px; }
+  .reader .body a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+  .reader .body .code { position: relative; margin: 0 0 14px; }
+  .reader .body .code pre { margin: 0; }
+  .reader .body .code-head { display: flex; align-items: center; gap: 8px; padding: 3px 4px 3px 12px; border: 1px solid var(--border); border-bottom: 0; border-radius: 8px 8px 0 0; font-size: 11.5px; color: var(--fg2); background: var(--hover); }
+  .reader .body .code-head + pre { border-radius: 0 0 8px 8px; }
+  .reader .body .code-head .copy { margin-left: auto; border: 0; background: none; padding: 2px 8px; border-radius: 6px; cursor: pointer; color: var(--fg2); font-size: 11.5px; }
+  .reader .body .code-head .copy:hover { background: var(--bg); color: var(--fg); }
+  .reader .body .table-wrap { margin: 0 0 16px; }
+  .reader .body .callout { margin: 0 0 16px; padding: 10px 14px; border-radius: 8px; border-left: 3px solid var(--tone); background: color-mix(in srgb, var(--tone) 9%, transparent); font-size: 14.5px; line-height: 1.6; white-space: pre-wrap; }
+  .reader .body .callout .callout-label { display: block; font-weight: 650; color: var(--tone); margin-bottom: 2px; white-space: normal; }
+  .callout.note { --tone: #2563eb; } .callout.tip { --tone: #0f9d8a; } .callout.warning { --tone: #d97706; } .callout.danger { --tone: #dc2626; }
+  :root[data-theme="dark"] .callout.note { --tone: #60a5fa; } :root[data-theme="dark"] .callout.tip { --tone: #2dd4bf; } :root[data-theme="dark"] .callout.warning { --tone: #fbbf24; } :root[data-theme="dark"] .callout.danger { --tone: #f87171; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme]) .callout.note { --tone: #60a5fa; } :root:not([data-theme]) .callout.tip { --tone: #2dd4bf; } :root:not([data-theme]) .callout.warning { --tone: #fbbf24; } :root:not([data-theme]) .callout.danger { --tone: #f87171; }
+  }
   .clip-tags { display: flex; flex-wrap: wrap; gap: 6px; margin: -10px 0 16px; }
   .clip-tags span { font-size: 12px; color: var(--fg2); background: var(--hover); padding: 1px 8px; border-radius: 10px; }
   .reader.space { max-width: 1120px; }
@@ -921,13 +944,70 @@
     }
   }
 
+  // Reader blocks (articles, docs pages, note clips) as DOM. Everything is built as text;
+  // links are only http(s), opened through the host, or #anchors within the same view.
+  function spanNodes(b, scope) {
+    if (!Array.isArray(b.spans)) return [b.text];
+    return b.spans.map((s) => {
+      const text = s.code ? el('code', null, s.text) : s.strong ? el('strong', null, s.text) : s.text;
+      if (typeof s.href !== 'string') return text;
+      if (/^#[\w\-.:%~]{1,200}$/.test(s.href)) {
+        return el('a', { href: s.href, onclick: (e) => { e.preventDefault(); scope().querySelector(`[data-anchor="${CSS.escape(s.href.slice(1))}"]`)?.scrollIntoView({ block: 'start', behavior: 'smooth' }); } }, text);
+      }
+      if (!isHttpUrl(s.href)) return text;
+      return el('a', { href: s.href, title: s.href, onclick: (e) => { e.preventDefault(); openLink(s.href); } }, text);
+    });
+  }
+
+  function copyButton(text) {
+    const button = el('button', { class: 'copy', type: 'button' }, 'Copy');
+    button.addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(text); button.textContent = 'Copied'; }
+      catch { button.textContent = 'Select and copy'; }
+      setTimeout(() => { button.textContent = 'Copy'; }, 1500);
+    });
+    return button;
+  }
+
+  function blockNodes(blocks) {
+    let body = null;
+    const scope = () => body;
+    const counters = [0, 0, 0, 0];
+    const nodes = blocks.map((b, i) => {
+      if (b.type !== 'li') counters.fill(0);
+      switch (b.type) {
+        case 'h': {
+          const level = Math.min(4, Math.max(2, b.level || 2));
+          const sig = b.level === 4 && typeof b.id === 'string' && /[.(]/.test(b.text);
+          return el(`h${level}`, { class: sig ? 'sig' : null, 'data-anchor': typeof b.id === 'string' ? b.id : null }, spanNodes(b, scope));
+        }
+        case 'pre': {
+          const head = b.lang || b.label ? el('div', { class: 'code-head' }, [b.label, b.lang].filter(Boolean).join(' · '), copyButton(b.text)) : null;
+          return el('div', { class: 'code' }, head, el('pre', null, b.text));
+        }
+        case 'li': {
+          const depth = Math.min(3, Math.max(0, b.level || 0));
+          counters.fill(0, depth + 1);
+          const n = ++counters[depth];
+          return el('div', { class: 'li', style: `--depth:${depth}`, 'data-marker': b.ordered ? `${n}.` : depth % 2 ? '◦' : '•' }, spanNodes(b, scope));
+        }
+        case 'quote': return el('blockquote', null, spanNodes(b, scope));
+        case 'table': return Array.isArray(b.columns) && Array.isArray(b.rows) ? el('div', { class: 'table-wrap' }, el('table', null,
+          el('thead', null, el('tr', null, b.columns.map((c) => el('th', null, c)))),
+          el('tbody', null, b.rows.map((r) => el('tr', null, r.map((c) => el('td', null, c))))))) : el('p', null, b.text);
+        case 'callout': {
+          const tone = ['note', 'tip', 'warning', 'danger'].includes(b.tone) ? b.tone : 'note';
+          return el('div', { class: `callout ${tone}`, role: 'note' }, b.label ? el('span', { class: 'callout-label' }, b.label) : null, spanNodes(b, scope));
+        }
+        default: return el('p', null, spanNodes(b, scope));
+      }
+    });
+    body = el('div', { class: 'body' }, nodes);
+    return body;
+  }
+
   function articleNodes(a, via, withBack) {
-    const body = el('div', { class: 'body' }, a.blocks.map((b) =>
-      b.type === 'h' ? el('h2', null, b.text)
-      : b.type === 'pre' ? el('pre', null, b.text)
-      : b.type === 'quote' ? el('blockquote', null, b.text)
-      : b.type === 'li' ? el('p', null, `• ${b.text}`)
-      : el('p', null, b.text)));
+    const body = blockNodes(a.blocks);
     const site = a.siteName && a.siteName !== a.byline ? a.siteName : null;
     const by = [a.byline, site, `${Math.max(1, Math.round(a.wordCount / 230))} min read`].filter(Boolean).join(' · ');
     const p = a.provenance;
@@ -996,9 +1076,7 @@
   function clipBody(data) {
     if (data.kind === 'quote') return [el('p', { class: 'clip-quote' }, data.text), data.attribution ? el('p', { class: 'clip-attr' }, `— ${data.attribution}`) : null];
     if (data.kind === 'exchange') return data.turns.map((t) => el('div', { class: `turn ${t.speaker === 'user' ? 'user' : ''}` }, el('div', { class: 'speaker' }, t.speaker), el('div', { class: 'said' }, t.text)));
-    if (data.kind === 'note') return data.blocks.map((b) =>
-      b.type === 'h' ? el('h2', null, b.text) : b.type === 'pre' ? el('pre', null, b.text) : b.type === 'quote' ? el('blockquote', null, b.text)
-      : b.type === 'li' ? el('p', null, `• ${b.text}`) : el('p', null, b.text));
+    if (data.kind === 'note') return [...blockNodes(data.blocks).childNodes];
     if (data.kind === 'table') return [el('div', { class: 'table-wrap' }, el('table', null,
       el('thead', null, el('tr', null, data.columns.map((c) => el('th', null, c)))),
       el('tbody', null, data.rows.map((r) => el('tr', null, r.map((c) => el('td', null, c)))))))];
