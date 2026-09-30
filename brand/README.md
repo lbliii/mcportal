@@ -54,7 +54,7 @@ The house ink set, "atomic":
 | Ink | `#1F2A36` | The door, MC on light, dark backgrounds |
 | Brick | `#C4452C` | The moon: the one warm accent |
 
-The fallback art uses seven more ink sets in the same spirit (see `src/ui/art.js`).
+The fallback art uses seven more ink sets in the same spirit (see `src/ui/art.js`). In the workspace, each feed's colour is the lead ink of its art's set, and your own panels use the house inks (Saved mustard, Clips teal, Following brick, Pinned ink). The workspace accent is a deeper teal, `#1D6B63`, so white text on it stays readable; on dark it's `#5FB0A4` with ink text.
 
 ## Voice
 

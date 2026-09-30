@@ -8,15 +8,18 @@
 <style>
   :root {
     --d-bg: #ffffff; --d-bg2: #f5f5f2; --d-fg: #1b1b1a; --d-fg2: #6a6a66; --d-border: #e3e3de; --d-hover: #efefeb;
+    --accent: #1D6B63; --on-accent: #ffffff; --lead-mix: 100%;
     color-scheme: light;
   }
   :root[data-theme="dark"] {
     --d-bg: #161616; --d-bg2: #1d1d1c; --d-fg: #ececea; --d-fg2: #9b9b96; --d-border: #2c2c2a; --d-hover: #242423;
+    --accent: #5FB0A4; --on-accent: #1F2A36; --lead-mix: 72%;
     color-scheme: dark;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme]) {
       --d-bg: #161616; --d-bg2: #1d1d1c; --d-fg: #ececea; --d-fg2: #9b9b96; --d-border: #2c2c2a; --d-hover: #242423;
+    --accent: #5FB0A4; --on-accent: #1F2A36; --lead-mix: 72%;
       color-scheme: dark;
     }
   }
@@ -27,9 +30,11 @@
     --fg2: var(--color-text-secondary, var(--d-fg2));
     --border: var(--color-border-primary, var(--d-border));
     --hover: var(--d-hover);
-    --accent: #2563eb;
     --radius: var(--border-radius-lg, 10px);
-    --src-hn: #f26522; --src-github: #7c5cff; --src-rss: #0f9d8a; --src-reader: #2563eb; --src-saved: #d97706; --src-pinned: #db2777; --src-clips: #0891b2; --src-following: #16a34a;
+    /* Your own panels take the house inks (brand/README.md); feeds take the lead ink of their
+       fallback art (sourceColor()). Dark mode tints every ink toward paper so dark ones show. */
+    --src-saved: color-mix(in srgb, #E0A526 var(--lead-mix), #F2E6CF); --src-clips: color-mix(in srgb, #2A8C82 var(--lead-mix), #F2E6CF);
+    --src-following: color-mix(in srgb, #C4452C var(--lead-mix), #F2E6CF); --src-pinned: color-mix(in srgb, #1F2A36 var(--lead-mix), #F2E6CF);
   }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
@@ -162,11 +167,11 @@
   .pack .pl { font-weight: 650; }
   .pack .pb { color: var(--fg2); font-size: 12px; line-height: 1.35; }
   .pack .ps { color: var(--fg2); font-size: 11px; margin-top: 5px; line-height: 1.35; }
-  .pack .tick { position: absolute; top: 8px; right: 8px; width: 18px; height: 18px; border-radius: 50%; background: var(--accent); color: #fff; display: none; align-items: center; justify-content: center; }
+  .pack .tick { position: absolute; top: 8px; right: 8px; width: 18px; height: 18px; border-radius: 50%; background: var(--accent); color: var(--on-accent); display: none; align-items: center; justify-content: center; }
   .pack .tick svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
   .pack[aria-pressed="true"] .tick { display: flex; }
   .welcome-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 14px; }
-  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; padding: 6px 14px; font-weight: 600; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); padding: 6px 14px; font-weight: 600; }
   .btn.primary:hover { background: var(--accent); filter: brightness(1.08); }
   .btn.primary:disabled { opacity: .45; cursor: default; filter: none; }
   .link-btn { border: 0; padding: 0; background: none; color: var(--fg2); font: inherit; font-size: 12.5px; text-decoration: underline; cursor: pointer; }
@@ -586,7 +591,7 @@
     const panel = state.panels.get(panelId);
     const wrap = el('section', { class: 'shelf', 'data-panel': panelId });
     if (!panel) { wrap.append(el('div', { class: 'empty' }, 'Stand by…')); return wrap; }
-    const color = `var(--src-${panel.source})`;
+    const color = sourceColor(panel.source, artStyle(panel));
     const row = el('div', { class: 'shelf-row' });
     const page = (dir) => row.scrollBy({ left: dir * Math.max(200, row.clientWidth - 60), behavior: 'smooth' });
     wrap.append(el('div', { class: 'shelf-head' },
@@ -636,7 +641,7 @@
     const panel = state.panels.get(panelId);
     const wrap = el('section', { class: 'panel', 'data-panel': panelId });
     if (!panel) { wrap.append(el('div', { class: 'empty' }, 'Stand by…')); return wrap; }
-    const color = `var(--src-${panel.source})`;
+    const color = sourceColor(panel.source, artStyle(panel));
     const refresh = el('span', { class: 'tools' }, refreshButton(panel));
     wrap.append(el('div', { class: 'panel-head' },
       el('span', { class: 'dot', style: `background:${color}` }),
@@ -714,13 +719,28 @@
     state.art = new Map(specs.map((spec, i) => [spec.id, styles[i]]));
   }
 
+  /** A panel's art style: its place in the layout, or (outside the layout) the one its feed hashes to. */
+  function artStyle(panel) {
+    return state.art.has(panel.panelId) ? state.art.get(panel.panelId) : portalArt.styles([panel.provenance.endpoint])[0];
+  }
+  const HOUSE_SOURCES = new Set(['saved', 'clips', 'following', 'pinned']);
+  /**
+   * A source's colour, for its dot and its cards' top edge. Your own panels take the house
+   * inks; a feed takes the lead ink of its fallback art, so the dot, the cards and the
+   * pictures agree and no two sources on screen share a colour.
+   */
+  function sourceColor(source, style) {
+    return HOUSE_SOURCES.has(source) ? `var(--src-${source})` : `color-mix(in srgb, ${portalArt.leadOf(style)} var(--lead-mix), #F2E6CF)`;
+  }
+  /** The colour a source outside the layout (a search result, someone's featured feed) would get. */
+  const loneColor = (source, config) => sourceColor(source, portalArt.styles([config && typeof config.url === 'string' ? config.url : `${source}:${JSON.stringify(config || {})}`])[0]);
+
   // The picture area starts as the source's fallback art; a loaded picture fades in over it.
   function thumbBox(item, panel) {
     const box = el('div', { class: 'thumb' },
       el('img', { alt: '', loading: 'lazy', decoding: 'async' }),
       item.video ? el('span', { class: 'play', 'aria-hidden': 'true' }, icon('play')) : null);
-    const style = state.art.has(panel.panelId) ? state.art.get(panel.panelId) : portalArt.styles([panel.provenance.endpoint])[0];
-    const art = portalArt.draw(style, item.id || item.url || item.title);
+    const art = portalArt.draw(artStyle(panel), item.id || item.url || item.title);
     box.prepend(document.importNode(new DOMParser().parseFromString(art, 'image/svg+xml').documentElement, true));
     if (!item.image) return box;
     box.dataset.img = item.image.url;
@@ -1131,7 +1151,7 @@
         try { await callTool('add_panel', { source: src.source, config: src.config, title: src.title }); add.textContent = 'Added'; }
         catch (error) { toast(error.message); add.disabled = false; }
       });
-      return el('div', { class: 'source' }, el('span', { class: 'dot', style: `background:var(--src-${src.source})` }),
+      return el('div', { class: 'source' }, el('span', { class: 'dot', style: `background:${loneColor(src.source, src.config)}` }),
         el('div', { class: 'st' }, el('div', null, src.title), el('div', null, src.source === 'rss' ? (() => { try { return new URL(src.config.url).hostname.replace(/^www\./, ''); } catch { return 'feed'; } })() : src.source === 'hn' ? 'Hacker News' : 'GitHub')), add);
     });
     return [
@@ -1250,7 +1270,7 @@
         const sub = c.source === 'rss' ? c.config.url : c.source === 'github' ? `GitHub · ${c.config.repo || c.config.query}` : `Hacker News · ${c.config.feed}`;
         const add = el('button', { class: 'btn', onclick: () => addCandidate(c, add) }, 'Add');
         return el('li', { class: 'cand' },
-          el('span', { class: 'dot', style: `background:var(--src-${c.source})` }),
+          el('span', { class: 'dot', style: `background:${loneColor(c.source, c.config)}` }),
           el('div', { class: 'cand-main' },
             el('div', { class: 'cand-title', title: c.title }, c.title),
             el('div', { class: 'cand-sub', title: sub }, sub),

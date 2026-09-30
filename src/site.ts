@@ -148,7 +148,7 @@ function landing(site: SiteConfig): string {
 <p class="lede">A door between your agent and everything you read. MCPortal brings the sites, subreddits, YouTube channels, GitHub repos and feeds you follow into your agent, so you can read, save and talk about them without leaving the chat.</p>
 <p class="cta"><a class="button" href="#get-it">Get it</a><a href="#how">How it works</a></p>
 </div>`, `
-<figure><img src="/site/columns.png" alt="An MCPortal workspace: columns of Hacker News, GitHub releases and blog posts, side by side" width="1600" height="666"><figcaption>Columns: each source scrolls on its own.</figcaption></figure>
+<figure><img src="/site/columns.png" alt="An MCPortal workspace: columns of Fireship videos, Hacker News, the GitHub Blog and Lobsters, side by side, each with its own colour" width="1600" height="666"><figcaption>Columns: each source scrolls on its own.</figcaption></figure>
 
 <h2 id="how">How it works</h2>
 <ol class="steps">
@@ -156,8 +156,8 @@ function landing(site: SiteConfig): string {
   <li><b>Arrange it by talking.</b> “Put GitHub on the left.” “Show pictures.” Starter packs (developer, AI, news, games, art, science, music, film) fill a new portal in seconds, and OPML import brings your subscriptions from another reader.</li>
   <li><b>Read and keep things.</b> Stories open in a clean reader view with no ads. Save the good ones to a Saved panel, and ask your agent about any of them. Say “clip that” to keep a quote, an explanation, a table or a chart from the conversation, and find it again in any later chat.</li>
 </ol>
-<figure class="alt"><img src="/site/shelves.png" alt="Picture shelves: one row of thumbnails per source" width="1600" height="626"><figcaption>Shelves: one row of pictures per source.</figcaption></figure>
-<figure class="alt2"><img src="/site/reader.png" alt="An article open in MCPortal's reader view" width="1600" height="1013"><figcaption>Reader view: just the article.</figcaption></figure>
+<figure class="alt"><img src="/site/shelves.png" alt="Picture shelves: a row of Game Maker's Toolkit videos, then Polygon" width="1600" height="626"><figcaption>Shelves: one row of pictures per source.</figcaption></figure>
+<figure class="alt2"><img src="/site/reader.png" alt="A Colossal article about the artist Eddy Firmin, open in MCPortal's reader view" width="1600" height="1013"><figcaption>Reader view: just the article.</figcaption></figure>
 
 <h2>Private by design</h2>
 <p>MCPortal fetches feeds and pictures on its server, so the sites you read don't see you until you open the original. There are no ads, trackers or analytics. Sign-in is through GitHub, and MCPortal keeps only your GitHub user ID and login. Your layout, sources, saved items and clips are yours: export them any time in open formats, or delete your account yourself. Details are in the <a href="/privacy">privacy policy</a>.</p>

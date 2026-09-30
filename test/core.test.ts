@@ -392,7 +392,7 @@ test('get_thumbnails: oversized WordPress uploads go through Photon; timeouts ar
 
 test('fallback art: distinct styles per source, varied placement per item, inlined into the app', async () => {
   const src = await readFile(new URL('../src/ui/art.js', import.meta.url), 'utf8');
-  type Art = { styles(keys: string[]): number[]; draw(style: number, item: string): string; motifOf(style: number): string; inkOf(style: number): number };
+  type Art = { styles(keys: string[]): number[]; draw(style: number, item: string): string; motifOf(style: number): string; inkOf(style: number): number; leadOf(style: number): string };
   const art = vm.runInNewContext(`${src}; portalArt`) as Art;
   const noIds = (svg: string) => svg.replace(/pa\d+/g, 'pa');
 
@@ -407,6 +407,9 @@ test('fallback art: distinct styles per source, varied placement per item, inlin
   assert.deepEqual(art.styles([...feeds, 'https://late.example/rss']).slice(0, 12), styles);
   assert.equal(new Set(art.styles(Array.from({ length: 40 }, (_, i) => `k${i}`))).size, 40);
   assert.deepEqual([...new Set(Array.from({ length: 40 }, (_, i) => art.motifOf(i)))].sort(), ['arches', 'doorway', 'gravity', 'orbits', 'portal']);
+  // A source's colour in the workspace is its art's lead ink, so the first eight sources get eight colours.
+  assert.equal(new Set(styles.slice(0, 8).map(art.leadOf)).size, 8);
+  assert.ok(styles.every((st) => /^#[0-9A-F]{6}$/.test(art.leadOf(st)) && art.draw(st, 'x').includes(`--ink-a:${art.leadOf(st)}`)), 'the lead ink is the one the art prints with');
 
   // Drawing: deterministic, and neighbouring items land in visibly different places.
   const style = Array.from({ length: 40 }, (_, i) => i).find((i) => art.motifOf(i) === 'arches')!;
