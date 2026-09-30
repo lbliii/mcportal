@@ -14,6 +14,7 @@ import { OAuthServer } from './auth/oauth.ts';
 import { AuthStore, fileAuthPersistence, type AuthPersistence } from './auth/store.ts';
 import { Accounts, bootstrapFromEnv } from './accounts.ts';
 import { AdminPanel } from './admin.ts';
+import { DEFAULT_SUPPORT_URL, serveSite, type SiteConfig } from './site.ts';
 import { limitsFromEnv, UsageBudget, type BudgetLimits } from './lib/budget.ts';
 import type { TtlCache } from './lib/cache.ts';
 import { isLoopbackHost } from './lib/ip.ts';
@@ -41,6 +42,8 @@ export interface AppConfig {
   dataDir: string;
   /** Per-user tool budget (MCPORTAL_LIMIT_PER_MINUTE / _PER_DAY / _GLOBAL_PER_DAY). */
   limits?: Partial<BudgetLimits>;
+  /** The public pages: support link (MCPORTAL_SUPPORT_URL) and operator name (MCPORTAL_OPERATOR). */
+  site?: Pick<SiteConfig, 'supportUrl' | 'operator'>;
 }
 
 export interface AppDeps {
@@ -86,6 +89,7 @@ export function configFromEnv(env: NodeJS.ProcessEnv, dataDir: string): AppConfi
     trustProxy: env.MCPORTAL_TRUST_PROXY === '1' || Boolean(env.RAILWAY_ENVIRONMENT),
     dataDir,
     limits: limitsFromEnv(env),
+    site: { supportUrl: env.MCPORTAL_SUPPORT_URL || DEFAULT_SUPPORT_URL, operator: env.MCPORTAL_OPERATOR || undefined },
   };
   if (!hasAuth && !isLoopbackHost(host) && env.MCPORTAL_ALLOW_UNAUTHENTICATED !== '1') {
     throw new Error(
@@ -127,13 +131,6 @@ function hostnameOf(hostHeader: string | undefined): string | undefined {
   }
 }
 
-const ABOUT = (base: string, oauth: boolean) => `<!doctype html><meta charset="utf-8"><title>MCPortal</title>
-<body style="font:15px/1.5 system-ui;max-width:640px;margin:48px auto;padding:0 16px">
-<h1>MCPortal</h1>
-<p>A personal, agent-composed workspace. This is its MCP server.</p>
-<p>MCP endpoint (Streamable HTTP): <code>${base}/mcp</code>${oauth ? ' — sign in with GitHub when your client asks.' : ''}</p>
-</body>`;
-
 export function createApp(config: AppConfig, deps: AppDeps): Server {
   const log = deps.log ?? ((m: string) => process.stderr.write(`[mcportal] ${m}\n`));
   // Normally passed in by server.ts; otherwise accounts.json next to the other data, bootstrapped from the env.
@@ -151,6 +148,7 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
   // The admin page needs GitHub sign-in; without it, admins use the `mcportal admin` CLI.
   const admin = oauth ? new AdminPanel(accounts, oauth, config.publicUrl, deps.now) : undefined;
   const budget = deps.budget ?? new UsageBudget(config.limits ?? {}, deps.now);
+  const site: SiteConfig = { supportUrl: DEFAULT_SUPPORT_URL, ...config.site, publicUrl: config.publicUrl, inviteOnly: Boolean(oauth) && !accounts.openSignup };
   const context = (userId: string): ToolContext => ({ store: deps.store, fetcher: deps.fetcher, cache: deps.cache, userId, budget, actor: accounts.actor(userId) });
 
   /** The user for a request, or undefined if it isn't authenticated. */
@@ -202,7 +200,7 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
     if (oauth && (await oauth.handle(req, res, url))) return;
     if (admin && (await admin.handle(req, res, url))) return;
 
-    if (url.pathname === '/' && req.method === 'GET') return send(res, 200, ABOUT(config.publicUrl, Boolean(oauth)), 'text/html; charset=utf-8');
+    if (req.method === 'GET' && (await serveSite(res, url.pathname, site))) return;
 
     if (url.pathname === '/preview' && req.method === 'GET') {
       // The page itself holds no secrets. With a static token, the page asks for it

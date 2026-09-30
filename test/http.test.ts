@@ -134,3 +134,25 @@ test('config: loopback by default; refuses a public bind without auth', () => {
   const token = configFromEnv({ MCPORTAL_TOKEN: 't' }, '/tmp/x');
   assert.equal(token.allowUnauthenticated, false, 'a token means auth is required even on loopback');
 });
+
+test('public pages: landing, privacy and support render without scripts; screenshots only from the allowlist', async () => {
+  const app = await startApp({ staticToken: 't', site: { supportUrl: 'mailto:help@example.com', operator: 'A <b>Person</b>' } });
+  try {
+    for (const path of ['/', '/privacy', '/support']) {
+      const page = await raw(app.port, { path });
+      assert.equal(page.status, 200, path);
+      assert.match(page.headers['content-type'] as string, /text\/html/);
+      assert.match(page.headers['content-security-policy'] as string, /default-src 'none'/);
+      assert.doesNotMatch(page.body, /<script/i, `${path} has no scripts`);
+      assert.match(page.body, /A &lt;b&gt;Person&lt;\/b&gt;/, 'operator is escaped');
+    }
+    assert.match((await raw(app.port, { path: '/support' })).body, /mailto:help@example\.com/);
+    assert.match((await raw(app.port, { path: '/' })).body, /http:\/\/localhost\/mcp/);
+    assert.equal((await raw(app.port, { path: '/site/columns.png' })).status, 200);
+    assert.equal((await raw(app.port, { path: '/site/..%2Fhttp.ts' })).status, 404);
+    assert.equal((await raw(app.port, { path: '/site/other.png' })).status, 404);
+    assert.equal((await raw(app.port, { method: 'POST', path: '/privacy' })).status, 404);
+  } finally {
+    await app.close();
+  }
+});

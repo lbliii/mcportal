@@ -29,7 +29,7 @@ agent: get_profile → update_profile → open_workspace
 | Parsing | `src/lib/html.ts` | Linear-time HTML tokenizer used by reader view and feed summaries |
 | Profile | `src/profile.ts`, `src/store.ts` | Your layout as validated JSON, one file per user |
 | Plugin | `.claude-plugin/`, `.mcp.json`, `skills/portal/`, `commands/portal.md` | Claude Code / Cowork plugin; `/portal` command and routing skill |
-| Deploy | `Dockerfile`, `railway.toml` | One Railway service plus a volume |
+| Deploy | `Dockerfile`, `.railway/railway.ts` | One Railway service plus a volume (Railway infrastructure as code) |
 | Dev launcher | `bin/mcportal-dev.mjs` | Stdio launcher that hot-reloads the server when `src/` changes (see [CONTRIBUTING.md](CONTRIBUTING.md)) |
 
 ## Requirements
@@ -71,7 +71,7 @@ args = ["/Users/llane/Developer/mcportal/bin/mcportal.mjs", "--stdio"]
 
 ## Host it on Railway (remote connector)
 
-1. Create a service from this repo. It picks up `railway.toml` and the `Dockerfile`.
+1. Create a service named `mcportal` from this repo, then run `railway config apply`. [`.railway/railway.ts`](.railway/railway.ts) sets the Dockerfile build, health check and the `/data` volume. Preview any change with `railway config plan` first.
 2. Generate a public domain. Add a **Postgres** service and set `DATABASE_URL=${{Postgres.DATABASE_URL}}` on MCPortal (profiles and sign-in state live there; turn on point-in-time recovery and scheduled backups). Without a database, attach a **volume at `/data`** and MCPortal uses files; with both, files found on the volume are imported once.
 3. Create a **GitHub OAuth App** (GitHub → Settings → Developer settings → OAuth Apps):
    - Homepage URL: `https://<your-domain>`
@@ -151,9 +151,10 @@ MCPortal is a **reading platform with light social**, driven by your agent. Anyt
 - [x] Accounts, invites and suspension replacing the allowlist; one `authorize()` gate for every tool; admins from `MCPORTAL_ADMINS`; `mcportal admin` commands ([plan](docs/plans/identity-and-access.md), phase 1)
 - [x] Admin page at `/admin`: invites, suspensions, audit log (phase 2)
 - [x] OPML import (bring subscriptions from another reader) and OPML export (phase 1b)
-- [ ] Migrate `railway.toml` to Railway's infrastructure-as-code format (old format works until 2026-12-01)
-- [ ] Privacy policy, support contact and screenshots; submit to Claude's connector directory
-- [ ] Landing page and README that show the first-run moment; Show HN
+- [x] Migrate `railway.toml` to Railway's infrastructure as code ([`.railway/railway.ts`](.railway/railway.ts))
+- [x] Landing page at `/`, privacy policy at `/privacy`, support at `/support`, with screenshots (`MCPORTAL_SUPPORT_URL`, `MCPORTAL_OPERATOR`)
+- [ ] Submit to Claude's connector directory
+- [ ] Show HN
 
 **M2: your portal, everywhere, and light social**
 - **Clips:** save quotes, exchanges, explanations, tables and images from the conversation; a Clips panel; the agent can search them across chats ([plan](docs/plans/clips.md))

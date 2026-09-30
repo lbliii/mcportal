@@ -153,6 +153,11 @@ export class Accounts {
     return run;
   }
 
+  /** Anyone with a GitHub account can sign in (no invite needed). */
+  get openSignup(): boolean {
+    return this.bootstrap.openSignup;
+  }
+
   private bootstrapMatch(list: string[], id: GithubIdentity): boolean {
     return list.includes(id.login.toLowerCase()) || list.includes(String(id.githubId));
   }
