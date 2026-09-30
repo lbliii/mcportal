@@ -135,7 +135,7 @@ export class AdminPanel {
     }
     const login = escapeHtml(invite.login);
     if (invite.acceptedAt) {
-      return sendHtml(res, 200, page('Already in', `<h1>@${login} is already in</h1><p>MCPortal is connected to that account. In Claude, ask <i>“open my portal”</i>.</p>`), headers);
+      return sendHtml(res, 200, page('Already in', `<h1>@${login} is already in</h1><p>MCPortal is connected to that account. In Claude, ask <i>“open my room”</i>.</p>`), headers);
     }
     const inviter = invite.invitedBy.startsWith('admin:') ? `@${escapeHtml(invite.invitedBy.slice(6))}` : 'The admin';
     const mcp = escapeHtml(`${this.publicUrl}/mcp`);
@@ -148,7 +148,7 @@ export class AdminPanel {
   <li>Click <b>Connect</b> and sign in with GitHub as <b>@${login}</b>.</li>
   <li>In a new chat, ask: <i>“open my portal”</i>.</li>
 </ol>
-<p class="muted">The invite is for @${login}, so signing in with another GitHub account won't work. If your organization's Claude doesn't allow custom connectors, the hosted portal isn't available to you yet.</p>`), headers);
+<p class="muted">The invite is for @${login}, so signing in with another GitHub account won't work. If your organization's Claude doesn't allow custom connectors, hosted MCPortal isn't available to you yet.</p>`), headers);
   }
 
   /** Returns true if it handled the request. */

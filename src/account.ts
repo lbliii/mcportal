@@ -188,7 +188,7 @@ export class AccountPage {
       const result = await importExport(parseExport(upload.file.toString('utf8')), userId, this.deps);
       this.deps.log?.(`import: ${result.panelsAdded} panels, ${result.savedAdded} saved, ${result.clipsAdded} clips`);
       const lines = describeImport(result).split('\n').map((l) => `<p>${escapeHtml(l)}</p>`).join('');
-      sendHtml(res, 200, page('Imported', `<h1>Imported</h1>${lines}<p>In Claude, ask <i>“open my portal”</i> to see it.</p>`));
+      sendHtml(res, 200, page('Imported', `<h1>Imported</h1>${lines}<p>In Claude, ask <i>“open my room”</i> to see it.</p>`));
     } catch (error) {
       if (!(error instanceof ProfileError)) throw error;
       sendHtml(res, 400, page('Not imported', `<p>${escapeHtml(error.message)}</p><p><a href="${back}">Try another file</a>.</p>`));
@@ -223,14 +223,14 @@ export class AccountPage {
     sendHtml(res, 200, page('Your MCPortal account', `
 <h1>Your MCPortal account</h1>
 <p>Signed in as <b>@${login}</b>${pub ? `. Public profile: <b>@${escapeHtml(pub.handle)}</b>` : '. No public profile'}.</p>
-<p class="muted">${panels} panel(s), ${profile.saved.length} saved item(s), ${clips} clip(s).</p>
+<p class="muted">${panels} portal(s), ${profile.saved.length} saved item(s), ${clips} clip(s).</p>
 <h2 style="font-size:16px">Download your data</h2>
 <ul>${EXPORT_FORMATS.map((f) => `<li><a href="/account/export/${f}">${labels[f]}</a></li>`).join('')}</ul>
 <h2 style="font-size:16px">Import</h2>
 <p>Add an MCPortal export from another server or your own machine. It only adds: nothing in your portal is removed or moved.</p>
 ${uploadForm('/account/import', s.csrf)}
 <h2 style="font-size:16px">Delete your account</h2>
-<p>This deletes your portal, saved items, clips, public profile, shares and follows, and signs you out everywhere. It can't be undone, so download your data first.</p>
+<p>This deletes your room, saved items, clips, public profile, shares and follows, and signs you out everywhere. It can't be undone, so download your data first.</p>
 <form method="post" action="/account/delete">
   <input type="hidden" name="csrf" value="${escapeHtml(s.csrf)}">
   <p><label>Type <code>delete @${login}</code> to confirm:<br><input name="confirm" autocomplete="off" style="font:inherit;padding:6px 8px;width:100%;box-sizing:border-box;margin-top:6px"></label></p>
@@ -265,7 +265,7 @@ ${uploadForm('/account/import', s.csrf)}
         return true;
       }
       if (req.method === 'GET') {
-        sendHtml(res, 200, page('Import into MCPortal', `<h1>Import into MCPortal</h1><p>Pick your MCPortal export file. It only adds to your portal: nothing is removed or moved.</p>${uploadForm(route)}<p class="muted">This link works once, for 15 minutes.</p>`));
+        sendHtml(res, 200, page('Import into MCPortal', `<h1>Import into MCPortal</h1><p>Pick your MCPortal export file. It only adds to your room: nothing is removed or moved.</p>${uploadForm(route)}<p class="muted">This link works once, for 15 minutes.</p>`));
         return true;
       }
       if (!this.sameOrigin(req)) return sendHtml(res, 403, page('Refused', '<p>That upload didn\'t come from the import page.</p>')), true;
@@ -356,7 +356,7 @@ ${uploadForm('/account/import', s.csrf)}
       for (const [k, u] of this.uploads) if (u.userId === accountId) this.uploads.delete(k);
       this.deps.log?.(`account deleted (${done.clips} clips, ${done.tokens} token records)`);
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'set-cookie': this.cookie('', 0), 'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'" });
-      res.end(page('Account deleted', '<h1>Your account is deleted</h1><p>Your portal, saved items, clips, public profile, shares and follows are gone, and you\'re signed out everywhere. Remove MCPortal from your Claude connectors too.</p>'));
+      res.end(page('Account deleted', '<h1>Your account is deleted</h1><p>Your room, saved items, clips, public profile, shares and follows are gone, and you\'re signed out everywhere. Remove MCPortal from your Claude connectors too.</p>'));
       return true;
     }
 

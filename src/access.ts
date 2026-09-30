@@ -38,7 +38,7 @@ export function authorize(actor: Actor, action: Action, resource: Resource = {})
 }
 
 /**
- * What each tool does, for the gate. Every tool acts on the caller's own portal
+ * What each tool does, for the gate. Every tool acts on the caller's own room
  * (no tool takes a user id). Unknown tools are treated as writes.
  */
 export const TOOL_ACTIONS: Record<string, Action> = {

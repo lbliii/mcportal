@@ -92,7 +92,7 @@ export async function buildExport(format: ExportFormat, userId: string, from: Ex
     filename: `mcportal-export-${stamp(now)}.json`,
     contentType: 'application/json; charset=utf-8',
     body: Buffer.from(`${JSON.stringify(data, null, 2)}\n`),
-    summary: `${panels} panel(s), ${profile.saved.length} saved item(s) and ${clips.length} clip(s)`,
+    summary: `${panels} portal(s), ${profile.saved.length} saved item(s) and ${clips.length} clip(s)`,
   };
 }
 
@@ -320,11 +320,11 @@ export async function importExport(data: PortalExport, userId: string, to: { sto
 
 export function describeImport(r: ImportResult): string {
   const parts = [
-    r.layoutAdopted ? `took the exported layout (${r.panelsAdded} panels)` : `${r.panelsAdded} panel(s) added`,
+    r.layoutAdopted ? `took the exported layout (${r.panelsAdded} portals)` : `${r.panelsAdded} portal(s) added`,
     `${r.savedAdded} saved item(s) added`,
     `${r.clipsAdded} clip(s) added${r.clipsSkipped ? ` (${r.clipsSkipped} already here)` : ''}`,
   ];
-  const problems = [...r.panelsSkipped.map((p) => `panel skipped: ${p}`), ...r.clipErrors.slice(0, 5).map((c) => `clip skipped: ${c}`)];
+  const problems = [...r.panelsSkipped.map((p) => `portal skipped: ${p}`), ...r.clipErrors.slice(0, 5).map((c) => `clip skipped: ${c}`)];
   return `Imported: ${parts.join(', ')}.${problems.length ? `\n${problems.join('\n')}` : ''}`;
 }
 

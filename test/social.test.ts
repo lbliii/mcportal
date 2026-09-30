@@ -140,10 +140,10 @@ test('spaces: title, accent and featured sources; visitors see what the rules al
   const { ctx, social, clips, portals } = await world();
   const layout = validateProfile({ ...defaultProfile(), onboarded: true, columns: [{ panels: [{ id: 'simonw', source: 'rss', title: 'Simon', config: { url: 'https://simonwillison.net/atom/everything/' } }, { id: 'saved', source: 'saved', config: {} }] }] });
   await portals.put('a', layout);
-  assert.match((await call(ctx('a'), 'set_public_profile', { featuredPanelIds: ['nope'] })).content[0]!.text, /no panel with id nope/);
+  assert.match((await call(ctx('a'), 'set_public_profile', { featuredPanelIds: ['nope'] })).content[0]!.text, /no portal with id nope/);
   assert.ok((await call(ctx('a'), 'set_public_profile', { accent: 'neon' })).isError);
   const set = await call(ctx('a'), 'set_public_profile', { spaceTitle: 'liminal webspace', accent: 'violet', bio: 'edges of the web', featuredPanelIds: ['simonw', 'saved'] });
-  assert.match(set.content[0]!.text, /1 panel\(s\) weren't featured/);
+  assert.match(set.content[0]!.text, /1 portal\(s\) weren't featured/);
   assert.deepEqual(set.structuredContent.profile.sources, [{ title: 'Simon', source: 'rss', config: { url: 'https://simonwillison.net/atom/everything/', limit: 10 } }]);
 
   const big = Buffer.alloc(300_000, 1);

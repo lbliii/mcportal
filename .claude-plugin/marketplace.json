@@ -7,7 +7,7 @@
     {
       "name": "mcportal",
       "source": "./",
-      "description": "Your personal, agent-composed workspace: Hacker News, GitHub and RSS in one multi-panel view."
+      "description": "Your personal, agent-composed reading room: portals onto Hacker News, GitHub and RSS."
     }
   ]
 }

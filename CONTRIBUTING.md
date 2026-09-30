@@ -31,14 +31,14 @@ This is the fastest way to see the workspace render inline in a Claude chat. It 
    ```
 
 3. Quit and reopen Claude desktop.
-4. In a new chat, ask **"open my portal"**.
+4. In a new chat, ask **"open my room"**.
 
 Your profile lives in `~/.mcportal/default.json`.
 
 `mcportal-dev.mjs` keeps Claude's connection open and runs the real server behind it. When a `.ts` file under `src/` changes, it restarts the server and replays the connection handshake, so Claude doesn't notice. What that means for your edits:
 
 - **Server code** (`src/**/*.ts`): live on the next tool call. No Claude restart needed.
-- **Workspace UI** (`src/ui/workspace.html`): read fresh each time a card opens. Ask Claude to open the portal again to see changes. A card that's already in the chat is frozen, because it's sandboxed and can't reload itself.
+- **Workspace UI** (`src/ui/workspace.html`): read fresh each time a card opens. Ask Claude to open the room again to see changes. A card that's already in the chat is frozen, because it's sandboxed and can't reload itself.
 - **Tool names, descriptions or schemas**: Claude may cache the tool list per session. Start a new chat, or restart Claude if a change doesn't show.
 
 Reload messages go to stderr, which shows up in Claude desktop's MCP logs. To run without hot reload, use `bin/mcportal.mjs` with `--stdio`.
