@@ -10,9 +10,9 @@
 
 ```
 you: /portal put GitHub on the left and add Simon Willison's blog
-agent: get_profile → update_profile → open_workspace
+agent: get_profile → update_profile → open_room
        ┌──────────────┬──────────────┬──────────────┐
-       │ GitHub       │ Hacker News  │ Simon W.     │   ← ui://mcportal/workspace.html
+       │ GitHub       │ Hacker News  │ Simon W.     │   ← ui://mcportal/room.html
        └──────────────┴──────────────┴──────────────┘
 ```
 
@@ -22,7 +22,7 @@ agent: get_profile → update_profile → open_workspace
 |---|---|---|
 | MCP server | `src/http.ts`, `src/mcp.ts`, `src/server.ts`, `bin/mcportal.mjs` | Streamable HTTP (`/mcp`) and stdio. No runtime dependencies locally; the hosted server adds `pg` for Postgres. |
 | Tools | `src/tools.ts` | See the tool reference below |
-| Workspace app | `src/ui/workspace.html` | Columns lane and picture shelves, welcome and starter packs, add-a-source sheet, saved items, reader view and reader cards, lazy thumbnails, provenance toggle, fullscreen. Self-contained; its icon set is inline |
+| Room app | `src/ui/room.html` | Columns lane and picture shelves, welcome and starter packs, add-a-source sheet, saved items, reader view and reader cards, lazy thumbnails, provenance toggle, fullscreen. Self-contained; its icon set is inline |
 | Discovery | `src/discover.ts` | Turns a site, feed URL, `r/subreddit`, `owner/repo`, YouTube/Bluesky/Mastodon profile and more into sources that load |
 | Starter packs | `src/packs.ts` | Eight interest packs of four live-checked sources each, for a new user's first room |
 | Adapters | `src/adapters/` | Hacker News, GitHub (search, releases), RSS/Atom, reader view |
@@ -109,7 +109,7 @@ Check a deployment with: `MCPORTAL_URL=https://<your-domain>/mcp MCPORTAL_TOKEN=
 | SSRF to localhost, private networks or cloud metadata | Every outbound socket connects only after its resolved address passes a public-IP check, inside the DNS lookup itself (no rebinding window). IPv6 is allowlisted to global unicast, so mapped, NAT64 and 6to4 forms can't sneak through. Redirects are re-checked, and credentials are dropped on cross-host hops. |
 | Hostile pages or feeds hanging the server | Linear-time tokenizer; input, block and total-text caps; bounded cache. 3 MB adversarial inputs parse in well under 100 ms. |
 | Prompt injection from third-party content | Adapters emit single-line plain text only. Tool results wrap third-party text in `<untrusted-content id="random">` fences. The UI never uses `innerHTML` and only opens http(s) links. |
-| An agent "tidying" the user's layout | `update_profile` refuses to drop portals unless their ids are passed in `removePanelIds`, and it reports every move, retitle and reconfigure. |
+| An agent "tidying" the user's layout | `update_profile` refuses to drop portals unless their ids are passed in `removePortalIds`, and it reports every move, retitle and reconfigure. |
 | Exposed server | Binds to 127.0.0.1 by default and refuses a public bind without auth. The Host header allowlist blocks DNS rebinding; tokens are compared in constant time and never read from query strings on `/mcp`. |
 | OAuth abuse | PKCE S256 required. Exact pre-registered redirect URIs only; errors before consent render a page and never redirect. MCPortal's own consent screen names the client. Consent is bound to the browser that loaded it (SameSite cookie, checked again on the GitHub callback) and must be same-origin, so a pre-fetched consent can't be approved cross-site. Codes are single-use. Refresh tokens rotate, and reusing a spent one revokes the whole grant. Tokens are audience-bound. The allowlist (login or numeric id) is re-checked on every request and every refresh. Registration, authorize and token endpoints are rate limited per IP. |
 | Stalled or slow upstreams | One timeout covers connect, headers and body, including gzip, deflate and brotli bodies (decompressors are wired with `pipeline()` so an abort tears them down). |
@@ -122,18 +122,18 @@ The `/preview` page never contains secrets. With a static token it asks for the 
 
 | Tool | Visible to | Purpose |
 |---|---|---|
-| `open_workspace` | model + app | Hydrate every portal and render the room; shows the welcome for a new user, or with `setup: true` |
-| `build_portal` | model + app | Build the room from up to 4 starter packs (replaces the layout; saved items stay) |
+| `open_room` | model + app | Hydrate every portal and render the room; shows the welcome for a new user, or with `setup: true` |
+| `build_room` | model + app | Build the room from up to 4 starter packs (replaces the layout; saved items stay) |
 | `find_source` | model + app | Resolve anything the user wants to follow into working, previewed candidates |
-| `add_panel` | model + app | Add one portal without moving anything else; refuses duplicates and sources that don't load |
-| `pin_panel` | model | Show results the agent fetched with another connected tool (Jira, Slack, Confluence, …) as a portal, or refresh one by `panelId`. Stored, never fetched by MCPortal |
+| `add_portal` | model + app | Add one portal without moving anything else; refuses duplicates and sources that don't load |
+| `pin_portal` | model | Show results the agent fetched with another connected tool (Jira, Slack, Confluence, …) as a portal, or refresh one by `portalId`. Stored, never fetched by MCPortal |
 | `save_item` / `remove_saved` | model + app | Bookmark a link (with an optional note), or remove one |
 | `get_profile` | model | Read the saved layout |
-| `update_profile` | model | Save a complete, validated layout (`removePanelIds` for explicit removals; can't touch saved or pinned items) |
+| `update_profile` | model | Save a complete, validated layout (`removePortalIds` for explicit removals; can't touch saved or pinned items) |
 | `read_source` | model + app | Preview any source without changing the layout |
 | `read_article` | model + app | Reader view for one URL; renders as its own reader card |
 | `list_sources` | model | Source types and their settings |
-| `refresh_panel` | app only | Reload one portal, bypassing cache |
+| `refresh_portal` | app only | Reload one portal, bypassing cache |
 | `get_thumbnails` | app only | Fetch item pictures through the guarded fetcher as data URIs |
 | `import_opml` | model + app | Bring subscriptions from another reader: test-load each feed, build a new user's room from their folders or add to an existing one |
 | `export_opml` | model | Sources as OPML for any feed reader (GitHub searches, saved and pinned portals have no feed and are listed as skipped) |

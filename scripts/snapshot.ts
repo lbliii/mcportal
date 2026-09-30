@@ -1,5 +1,5 @@
 /**
- * Write a self-contained demo of the workspace UI with canned data baked in.
+ * Write a self-contained demo of the room UI with canned data baked in.
  *
  *   node scripts/snapshot.ts [out.html] [--reader] [--packs=developer,ai] [--layout=shelves] [--profile=~/.mcportal/default.json]
  *
@@ -15,7 +15,7 @@ import { validateProfile } from '../src/profile.ts';
 import { TtlCache } from '../src/lib/cache.ts';
 import { createFixtureFetcher } from '../src/lib/fixture-fetch.ts';
 import { safeFetch } from '../src/lib/safe-fetch.ts';
-import { handleMessage, workspaceHtml } from '../src/mcp.ts';
+import { handleMessage, roomHtml } from '../src/mcp.ts';
 import { MemoryClipStore } from '../src/clips.ts';
 import { MemoryProfileStore } from '../src/store.ts';
 import type { ToolContext } from '../src/tools.ts';
@@ -37,21 +37,21 @@ const ctx: ToolContext = {
 const call = (name: string, args: Record<string, unknown> = {}) =>
   handleMessage({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }, ctx);
 
-if (packs) await call('build_portal', { packs, layout: layout ?? 'columns' });
+if (packs) await call('build_room', { packs, layout: layout ?? 'columns' });
 else if (layout) {
   const profile = (((await call('get_profile'))?.result as any)?.structuredContent?.profile ?? {}) as Record<string, unknown>;
   await call('update_profile', { profile: { ...profile, layout } });
 }
-const workspace = await call('open_workspace');
-const panels = ((workspace?.result as any)?.structuredContent?.panels ?? []) as Array<{ items: Array<{ url?: string }>; source: string }>;
+const room = await call('open_room');
+const portals = ((room?.result as any)?.structuredContent?.portals ?? []) as Array<{ items: Array<{ url?: string }>; source: string }>;
 const articles: Record<string, unknown> = {};
-for (const panel of panels.filter((p) => p.source !== 'github')) {
-  for (const item of panel.items.slice(0, 3)) {
+for (const portal of portals.filter((p) => p.source !== 'github')) {
+  for (const item of portal.items.slice(0, 3)) {
     if (item.url) articles[item.url] = await call('read_article', { url: item.url });
   }
 }
 const images: Record<string, string | null> = {};
-const thumbUrls = [...new Set(panels.flatMap((p) => p.items.map((i: any) => i.image?.url).filter(Boolean)))] as string[];
+const thumbUrls = [...new Set(portals.flatMap((p) => p.items.map((i: any) => i.image?.url).filter(Boolean)))] as string[];
 for (let i = 0; i < thumbUrls.length; i += 24) {
   const r = await call('get_thumbnails', { urls: thumbUrls.slice(i, i + 24) });
   Object.assign(images, (r?.result as any)?.structuredContent?.images ?? {});
@@ -59,25 +59,25 @@ for (let i = 0; i < thumbUrls.length; i += 24) {
 
 const stub = `<script>
 window.__MCPORTAL_DEV__ = { token: null };
-const WORKSPACE = ${JSON.stringify(workspace)};
+const ROOM = ${JSON.stringify(room)};
 const ARTICLES = ${JSON.stringify(articles)};
 const IMAGES = ${JSON.stringify(images)};
 window.fetch = async (_url, init) => {
   const body = JSON.parse(init.body);
   const { name, arguments: args } = body.params;
-  let r = name === 'open_workspace' ? WORKSPACE : name === 'read_article' ? ARTICLES[args.url] : null;
+  let r = name === 'open_room' ? ROOM : name === 'read_article' ? ARTICLES[args.url] : null;
   if (name === 'get_thumbnails') r = { result: { content: [], structuredContent: { images: Object.fromEntries(args.urls.map((u) => [u, IMAGES[u] ?? null])) } } };
   if (!r) r = { result: { isError: true, content: [{ type: 'text', text: 'Not available in this snapshot' }] } };
   return { json: async () => ({ ...r, jsonrpc: '2.0', id: body.id }) };
 };
 </script>`;
 // The article to open: the PS5 story in fixtures, else the first one reader view could load.
-const readable = panels.filter((p) => p.source !== 'github').flatMap((p: any) => p.items).find((i: any) => i.url && !i.video && (articles[i.url] as any)?.result && !(articles[i.url] as any).result.isError);
+const readable = portals.filter((p) => p.source !== 'github').flatMap((p: any) => p.items).find((i: any) => i.url && !i.video && (articles[i.url] as any)?.result && !(articles[i.url] as any).result.isError);
 const readerTitle = packs ? String(readable?.title ?? '') : 'PS5';
 const autoOpen = openReader
   ? `<script>setTimeout(() => { const t = [...document.querySelectorAll('.item, .card')].find((i) => i.textContent.includes(${JSON.stringify(readerTitle)})); if (t) t.click(); }, 300);</script>`
   : '';
 
-const html = (await workspaceHtml()).replace('<!--MCPORTAL_BOOT-->', stub).replace('</body>', `${autoOpen}</body>`);
+const html = (await roomHtml()).replace('<!--MCPORTAL_BOOT-->', stub).replace('</body>', `${autoOpen}</body>`);
 await writeFile(out, html);
-console.log(`wrote ${out} (${panels.length} panels, ${Object.keys(articles).length} articles, ${Object.values(images).filter(Boolean).length} thumbnails)`);
+console.log(`wrote ${out} (${portals.length} portals, ${Object.keys(articles).length} articles, ${Object.values(images).filter(Boolean).length} thumbnails)`);

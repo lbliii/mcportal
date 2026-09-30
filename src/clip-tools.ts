@@ -5,8 +5,8 @@
  */
 import { buildClip, CLIP_KINDS, CLIP_LIMITS, ClipError, clampLimit, queryWords, summaryOf, type Clip, type ClipData, type ClipKind, type ClipSummary } from './clips.ts';
 import { clean } from './lib/text.ts';
-import { clipsPanel, clipsQuery } from './sources.ts';
-import { ensurePanel, toolError, untrusted, WORKSPACE_URI, type CallToolResult, type ToolContext, type ToolDef } from './tools.ts';
+import { clipsPortal, clipsQuery } from './sources.ts';
+import { ensurePortal, toolError, untrusted, ROOM_URI, type CallToolResult, type ToolContext, type ToolDef } from './tools.ts';
 
 const MODEL_TABLE_ROWS = 100;
 
@@ -42,10 +42,10 @@ function sourceLabel(clip: ClipSummary): string {
   return clip.source.url ?? (clip.source.kind === 'conversation' ? 'a conversation' : clip.source.title ?? 'a clip');
 }
 
-/** The clips panels in the layout, rebuilt so the app can redraw them. */
-async function clipPanels(ctx: ToolContext, profile: Awaited<ReturnType<ToolContext['store']['get']>>) {
+/** The clips portals in the layout, rebuilt so the app can redraw them. */
+async function clipPortals(ctx: ToolContext, profile: Awaited<ReturnType<ToolContext['store']['get']>>) {
   const specs = profile.columns.flatMap((c) => c.panels).filter((p) => p.source === 'clips');
-  return Promise.all(specs.map(async (spec) => clipsPanel(spec, await ctx.clips!.list(ctx.userId, clipsQuery(spec)))));
+  return Promise.all(specs.map(async (spec) => clipsPortal(spec, await ctx.clips!.list(ctx.userId, clipsQuery(spec)))));
 }
 
 const kindProperty = { type: 'string', enum: CLIP_KINDS };
@@ -109,7 +109,7 @@ export const CLIP_TOOLS: ToolDef[] = [
         throw error;
       }
       const before = await ctx.store.get(ctx.userId);
-      const { profile, added } = ensurePanel(before, 'clips', 'Clips');
+      const { profile, added } = ensurePortal(before, 'clips', 'Clips');
       if (added) await ctx.store.put(ctx.userId, profile);
       const { count } = await ctx.clips.usage(ctx.userId);
       const summary = summaryOf(clip);
@@ -118,7 +118,7 @@ export const CLIP_TOOLS: ToolDef[] = [
         added ? 'Added a "Clips" portal to the room.' : '',
         untrusted(sourceLabel(clip), summaryLine(summary)),
       ].filter(Boolean).join('\n');
-      return ok(text, { clip: summary, profile, layoutChanged: added, panels: await clipPanels(ctx, profile) });
+      return ok(text, { clip: summary, profile, layoutChanged: added, portals: await clipPortals(ctx, profile) });
     },
   },
   {
@@ -163,7 +163,7 @@ export const CLIP_TOOLS: ToolDef[] = [
     description: "Show one of the user's clips in full, as a card in the conversation (\"show me that table\"). Get the id from search_clips or the Clips portal.",
     inputSchema: { type: 'object', required: ['id'], additionalProperties: false, properties: { id: { type: 'string' } } },
     annotations: { readOnlyHint: true },
-    _meta: { ui: { resourceUri: WORKSPACE_URI } },
+    _meta: { ui: { resourceUri: ROOM_URI } },
     async handler(args, ctx) {
       if (!ctx.clips) return noStore();
       const clip = await ctx.clips.get(ctx.userId, String(args.id ?? ''));
@@ -203,7 +203,7 @@ export const CLIP_TOOLS: ToolDef[] = [
       }
       if (!clip) return toolError(`No clip with id "${clean(args.id, 40)}".`);
       const profile = await ctx.store.get(ctx.userId);
-      return ok(`Updated clip ${clip.id}.\n${untrusted(sourceLabel(clip), summaryLine(summaryOf(clip)))}`, { clip: summaryOf(clip), panels: await clipPanels(ctx, profile) });
+      return ok(`Updated clip ${clip.id}.\n${untrusted(sourceLabel(clip), summaryLine(summaryOf(clip)))}`, { clip: summaryOf(clip), portals: await clipPortals(ctx, profile) });
     },
   },
   {
@@ -218,7 +218,7 @@ export const CLIP_TOOLS: ToolDef[] = [
       const deleted = await ctx.clips.delete(ctx.userId, id);
       const profile = await ctx.store.get(ctx.userId);
       const { count } = await ctx.clips.usage(ctx.userId);
-      return ok(deleted ? `Deleted. ${count} clip(s) left.` : `No clip with id "${clean(id, 40)}"; nothing changed.`, { deleted, id, panels: await clipPanels(ctx, profile) });
+      return ok(deleted ? `Deleted. ${count} clip(s) left.` : `No clip with id "${clean(id, 40)}"; nothing changed.`, { deleted, id, portals: await clipPortals(ctx, profile) });
     },
   },
 ];

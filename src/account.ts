@@ -119,7 +119,7 @@ function sendFile(res: ServerResponse, file: ExportFile): void {
 }
 
 /**
- * Delete an account and everything it owns: portal, saved items, clips, public
+ * Delete an account and everything it owns: room, saved items, clips, public
  * profile (its handle stays held for 30 days), shares, follows, mutes and blocks
  * (reports they filed stay, anonymized), sign-in tokens, and the account.
  */
@@ -186,7 +186,7 @@ export class AccountPage {
     if (!upload.file) return sendHtml(res, 400, page('No file', `<p>Pick your MCPortal export file (a .json). <a href="${back}">Go back</a>.</p>`));
     try {
       const result = await importExport(parseExport(upload.file.toString('utf8')), userId, this.deps);
-      this.deps.log?.(`import: ${result.panelsAdded} panels, ${result.savedAdded} saved, ${result.clipsAdded} clips`);
+      this.deps.log?.(`import: ${result.portalsAdded} portals, ${result.savedAdded} saved, ${result.clipsAdded} clips`);
       const lines = describeImport(result).split('\n').map((l) => `<p>${escapeHtml(l)}</p>`).join('');
       sendHtml(res, 200, page('Imported', `<h1>Imported</h1>${lines}<p>In Claude, ask <i>“open my room”</i> to see it.</p>`));
     } catch (error) {
@@ -217,13 +217,13 @@ export class AccountPage {
     const profile = await this.deps.store.get(s.accountId);
     const clips = this.deps.clips ? (await this.deps.clips.usage(s.accountId)).count : 0;
     const pub = await this.deps.publicProfiles?.get(s.accountId);
-    const panels = profile.columns.reduce((n, c) => n + c.panels.length, 0);
+    const portals = profile.columns.reduce((n, c) => n + c.panels.length, 0);
     const login = escapeHtml(s.login);
     const labels: Record<ExportFormat, string> = { mcportal: 'Everything (MCPortal export, JSON)', bookmarks: 'Saved items (bookmarks file)', clips: 'Clips (Markdown, .tar.gz)', opml: 'Sources (OPML)' };
     sendHtml(res, 200, page('Your MCPortal account', `
 <h1>Your MCPortal account</h1>
 <p>Signed in as <b>@${login}</b>${pub ? `. Public profile: <b>@${escapeHtml(pub.handle)}</b>` : '. No public profile'}.</p>
-<p class="muted">${panels} portal(s), ${profile.saved.length} saved item(s), ${clips} clip(s).</p>
+<p class="muted">${portals} portal(s), ${profile.saved.length} saved item(s), ${clips} clip(s).</p>
 <h2 style="font-size:16px">Download your data</h2>
 <ul>${EXPORT_FORMATS.map((f) => `<li><a href="/account/export/${f}">${labels[f]}</a></li>`).join('')}</ul>
 <h2 style="font-size:16px">Import</h2>

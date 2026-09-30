@@ -26,15 +26,15 @@ const started = Date.now();
 const init = await rpc('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'smoke', version: '1' } });
 console.log(`server: ${init.result.serverInfo.name} ${init.result.serverInfo.version} (${remote ?? 'in-process'})`);
 
-const ws = await rpc('tools/call', { name: 'open_workspace', arguments: {} });
+const room = await rpc('tools/call', { name: 'open_room', arguments: {} });
 let failed = false;
-for (const panel of ws.result.structuredContent.panels) {
-  const status = panel.error ? `ERROR ${panel.error}` : `${panel.items.length} items`;
-  if (panel.error || panel.items.length === 0) failed = true;
-  console.log(`  ${panel.title.padEnd(28)} ${status}  <- ${panel.provenance.endpoint}`);
+for (const portal of room.result.structuredContent.portals) {
+  const status = portal.error ? `ERROR ${portal.error}` : `${portal.items.length} items`;
+  if (portal.error || portal.items.length === 0) failed = true;
+  console.log(`  ${portal.title.padEnd(28)} ${status}  <- ${portal.provenance.endpoint}`);
 }
 
-const first = ws.result.structuredContent.panels.find((p: any) => p.source === 'rss')?.items[0];
+const first = room.result.structuredContent.portals.find((p: any) => p.source === 'rss')?.items[0];
 if (first?.url) {
   const article = await rpc('tools/call', { name: 'read_article', arguments: { url: first.url } });
   const a = article.result.structuredContent?.article;

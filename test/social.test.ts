@@ -42,10 +42,10 @@ test('audiences: followers-only shares reach followers; mcportal shares reach an
   assert.deepEqual((await social.feed('b')).map((s) => s.title), ['For everyone', 'For followers']);
   assert.equal((await social.feed('b'))[0]!.hasOwnProperty('accountId'), false, 'account ids never leave');
   assert.deepEqual((await social.sharesOf('c', 'a')).map((s) => s.title), ['For everyone'], 'a non-follower sees only the public one on the profile');
-  const panel = await call(ctx('b'), 'read_source', { source: 'following', config: {} });
-  assert.match(panel.content[0]!.text, /<untrusted-content/);
-  assert.equal(panel.structuredContent.panel.items[1].summary, 'friends only');
-  assert.equal(panel.structuredContent.panel.items[1].share.id, toFollowers.id);
+  const portal = await call(ctx('b'), 'read_source', { source: 'following', config: {} });
+  assert.match(portal.content[0]!.text, /<untrusted-content/);
+  assert.equal(portal.structuredContent.portal.items[1].summary, 'friends only');
+  assert.equal(portal.structuredContent.portal.items[1].share.id, toFollowers.id);
 });
 
 test('mute hides from your feed only; block hides both ways and removes follows', async () => {
@@ -105,7 +105,7 @@ test('reports: need a reason and a visible target; admins resolve them; deleting
   assert.equal((await social.reports('open'))[0]!.reporterId, 'deleted');
 });
 
-test('tools: share a saved item or a clip, the Following panel appears on first follow, relationships, reports', async () => {
+test('tools: share a saved item or a clip, the Following portal appears on first follow, relationships, reports', async () => {
   const { ctx, clips } = await world();
   const clip = buildClip({ kind: 'table', table: '| a | b |\n|---|---|\n| 1 | 2 |', title: 'Numbers' });
   await clips.add('a', clip);
@@ -118,9 +118,9 @@ test('tools: share a saved item or a clip, the Following panel appears on first 
   const follow = await call(ctx('b'), 'relationship', { handle: '@alice', action: 'follow' });
   assert.equal(follow.structuredContent.layoutChanged, true);
   assert.equal((await call(ctx('b'), 'relationship', { handle: 'alice', action: 'follow' })).structuredContent.layoutChanged, false);
-  const ws = await call(ctx('b'), 'open_workspace');
-  const panel = ws.structuredContent.panels.find((p: any) => p.source === 'following');
-  assert.deepEqual(panel.items.map((i: any) => i.title), [ `a's link`, 'Numbers']);
+  const room = await call(ctx('b'), 'open_room');
+  const portal = room.structuredContent.portals.find((p: any) => p.source === 'following');
+  assert.deepEqual(portal.items.map((i: any) => i.title), [ `a's link`, 'Numbers']);
   const card = await call(ctx('b'), 'get_share', { id: shared.structuredContent.share.id });
   assert.equal(card.structuredContent.share.clip.data.rows[0][0], '1');
   const text = card.content[0]!.text;
@@ -140,9 +140,9 @@ test('spaces: title, accent and featured sources; visitors see what the rules al
   const { ctx, social, clips, portals } = await world();
   const layout = validateProfile({ ...defaultProfile(), onboarded: true, columns: [{ panels: [{ id: 'simonw', source: 'rss', title: 'Simon', config: { url: 'https://simonwillison.net/atom/everything/' } }, { id: 'saved', source: 'saved', config: {} }] }] });
   await portals.put('a', layout);
-  assert.match((await call(ctx('a'), 'set_public_profile', { featuredPanelIds: ['nope'] })).content[0]!.text, /no portal with id nope/);
+  assert.match((await call(ctx('a'), 'set_public_profile', { featuredPortalIds: ['nope'] })).content[0]!.text, /no portal with id nope/);
   assert.ok((await call(ctx('a'), 'set_public_profile', { accent: 'neon' })).isError);
-  const set = await call(ctx('a'), 'set_public_profile', { spaceTitle: 'liminal webspace', accent: 'violet', bio: 'edges of the web', featuredPanelIds: ['simonw', 'saved'] });
+  const set = await call(ctx('a'), 'set_public_profile', { spaceTitle: 'liminal webspace', accent: 'violet', bio: 'edges of the web', featuredPortalIds: ['simonw', 'saved'] });
   assert.match(set.content[0]!.text, /1 portal\(s\) weren't featured/);
   assert.deepEqual(set.structuredContent.profile.sources, [{ title: 'Simon', source: 'rss', config: { url: 'https://simonwillison.net/atom/everything/', limit: 10 } }]);
 

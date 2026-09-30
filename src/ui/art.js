@@ -10,9 +10,9 @@
  *
  * draw() returns SVG markup built only from numbers and the constants below; keys only
  * reach it through the hash. Colours are CSS classes, not attributes, so the .art rules
- * in workspace.html can swap paper and ink for dark mode.
+ * in room.html can swap paper and ink for dark mode.
  *
- * Plain script, inlined into workspace.html by workspaceHtml(); tests load it with vm.
+ * Plain script, inlined into room.html by roomHtml(); tests load it with vm.
  */
 const portalArt = (() => {
   // paper, ink a, ink b, darkest ink, accent
@@ -154,10 +154,10 @@ const portalArt = (() => {
 
   /**
    * Styles for a portal's sources, in display order. Each source takes the free style
-   * that repeats the fewest ink sets and motifs used so far, never the motif of the panel
+   * that repeats the fewest ink sets and motifs used so far, never the motif of the portal
    * just before it; ties go to the style its key hashes to (then the next ones after it).
    * So the first eight sources get eight ink sets and the first five get all five motifs,
-   * and adding a panel never restyles the ones before it.
+   * and adding a portal never restyles the ones before it.
    */
   function styles(keys) {
     const taken = new Set(), inkUse = INKS.map(() => 0), motifUse = NAMES.map(() => 0);
@@ -188,7 +188,7 @@ const portalArt = (() => {
     return `<svg xmlns="http://www.w3.org/2000/svg" class="art" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false" style="--ink-p:${p};--ink-a:${a};--ink-b:${b};--ink-c:${c};--ink-x:${accent}">${body}</svg>`;
   }
 
-  /** A style's lead ink (its set's first ink after paper): the source's colour in the workspace. */
+  /** A style's lead ink (its set's first ink after paper): the source's colour in the room. */
   const leadOf = (style) => INKS[style % INKS.length][1];
 
   return { styles, draw, leadOf, motifOf: (style) => parts(style).motif, inkOf: (style) => style % INKS.length };

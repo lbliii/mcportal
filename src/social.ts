@@ -1,13 +1,13 @@
 /**
  * Sharing and follows (identity plan, phase 4). Native to MCPortal: shares are
- * seen by signed-in users in their Following panel or on a profile, never
+ * seen by signed-in users in their Following portal or on a profile, never
  * published to the open web.
  *
  *   share   a saved link or a clip with a note. The content is copied at share
  *           time, so the share doesn't change if the clip does. Audience:
  *           'followers' (default) or 'mcportal' (anyone signed in).
  *   follow  open for anyone with a public profile.
- *   mute    their shares disappear from your Following panel.
+ *   mute    their shares disappear from your Following portal.
  *   block   they can't follow you or see your shares, and you don't see theirs;
  *           blocking removes follows both ways.
  *   report  a share or a profile, for admins to look at. Admins can hide a share.
@@ -322,7 +322,7 @@ export class Social {
     return share && (await this.canSee(viewer, share)) ? (await this.present(viewer, [share]))[0] : undefined;
   }
 
-  /** The Following panel: shares from people the viewer follows, minus muted and blocked. */
+  /** The Following portal: shares from people the viewer follows, minus muted and blocked. */
   async feed(viewer: string, query: PageQuery = {}): Promise<SharedItem[]> {
     const limit = limitOf(query);
     const muted = new Set(await this.store.outgoing('mutes', viewer));

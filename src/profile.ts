@@ -1,5 +1,5 @@
 /**
- * The preference profile: the user's workspace, stated in plain language and
+ * The preference profile: the user's room, stated in plain language and
  * stored as structured data. Principle: the agent never moves anything the
  * user placed unless asked, so updates are validated whole-profile writes.
  */
@@ -9,7 +9,7 @@ import type { RssConfig } from './adapters/rss.ts';
 import { clean } from './lib/text.ts';
 import { CLIP_KINDS, type ClipKind, type Item, type SourceKind } from './types.ts';
 
-export interface PanelSpec {
+export interface PortalSpec {
   id: string;
   source: SourceKind;
   title?: string;
@@ -19,13 +19,13 @@ export interface PanelSpec {
 export interface ColumnSpec {
   /** Relative width (flex-grow), 1 to 4. */
   width: number;
-  panels: PanelSpec[];
+  panels: PortalSpec[];
 }
 
-/** columns: side-by-side panels. shelves: one horizontally scrolling row per panel. */
+/** columns: side-by-side portals. shelves: one horizontally scrolling row per portal. */
 export const LAYOUTS = ['columns', 'shelves'] as const;
 export type Layout = (typeof LAYOUTS)[number];
-/** Where a story opens: card = reader inside the workspace, chat = its own reader card in the conversation. */
+/** Where a story opens: card = reader inside the room, chat = its own reader card in the conversation. */
 export const OPEN_IN = ['card', 'chat'] as const;
 export type OpenIn = (typeof OPEN_IN)[number];
 
@@ -38,7 +38,7 @@ export interface SavedItem {
   savedAt: string;
 }
 
-/** The items of one pinned panel, as the agent last passed them. Untrusted, plain text. */
+/** The items of one pinned portal, as the agent last passed them. Untrusted, plain text. */
 export interface PinnedData {
   items: Item[];
   pinnedAt: string;
@@ -52,7 +52,7 @@ export interface PinnedConfig {
   limit: number;
 }
 
-/** A clips panel: optionally only one kind or one tag. */
+/** A clips portal: optionally only one kind or one tag. */
 export interface ClipsConfig {
   kind?: ClipKind;
   tag?: string;
@@ -67,7 +67,7 @@ export interface Profile {
   columns: ColumnSpec[];
   /** Newest first. Only save_item / remove_saved change it; update_profile carries it over. */
   saved: SavedItem[];
-  /** Items of pinned panels, by panel id. Only pin_panel changes them; update_profile carries them over. */
+  /** Items of pinned portals, by portal id. Only pin_portal changes them; update_profile carries them over. */
   pins: Record<string, PinnedData>;
   /** False only for a brand-new user who hasn't set up their room yet (shows the welcome). */
   onboarded: boolean;
@@ -75,7 +75,7 @@ export interface Profile {
 }
 
 /** Columns scroll sideways, so there can be more than fit on screen. */
-export const LIMITS = { columns: 8, panelsPerColumn: 4, items: 30, saved: 200 } as const;
+export const LIMITS = { columns: 8, portalsPerColumn: 4, items: 30, saved: 200 } as const;
 export const SOURCES: SourceKind[] = ['hn', 'rss', 'github', 'saved', 'pinned', 'clips', 'following'];
 
 export class ProfileError extends Error {
@@ -186,12 +186,12 @@ export function validateProfile(input: unknown, now = new Date()): Profile {
   const seen = new Set<string>();
   const columns: ColumnSpec[] = columnsRaw.map((colRaw, ci) => {
     if (!isRecord(colRaw)) throw new ProfileError(`columns[${ci}] must be an object`);
-    const panelsRaw = colRaw.panels;
-    if (!Array.isArray(panelsRaw) || panelsRaw.length === 0) throw new ProfileError(`columns[${ci}] needs at least one panel`);
-    if (panelsRaw.length > LIMITS.panelsPerColumn) {
-      throw new ProfileError(`columns[${ci}] has more than ${LIMITS.panelsPerColumn} panels`);
+    const portalsRaw = colRaw.panels;
+    if (!Array.isArray(portalsRaw) || portalsRaw.length === 0) throw new ProfileError(`columns[${ci}] needs at least one portal`);
+    if (portalsRaw.length > LIMITS.portalsPerColumn) {
+      throw new ProfileError(`columns[${ci}] has more than ${LIMITS.portalsPerColumn} portals`);
     }
-    const panels = panelsRaw.map((pRaw, pi): PanelSpec => {
+    const portals = portalsRaw.map((pRaw, pi): PortalSpec => {
       const where = `columns[${ci}].panels[${pi}]`;
       if (!isRecord(pRaw)) throw new ProfileError(`${where} must be an object`);
       const source = pRaw.source as SourceKind;
@@ -203,10 +203,10 @@ export function validateProfile(input: unknown, now = new Date()): Profile {
       const config = normalizeSourceConfig(source, pRaw.config, where) as unknown as Record<string, unknown>;
       return title ? { id, source, title, config } : { id, source, config };
     });
-    return { width: clampInt(colRaw.width, 1, 4, 1), panels };
+    return { width: clampInt(colRaw.width, 1, 4, 1), panels: portals };
   });
 
-  const name = clean(input.name, 60) || 'workspace';
+  const name = clean(input.name, 60) || 'room';
   const layout = (LAYOUTS as readonly unknown[]).includes(input.layout) ? (input.layout as Layout) : 'columns';
   const openIn = (OPEN_IN as readonly unknown[]).includes(input.openIn) ? (input.openIn as OpenIn) : 'card';
   // Profiles saved before onboarding existed belong to people who are already set up.
@@ -216,11 +216,11 @@ export function validateProfile(input: unknown, now = new Date()): Profile {
   return { version: 1, name, layout, openIn, columns, saved: normalizeSaved(input.saved, now), pins, onboarded, updatedAt: now.toISOString() };
 }
 
-/** Keep pinned items only for pinned panels that exist; an unknown id gets none. */
-export function normalizePins(raw: unknown, panelIds: string[], now = new Date()): Record<string, PinnedData> {
+/** Keep pinned items only for pinned portals that exist; an unknown id gets none. */
+export function normalizePins(raw: unknown, portalIds: string[], now = new Date()): Record<string, PinnedData> {
   const pins: Record<string, PinnedData> = {};
   const all = isRecord(raw) ? raw : {};
-  for (const id of panelIds) {
+  for (const id of portalIds) {
     const entry = Object.hasOwn(all, id) && isRecord(all[id]) ? all[id] : {};
     const pinnedAt = typeof entry.pinnedAt === 'string' && !Number.isNaN(Date.parse(entry.pinnedAt)) ? new Date(entry.pinnedAt).toISOString() : now.toISOString();
     pins[id] = { items: normalizePinnedItems(entry.items), pinnedAt };
@@ -230,7 +230,7 @@ export function normalizePins(raw: unknown, panelIds: string[], now = new Date()
 
 /**
  * Items from another tool, as the agent passed them: plain text, http(s) links only,
- * capped. The shape is our own Item, so every panel renders the same way.
+ * capped. The shape is our own Item, so every portal renders the same way.
  */
 export function normalizePinnedItems(raw: unknown): Item[] {
   if (!Array.isArray(raw)) return [];
@@ -284,19 +284,19 @@ export function normalizeSaved(raw: unknown, now = new Date()): SavedItem[] {
   return out;
 }
 
-/** The first panel showing saved items, if the user has one in their layout. */
-export function findSavedPanel(profile: Profile): PanelSpec | undefined {
+/** The first portal showing saved items, if the user has one in their layout. */
+export function findSavedPortal(profile: Profile): PortalSpec | undefined {
   for (const column of profile.columns) {
-    const panel = column.panels.find((p) => p.source === 'saved');
-    if (panel) return panel;
+    const portal = column.panels.find((p) => p.source === 'saved');
+    if (portal) return portal;
   }
   return undefined;
 }
 
-export function findPanel(profile: Profile, panelId: string): PanelSpec | undefined {
+export function findPortal(profile: Profile, portalId: string): PortalSpec | undefined {
   for (const column of profile.columns) {
-    const panel = column.panels.find((p) => p.id === panelId);
-    if (panel) return panel;
+    const portal = column.panels.find((p) => p.id === portalId);
+    if (portal) return portal;
   }
   return undefined;
 }
@@ -310,13 +310,13 @@ export interface ProfileDiff {
   reconfigured: string[];
 }
 
-function locate(profile: Profile): Map<string, { column: number; index: number; panel: PanelSpec }> {
-  const map = new Map<string, { column: number; index: number; panel: PanelSpec }>();
-  profile.columns.forEach((c, column) => c.panels.forEach((panel, index) => map.set(panel.id, { column, index, panel })));
+function locate(profile: Profile): Map<string, { column: number; index: number; portal: PortalSpec }> {
+  const map = new Map<string, { column: number; index: number; portal: PortalSpec }>();
+  profile.columns.forEach((c, column) => c.panels.forEach((portal, index) => map.set(portal.id, { column, index, portal })));
   return map;
 }
 
-/** What changed between two layouts, by panel id. */
+/** What changed between two layouts, by portal id. */
 export function diffProfiles(before: Profile, after: Profile): ProfileDiff {
   const a = locate(before);
   const b = locate(after);
@@ -330,8 +330,8 @@ export function diffProfiles(before: Profile, after: Profile): ProfileDiff {
       continue;
     }
     if (was.column !== now.column || was.index !== now.index) diff.moved.push(`${id} (column ${was.column + 1} → ${now.column + 1})`);
-    if ((was.panel.title ?? '') !== (now.panel.title ?? '')) diff.retitled.push(id);
-    if (JSON.stringify(was.panel.config) !== JSON.stringify(now.panel.config) || was.panel.source !== now.panel.source) diff.reconfigured.push(id);
+    if ((was.portal.title ?? '') !== (now.portal.title ?? '')) diff.retitled.push(id);
+    if (JSON.stringify(was.portal.config) !== JSON.stringify(now.portal.config) || was.portal.source !== now.portal.source) diff.reconfigured.push(id);
   }
   for (const id of b.keys()) if (!a.has(id)) diff.added.push(id);
   return diff;

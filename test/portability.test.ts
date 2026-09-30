@@ -110,29 +110,29 @@ test('exports: JSON round-trips, bookmarks escape, clips archive is a valid tar.
   assert.equal(execFileSync('cat', [path.join(dir, png)]).toString('base64'), PNG_1PX, 'image bytes intact');
 });
 
-test('import adds only, is idempotent, adopts the layout for a new portal, and re-validates everything', async () => {
+test('import adds only, is idempotent, adopts the layout for a new room, and re-validates everything', async () => {
   const src = portal();
   await src.clips.add('u1', buildClip({ kind: 'note', markdown: '# Plan\n\n- one\n- two' }));
   await src.store.put('u1', validateProfile({ ...(await src.store.get('u1')), columns: [...(await src.store.get('u1')).columns, { panels: [{ id: 'lobsters', source: 'rss', config: { url: 'https://lobste.rs/rss' } }] }] }));
   const exported = parseExport((await buildExport('mcportal', 'u1', src)).body.toString());
 
-  // An existing portal: only the new panel, saved item and clip are added.
+  // An existing room: only the new portal, saved item and clip are added.
   const dst = portal('u2');
   await dst.store.put('u2', validateProfile({ ...defaultProfile(), onboarded: true, name: 'mine', saved: [{ url: 'https://example.com/z', title: 'Z' }] }));
   const first = await importExport(exported, 'u2', dst);
   assert.equal(first.layoutAdopted, false);
-  assert.equal(first.panelsAdded, 1);
+  assert.equal(first.portalsAdded, 1);
   assert.equal(first.savedAdded, 1);
   assert.equal(first.clipsAdded, 1);
   const after = await dst.store.get('u2');
   assert.equal(after.name, 'mine', 'nothing replaced');
   assert.deepEqual(after.saved.map((s) => s.url).sort(), ['https://example.com/a', 'https://example.com/z']);
   const again = await importExport(exported, 'u2', dst);
-  assert.deepEqual([again.panelsAdded, again.savedAdded, again.clipsAdded, again.clipsSkipped], [0, 0, 0, 1], 'importing twice changes nothing');
+  assert.deepEqual([again.portalsAdded, again.savedAdded, again.clipsAdded, again.clipsSkipped], [0, 0, 0, 1], 'importing twice changes nothing');
   const note = await dst.clips.get('u2', (await dst.clips.list('u2'))[0]!.id);
   assert.deepEqual(note!.data, { kind: 'note', blocks: [{ type: 'h', text: 'Plan' }, { type: 'li', text: 'one' }, { type: 'li', text: 'two' }] });
 
-  // A new portal takes the layout as is.
+  // A new room takes the layout as is.
   const fresh = { ...portal('u3'), store: new MemoryProfileStore() };
   const adopted = await importExport(exported, 'u3', fresh);
   assert.equal(adopted.layoutAdopted, true);

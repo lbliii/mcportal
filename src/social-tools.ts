@@ -9,7 +9,7 @@ import { clean } from './lib/text.ts';
 import { httpUrl } from './profile.ts';
 import type { ClipData } from './clips.ts';
 import { AUDIENCES, SocialError, type SharedItem } from './social.ts';
-import { ensurePanel, toolError, untrusted, WORKSPACE_URI, type CallToolResult, type ToolContext, type ToolDef } from './tools.ts';
+import { ensurePortal, toolError, untrusted, ROOM_URI, type CallToolResult, type ToolContext, type ToolDef } from './tools.ts';
 
 function ok(text: string, structuredContent: Record<string, unknown>): CallToolResult {
   return { content: [{ type: 'text', text }], structuredContent };
@@ -59,7 +59,7 @@ export const SOCIAL_TOOLS: ToolDef[] = [
     ].join(' '),
     inputSchema: { type: 'object', additionalProperties: false, properties: { handle: handleProp } },
     annotations: { readOnlyHint: true },
-    _meta: { ui: { resourceUri: WORKSPACE_URI } },
+    _meta: { ui: { resourceUri: ROOM_URI } },
     async handler(args, ctx) {
       if (!ctx.social || !ctx.publicProfiles) return toolError(HOSTED_ONLY);
       try {
@@ -144,7 +144,7 @@ export const SOCIAL_TOOLS: ToolDef[] = [
     description: 'Show one share in full (the note and the shared link or clip), as a card in the conversation. Ids come from the Following portal or list_shares.',
     inputSchema: { type: 'object', required: ['id'], additionalProperties: false, properties: { id: { type: 'string' } } },
     annotations: { readOnlyHint: true },
-    _meta: { ui: { resourceUri: WORKSPACE_URI } },
+    _meta: { ui: { resourceUri: ROOM_URI } },
     async handler(args, ctx) {
       if (!ctx.social) return toolError(HOSTED_ONLY);
       const share = await ctx.social.get(ctx.userId, String(args.id ?? ''));
@@ -200,7 +200,7 @@ export const SOCIAL_TOOLS: ToolDef[] = [
         switch (args.action) {
           case 'follow': {
             const target = await ctx.social.follow(ctx.userId, handle);
-            const { profile, added } = ensurePanel(await ctx.store.get(ctx.userId), 'following', 'Following');
+            const { profile, added } = ensurePortal(await ctx.store.get(ctx.userId), 'following', 'Following');
             if (added) await ctx.store.put(ctx.userId, profile);
             return ok(`Following @${target.handle}.${added ? ' Added a "Following" portal to the room.' : ''}`, { handle: target.handle, layoutChanged: added, profile });
           }

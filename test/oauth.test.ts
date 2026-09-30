@@ -124,7 +124,7 @@ test('full flow: register → consent → GitHub → code → token → per-user
     assert.equal(first.status, 200);
     // Save a custom layout for this user.
     const profile = JSON.parse(first.body).result.structuredContent.profile;
-    profile.name = 'lawrence-workspace';
+    profile.name = 'lawrence-room';
     await mcp(tokens.access_token, { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'update_profile', arguments: { profile } } });
 
     // A different GitHub user gets their own profile.
@@ -133,7 +133,7 @@ test('full flow: register → consent → GitHub → code → token → per-user
     const mallory = JSON.parse((await mcp(otherTokens.access_token, getProfile)).body);
     assert.equal(mallory.result.structuredContent.profile.name, 'morning');
     const mine = JSON.parse((await mcp(tokens.access_token, getProfile)).body);
-    assert.equal(mine.result.structuredContent.profile.name, 'lawrence-workspace');
+    assert.equal(mine.result.structuredContent.profile.name, 'lawrence-room');
 
     // Refresh rotates; the old refresh token dies.
     const refreshed = await raw(app.port, { method: 'POST', path: '/oauth/token', ...form({ grant_type: 'refresh_token', refresh_token: tokens.refresh_token, client_id: clientId }) });

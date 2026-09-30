@@ -1,5 +1,5 @@
 /**
- * Data portability (identity plan): your portal is yours to move.
+ * Data portability (identity plan): your room is yours to move.
  *
  *   mcportal   one versioned JSON file: layout and sources, saved items, pinned
  *              items, clips and the public profile. Import it into any MCPortal.
@@ -7,18 +7,18 @@
  *   clips      clips as Markdown files with front matter, images alongside, in a .tar.gz
  *   opml       sources as OPML (any feed reader)
  *
- * Imports only ever add: panels that aren't there yet, saved items by URL, clips
+ * Imports only ever add: portals that aren't there yet, saved items by URL, clips
  * that aren't already kept. Everything in an import is untrusted and re-validated.
  */
 import { gzipSync } from 'node:zlib';
 import { buildClip, ClipError, CLIP_KINDS, type Clip, type ClipStore } from './clips.ts';
 import { clipText } from './clip-tools.ts';
 import { buildOpml } from './opml.ts';
-import { LIMITS, normalizePinnedItems, normalizeSaved, ProfileError, validateProfile, type PanelSpec, type Profile } from './profile.ts';
+import { LIMITS, normalizePinnedItems, normalizeSaved, ProfileError, validateProfile, type PortalSpec, type Profile } from './profile.ts';
 import type { PublicProfile } from './public-profiles.ts';
 import type { SharedItem, Social } from './social.ts';
 import type { ProfileStore } from './store.ts';
-import { addPanelTo } from './tools.ts';
+import { addPortalTo } from './tools.ts';
 import type { ArticleBlock } from './types.ts';
 
 export const EXPORT_FORMATS = ['mcportal', 'bookmarks', 'clips', 'opml'] as const;
@@ -87,12 +87,12 @@ export async function buildExport(format: ExportFormat, userId: string, from: Ex
     data.shares = (await from.social.sharesOf(userId, userId, { limit: 100_000 })).map(({ author: _a, mine: _m, ...s }) => s);
     data.following = (await from.social.connections(userId)).following;
   }
-  const panels = profile.columns.reduce((n, c) => n + c.panels.length, 0);
+  const portals = profile.columns.reduce((n, c) => n + c.panels.length, 0);
   return {
     filename: `mcportal-export-${stamp(now)}.json`,
     contentType: 'application/json; charset=utf-8',
     body: Buffer.from(`${JSON.stringify(data, null, 2)}\n`),
-    summary: `${panels} portal(s), ${profile.saved.length} saved item(s) and ${clips.length} clip(s)`,
+    summary: `${portals} portal(s), ${profile.saved.length} saved item(s) and ${clips.length} clip(s)`,
   };
 }
 
@@ -198,8 +198,8 @@ export function clipsArchive(clips: Clip[], now = new Date()): Buffer {
 // ---- import -------------------------------------------------------------------
 
 export interface ImportResult {
-  panelsAdded: number;
-  panelsSkipped: string[];
+  portalsAdded: number;
+  portalsSkipped: string[];
   layoutAdopted: boolean;
   savedAdded: number;
   clipsAdded: number;
@@ -235,7 +235,7 @@ function clipInput(raw: Record<string, unknown>): Record<string, unknown> {
   }
 }
 
-const panelKey = (p: PanelSpec) => `${p.source}:${JSON.stringify({ ...p.config, limit: undefined })}`;
+const portalKey = (p: PortalSpec) => `${p.source}:${JSON.stringify({ ...p.config, limit: undefined })}`;
 
 /** Parse and check an export file's envelope. Throws with a readable message. */
 export function parseExport(text: string): PortalExport {
@@ -250,38 +250,38 @@ export function parseExport(text: string): PortalExport {
   return data as unknown as PortalExport;
 }
 
-/** Add an export to a portal. Never removes or rearranges anything. */
+/** Add an export to a room. Never removes or rearranges anything. */
 export async function importExport(data: PortalExport, userId: string, to: { store: ProfileStore; clips?: ClipStore }): Promise<ImportResult> {
-  const result: ImportResult = { panelsAdded: 0, panelsSkipped: [], layoutAdopted: false, savedAdded: 0, clipsAdded: 0, clipsSkipped: 0, clipErrors: [] };
+  const result: ImportResult = { portalsAdded: 0, portalsSkipped: [], layoutAdopted: false, savedAdded: 0, clipsAdded: 0, clipsSkipped: 0, clipErrors: [] };
   const before = await to.store.get(userId);
   let incoming: Profile | undefined;
   try {
     incoming = isRecord(data.profile) ? validateProfile(data.profile) : undefined;
   } catch (error) {
     if (!(error instanceof ProfileError)) throw error;
-    result.panelsSkipped.push(`the layout (${error.message})`);
+    result.portalsSkipped.push(`the layout (${error.message})`);
   }
   let profile = before;
   if (incoming && !before.onboarded) {
-    // A brand-new portal takes the exported layout as it is.
+    // A brand-new room takes the exported layout as it is.
     profile = { ...incoming, saved: before.saved, onboarded: true };
     result.layoutAdopted = true;
-    result.panelsAdded = incoming.columns.reduce((n, c) => n + c.panels.length, 0);
+    result.portalsAdded = incoming.columns.reduce((n, c) => n + c.panels.length, 0);
   } else if (incoming) {
-    const have = new Set(before.columns.flatMap((c) => c.panels).map(panelKey));
+    const have = new Set(before.columns.flatMap((c) => c.panels).map(portalKey));
     for (const spec of incoming.columns.flatMap((c) => c.panels)) {
-      if (have.has(panelKey(spec))) continue;
-      const added = addPanelTo(profile, { ...spec, id: spec.id });
+      if (have.has(portalKey(spec))) continue;
+      const added = addPortalTo(profile, { ...spec, id: spec.id });
       if ('error' in added) {
-        result.panelsSkipped.push(`${spec.title ?? spec.id} (${added.error})`);
+        result.portalsSkipped.push(`${spec.title ?? spec.id} (${added.error})`);
         continue;
       }
       profile = added.profile;
       if (spec.source === 'pinned' && incoming.pins[spec.id]) {
-        profile = { ...profile, pins: { ...profile.pins, [added.panelId]: { items: normalizePinnedItems(incoming.pins[spec.id]!.items), pinnedAt: incoming.pins[spec.id]!.pinnedAt } } };
+        profile = { ...profile, pins: { ...profile.pins, [added.portalId]: { items: normalizePinnedItems(incoming.pins[spec.id]!.items), pinnedAt: incoming.pins[spec.id]!.pinnedAt } } };
       }
-      have.add(panelKey(spec));
-      result.panelsAdded++;
+      have.add(portalKey(spec));
+      result.portalsAdded++;
     }
   }
   if (incoming) {
@@ -320,11 +320,11 @@ export async function importExport(data: PortalExport, userId: string, to: { sto
 
 export function describeImport(r: ImportResult): string {
   const parts = [
-    r.layoutAdopted ? `took the exported layout (${r.panelsAdded} portals)` : `${r.panelsAdded} portal(s) added`,
+    r.layoutAdopted ? `took the exported layout (${r.portalsAdded} portals)` : `${r.portalsAdded} portal(s) added`,
     `${r.savedAdded} saved item(s) added`,
     `${r.clipsAdded} clip(s) added${r.clipsSkipped ? ` (${r.clipsSkipped} already here)` : ''}`,
   ];
-  const problems = [...r.panelsSkipped.map((p) => `portal skipped: ${p}`), ...r.clipErrors.slice(0, 5).map((c) => `clip skipped: ${c}`)];
+  const problems = [...r.portalsSkipped.map((p) => `portal skipped: ${p}`), ...r.clipErrors.slice(0, 5).map((c) => `clip skipped: ${c}`)];
   return `Imported: ${parts.join(', ')}.${problems.length ? `\n${problems.join('\n')}` : ''}`;
 }
 

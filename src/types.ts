@@ -12,7 +12,7 @@ export type ClipKind = (typeof CLIP_KINDS)[number];
 /** Largest picture get_thumbnails will fetch. Feed adapters use it to skip renditions they know are bigger. */
 export const MAX_THUMB_BYTES = 350_000;
 
-/** One row in a panel. Everything here is untrusted data from a source. */
+/** One row in a portal. Everything here is untrusted data from a source. */
 export interface Item {
   id: string;
   title: string;
@@ -26,9 +26,9 @@ export interface Item {
   image?: { url: string; kind: 'thumb' | 'avatar' };
   /** The link is a video (YouTube). */
   video?: boolean;
-  /** Items of a clips panel: open with get_clip. */
+  /** Items of a clips portal: open with get_clip. */
   clip?: { id: string; kind: ClipKind };
-  /** Items of a following panel: open with get_share. */
+  /** Items of a following portal: open with get_share. */
   share?: { id: string; kind: 'link' | 'clip' };
 }
 
@@ -41,14 +41,14 @@ export interface Provenance {
   ttlSeconds: number;
 }
 
-export interface PanelResult {
-  panelId: string;
+export interface PortalResult {
+  portalId: string;
   source: SourceKind;
   title: string;
   items: Item[];
   provenance: Provenance;
   error?: string;
-  /** Pinned panels: where the items came from and how the agent fetches them again. */
+  /** Pinned portals: where the items came from and how the agent fetches them again. */
   pin?: { from: string; recipe: string };
 }
 
