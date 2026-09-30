@@ -176,3 +176,29 @@ test('blocksToText: what the agent reads keeps the structure', () => {
   ]);
   assert.equal(text, '### Setup\n\n  1. Step\n\n```bash terminal\nnpm i\n```\n\n> **Careful:** One\n> Two\n\n| a | b |\n| 1 | 2 |');
 });
+
+test('markdown: reference links, underscore emphasis at word edges, mdBook code flags', () => {
+  const blocks = parseMarkdown([
+    'See [the guide][guide], [Rust][] and [missing][nope]. Open _src/main.rs_ but keep my_var_name.',
+    '',
+    '```rust,ignore,does_not_compile',
+    'fn main() {}',
+    '```',
+    '',
+    '[guide]: ch02-00.html#start "Guide"',
+    '[Rust]: <https://www.rust-lang.org>',
+  ].join('\n'), { base: 'https://raw.githubusercontent.com/rust-lang/book/HEAD/src/ch01.md' });
+  assert.equal(blocks.length, 2, 'definitions are not text');
+  assert.equal(blocks[0]!.text, 'See the guide, Rust and [missing][nope]. Open src/main.rs but keep my_var_name.');
+  assert.deepEqual(blocks[0]!.spans!.filter((s) => s.href).map((s) => [s.text, s.href]), [
+    ['the guide', 'https://raw.githubusercontent.com/rust-lang/book/HEAD/src/ch02-00.html#start'],
+    ['Rust', 'https://www.rust-lang.org/'],
+  ]);
+  assert.deepEqual([blocks[1]!.lang, blocks[1]!.label], ['rust', undefined]);
+});
+
+test('docs page on GitHub: book links to built .html pages point at the .md sources', () => {
+  const page = markdownPage('## Chapter\n\nSee [next](ch02.html#top) and [site](https://example.com/a.html).', 'Chapter', 'https://raw.githubusercontent.com/o/r/HEAD/src/ch01.md');
+  assert.deepEqual(page.blocks[0]!.spans!.filter((s) => s.href).map((s) => s.href), ['https://raw.githubusercontent.com/o/r/HEAD/src/ch02.md#top', 'https://example.com/a.html']);
+  assert.equal(page.blocks.length, 1, 'the ## Chapter heading repeating the title is dropped');
+});

@@ -90,7 +90,7 @@ function closing(text: string, open: number, openCh: string, closeCh: string): n
 const same = (a: Span, b: Span) => a.href === b.href && a.code === b.code && a.strong === b.strong;
 
 /** Inline markdown as spans: links, code, strong; single-* emphasis markers dropped; images dropped. */
-export function parseInline(text: string, base?: string, depth = 0): Span[] {
+export function parseInline(text: string, base?: string, depth = 0, refs?: Map<string, string>): Span[] {
   const spans: Span[] = [];
   let plain = '';
   const flushPlain = () => {
@@ -101,7 +101,7 @@ export function parseInline(text: string, base?: string, depth = 0): Span[] {
     flushPlain();
     if (span.text) spans.push(span);
   };
-  const nested = (inner: string) => (depth < 4 ? parseInline(inner, base, depth + 1) : [{ text: inner }]);
+  const nested = (inner: string) => (depth < 4 ? parseInline(inner, base, depth + 1, refs) : [{ text: inner }]);
 
   for (let i = 0; i < text.length;) {
     const c = text[i]!;
@@ -123,6 +123,18 @@ export function parseInline(text: string, base?: string, depth = 0): Span[] {
     if ((c === '!' && next === '[') || c === '[') {
       const start = c === '!' ? i + 1 : i;
       const close = closing(text, start, '[', ']');
+      // Reference links: [text][label], [label][] and a bare [label], when the label is defined.
+      if (close !== -1 && refs?.size && text[close + 1] !== '(') {
+        const labelled = text[close + 1] === '[' ? closing(text, close + 1, '[', ']') : -1;
+        const label = (labelled > close + 2 ? text.slice(close + 2, labelled) : text.slice(start + 1, close)).trim().toLowerCase().replace(/\s+/g, ' ');
+        const target = refs.get(label);
+        if (target) {
+          const href = linkTarget(target, base);
+          if (c === '[') for (const s of nested(text.slice(start + 1, close))) push(href ? { ...s, href } : s);
+          i = (labelled !== -1 ? labelled : close) + 1;
+          continue;
+        }
+      }
       const end = close !== -1 && text[close + 1] === '(' ? closing(text, close + 1, '(', ')') : -1;
       if (end !== -1) {
         if (c === '[') {
@@ -143,6 +155,16 @@ export function parseInline(text: string, base?: string, depth = 0): Span[] {
       if (end !== -1 && !/\s/.test(text[end - 1]!)) {
         for (const s of nested(text.slice(i + 2, end))) push({ ...s, strong: true });
         i = end + 2;
+        continue;
+      }
+    }
+    // _emphasis_: markers dropped, but only at word edges (snake_case stays as it is).
+    if (c === '_' && next && next !== '_' && !/\s/.test(next) && !/[\p{L}\p{N}]/u.test(text[i - 1] ?? '')) {
+      let end = text.indexOf('_', i + 1);
+      while (end !== -1 && /[\p{L}\p{N}]/u.test(text[end + 1] ?? '')) end = text.indexOf('_', end + 1);
+      if (end > i + 1 && !/\s/.test(text[end - 1]!)) {
+        for (const s of nested(text.slice(i + 1, end))) push(s);
+        i = end + 1;
         continue;
       }
     }
@@ -168,8 +190,8 @@ export function parseInline(text: string, base?: string, depth = 0): Span[] {
 }
 
 /** A block's text and, when there's any markup, its spans. */
-function inlineBlock(markdown: string, base?: string): { text: string; spans?: Span[] } {
-  const spans = parseInline(markdown.replace(/\s+/g, ' ').trim(), base);
+function inlineBlock(markdown: string, base?: string, refs?: Map<string, string>): { text: string; spans?: Span[] } {
+  const spans = parseInline(markdown.replace(/\s+/g, ' ').trim(), base, 0, refs);
   const text = clean(spans.map((s) => s.text).join(''), MARKDOWN_LIMITS.blockChars);
   if (!spans.some((s) => s.href || s.code || s.strong) || text.length !== spans.reduce((n, s) => n + s.text.length, 0)) return { text };
   return { text, spans };
@@ -211,8 +233,9 @@ const unquote = (s: string) => clean(s.replace(/^["'{]+|["'}]+$/g, ''), 120);
 
 /** Code fence info: "bash", "bash terminal icon=…", "ts title=\"app.ts\"", "{.python}". */
 function fenceInfo(info: string): { lang?: string; label?: string } {
-  const lang = info.match(/^\{?\.?([\w+#.-]+)/)?.[1]?.toLowerCase();
-  const rest = lang ? info.slice(info.indexOf(lang) + lang.length) : info;
+  const lang = info.match(/^\{?\.?([\w+#-]+(?:\.[\w+#-]+)*)/)?.[1]?.toLowerCase();
+  // mdBook and rustdoc add build flags after a comma ("rust,ignore,does_not_compile"): not a label.
+  const rest = (lang ? info.slice(info.toLowerCase().indexOf(lang) + lang.length) : info).replace(/^,[\w,-]*/, '');
   const titled = rest.match(/\b(?:title|filename|file)\s*=\s*("[^"]*"|'[^']*'|\S+)/i)?.[1];
   const bare = rest.trim().match(/^([^\s={}"']+)(?=\s|$)/)?.[1];
   const label = unquote(titled ?? bare ?? '');
@@ -222,7 +245,16 @@ function fenceInfo(info: string): { lang?: string; label?: string } {
 /** Docs markdown (already through cleanDocsMarkdown) into structured blocks. `base` resolves relative links. */
 export function parseMarkdown(markdown: string, options: { base?: string } = {}): ArticleBlock[] {
   const { base } = options;
-  const lines = markdown.replace(/\r\n?/g, '\n').replace(/\t/g, '    ').split('\n');
+  const refs = new Map<string, string>();
+  let inFence = false;
+  const lines = markdown.replace(/\r\n?/g, '\n').replace(/\t/g, '    ').split('\n').filter((line) => {
+    if (/^\s*(?:```|~~~)/.test(line)) inFence = !inFence;
+    const def = !inFence && line.match(/^\s{0,3}\[([^\]]{1,200})\]:\s*<?(\S+?)>?(?:\s+["'(].*["')])?\s*$/);
+    if (!def) return true;
+    const label = def[1]!.trim().toLowerCase().replace(/\s+/g, ' ');
+    if (!refs.has(label)) refs.set(label, def[2]!);
+    return false;
+  });
   const blocks: ArticleBlock[] = [];
   const ids = new Set<string>();
   let chars = 0;
@@ -238,11 +270,11 @@ export function parseMarkdown(markdown: string, options: { base?: string } = {})
     blocks.push(block);
   };
   const flushPara = () => {
-    if (para.length) add({ type: 'p', ...inlineBlock(para.join(' '), base) });
+    if (para.length) add({ type: 'p', ...inlineBlock(para.join(' '), base, refs) });
     para = [];
   };
   const flushLi = () => {
-    if (li) add({ ...li.block, ...inlineBlock(li.lines.join(' '), base) });
+    if (li) add({ ...li.block, ...inlineBlock(li.lines.join(' '), base, refs) });
     li = undefined;
   };
   const flush = () => { flushPara(); flushLi(); };
@@ -261,7 +293,7 @@ export function parseMarkdown(markdown: string, options: { base?: string } = {})
       const parts = p.join(' ').split('\n').map((part) => part.trim()).filter(Boolean);
       parts.forEach((part, i) => {
         if (i) spans.push({ text: '\n' });
-        spans.push(...parseInline(part.replace(/\s+/g, ' '), base));
+        spans.push(...parseInline(part.replace(/\s+/g, ' '), base, 0, refs));
       });
     }
     const text = spans.map((s) => s.text).join('').replace(/[^\S\n]+/g, ' ').trim().slice(0, MARKDOWN_LIMITS.blockChars);
@@ -273,7 +305,7 @@ export function parseMarkdown(markdown: string, options: { base?: string } = {})
   };
   const openCallout = () => [...containers].reverse().find((c) => c.lines);
   const heading = (level: number, raw: string, explicitId?: string) => {
-    const { text, spans } = inlineBlock(raw, base);
+    const { text, spans } = inlineBlock(raw, base, refs);
     const root = slug(explicitId ?? text);
     let id = root;
     for (let n = 2; ids.has(id); n++) id = `${root}-${n}`;
@@ -362,7 +394,7 @@ export function parseMarkdown(markdown: string, options: { base?: string } = {})
         calloutBlock(tone, label, quoted.slice(1));
       } else {
         const paragraphs = quoted.join('\n').split(/\n\s*\n/).map((p) => p.replace(/\s+/g, ' ').trim()).filter(Boolean);
-        const spans = paragraphs.flatMap((p, n) => [...(n ? [{ text: '\n' }] : []), ...parseInline(p, base)]);
+        const spans = paragraphs.flatMap((p, n) => [...(n ? [{ text: '\n' }] : []), ...parseInline(p, base, 0, refs)]);
         const text = clean(spans.map((s) => s.text).join('').replace(/[^\S\n]+/g, ' '), MARKDOWN_LIMITS.blockChars);
         add({ type: 'quote', text: paragraphs.length > 1 ? spans.map((s) => s.text).join('').slice(0, MARKDOWN_LIMITS.blockChars) : text, ...(spans.some((s) => s.href || s.code || s.strong) ? { spans } : {}) });
       }

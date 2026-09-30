@@ -51,7 +51,7 @@ export function githubEndpoint(config: GithubConfig): string {
   return `${GITHUB_API}/search/repositories?${params}`;
 }
 
-function headers(token = process.env.GITHUB_TOKEN): Record<string, string> {
+export function githubHeaders(token = process.env.GITHUB_TOKEN): Record<string, string> {
   const h: Record<string, string> = { accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28' };
   if (token) h.authorization = `Bearer ${token}`;
   return h;
@@ -73,7 +73,7 @@ function avatar(raw: unknown): Item['image'] {
 export async function fetchGithub(config: GithubConfig, fetcher: Fetcher): Promise<Item[]> {
   const url = githubEndpoint(config);
   if (config.mode === 'releases') {
-    const releases = await fetchJson<Release[]>(fetcher, url, { headers: headers() });
+    const releases = await fetchJson<Release[]>(fetcher, url, { headers: githubHeaders() });
     if (!Array.isArray(releases)) throw new Error('GitHub returned an unexpected response');
     return releases
       .filter((r) => r && !r.draft)
@@ -86,7 +86,7 @@ export async function fetchGithub(config: GithubConfig, fetcher: Fetcher): Promi
         image: avatar(r.author?.avatar_url),
       }));
   }
-  const data = await fetchJson<{ items: Repo[] }>(fetcher, url, { headers: headers() });
+  const data = await fetchJson<{ items: Repo[] }>(fetcher, url, { headers: githubHeaders() });
   if (!Array.isArray(data?.items)) throw new Error('GitHub returned an unexpected response');
   return data.items.map((r) => ({
     id: String(r.id),

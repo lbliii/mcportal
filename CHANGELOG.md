@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Docs
+- **Read any docs site in your portal:** ask for "docs.stripe.com", "nextjs.org/docs" or "react.dev docs" and `find_source` offers a docs panel that lists the site's sections. MCPortal reads the site's `llms.txt`, its Sphinx inventory (Python, Django, NumPy, Flask) or its sitemap, and pages as markdown where the site offers it, else through the reader.
+- **Docs on GitHub too:** "rust-lang/book" or "astral-sh/ruff" turns a repo's markdown docs folder into the same panel, ordered by its `SUMMARY.md` or `_sidebar.md` when it has one.
+- **Clean pages:** headings, code with its language and a Copy button, tables, notes and warnings as callouts, and links. Docs-site components (tabs, cards, steps, parameter lists) become plain text. Prev and next buttons move through the docs, and links to other pages of the same docs stay in the reader.
+- **For Claude:** `open_docs` shows a site's contents, `search_docs` finds pages and (on Sphinx sites) functions like `str.split`, and `read_doc_page` reads one page. Only pages of that site can be read, and docs text reaches Claude fenced as untrusted, including text addressed to AI agents.
+- **Better reader view everywhere:** articles keep their tables, code languages, callouts and links too.
+
 ### Clips
 - **Keep things from the conversation:** say “clip that” and Claude saves a quote, an exchange (verbatim), a note, a table, an image (an SVG, PNG, JPEG or WebP chart or diagram) or a link, with a title, note and tags (`clip`).
 - **Find them in later chats:** `search_clips` by words, kind or tag, and `get_clip` shows one as its own clip card. `update_clip` and `delete_clip` edit and remove them.

@@ -24,7 +24,7 @@ export function toolCost(name: string, args: Record<string, unknown>): number {
     case 'export_data': return 5;
     case 'find_source': return 5;
     case 'open_workspace': return 3;
-    case 'refresh_panel': case 'read_article': case 'read_source': case 'add_panel': return 2;
+    case 'refresh_panel': case 'read_article': case 'read_source': case 'add_panel': case 'open_docs': case 'read_doc_page': return 2;
     case 'get_thumbnails': return 1 + Math.ceil((Array.isArray(args.urls) ? Math.min(args.urls.length, 24) : 0) / 8);
     default: return 1;
   }

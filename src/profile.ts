@@ -4,7 +4,7 @@
  * user placed unless asked, so updates are validated whole-profile writes.
  */
 import { HN_FEEDS, type HnConfig } from './adapters/hn.ts';
-import { TOC_KINDS, type DocsConfig, type TocKind } from './adapters/docs.ts';
+import { docsInputUrl, TOC_KINDS, type DocsConfig, type TocKind } from './adapters/docs.ts';
 import { REPO_PATTERN, type GithubConfig } from './adapters/github.ts';
 import type { RssConfig } from './adapters/rss.ts';
 import { clean } from './lib/text.ts';
@@ -149,8 +149,9 @@ export function normalizeSourceConfig(source: SourceKind, raw: unknown, where: s
     return { from, recipe, limit: clampInt(config.limit, 1, LIMITS.items, LIMITS.items) };
   }
   if (source === 'docs') {
-    const url = httpUrl(config.url);
-    if (!url) throw new ProfileError(`${where}: docs needs a valid http(s) "url"`);
+    let url: string | null = null;
+    try { url = typeof config.url === 'string' ? httpUrl(docsInputUrl(config.url)) : null; } catch { /* not an address */ }
+    if (!url) throw new ProfileError(`${where}: docs needs a "url": a docs address or a GitHub owner/repo`);
     const docs: DocsConfig = { url, limit: clampInt(config.limit, 1, LIMITS.items, LIMITS.items) };
     if (config.toc !== undefined) {
       const toc = isRecord(config.toc) ? config.toc : {};

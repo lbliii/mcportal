@@ -8,7 +8,7 @@ import {
 import { discover } from './discover.ts';
 import { buildOpml, OPML_LIMITS, parseOpml } from './opml.ts';
 import { MAX_PACKS, packSummaries, STARTER_PACKS } from './packs.ts';
-import { clipsPanel, clipsQuery, followingPanel, loadArticle, loadPanel, pinnedPanel, savedPanel, SOURCE_DOCS, type SourceDeps } from './sources.ts';
+import { clipsPanel, clipsQuery, followingPanel, loadArticle, loadPanel, pinnedPanel, savedPanel, SOURCE_DOCS, type SourceDeps, findDocs } from './sources.ts';
 import type { ClipStore } from './clips.ts';
 import type { ExportFormat } from './portability.ts';
 import type { PublicProfiles } from './public-profiles.ts';
@@ -103,8 +103,7 @@ async function panelFor(spec: PanelSpec, profile: Profile, ctx: ToolContext, for
 }
 
 /** Sources MCPortal fetches (or, for saved, reads) itself. Pinned panels only come from pin_panel. */
-// Docs panels become addable once find_source can resolve them (docs-portal plan, phase 3).
-const ADDABLE: SourceKind[] = SOURCES.filter((s) => s !== 'pinned' && s !== 'docs');
+const ADDABLE: SourceKind[] = SOURCES.filter((s) => s !== 'pinned');
 
 /**
  * Put a Saved (or Clips) panel in the layout the first time something is saved, so
@@ -592,7 +591,9 @@ export const TOOLS: ToolDef[] = [
       'Work out what MCPortal can show for something the user wants to follow, and preview it. Accepts a site address ("theverge.com"), a feed URL,',
       '"r/subreddit", "owner/repo", "hn", or a YouTube channel/playlist, Bluesky, Mastodon ("@name@server"), Medium, Substack, dev.to, PyPI, Lobsters,',
       'Stack Overflow tag or arXiv URL. For a name ("The Verge"), pass the site\'s domain. For a news topic, pass',
-      'https://news.google.com/rss/search?q=TOPIC. Returns working candidates (each already test-loaded) with a preview; add one with add_panel.',
+      'https://news.google.com/rss/search?q=TOPIC. For documentation, pass the docs address ("docs.stripe.com", "nextjs.org/docs"), a domain followed by "docs"',
+      '("react.dev docs"), or a GitHub "owner/repo" with markdown docs: you get a docs candidate that shows the site\'s sections.',
+      'Returns working candidates (each already test-loaded) with a preview; add one with add_panel.',
       'Doesn\'t change the portal.',
     ].join(' '),
     inputSchema: { type: 'object', required: ['query'], additionalProperties: false, properties: { query: { type: 'string' } } },
@@ -600,7 +601,9 @@ export const TOOLS: ToolDef[] = [
     async handler(args, ctx) {
       const query = clean(args.query, 500);
       if (!query) return toolError('find_source needs a "query"');
-      const found = await discover(query, ctx.fetcher);
+      const [found, docs] = await Promise.all([discover(query, ctx.fetcher), findDocs(query, ctx)]);
+      if (docs && 'config' in docs) found.candidates.unshift({ source: 'docs', config: docs.config as unknown as Record<string, unknown>, title: docs.title, via: 'docs' });
+      else if (docs && !found.candidates.length) found.hint ??= docs.error;
       const loaded = await Promise.all(found.candidates.slice(0, 5).map(async (c, i) => {
         try {
           const panel = await loadPanel({ id: `candidate-${i}`, source: c.source, title: c.source === 'rss' ? undefined : c.title, config: c.config }, ctx);

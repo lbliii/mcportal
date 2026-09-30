@@ -1,6 +1,6 @@
 # Plan: docs portal — read any docs site without its front end
 
-**Status:** phases 1–2 shipped (2026-09-30); phase 3 next. **Milestone:** first new portal type after columns and shelves; the developer hook for paid plans.
+**Status:** phases 1–3 shipped (2026-09-30); phase 4 (the docs viewer and the starter pack) next. **Milestone:** first new portal type after columns and shelves; the developer hook for paid plans.
 
 ## Goal
 
@@ -175,10 +175,19 @@ As with the other packs, every source must be checked **from the Railway server*
 |---|---|---|
 | 1 ✅ | `src/adapters/docs.ts`: `llms.txt` parser (with nesting), `objects.inv` parser, resolver ladder with body validation, page ladder with learned route; `docs` source kind and config normalisation; `scripts/docs-probe.ts` (the probe as a script, run locally or on the server) | Unit tests against fixtures from Stripe, Railway, Cloudflare (nested), Python (Sphinx), Cursor (fake 200), Docker (empty links); probe output checked in as a report |
 | 2 ✅ | `src/lib/markdown.ts` with the richer blocks, MDX and directive cleanup; clips moved onto it; HTML reader gains `role=main`, tables and heading levels | Tests: every MDX component case, tables, callouts, spans reject `javascript:` links; clips tests still pass unchanged |
-| 3 | Tools: `find_source` learns docs, `open_docs`, `read_doc_page`, `search_docs`, `read_source` for docs; server instructions; budget costs | Tool tests: fenced output, fetch scope refuses off-site URLs, section filter, search ranking |
+| 3 ✅ | GitHub docs folders; tools: `find_source` learns docs, `open_docs`, `read_doc_page`, `search_docs`, `read_source` for docs; server instructions; budget costs | Tool tests: fenced output, fetch scope refuses off-site URLs, section filter, search ranking |
 | 4 | UI: Docs panel in columns and shelves, docs viewer (TOC, search, on-this-page, prev/next, in-docs links), docs card in chat, narrow-screen drawer; the **Developer docs** starter pack | Preview: Stripe, Railway, Python and Next.js end to end; a page with `<Tabs>` and `<Info>`; mobile width; pack checked from the Railway server |
 | 5 | Search inside pages: build an index from `llms-full.txt` when it splits cleanly (the two easy conventions first), else from pages as they're read; Sphinx symbol jump ("`str.split`") | Search quality on Stripe and Python; memory stays inside the cache budget |
 | 6 (later) | Docs sites' own MCP servers (Mintlify, GitBook) as a source; "what changed since you last read it" (the Watch portal idea); docs in Spaces | Separate plan |
+
+## Phase 3 notes
+
+- **Tools shipped:** `open_docs` (the outline, for the model; its own card comes with the viewer in phase 4), `read_doc_page` (one page, fenced, with section and prev/next; only pages of that site), `search_docs` (titles, descriptions, sections, Sphinx symbols), and `find_source` offering a docs candidate first when the query is a docs address, "<domain> docs", or a GitHub `owner/repo` (the repo's releases stay as the second candidate). Docs panels are addable, and a panel config accepts `owner/repo`.
+- **GitHub docs folders** work as planned, with one addition: a shallow folder holding an outline file wins over the usual names, which finds the Rust book at `src/`. Agent and upkeep files (`AGENTS.md`, `CLAUDE.md`, `SECURITY.md`…) and `_partials` aren't pages. `github.com/features/…` and GitHub's other own pages aren't taken for `owner/repo`, and `r/…` stays a subreddit.
+- **Markdown gained** reference links (`[text][label]` with `[label]: url` definitions), `_emphasis_` at word edges (`snake_case` untouched), mdBook's `rust,ignore` fence flags, and a title heading at H2 (books) is dropped like an H1. In a GitHub folder, links to built `.html` pages point at the `.md` sources.
+- **Docs panels are readable now,** ahead of the viewer: an item opens its page through `read_doc_page` in the reader, with the site and section as the byline, prev/next buttons, and links to other pages of the same docs opening in the reader. The model is told which page is open.
+- **Live:** Stripe, Railway, Python, Next.js, the Rust book, ruff, Astro (via `withastro/docs`, which its website couldn't give us) and docsify all resolve and read.
+- **Follow-ups:** mdBook `{{#include}}` / `{{#rustdoc_include}}` placeholders show as written (resolving them means fetching the listing files); `mkdocs.yml` `nav` isn't read yet (folders are used instead); a GitHub page's title comes from its file name until opened; jumping to an `#anchor` after opening a page is phase 4.
 
 ## Phase 2 notes
 

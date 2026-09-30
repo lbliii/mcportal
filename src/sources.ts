@@ -1,4 +1,4 @@
-import { loadDocs, resolveDocs, type DocsConfig, type DocSite } from './adapters/docs.ts';
+import { docsInputUrl, docsUrl, loadDocs, parseGithubDocs, resolveDocs, type DocsConfig, type DocSite } from './adapters/docs.ts';
 import { fetchGithub, githubEndpoint, type GithubConfig } from './adapters/github.ts';
 import { fetchHn, hnEndpoint, type HnConfig } from './adapters/hn.ts';
 import { fetchArticle } from './adapters/reader.ts';
@@ -114,6 +114,36 @@ export async function loadDocSite(config: DocsConfig, deps: SourceDeps, force = 
   return deps.cache.get(key, FRESHNESS.docs, () => (config.toc ? loadDocs(config.toc, deps.fetcher) : resolveDocs(config.url, deps.fetcher)), force);
 }
 
+/**
+ * Whether a find_source query asks for docs, and what to resolve: a GitHub repo or folder, a
+ * docs-looking address (docs.x, developer.x, x/docs, …), or any address followed by "docs".
+ */
+export function docsQuery(query: string): string | null {
+  const q = query.trim();
+  const stripped = q.replace(/\s+(?:docs?|documentation|reference|manual)$/i, '').trim();
+  if (/^\/?[ru]\//i.test(stripped)) return null; // r/subreddit, u/user
+  if (parseGithubDocs(stripped)) return stripped;
+  let url: URL;
+  try { url = docsUrl(stripped); } catch { return null; }
+  if (!url.hostname.includes('.')) return null;
+  const docsy = /^(?:docs?|developers?|dev|learn|guides?|reference|api|manual|book|wiki)\./i.test(url.hostname)
+    || /\/(?:docs?|documentation|reference|guides?|manual|api|book|learn)(?:\/|$)/i.test(url.pathname);
+  return stripped !== q || docsy ? stripped : null;
+}
+
+/** A docs panel candidate for find_source, already loaded (and cached for the test-load that follows). */
+export async function findDocs(query: string, deps: SourceDeps): Promise<{ config: DocsConfig; title: string } | { error: string } | null> {
+  const input = docsQuery(query);
+  if (!input) return null;
+  try {
+    const site = await resolveDocs(input, deps.fetcher);
+    await deps.cache.get(`docs:${site.toc.url}`, FRESHNESS.docs, async () => site);
+    return { config: { url: docsInputUrl(input), toc: site.toc, limit: 30 }, title: site.title };
+  } catch (error) {
+    return { error: clean((error as Error).message, 200) };
+  }
+}
+
 /** A docs panel lists the site's sections, or one section's pages. */
 export function docsItems(site: DocSite, config: DocsConfig): Item[] {
   if (config.section) {
@@ -218,6 +248,15 @@ export const SOURCE_DOCS = {
     },
   },
   rss: { description: 'Any RSS or Atom feed: blogs, release feeds, podcasts, YouTube channels.', config: { url: 'feed URL (http/https)', limit: '1-30' } },
+  docs: {
+    description: 'A documentation site: its sections, or one section\'s pages. Found with find_source ("docs.stripe.com", "nextjs.org/docs", "python.org docs", or a GitHub "owner/repo" with markdown docs). Pages are read with read_doc_page.',
+    config: {
+      url: 'the docs address, or a GitHub owner/repo or folder link',
+      toc: 'from find_source: { kind: llms | sphinx | sitemap | github, url } (optional; resolved on first load if missing)',
+      section: 'show only this section\'s pages (optional)',
+      limit: '1-30 (default 30)',
+    },
+  },
   saved: { description: "The user's saved items (bookmarks), newest first. Items are added with save_item and removed with remove_saved.", config: { limit: '1-30 (default 30)' } },
   clips: {
     description: "The user's clips: quotes, exchanges, notes, tables, images and links they asked to keep, newest first. Added with clip; found with search_clips.",
