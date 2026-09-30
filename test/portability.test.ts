@@ -161,3 +161,36 @@ test('export_data writes a file locally; import_portal works through the tool', 
   assert.ok((await call(other, 'import_portal', { data: 'not json' })).isError);
   assert.match((await call(portal(), 'account_settings')).content[0]!.text, /runs on your machine/);
 });
+
+test('multipart: fields and a file, binary-safe; malformed bodies throw', async () => {
+  const { boundaryOf, parseMultipart } = await import('../src/lib/multipart.ts');
+  const b = '----x7';
+  const bin = Buffer.from([0, 13, 10, 45, 45, 255]);
+  const body = Buffer.concat([
+    Buffer.from(`--${b}\r\nContent-Disposition: form-data; name="csrf"\r\n\r\ntok\r\n--${b}\r\nContent-Disposition: form-data; name="file"; filename="e.json"\r\nContent-Type: application/json\r\n\r\n`),
+    bin,
+    Buffer.from(`\r\n--${b}--\r\n`),
+  ]);
+  assert.equal(boundaryOf(`multipart/form-data; boundary=${b}`), b);
+  assert.equal(boundaryOf('application/json'), undefined);
+  const parts = parseMultipart(body, b);
+  assert.equal(parts.get('csrf')!.data.toString(), 'tok');
+  assert.equal(parts.get('file')!.filename, 'e.json');
+  assert.deepEqual([...parts.get('file')!.data], [...bin]);
+  assert.throws(() => parseMultipart(Buffer.from('nothing here'), b));
+  assert.throws(() => parseMultipart(Buffer.from(`--${b}\r\nContent-Disposition: form-data; name="a"\r\n\r\nno end`), b));
+});
+
+test('import_portal: a local path, and an upload link when hosted', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'mcportal-import-'));
+  const src = portal();
+  await src.clips.add('u1', buildClip({ kind: 'quote', text: 'from disk' }));
+  const file = path.join(dir, 'export.json');
+  await writeFile(file, (await buildExport('mcportal', 'u1', src)).body);
+  const local = { ...portal('u5'), localFiles: true };
+  assert.match((await call(local, 'import_portal', { path: file })).content[0]!.text, /1 clip\(s\) added/);
+  assert.match((await call(local, 'import_portal', { path: path.join(dir, 'nope.txt') })).content[0]!.text, /\.json/);
+  assert.match((await call(portal(), 'import_portal', { path: file })).content[0]!.text, /only works with a local MCPortal/, 'a hosted server never reads its own disk');
+  const hosted = { ...portal('u6'), uploadLink: () => 'http://localhost/upload/abc' };
+  assert.equal((await call(hosted, 'import_portal')).structuredContent.uploadUrl, 'http://localhost/upload/abc');
+});

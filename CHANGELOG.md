@@ -11,8 +11,8 @@
 
 ### Your data and identity
 - **Export everything:** `export_data` gives a one-time download link (hosted) or a file (local). You get one versioned MCPortal export (layout, sources, saved items, clips, public profile), saved items as a bookmarks file, clips as Markdown with front matter and images (`.tar.gz`), or sources as OPML.
-- **Import:** `import_portal` adds an MCPortal export to any portal. It only adds, running twice changes nothing, and every clip is re-validated.
-- **Account page** at `/account`: sign in with GitHub to download everything or delete your account. Deletion needs the typed confirmation, and it removes the portal, clips and public profile, revokes every sign-in token and removes the account. It is never an MCP tool.
+- **Import:** `import_portal` adds an MCPortal export to any portal. It only adds, running twice changes nothing, and every clip is re-validated. On the hosted server, the tool returns a one-time upload link (or you can use the account page), so exports up to 60 MB go straight from the browser to the server instead of through the model. Local MCPortal reads a file path.
+- **Account page** at `/account`: sign in with GitHub to download everything, import an export, or delete your account. Deletion needs the typed confirmation, and it removes the portal, clips and public profile, revokes every sign-in token and removes the account. It is never an MCP tool.
 - **Public profiles (opt-in):** claim a handle (suggested from your GitHub login) with a display name and bio. Other signed-in users can look you up. A handle you give up is held for you for 30 days.
 
 ### Hosted service

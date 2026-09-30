@@ -5,6 +5,8 @@
  * Deleting the account is deliberately not a tool: it happens on the account page
  * after a fresh GitHub sign-in, so no text a model reads can trigger it.
  */
+import { readFile, stat } from 'node:fs/promises';
+import { homedir } from 'node:os';
 import { clean } from './lib/text.ts';
 import { describeImport, EXPORT_FORMATS, importExport, parseExport, type ExportFormat } from './portability.ts';
 import { HandleError, suggestHandle, type PublicProfile } from './public-profiles.ts';
@@ -124,14 +126,37 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
     name: 'import_portal',
     title: 'Import an MCPortal export',
     description: [
-      'Add the contents of an MCPortal export file (format "mcportal-export") to the user\'s portal: panels they don\'t have, saved items and clips. Only adds; nothing is removed or moved. A brand-new portal takes the exported layout as is.',
-      'Pass the file\'s text as data. For subscriptions from another feed reader, use import_opml instead.',
+      'Add an MCPortal export file (format "mcportal-export") to the user\'s portal: panels they don\'t have, saved items and clips. Only adds; nothing is removed or moved. A brand-new portal takes the exported layout as is.',
+      'Usually call it with no arguments: on the hosted MCPortal that returns a one-time upload link for the user to pick the file, so it never has to pass through the conversation. Show them the link as is.',
+      'On a local MCPortal, pass path (a .json file on this machine). Pass data (the file\'s text) only for a small export that is already in the conversation.',
+      'For subscriptions from another feed reader, use import_opml instead.',
     ].join(' '),
-    inputSchema: { type: 'object', required: ['data'], additionalProperties: false, properties: { data: { type: 'string', description: 'The export file\'s JSON text' } } },
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        data: { type: 'string', description: 'The export file\'s JSON text (small exports only)' },
+        path: { type: 'string', description: 'Local MCPortal only: path to the .json export file' },
+      },
+    },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
     async handler(args, ctx) {
+      let text: string;
+      if (typeof args.data === 'string' && args.data.trim()) text = args.data;
+      else if (typeof args.path === 'string' && args.path.trim()) {
+        if (!ctx.localFiles) return toolError('path only works with a local MCPortal. Call import_portal with no arguments for an upload link.');
+        const file = args.path.trim().replace(/^~(?=\/|$)/, homedir());
+        if (!/\.json$/i.test(file)) return toolError('path must be a .json MCPortal export file.');
+        const info = await stat(file).catch(() => undefined);
+        if (!info?.isFile()) return toolError(`No file at ${clean(file, 200)}.`);
+        if (info.size > 60 * 1024 * 1024) return toolError('That file is over 60 MB; it isn\'t an MCPortal export.');
+        text = await readFile(file, 'utf8');
+      } else if (ctx.uploadLink) {
+        const link = ctx.uploadLink();
+        return ok(`Upload link (works once, for 15 minutes): ${link}\nThe user picks their MCPortal export file there; the page says what was imported. Then call open_workspace to show it.`, { uploadUrl: link });
+      } else return toolError('Pass path (the export file on this machine) or data (its text).');
       try {
-        const result = await importExport(parseExport(String(args.data ?? '')), ctx.userId, ctx);
+        const result = await importExport(parseExport(text), ctx.userId, ctx);
         return ok(`${describeImport(result)}\nCall open_workspace to show it.`, { result, profile: await ctx.store.get(ctx.userId) });
       } catch (error) {
         if (error instanceof ProfileError) return toolError(`Not imported: ${error.message}`);

@@ -164,6 +164,8 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
   const context = (userId: string): ToolContext => ({
     store: deps.store, clips, publicProfiles, fetcher: deps.fetcher, cache: deps.cache, userId, budget, actor: accounts.actor(userId),
     accountUrl: account?.url,
+    uploadLink: account ? () => account.uploadLink(userId) : undefined,
+    localFiles: !account && config.allowUnauthenticated && isLoopbackHost(config.host),
     deliver: async (format) => {
       if (!account) return deliverToFile(format, userId, { store: deps.store, clips }, config.dataDir);
       // Built when the link is opened, so it's current and the big ones aren't built twice.
@@ -270,7 +272,7 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
   server.on('clientError', (_error, socket) => {
     if (socket.writable) socket.end('HTTP/1.1 400 Bad Request\r\n\r\n');
   });
-  server.requestTimeout = 60_000;
+  server.requestTimeout = 300_000;   // room for an export upload on a slow connection; headersTimeout still guards slow-drip requests
   server.headersTimeout = 20_000;
   return server;
 }

@@ -495,3 +495,73 @@ test('account page: download everything, one-time links, and delete the account 
     await app.close();
   }
 });
+
+test('import uploads: one-time links from import_portal and the account page, CSRF, size cap', async () => {
+  const { Accounts, makeBootstrap, memoryPersistence } = await import('../src/accounts.ts');
+  const { MemoryClipStore, buildClip } = await import('../src/clips.ts');
+  const { buildExport } = await import('../src/portability.ts');
+  const { MemoryProfileStore } = await import('../src/store.ts');
+  const users = { 'gh-code-lawrence': { id: 42, login: 'Lawrence' } };
+  const accounts = new Accounts(memoryPersistence(), makeBootstrap([], ['lawrence']));
+  const clips = new MemoryClipStore();
+  const app = await startApp({ github: { clientId: 'gh-client', clientSecret: 'gh-secret' } }, fakeUpstreams(users).fetcher, { accounts, clips });
+  // An export from somewhere else, with a clip.
+  const elsewhere = { store: new MemoryProfileStore(), clips: new MemoryClipStore() };
+  await elsewhere.clips.add('x', buildClip({ kind: 'quote', text: 'brought along' }));
+  const exported = (await buildExport('mcportal', 'x', elsewhere)).body.toString();
+  const multipart = (fields: Record<string, string>) => {
+    const b = 'mcportal-test-boundary';
+    const body = Object.entries(fields).map(([k, v]) => `--${b}\r\nContent-Disposition: form-data; name="${k}"${k === 'file' ? '; filename="export.json"' : ''}\r\n\r\n${v}\r\n`).join('') + `--${b}--\r\n`;
+    return { headers: { 'content-type': `multipart/form-data; boundary=${b}` }, body };
+  };
+  const cookieOf = (res: { headers: Record<string, string | string[] | undefined> }, name: string) =>
+    ([] as string[]).concat(res.headers['set-cookie'] ?? []).map((c) => c.split(';')[0]!).find((c) => c.startsWith(`${name}=`) && c.length > name.length + 1);
+  try {
+    const clientId = await register(app);
+    const { verifier, challenge } = pkce();
+    const code = (await authorize(app, clientId, challenge, 'gh-code-lawrence')).searchParams.get('code')!;
+    const tokens = JSON.parse((await raw(app.port, { method: 'POST', path: '/oauth/token', ...form({ grant_type: 'authorization_code', code, client_id: clientId, redirect_uri: CLIENT_REDIRECT, code_verifier: verifier, resource: 'http://localhost/mcp' }) })).body);
+    const tool = async (name: string, args: Record<string, unknown> = {}) => JSON.parse((await raw(app.port, { method: 'POST', path: '/mcp', headers: { 'content-type': 'application/json', authorization: `Bearer ${tokens.access_token}` }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }) })).body).result;
+
+    // import_portal with no arguments: an upload link. The file never passes through the model.
+    const link = new URL((await tool('import_portal')).structuredContent.uploadUrl);
+    const pageRes = await raw(app.port, { path: link.pathname });
+    assert.equal(pageRes.status, 200);
+    assert.match(pageRes.body, /enctype="multipart\/form-data"/);
+    assert.doesNotMatch(String(pageRes.headers['content-security-policy']), /script-src/);
+    const upload = (path: string, fields: Record<string, string>, extra: Record<string, string> = sameOrigin(app.port)) => {
+      const m = multipart(fields);
+      return raw(app.port, { method: 'POST', path, headers: { ...m.headers, ...extra }, body: m.body });
+    };
+    assert.equal((await upload(link.pathname, { file: exported }, { origin: 'https://evil.example' })).status, 403, 'same origin');
+    const done = await upload(link.pathname, { file: exported });
+    assert.equal(done.status, 200, done.body);
+    assert.match(done.body, /1 clip\(s\) added/);
+    assert.equal((await tool('search_clips', { query: 'brought' })).structuredContent.clips.length, 1);
+    assert.equal((await upload(link.pathname, { file: exported })).status, 410, 'one use');
+
+    const bad = new URL((await tool('import_portal')).structuredContent.uploadUrl);
+    const refused = await upload(bad.pathname, { file: '{"format":"nope"}' });
+    assert.equal(refused.status, 400);
+    assert.match(refused.body, /not an MCPortal export/);
+
+    const big = new URL((await tool('import_portal')).structuredContent.uploadUrl);
+    const tooBig = await raw(app.port, { method: 'POST', path: big.pathname, headers: { ...sameOrigin(app.port), 'content-type': 'multipart/form-data; boundary=x', 'content-length': String(61 * 1024 * 1024) }, body: '' });
+    assert.equal(tooBig.status, 413);
+
+    // The account page's import needs the session's CSRF token.
+    const start = await raw(app.port, { path: '/account/login' });
+    const gh = new URL(String(start.headers.location));
+    const signedIn = await raw(app.port, { path: `/oauth/callback?code=gh-code-lawrence&state=${gh.searchParams.get('state')}`, headers: { cookie: cookieOf(start, 'mcportal_page')! } });
+    const session = cookieOf(signedIn, 'mcportal_account')!;
+    const home = await raw(app.port, { path: '/account', headers: { cookie: session } });
+    assert.match(home.body, /action="\/account\/import"/);
+    const csrf = home.body.match(/name="csrf" value="([^"]+)"/)![1]!;
+    assert.equal((await upload('/account/import', { csrf: 'wrong', file: exported }, { ...sameOrigin(app.port), cookie: session })).status, 403);
+    const again = await upload('/account/import', { csrf, file: exported }, { ...sameOrigin(app.port), cookie: session });
+    assert.equal(again.status, 200);
+    assert.match(again.body, /0 clip\(s\) added \(1 already here\)/, 'importing twice changes nothing');
+  } finally {
+    await app.close();
+  }
+});

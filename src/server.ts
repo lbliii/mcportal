@@ -87,7 +87,7 @@ async function start(argv: string[]): Promise<void> {
     const store = new FileProfileStore(dataDir);
     const clips = new FileClipStore(dataDir);
     const userId = process.env.MCPORTAL_USER || 'default';
-    runStdio({ store, clips, fetcher, cache, userId, deliver: (format) => deliverToFile(format, userId, { store, clips }, dataDir) });
+    runStdio({ store, clips, fetcher, cache, userId, localFiles: true, deliver: (format) => deliverToFile(format, userId, { store, clips }, dataDir) });
     return;
   }
 

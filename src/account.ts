@@ -5,9 +5,15 @@
  *   GET  /account                  sign in, or: your data, downloads, delete
  *   GET  /account/login            sign in with GitHub (browser-bound)
  *   GET  /account/export/<format>  download (signed in)
+ *   POST /account/import           upload an MCPortal export (signed in, same origin, CSRF)
  *   POST /account/delete           delete everything (signed in, same origin, CSRF, typed confirmation)
  *   POST /account/logout
  *   GET  /download/<token>         a one-time link from the export_data tool (15 minutes)
+ *   GET  /upload/<token>           a one-time link from import_portal: pick a file (15 minutes)
+ *   POST /upload/<token>
+ *
+ * Uploads go from the browser straight to the server, so an export of any size
+ * (up to the clip caps) never has to pass through the model.
  *
  * Plain server-rendered forms: no scripts. Sessions live in memory for an hour.
  */
@@ -16,7 +22,9 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Accounts } from './accounts.ts';
 import { cookies, escapeHtml, page, redirect, safeEqual, sendHtml, type OAuthServer } from './auth/oauth.ts';
 import type { ClipStore } from './clips.ts';
-import { buildExport, EXPORT_FORMATS, type ExportFile, type ExportFormat } from './portability.ts';
+import { boundaryOf, parseMultipart } from './lib/multipart.ts';
+import { ProfileError } from './profile.ts';
+import { buildExport, describeImport, EXPORT_FORMATS, importExport, parseExport, type ExportFile, type ExportFormat } from './portability.ts';
 import type { PublicProfiles } from './public-profiles.ts';
 import type { ProfileStore } from './store.ts';
 
@@ -24,6 +32,8 @@ const SESSION_MS = 3600 * 1000;
 const DOWNLOAD_MS = 15 * 60 * 1000;
 const MAX_ENTRIES = 500;
 const MAX_FORM = 2048;
+/** An export holds at most 50 MB of clips; leave room for the layout and JSON overhead. */
+export const MAX_UPLOAD = 60 * 1024 * 1024;
 
 export interface AccountDeps {
   accounts: Accounts;
@@ -48,6 +58,38 @@ const hash = (v: string) => createHash('sha256').update(v).digest('hex');
 function prune<V extends { expiresAt: number }>(map: Map<string, V>, now: number): void {
   for (const [k, v] of map) if (v.expiresAt <= now) map.delete(k);
   while (map.size >= MAX_ENTRIES) map.delete(map.keys().next().value!);
+}
+
+class TooLarge extends Error {}
+
+async function readBody(req: IncomingMessage, max: number): Promise<Buffer> {
+  const declared = Number(req.headers['content-length'] ?? 0);
+  if (declared > max) throw new TooLarge();
+  let size = 0;
+  const chunks: Buffer[] = [];
+  for await (const chunk of req) {
+    size += (chunk as Buffer).length;
+    if (size > max) throw new TooLarge();
+    chunks.push(chunk as Buffer);
+  }
+  return Buffer.concat(chunks);
+}
+
+/** The export file and the other fields of an upload form. */
+async function readUpload(req: IncomingMessage): Promise<{ file?: Buffer; csrf?: string }> {
+  const boundary = boundaryOf(req.headers['content-type']);
+  if (!boundary) throw new Error('Upload the file with the form');
+  const parts = parseMultipart(await readBody(req, MAX_UPLOAD), boundary);
+  const file = parts.get('file');
+  return { file: file && file.data.length ? file.data : undefined, csrf: parts.get('csrf')?.data.toString('utf8') };
+}
+
+function uploadForm(action: string, csrf?: string): string {
+  return `<form method="post" action="${action}" enctype="multipart/form-data">
+  ${csrf ? `<input type="hidden" name="csrf" value="${escapeHtml(csrf)}">` : ''}
+  <p><input type="file" name="file" accept=".json,application/json" required></p>
+  <p><button class="primary">Import</button></p>
+</form>`;
 }
 
 async function readForm(req: IncomingMessage): Promise<URLSearchParams> {
@@ -90,6 +132,7 @@ export async function deleteAccountData(accountId: string, deps: Pick<AccountDep
 export class AccountPage {
   private sessions = new Map<string, Session>();
   private downloads = new Map<string, { userId: string; format: ExportFormat; expiresAt: number }>();
+  private uploads = new Map<string, { userId: string; expiresAt: number }>();
   private deps: AccountDeps;
   private now: () => number;
 
@@ -120,6 +163,28 @@ export class AccountPage {
     const token = randomBytes(24).toString('base64url');
     this.downloads.set(hash(token), { userId, format, expiresAt: this.now() + DOWNLOAD_MS });
     return `${this.deps.publicUrl}/download/${token}`;
+  }
+
+  /** A one-time upload page for import_portal, so the file never passes through the model. */
+  uploadLink(userId: string): string {
+    prune(this.uploads, this.now());
+    const token = randomBytes(24).toString('base64url');
+    this.uploads.set(hash(token), { userId, expiresAt: this.now() + DOWNLOAD_MS });
+    return `${this.deps.publicUrl}/upload/${token}`;
+  }
+
+  /** Import an uploaded export and answer with what happened. */
+  private async runImport(res: ServerResponse, userId: string, upload: { file?: Buffer }, back: string): Promise<void> {
+    if (!upload.file) return sendHtml(res, 400, page('No file', `<p>Pick your MCPortal export file (a .json). <a href="${back}">Go back</a>.</p>`));
+    try {
+      const result = await importExport(parseExport(upload.file.toString('utf8')), userId, this.deps);
+      this.deps.log?.(`import: ${result.panelsAdded} panels, ${result.savedAdded} saved, ${result.clipsAdded} clips`);
+      const lines = describeImport(result).split('\n').map((l) => `<p>${escapeHtml(l)}</p>`).join('');
+      sendHtml(res, 200, page('Imported', `<h1>Imported</h1>${lines}<p>In Claude, ask <i>“open my portal”</i> to see it.</p>`));
+    } catch (error) {
+      if (!(error instanceof ProfileError)) throw error;
+      sendHtml(res, 400, page('Not imported', `<p>${escapeHtml(error.message)}</p><p><a href="${back}">Try another file</a>.</p>`));
+    }
   }
 
   private session(req: IncomingMessage): { key: string; session: Session } | undefined {
@@ -153,6 +218,9 @@ export class AccountPage {
 <p class="muted">${panels} panel(s), ${profile.saved.length} saved item(s), ${clips} clip(s).</p>
 <h2 style="font-size:16px">Download your data</h2>
 <ul>${EXPORT_FORMATS.map((f) => `<li><a href="/account/export/${f}">${labels[f]}</a></li>`).join('')}</ul>
+<h2 style="font-size:16px">Import</h2>
+<p>Add an MCPortal export from another server or your own machine. It only adds: nothing in your portal is removed or moved.</p>
+${uploadForm('/account/import', s.csrf)}
 <h2 style="font-size:16px">Delete your account</h2>
 <p>This deletes your portal, saved items, clips and public profile, and signs you out everywhere. It can't be undone, so download your data first.</p>
 <form method="post" action="/account/delete">
@@ -177,6 +245,31 @@ export class AccountPage {
         return true;
       }
       sendFile(res, await buildExport(entry.format, entry.userId, { ...this.deps, publicProfile: await this.deps.publicProfiles?.get(entry.userId) }));
+      return true;
+    }
+
+    if (route.startsWith('/upload/') && (req.method === 'GET' || req.method === 'POST')) {
+      const key = hash(route.match(/^\/upload\/([A-Za-z0-9_-]{20,64})$/)?.[1] ?? '');
+      const entry = this.uploads.get(key);
+      if (!entry || entry.expiresAt <= this.now() || this.deps.accounts.actor(entry.userId).status !== 'active') {
+        this.uploads.delete(key);
+        sendHtml(res, 410, page('Link expired', '<p>This upload link has expired or was already used. Ask Claude for a new one, or import from your <a href="/account">account page</a>.</p>'));
+        return true;
+      }
+      if (req.method === 'GET') {
+        sendHtml(res, 200, page('Import into MCPortal', `<h1>Import into MCPortal</h1><p>Pick your MCPortal export file. It only adds to your portal: nothing is removed or moved.</p>${uploadForm(route)}<p class="muted">This link works once, for 15 minutes.</p>`));
+        return true;
+      }
+      if (!this.sameOrigin(req)) return sendHtml(res, 403, page('Refused', '<p>That upload didn\'t come from the import page.</p>')), true;
+      this.uploads.delete(key);   // one use, whatever happens next
+      let upload: { file?: Buffer };
+      try {
+        upload = await readUpload(req);
+      } catch (error) {
+        const big = error instanceof TooLarge;
+        return sendHtml(res, big ? 413 : 400, page('Not imported', `<p>${big ? `That file is over ${MAX_UPLOAD / 1024 / 1024} MB.` : 'The upload was malformed.'} Ask Claude for a new link.</p>`), { connection: 'close' }), true;
+      }
+      await this.runImport(res, entry.userId, upload, '/account');
       return true;
     }
 
@@ -215,6 +308,20 @@ export class AccountPage {
       return true;
     }
 
+    if (route === '/account/import' && req.method === 'POST') {
+      if (!this.sameOrigin(req)) return sendHtml(res, 403, page('Refused', '<p>That request didn\'t come from your account page. <a href="/account">Go back</a>.</p>')), true;
+      let upload: { file?: Buffer; csrf?: string };
+      try {
+        upload = await readUpload(req);
+      } catch (error) {
+        const big = error instanceof TooLarge;
+        return sendHtml(res, big ? 413 : 400, page('Not imported', `<p>${big ? `That file is over ${MAX_UPLOAD / 1024 / 1024} MB.` : 'The upload was malformed.'} <a href="/account">Go back</a>.</p>`), { connection: 'close' }), true;
+      }
+      if (!safeEqual(upload.csrf ?? '', current.session.csrf)) return sendHtml(res, 403, page('Refused', '<p>That request didn\'t come from your account page. <a href="/account">Go back</a>.</p>')), true;
+      await this.runImport(res, current.session.accountId, upload, '/account');
+      return true;
+    }
+
     if ((route === '/account/delete' || route === '/account/logout') && req.method === 'POST') {
       let form: URLSearchParams;
       try {
@@ -238,6 +345,7 @@ export class AccountPage {
       const done = await deleteAccountData(accountId, this.deps);
       for (const [k, s] of this.sessions) if (s.accountId === accountId) this.sessions.delete(k);
       for (const [k, d] of this.downloads) if (d.userId === accountId) this.downloads.delete(k);
+      for (const [k, u] of this.uploads) if (u.userId === accountId) this.uploads.delete(k);
       this.deps.log?.(`account deleted (${done.clips} clips, ${done.tokens} token records)`);
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'set-cookie': this.cookie('', 0), 'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'" });
       res.end(page('Account deleted', '<h1>Your account is deleted</h1><p>Your portal, saved items, clips and public profile are gone, and you\'re signed out everywhere. Remove MCPortal from your Claude connectors too.</p>'));

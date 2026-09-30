@@ -28,6 +28,10 @@ export interface ToolContext extends SourceDeps {
   deliver?: (format: ExportFormat) => Promise<{ kind: 'link' | 'file'; where: string; summary: string }>;
   /** The account page (download everything, delete the account), when the server has one. */
   accountUrl?: string;
+  /** A one-time page where the user uploads an export (hosted), so it never passes through the model. */
+  uploadLink?: () => string;
+  /** Local MCPortal: imports may read an export file from this machine. */
+  localFiles?: boolean;
   userId: string;
   /** Hosted server only: charged per tool call. Local stdio has none (unlimited). */
   budget?: UsageBudget;
