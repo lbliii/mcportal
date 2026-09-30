@@ -70,9 +70,18 @@ Blocking and reporting ship with sharing, not after it.
 - **Invites** replace `MCPORTAL_ALLOWED_GITHUB_USERS`. An admin invites a GitHub login, and the account activates on first sign-in. Open sign-up is a switch for later. The environment variable is still honored as a bootstrap until the table exists.
 - **Suspension** is checked on every request and every token refresh, the same way the allowlist is today, so it takes effect at once.
 
-## Data rights
+## Data rights and portability
 
-- **Export:** everything as JSON (profile, saved items, clips, shares, follows).
+Your portal is yours to move, not just to download.
+
+- **MCPortal export:** one versioned, documented JSON file (`mcportal-export` with a schema version) containing layout and sources, saved items, clips, and later shares and follows (by handle). **Import** into any MCPortal: local to hosted, hosted to local, or another server. Device linking in the hybrid plan can start from it.
+- **Standard formats:**
+  - **Sources as OPML**, which any feed reader imports.
+  - **Saved items as a Netscape bookmarks file**, which browsers and bookmark managers import.
+  - **Clips as Markdown files** (one per clip, with front matter), usable in Obsidian, Notion and plain folders.
+- **OPML import:** bring subscriptions in from another reader. Each feed is test-loaded through discovery, and working ones become panels (or a starter layout for a new user). This is small and a strong onboarding path, so it comes early.
+- Imports only ever add; they never replace an existing layout without asking.
+
 - **Delete account:** removes the account, identities, profile, saved items, clips, shares, follows and reactions, and revokes tokens. Reports the user filed stay, anonymized.
 
 ## Tables (Postgres)
@@ -95,6 +104,7 @@ The existing `mcportal_profiles` (layout, saved items) and the planned `mcportal
 |---|---|---|
 | 1 | `accounts` and `identities`, bootstrap admins, invites and suspension, `authorize()` wired into every tool | M1.5 |
 | 2 | Admin page: invites, suspend, audit log | M1.5 |
-| 3 | Public profiles and handles, export, delete account | M2 |
+| 1b | OPML import (onboarding) and OPML export | M1.5 |
+| 3 | Public profiles and handles, full export and import, bookmarks and Markdown exports, delete account | M2 |
 | 4 | Shares, follows, mutes, blocks, reports; Following panel | M2 |
 | 5 | Reactions; row-level security | M2+ |
