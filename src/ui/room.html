@@ -36,11 +36,28 @@
     --src-saved: color-mix(in srgb, #E0A526 var(--lead-mix), #F2E6CF); --src-clips: color-mix(in srgb, #2A8C82 var(--lead-mix), #F2E6CF);
     --src-following: color-mix(in srgb, #C4452C var(--lead-mix), #F2E6CF); --src-pinned: color-mix(in srgb, #1F2A36 var(--lead-mix), #F2E6CF);
   }
+  /* Hosts may supply only a background. Where supported, let CSS choose readable
+     text from that actual colour; complete host palettes still take precedence.
+     Older engines keep the explicit light/dark palette above. */
+  @supports (color: contrast-color(white)) {
+    :root {
+      --fg: var(--color-text-primary, contrast-color(var(--bg)));
+      --fg2: var(--color-text-secondary, color-mix(in srgb, var(--fg) 70%, var(--bg)));
+      --border: var(--color-border-primary, color-mix(in srgb, var(--fg) 20%, var(--bg)));
+      --hover: color-mix(in srgb, var(--fg) 8%, var(--bg));
+    }
+  }
+  @media (prefers-contrast: more) {
+    :root { --fg2: var(--fg); --border: var(--fg); }
+  }
+  @media (forced-colors: active) {
+    :root { --bg: Canvas; --bg2: Canvas; --fg: CanvasText; --fg2: CanvasText; --border: ButtonText; --hover: Canvas; --accent: LinkText; --on-accent: Canvas; }
+  }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
-  /* Inline in a chat the app has no backdrop of its own, so it sits in the host's
-     surface like native UI. Fullscreen and the browser preview (.framed) get one. */
-  :root { --page: transparent; --surface: transparent; }
+  /* Paint our own canvas even inline: a transparent iframe can expose a host backing
+     with a different theme, hiding text until an opaque hover background appears. */
+  :root { --page: var(--bg); --surface: var(--bg); }
   :root.framed { --page: var(--bg2); --surface: var(--bg); }
   html, body { margin: 0; background: var(--page); color: var(--fg); font: 13.5px/1.45 var(--font-sans, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif); }
   button { font: inherit; color: inherit; }
@@ -491,7 +508,11 @@
     if (!ctx) return;
     if (ctx.theme === 'dark' || ctx.theme === 'light') root.dataset.theme = ctx.theme;
     const vars = ctx.styles && ctx.styles.variables;
-    if (vars) for (const [k, v] of Object.entries(vars)) if (k.startsWith('--') && typeof v === 'string') root.style.setProperty(k, v);
+    // Host styles use the MCP Apps token namespaces. Other variables can collide
+    // with our palette/layout (e.g. --fg or --surface) and must stay local.
+    if (vars) for (const [k, v] of Object.entries(vars)) {
+      if (/^--(?:color-|font-|border-radius-|border-width-)/.test(k) && typeof v === 'string' && v.trim()) root.style.setProperty(k, v);
+    }
     if (Array.isArray(ctx.availableDisplayModes)) canFullscreen = ctx.availableDisplayModes.includes('fullscreen');
     if (ctx.displayMode) setDisplayMode(ctx.displayMode);
     $('btnExpand').hidden = !canFullscreen;
