@@ -134,7 +134,9 @@ MCPortal is a **reading platform with light social**, driven by your agent. Anyt
 - [x] `GITHUB_TOKEN` on the hosted server (fine-grained, public repos read-only; 5,000 requests/hour instead of ~60)
 - [x] Per-user rate limits and daily fetch/thumbnail caps
 - [ ] Sign-in beyond the allowlist: an invite list first, then a non-GitHub option (Google or email link)
-- [ ] Durable storage: volume backups, then Postgres for profiles and auth
+- [x] Durable storage: Postgres for profiles and sign-in state, point-in-time recovery on
+- [ ] Scheduled backups (daily + weekly) on the Postgres service
+- [ ] Migrate `railway.toml` to Railway's infrastructure-as-code format (old format works until 2026-12-01)
 - [ ] Privacy policy, support contact and screenshots; submit to Claude's connector directory
 - [ ] Landing page and README that show the first-run moment; Show HN
 
