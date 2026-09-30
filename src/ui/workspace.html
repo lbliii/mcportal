@@ -29,7 +29,7 @@
     --hover: var(--d-hover);
     --accent: #2563eb;
     --radius: var(--border-radius-lg, 10px);
-    --src-hn: #f26522; --src-github: #7c5cff; --src-rss: #0f9d8a; --src-reader: #2563eb;
+    --src-hn: #f26522; --src-github: #7c5cff; --src-rss: #0f9d8a; --src-reader: #2563eb; --src-saved: #d97706;
   }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
@@ -43,8 +43,8 @@
   .bar { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 5px 8px 5px 12px; background: var(--page); border-bottom: 1px solid var(--border); }
   .brand { font-weight: 650; letter-spacing: -0.01em; }
   .brand { display: inline-flex; align-items: center; gap: 5px; }
-  .brand span { color: var(--accent); }
-  .brand .mark { display: inline-flex; }
+  .brand .accent { color: var(--accent); }
+  .brand .mark { display: inline-flex; color: var(--accent); }
   .brand .mark svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
   .ws-name { color: var(--fg2); font-size: 12px; }
   .spacer { flex: 1; }
@@ -87,6 +87,12 @@
   .mi svg { width: 12px; height: 12px; }
   .mi:hover, .mi:focus-visible { color: var(--accent); background: var(--bg2); outline: none; }
   .mi.go { margin-left: auto; }
+  .mi.go + .mi.save, .mi.save:first-child { margin-left: 0; }
+  .mi.save[aria-pressed="true"], .ib.save[aria-pressed="true"] { color: var(--src-saved); }
+  .mi.save[aria-pressed="true"] svg, .ib.save[aria-pressed="true"] svg { fill: currentColor; }
+  .item .mi.save:not([aria-pressed="true"]), .card .mi.save:not([aria-pressed="true"]) { opacity: 0; }
+  .item:hover .mi.save, .item:focus-within .mi.save, .card:hover .mi.save, .card:focus-within .mi.save { opacity: 1; }
+  @media (hover: none) { .item .mi.save, .card .mi.save { opacity: 1; } }
   .panel-foot { display: none; padding: 7px 12px; border-top: 1px solid var(--border); color: var(--fg2); font-size: 11.5px; word-break: break-all; }
   :root.show-sources .panel-foot { display: block; }
   /* shelves: one horizontally scrolling row of cards per panel */
@@ -123,7 +129,7 @@
 </head>
 <body>
 <header class="bar">
-  <div class="brand"><span class="mark" data-icon="portal"></span>MC<span>Portal</span></div>
+  <div class="brand"><span class="mark" data-icon="portal"></span><span>MC<span class="accent">Portal</span></span></div>
   <div class="ws-name" id="wsName"></div>
   <div class="spacer"></div>
   <span class="status" id="status">Connecting…</span>
@@ -168,6 +174,7 @@
     external: 'M13.5 4.5h6v6 M19.5 4.5l-8 8 M17.5 14v4a2 2 0 0 1-2 2h-9.5a2 2 0 0 1-2-2V8.5a2 2 0 0 1 2-2h4',
     comment: 'M6 5h12a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-6.5l-4.5 3.5v-3.5H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z',
     up: 'M12 19V6.5 M6.5 12L12 6.5l5.5 5.5',
+    bookmark: 'M7 4.5h10a1 1 0 0 1 1 1v14l-6-4-6 4v-14a1 1 0 0 1 1-1z',
   };
   function icon(name) {
     const NS = 'http://www.w3.org/2000/svg';
@@ -235,7 +242,7 @@
     } else if (method === 'ui/notifications/tool-result') {
       toolRunning = false;
       const data = params.structuredContent;
-      if (data && data.article) { gotInitialResult = true; showArticleCard(data.article); }
+      if (data && data.article) { gotInitialResult = true; showArticleCard(data.article, data.saved); }
       else if (data && data.profile && data.panels) { gotInitialResult = true; renderWorkspace(data); }
       else if (params.isError) setStatus('The workspace could not load');
     } else if (method === 'ui/notifications/host-context-changed') {
@@ -312,7 +319,7 @@
   }).observe(document.body);
 
   // ------------------------------------------------------------ state + rendering
-  const state = { profile: null, panels: new Map() };
+  const state = { profile: null, panels: new Map(), saved: new Set() };
 
   function el(tag, attrs, ...children) {
     const node = document.createElement(tag);
@@ -352,7 +359,8 @@
   }
 
   function renderWorkspace(data) {
-    state.profile = { layout: 'columns', openIn: 'card', ...data.profile };
+    state.profile = { layout: 'columns', openIn: 'card', saved: [], ...data.profile };
+    state.saved = new Set(state.profile.saved.map((s) => s.url));
     state.panels = new Map(data.panels.map((p) => [p.panelId, p]));
     $('wsName').textContent = `· ${data.profile.name}`;
     drawLayout();
@@ -400,6 +408,8 @@
 
   function renderCard(item, panel, color) {
     const meta = compactMeta(item).out;
+    const save = saveButton(item, panel.source);
+    if (save) { save.classList.add('go'); meta.push(save); }
     return el('div', {
       class: 'card', role: 'button', tabindex: '0', style: `--c:${color}`, title: item.title,
       onclick: () => openItem(item, panel),
@@ -431,6 +441,54 @@
     return wrap;
   }
 
+  // ------------------------------------------------------------ saving
+  function saveButton(item, source, cls = 'mi save') {
+    if (!item.url) return null;
+    const on = state.saved.has(item.url);
+    return el('button', {
+      class: cls, 'data-save-url': item.url, 'aria-pressed': String(on),
+      title: on ? 'Saved (click to remove)' : 'Save to your portal',
+      'aria-label': on ? 'Remove from saved' : 'Save to your portal',
+      onclick: (e) => { e.stopPropagation(); toggleSaved(item, source); },
+    }, icon('bookmark'));
+  }
+
+  function markSaved() {
+    for (const b of document.querySelectorAll('[data-save-url]')) {
+      const on = state.saved.has(b.dataset.saveUrl);
+      b.setAttribute('aria-pressed', String(on));
+      b.title = on ? 'Saved (click to remove)' : 'Save to your portal';
+      b.setAttribute('aria-label', on ? 'Remove from saved' : 'Save to your portal');
+    }
+  }
+
+  async function toggleSaved(item, source) {
+    const url = item.url;
+    const was = state.saved.has(url);
+    was ? state.saved.delete(url) : state.saved.add(url);   // optimistic
+    markSaved();
+    try {
+      const result = await callTool(was ? 'remove_saved' : 'save_item',
+        was ? { url } : { url, title: item.title, source: source === 'saved' ? undefined : source });
+      const data = result.structuredContent;
+      state.saved = new Set(data.saved.map((s) => s.url));
+      if (state.profile) {
+        state.profile = { ...state.profile, ...data.profile };
+        if (data.panel) state.panels.set(data.panel.panelId, data.panel);
+        if (data.layoutChanged) { drawLayout(); toast('Saved. Your portal now has a Saved panel.'); }
+        else if (data.panel) {
+          const node = document.querySelector(`[data-panel="${CSS.escape(data.panel.panelId)}"]`);
+          if (node) node.replaceWith(renderPanel(data.panel.panelId));
+        }
+      }
+      if (!was && !data.layoutChanged) toast('Saved');
+    } catch (error) {
+      was ? state.saved.add(url) : state.saved.delete(url);
+      toast(`Couldn't ${was ? 'remove' : 'save'}: ${error.message}`);
+    }
+    markSaved();
+  }
+
   // Compact meta: "364 points" -> ▲364, "192 comments" -> a comment-count link to the
   // discussion, "by someone" dropped (kept in the tooltip). Unknown strings pass through.
   function compactMeta(item) {
@@ -454,6 +512,7 @@
   function renderItem(item, panel) {
     const { out, byline } = compactMeta(item);
     if (item.url) out.push(el('button', { class: 'mi go', title: 'Open the original', 'aria-label': 'Open the original', onclick: (e) => { e.stopPropagation(); openLink(item.url); } }, icon('external')));
+    out.push(saveButton(item, panel.source));
     return el('div', {
       class: 'item', role: 'button', tabindex: '0',
       title: [item.url && panel.source !== 'github' ? 'Open in reader view' : 'Open', byline].filter(Boolean).join(' · '),
@@ -543,12 +602,13 @@
     const site = a.siteName && a.siteName !== a.byline ? a.siteName : null;
     const by = [a.byline, site, `${Math.max(1, Math.round(a.wordCount / 230))} min read`].filter(Boolean).join(' · ');
     const p = a.provenance;
-    return [readerTop(a.url, withBack), el('h1', null, a.title), el('div', { class: 'byline' }, by), body,
+    return [readerTop(a.url, withBack, a.title), el('h1', null, a.title), el('div', { class: 'byline' }, by), body,
       el('div', { class: 'prov' }, `Reader view of ${p.endpoint}${via ? ` · via ${via}` : ''} · fetched ${new Date(p.fetchedAt).toLocaleString()}${p.cached ? ' (cached)' : ''}. Text only; scripts, trackers and ads removed.`)];
   }
 
   // This view belongs to a read_article call: it is a reader card, not a workspace.
-  function showArticleCard(a) {
+  function showArticleCard(a, saved) {
+    if (saved) state.saved.add(a.url);
     root.classList.add('article-view');
     $('wsName').textContent = '· reader';
     $('grid').hidden = true;
@@ -562,7 +622,7 @@
     setStatus('Loading…');
     try {
       const result = await callTool('read_article', { url });
-      showArticleCard(result.structuredContent.article);
+      showArticleCard(result.structuredContent.article, result.structuredContent.saved);
     } catch (error) {
       setStatus('');
       $('grid').hidden = true;
@@ -592,10 +652,11 @@
         el('button', { class: 'btn', onclick: () => openLink(item.url) }, 'Open the original'));
     }
   }
-  function readerTop(url, withBack) {
+  function readerTop(url, withBack, title) {
     return el('div', { class: 'reader-top' },
       withBack ? iconButton('back', 'Back to the workspace', closeReader, 'ib') : null,
-      iconButton('external', 'Open the original', () => openLink(url), 'ib'));
+      iconButton('external', 'Open the original', () => openLink(url), 'ib'),
+      title ? saveButton({ url, title }, 'reader', 'ib save') : null);
   }
   function closeReader() { if (articleUrl) return; $('reader').hidden = true; $('grid').hidden = false; }
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('reader').hidden) closeReader(); });

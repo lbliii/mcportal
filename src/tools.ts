@@ -1,7 +1,10 @@
 import { randomBytes } from 'node:crypto';
 import { clean } from './lib/text.ts';
-import { describeDiff, describeLayout, diffProfiles, findPanel, ProfileError, SOURCES, validateProfile, type Profile } from './profile.ts';
-import { loadArticle, loadPanel, SOURCE_DOCS, type SourceDeps } from './sources.ts';
+import {
+  describeDiff, describeLayout, diffProfiles, findPanel, findSavedPanel, httpUrl, LIMITS, ProfileError, SOURCES, validateProfile,
+  type PanelSpec, type Profile, type SavedItem,
+} from './profile.ts';
+import { loadArticle, loadPanel, savedPanel, SOURCE_DOCS, type SourceDeps } from './sources.ts';
 import type { ProfileStore } from './store.ts';
 import type { PanelResult, SourceKind } from './types.ts';
 
@@ -55,6 +58,31 @@ function itemLine(item: PanelResult['items'][number]): string {
   return `- ${item.title}${item.meta.length ? ` (${item.meta.join(', ')})` : ''}${item.url ? ` <${item.url}>` : ''}`;
 }
 
+function panelFor(spec: PanelSpec, profile: Profile, ctx: ToolContext, force = false): Promise<PanelResult> {
+  return spec.source === 'saved' ? Promise.resolve(savedPanel(spec, profile.saved)) : loadPanel(spec, ctx, force);
+}
+
+/**
+ * Put a Saved panel in the layout the first time something is saved, so the item
+ * visibly lands somewhere. Only adds; never moves or removes the user's panels.
+ */
+function ensureSavedPanel(profile: Profile): { profile: Profile; added: boolean } {
+  if (findSavedPanel(profile)) return { profile, added: false };
+  const panel: PanelSpec = { id: 'saved', source: 'saved', title: 'Saved', config: { limit: LIMITS.items } };
+  while (findPanel(profile, panel.id)) panel.id += '-2';
+  const columns = profile.columns.map((c) => ({ ...c, panels: [...c.panels] }));
+  if (columns.length < LIMITS.columns) columns.push({ width: 1, panels: [panel] });
+  else if (columns[columns.length - 1]!.panels.length < LIMITS.panelsPerColumn) columns[columns.length - 1]!.panels.push(panel);
+  else return { profile, added: false };
+  return { profile: { ...profile, columns }, added: true };
+}
+
+/** What the saving tools return: the model gets a fenced summary, the app gets state to redraw. */
+function savedResult(text: string, profile: Profile, layoutChanged: boolean): CallToolResult {
+  const spec = findSavedPanel(profile);
+  return ok(text, { saved: profile.saved, profile, layoutChanged, panel: spec ? savedPanel(spec, profile.saved) : null });
+}
+
 function summarizePanels(profile: Profile, panels: PanelResult[], notice?: string): string {
   const lines = [`MCPortal workspace "${profile.name}": ${describeLayout(profile)}.`];
   if (notice) lines.push(`Notice for the user: ${notice}`);
@@ -92,7 +120,7 @@ export const TOOLS: ToolDef[] = [
     async handler(_args, ctx) {
       const profile = await ctx.store.get(ctx.userId);
       const notice = ctx.store.takeNotice?.(ctx.userId);
-      const panels = await Promise.all(profile.columns.flatMap((c) => c.panels).map((p) => loadPanel(p, ctx)));
+      const panels = await Promise.all(profile.columns.flatMap((c) => c.panels).map((p) => panelFor(p, profile, ctx)));
       return ok(summarizePanels(profile, panels, notice), { profile, panels, notice, generatedAt: new Date().toISOString() });
     },
   },
@@ -116,6 +144,7 @@ export const TOOLS: ToolDef[] = [
       'Columns are left to right; panels in a column stack top to bottom; width is relative (1-4).',
       'layout "columns" shows columns side by side; "shelves" shows each panel as a horizontally scrolling row, in column order. openIn "card" opens stories in a reader inside the workspace; "chat" opens each as its own reader card in the conversation.',
       "Never move, retitle, or remove panels the user did not mention: their stated layout is a fixed rule. Removing a panel is refused unless its id is listed in removePanelIds, which you may only do when the user explicitly asked to remove it.",
+      'Saved items (bookmarks) are not part of this tool: they are kept as they are; use save_item and remove_saved for them. A panel with source "saved" shows them.',
       'After saving, tell the user what changed (the result lists it) and call open_workspace to show it.',
     ].join(' '),
     inputSchema: {
@@ -159,6 +188,7 @@ export const TOOLS: ToolDef[] = [
         throw error;
       }
       const before = await ctx.store.get(ctx.userId);
+      next = { ...next, saved: before.saved };   // bookmarks are never edited through the layout
       ctx.store.takeNotice?.(ctx.userId);
       const diff = diffProfiles(before, next);
       const allowed = new Set(Array.isArray(args.removePanelIds) ? args.removePanelIds.map(String) : []);
@@ -189,7 +219,8 @@ export const TOOLS: ToolDef[] = [
       if (!SOURCES.includes(source)) return toolError(`source must be one of ${SOURCES.join(', ')}`);
       let panel: PanelResult;
       try {
-        panel = await loadPanel({ id: `preview-${source}`, source, config: (args.config as Record<string, unknown>) ?? {} }, ctx);
+        const spec = { id: `preview-${source}`, source, config: (args.config as Record<string, unknown>) ?? {} };
+        panel = await panelFor(spec, await ctx.store.get(ctx.userId), ctx);
       } catch (error) {
         return toolError(`Could not read ${source}: ${clean((error as Error).message, 200)}`);
       }
@@ -208,7 +239,7 @@ export const TOOLS: ToolDef[] = [
       const profile = await ctx.store.get(ctx.userId);
       const spec = findPanel(profile, String(args.panelId ?? ''));
       if (!spec) return toolError(`No panel with id "${clean(args.panelId, 60)}"`);
-      const panel = await loadPanel(spec, ctx, true);
+      const panel = await panelFor(spec, profile, ctx, true);
       return ok(`${panel.panelId}: ${panel.items.length} items`, { panel });
     },
   },
@@ -226,10 +257,72 @@ export const TOOLS: ToolDef[] = [
         const article = await loadArticle(url, ctx);
         const text = article.blocks.slice(0, 60).map((b) => (b.type === 'h' ? `## ${b.text}` : b.text)).join('\n');
         const head = [`title: ${article.title}`, article.byline ? `byline: ${article.byline}` : ''].filter(Boolean).join('\n');
-        return ok(untrusted(article.url, `${head}\n\n${text}`), { article });
+        const { saved } = await ctx.store.get(ctx.userId);
+        return ok(untrusted(article.url, `${head}\n\n${text}`), { article, saved: saved.some((s) => s.url === article.url) });
       } catch (error) {
         return toolError(`Could not open ${clean(url, 200)}: ${clean((error as Error).message, 200)}`);
       }
+    },
+  },
+  {
+    name: 'save_item',
+    title: 'Save to MCPortal',
+    description: [
+      "Save a link to the user's MCPortal (a bookmark), or update the title or note of one already saved.",
+      'Use when the user asks to save, bookmark, favorite, or keep something for later. Newest first; at most 200 (the oldest drop off).',
+      'The first save adds a "Saved" panel to the layout if there isn\'t one; say so.',
+    ].join(' '),
+    inputSchema: {
+      type: 'object',
+      required: ['url'],
+      additionalProperties: false,
+      properties: {
+        url: { type: 'string', description: 'http(s) URL' },
+        title: { type: 'string', description: 'Short title; defaults to the site name' },
+        note: { type: 'string', description: "Optional note in the user's words" },
+        source: { type: 'string', description: 'Where it came from, e.g. hn, rss, github' },
+      },
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+    async handler(args, ctx) {
+      const url = httpUrl(args.url);
+      if (!url) return toolError('save_item needs an http(s) "url"');
+      const before = await ctx.store.get(ctx.userId);
+      const existing = before.saved.find((s) => s.url === url);
+      const entry: Record<string, unknown> = {
+        ...existing,
+        url,
+        title: args.title ?? existing?.title,
+        note: args.note ?? existing?.note,
+        source: args.source ?? existing?.source,
+        savedAt: existing?.savedAt ?? new Date().toISOString(),
+      };
+      const withItem = validateProfile({ ...before, saved: [entry, ...before.saved.filter((s) => s.url !== url)] });
+      const { profile, added } = ensureSavedPanel(withItem);
+      await ctx.store.put(ctx.userId, profile);
+      const item = profile.saved[0] as SavedItem;
+      const text = [
+        existing ? 'Updated a saved item.' : `Saved. ${profile.saved.length} saved item(s).`,
+        added ? 'Added a "Saved" panel to the layout.' : '',
+        untrusted(item.url, `title: ${item.title}${item.note ? `\nnote: ${item.note}` : ''}`),
+      ].filter(Boolean).join('\n');
+      return savedResult(text, profile, added);
+    },
+  },
+  {
+    name: 'remove_saved',
+    title: 'Remove a saved item',
+    description: "Remove one link from the user's saved items. Only when the user asks to remove, unsave, or delete it.",
+    inputSchema: { type: 'object', required: ['url'], additionalProperties: false, properties: { url: { type: 'string' } } },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
+    async handler(args, ctx) {
+      const url = httpUrl(args.url);
+      if (!url) return toolError('remove_saved needs an http(s) "url"');
+      const before = await ctx.store.get(ctx.userId);
+      if (!before.saved.some((s) => s.url === url)) return savedResult('That link was not saved; nothing changed.', before, false);
+      const profile = { ...before, saved: before.saved.filter((s) => s.url !== url), updatedAt: new Date().toISOString() };
+      await ctx.store.put(ctx.userId, profile);
+      return savedResult(`Removed. ${profile.saved.length} saved item(s) left.`, profile, false);
     },
   },
   {

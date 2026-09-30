@@ -29,17 +29,28 @@ export type Layout = (typeof LAYOUTS)[number];
 export const OPEN_IN = ['card', 'chat'] as const;
 export type OpenIn = (typeof OPEN_IN)[number];
 
+/** A bookmark. Title and note may come from third-party pages: untrusted, plain text. */
+export interface SavedItem {
+  url: string;
+  title: string;
+  source?: string;
+  note?: string;
+  savedAt: string;
+}
+
 export interface Profile {
   version: 1;
   name: string;
   layout: Layout;
   openIn: OpenIn;
   columns: ColumnSpec[];
+  /** Newest first. Only save_item / remove_saved change it; update_profile carries it over. */
+  saved: SavedItem[];
   updatedAt: string;
 }
 
-export const LIMITS = { columns: 4, panelsPerColumn: 4, items: 30 } as const;
-export const SOURCES: SourceKind[] = ['hn', 'rss', 'github'];
+export const LIMITS = { columns: 4, panelsPerColumn: 4, items: 30, saved: 200 } as const;
+export const SOURCES: SourceKind[] = ['hn', 'rss', 'github', 'saved'];
 
 export class ProfileError extends Error {
   override name = 'ProfileError';
@@ -51,6 +62,7 @@ export function defaultProfile(now = new Date()): Profile {
     name: 'morning',
     layout: 'columns',
     openIn: 'card',
+    saved: [],
     updatedAt: now.toISOString(),
     columns: [
       { width: 1, panels: [{ id: 'hn-top', source: 'hn', title: 'Hacker News', config: { feed: 'top', limit: 12 } }] },
@@ -93,8 +105,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-export function normalizeSourceConfig(source: SourceKind, raw: unknown, where: string): HnConfig | RssConfig | GithubConfig {
+export function normalizeSourceConfig(source: SourceKind, raw: unknown, where: string): HnConfig | RssConfig | GithubConfig | { limit: number } {
   const config = isRecord(raw) ? raw : {};
+  if (source === 'saved') return { limit: clampInt(config.limit, 1, LIMITS.items, LIMITS.items) };
   const limit = clampInt(config.limit, 1, LIMITS.items, 10);
   if (source === 'hn') {
     const feed = (config.feed ?? 'top') as string;
@@ -157,7 +170,48 @@ export function validateProfile(input: unknown, now = new Date()): Profile {
   const name = clean(input.name, 60) || 'workspace';
   const layout = (LAYOUTS as readonly unknown[]).includes(input.layout) ? (input.layout as Layout) : 'columns';
   const openIn = (OPEN_IN as readonly unknown[]).includes(input.openIn) ? (input.openIn as OpenIn) : 'card';
-  return { version: 1, name, layout, openIn, columns, updatedAt: now.toISOString() };
+  return { version: 1, name, layout, openIn, columns, saved: normalizeSaved(input.saved, now), updatedAt: now.toISOString() };
+}
+
+export function httpUrl(value: unknown): string | null {
+  if (typeof value !== 'string' || value.length > 2000) return null;
+  try {
+    const url = new URL(value.trim());
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Keep valid http(s) bookmarks, newest first, one per URL, capped. */
+export function normalizeSaved(raw: unknown, now = new Date()): SavedItem[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  const out: SavedItem[] = [];
+  for (const entry of raw) {
+    if (!isRecord(entry)) continue;
+    const url = httpUrl(entry.url);
+    if (!url || seen.has(url)) continue;
+    seen.add(url);
+    const savedAt = typeof entry.savedAt === 'string' && !Number.isNaN(Date.parse(entry.savedAt)) ? new Date(entry.savedAt).toISOString() : now.toISOString();
+    const item: SavedItem = { url, title: clean(entry.title, 200) || new URL(url).hostname, savedAt };
+    const source = clean(entry.source, 20);
+    const note = clean(entry.note, 280);
+    if (source) item.source = source;
+    if (note) item.note = note;
+    out.push(item);
+    if (out.length >= LIMITS.saved) break;
+  }
+  return out;
+}
+
+/** The first panel showing saved items, if the user has one in their layout. */
+export function findSavedPanel(profile: Profile): PanelSpec | undefined {
+  for (const column of profile.columns) {
+    const panel = column.panels.find((p) => p.source === 'saved');
+    if (panel) return panel;
+  }
+  return undefined;
 }
 
 export function findPanel(profile: Profile, panelId: string): PanelSpec | undefined {
@@ -211,7 +265,7 @@ export function describeDiff(diff: ProfileDiff): string {
 
 /** A short, human-readable description of the layout, for the model and for diffs. */
 export function describeLayout(profile: Profile): string {
-  const mode = `${profile.layout} layout, stories open in ${profile.openIn === 'chat' ? 'their own chat card' : 'the workspace'}`;
+  const mode = `${profile.layout} layout, stories open in ${profile.openIn === 'chat' ? 'their own chat card' : 'the workspace'}, ${profile.saved.length} saved`;
   return `${mode}; ` + profile.columns
     .map((c, i) => `column ${i + 1} (width ${c.width}): ${c.panels.map((p) => `${p.title ?? p.id} [${p.source}]`).join(' / ')}`)
     .join('; ');

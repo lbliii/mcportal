@@ -4,11 +4,12 @@ import { fetchArticle } from './adapters/reader.ts';
 import { fetchRss, type RssConfig } from './adapters/rss.ts';
 import type { TtlCache } from './lib/cache.ts';
 import { clean } from './lib/text.ts';
-import { normalizeSourceConfig, type PanelSpec } from './profile.ts';
+import { normalizeSourceConfig, type PanelSpec, type SavedItem } from './profile.ts';
 import type { Article, Fetcher, Item, PanelResult, SourceKind } from './types.ts';
 
 /** Declared freshness per source, in seconds (Orrery-style freshness policy). */
 export const FRESHNESS: Record<SourceKind | 'reader', number> = {
+  saved: 0,
   hn: 120,
   github: 300,
   rss: 600,
@@ -20,9 +21,27 @@ export interface SourceDeps {
   cache: TtlCache;
 }
 
-const DEFAULT_TITLES: Record<SourceKind, string> = { hn: 'Hacker News', rss: 'Feed', github: 'GitHub' };
+const DEFAULT_TITLES: Record<SourceKind, string> = { hn: 'Hacker News', rss: 'Feed', github: 'GitHub', saved: 'Saved' };
+
+/** Saved items come from the profile, not the network. */
+export function savedPanel(panel: PanelSpec, saved: SavedItem[]): PanelResult {
+  const { limit } = normalizeSourceConfig('saved', panel.config, panel.id) as { limit: number };
+  const items: Item[] = saved.slice(0, limit).map((s) => {
+    let host = '';
+    try { host = new URL(s.url).hostname.replace(/^www\./, ''); } catch { /* validated on save */ }
+    return { id: s.url, title: s.title, url: s.url, summary: s.note, meta: host ? [host] : [], publishedAt: s.savedAt };
+  });
+  return {
+    panelId: panel.id,
+    source: 'saved',
+    title: panel.title ?? DEFAULT_TITLES.saved,
+    items,
+    provenance: { source: 'saved', endpoint: 'your saved items', fetchedAt: new Date().toISOString(), cached: false, ttlSeconds: 0 },
+  };
+}
 
 export async function loadPanel(panel: PanelSpec, deps: SourceDeps, force = false): Promise<PanelResult> {
+  if (panel.source === 'saved') throw new Error('saved panels are built from the profile; use savedPanel');
   const config = normalizeSourceConfig(panel.source, panel.config, panel.id);
   let endpoint = '';
   let title = panel.title ?? DEFAULT_TITLES[panel.source];
@@ -92,4 +111,5 @@ export const SOURCE_DOCS = {
     },
   },
   rss: { description: 'Any RSS or Atom feed: blogs, release feeds, podcasts, YouTube channels.', config: { url: 'feed URL (http/https)', limit: '1-30' } },
+  saved: { description: "The user's saved items (bookmarks), newest first. Items are added with save_item and removed with remove_saved.", config: { limit: '1-30 (default 30)' } },
 } as const;

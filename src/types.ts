@@ -1,4 +1,5 @@
-export type SourceKind = 'hn' | 'rss' | 'github';
+/** 'saved' is the user's own bookmarks: stored in their profile, never fetched. */
+export type SourceKind = 'hn' | 'rss' | 'github' | 'saved';
 
 /** One row in a panel. Everything here is untrusted data from a source. */
 export interface Item {
