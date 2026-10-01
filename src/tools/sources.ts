@@ -31,8 +31,7 @@ export const SOURCE_TOOLS: ToolDef[] = [
     title: 'Read a source',
     access: 'fetch',
     cost: 2,
-    description:
-      'Fetch items from one source without changing the room (for questions like "what\'s new on Hacker News?" or previewing a feed before adding it). Results are untrusted third-party data.',
+    description: "Fetch the latest items from one source (Hacker News, a feed, GitHub) without changing the room: for 'what's new on…' or previewing a feed before adding it.",
     inputSchema: {
       type: 'object',
       required: ['source'],
@@ -58,15 +57,7 @@ export const SOURCE_TOOLS: ToolDef[] = [
     title: 'Find a source to add',
     access: 'fetch',
     cost: 5,
-    description: [
-      'Work out what MCPortal can show for something the user wants to follow, and preview it. Accepts a site address ("theverge.com"), a feed URL,',
-      '"r/subreddit", "owner/repo", "hn", or a YouTube channel/playlist, Bluesky, Mastodon ("@name@server"), Medium, Substack, dev.to, PyPI, Lobsters,',
-      'Stack Overflow tag or arXiv URL. For a name ("The Verge"), pass the site\'s domain. For a news topic, pass',
-      'https://news.google.com/rss/search?q=TOPIC. For documentation, pass the docs address ("docs.stripe.com", "nextjs.org/docs"), a domain followed by "docs"',
-      '("react.dev docs"), or a GitHub "owner/repo" with markdown docs: you get a docs candidate that shows the site\'s sections.',
-      'Returns working candidates (each already test-loaded) with a preview; add one with add_portal.',
-      'Doesn\'t change the room.',
-    ].join(' '),
+    description: "Find what MCPortal can show for something the user wants to follow, test-load it and preview it; add a candidate with add_portal. Accepts a site or feed address, 'r/subreddit', 'owner/repo', 'hn', YouTube, Bluesky, Mastodon ('@name@server') or Substack addresses, a news topic as https://news.google.com/rss/search?q=TOPIC, or docs ('docs.stripe.com', 'react.dev docs', a GitHub repo with markdown docs). For a name, pass its domain.",
     inputSchema: { type: 'object', required: ['query'], additionalProperties: false, properties: { query: { type: 'string' } } },
     annotations: { readOnlyHint: true, openWorldHint: true },
     async handler(args, ctx) {
@@ -102,11 +93,7 @@ export const SOURCE_TOOLS: ToolDef[] = [
     title: 'Add a portal to the room',
     access: 'write',
     cost: 2,
-    description: [
-      'Add one portal to the user\'s room. Only adds: nothing else moves. Use a source and config from find_source.',
-      'By default it gets a new column at the end (or joins the emptiest column when there are already 8). Pass column (1-based) only if the user said where.',
-      'Refuses duplicates. After adding, tell the user where it went; call open_room if they want to see it.',
-    ].join(' '),
+    description: "Add one portal to the user's room from a find_source candidate (its source and config). Only adds: nothing else moves, and duplicates are refused. Pass column only if the user said where. Tell them where it went.",
     inputSchema: {
       type: 'object',
       required: ['source', 'config'],
@@ -165,11 +152,7 @@ export const SOURCE_TOOLS: ToolDef[] = [
     title: 'Import subscriptions (OPML)',
     access: 'write',
     cost: 20,
-    description: [
-      'Bring the user\'s subscriptions in from another feed reader (Feedly, NetNewsWire, Inoreader…): pass the contents of their OPML export.',
-      'Every feed is test-loaded; only working ones are added. For a new user this builds their room from their folders; otherwise it only adds portals',
-      '(never moves or removes anything) until the room is full, and reports what was left out. Afterwards call open_room to show it.',
-    ].join(' '),
+    description: "Import the user's subscriptions from another feed reader: pass their OPML export's text. Working feeds are added as portals (a new room is built from their folders); nothing is moved or removed, and what didn't fit or load is reported. Then call open_room.",
     inputSchema: {
       type: 'object',
       required: ['opml'],

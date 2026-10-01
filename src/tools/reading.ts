@@ -68,7 +68,7 @@ export const READING_TOOLS: ToolDef[] = [
     name: 'list_reading',
     title: 'Continue reading',
     access: 'read',
-    description: 'List recent unfinished reading (actually opened, not completed), newest opened first. Set unfinished=false to include seen and completed items. At most 100 items per call.',
+    description: "What the user was reading: pages they opened and haven't finished, most recent first ('what was I in the middle of?').",
     inputSchema: {
       type: 'object',
       additionalProperties: false,

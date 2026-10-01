@@ -61,8 +61,7 @@ export const ROOM_TOOLS: ToolDef[] = [
     title: 'Open your MCPortal room',
     access: 'fetch',
     cost: 3,
-    description:
-      "Open the user's MCPortal room: their portals onto their sources (Hacker News, GitHub, RSS, and data pinned from their other tools), arranged by their saved layout. Use this when the user asks to open their room, portal, MCPortal, dashboard, or morning view, or asks what's new across their sources.",
+    description: "Open the user's MCPortal room: portals onto the sources they follow, in their layout, with what's new in each and each portal's id. For 'open my room / portal / MCPortal' or what's new across their sources.",
     inputSchema: {
       type: 'object',
       additionalProperties: false,
@@ -92,11 +91,7 @@ export const ROOM_TOOLS: ToolDef[] = [
     name: 'build_room',
     title: 'Build the room from starter packs',
     access: 'write',
-    description: [
-      `Set up the user's room from up to ${MAX_PACKS} starter packs (ids from open_room's setup, e.g. developer, docs, ai, news, gaming, art, science, music, film).`,
-      'Replaces the current layout; saved items stay. Use it for first-time setup, or when the user asks to start over (confirm first if they have a room they built).',
-      'An empty packs list keeps the sample layout and just finishes setup. Afterwards call open_room to show it, and offer to add anything specific with find_source.',
-    ].join(' '),
+    description: `Set up the user's room from up to ${MAX_PACKS} starter packs (ids from open_room's setup). Replaces the layout, keeping saved items: confirm first if they built the room themselves. An empty list keeps the sample room and finishes setup. Then call open_room.`,
     inputSchema: {
       type: 'object',
       required: ['packs'],

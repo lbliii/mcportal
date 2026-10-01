@@ -101,10 +101,7 @@ export const CLIP_TOOLS: ToolDef[] = [
     name: 'search_clips',
     title: 'Search clips',
     access: 'read',
-    description: [
-      "Find the user's clips by words, kind or tag, newest first. Returns summaries; use get_clip for the full content.",
-      'Use it when the user refers to something from an earlier chat ("that table we made about…", "what did we decide about…").',
-    ].join(' '),
+    description: "Find the user's clips by words, kind or tag, for things from earlier chats ('that table we made about…'). Returns summaries; get_clip shows one in full.",
     inputSchema: {
       type: 'object',
       additionalProperties: false,

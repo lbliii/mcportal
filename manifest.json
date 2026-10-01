@@ -30,11 +30,11 @@
   "tools": [
     {
       "name": "open_room",
-      "description": "Open the user's MCPortal room: their portals onto their sources (Hacker News, GitHub, RSS, and data pinned from their other tools), arranged by their saved layout."
+      "description": "Open the user's MCPortal room: portals onto the sources they follow, in their layout, with what's new in each and each portal's id."
     },
     {
       "name": "build_room",
-      "description": "Set up the user's room from up to 4 starter packs (ids from open_room's setup, e.g."
+      "description": "Set up the user's room from up to 4 starter packs (ids from open_room's setup)."
     },
     {
       "name": "get_profile",
@@ -46,15 +46,15 @@
     },
     {
       "name": "read_source",
-      "description": "Fetch items from one source without changing the room (for questions like \"what's new on Hacker News?\" or previewing a feed before adding it)."
+      "description": "Fetch the latest items from one source (Hacker News, a feed, GitHub) without changing the room: for 'what's new on…' or previewing a feed before adding it."
     },
     {
       "name": "find_source",
-      "description": "Work out what MCPortal can show for something the user wants to follow, and preview it."
+      "description": "Find what MCPortal can show for something the user wants to follow, test-load it and preview it; add a candidate with add_portal."
     },
     {
       "name": "add_portal",
-      "description": "Add one portal to the user's room."
+      "description": "Add one portal to the user's room from a find_source candidate (its source and config)."
     },
     {
       "name": "list_sources",
@@ -62,15 +62,15 @@
     },
     {
       "name": "import_opml",
-      "description": "Bring the user's subscriptions in from another feed reader (Feedly, NetNewsWire, Inoreader…): pass the contents of their OPML export."
+      "description": "Import the user's subscriptions from another feed reader: pass their OPML export's text."
     },
     {
       "name": "read_article",
-      "description": "Fetch a web page and return a clean reader-view version (title, byline, plain-text paragraphs)."
+      "description": "Open a web page in reader view: clean title, byline and text, shown as a card."
     },
     {
       "name": "save_item",
-      "description": "Save a link to the user's MCPortal (a bookmark), or update the title or note of one already saved."
+      "description": "Save a link for later (a bookmark), or change the title or note of one already saved."
     },
     {
       "name": "remove_saved",
@@ -82,15 +82,15 @@
     },
     {
       "name": "open_docs",
-      "description": "Open a documentation site in the docs viewer (contents, search, the page, on-this-page), shown as its own card."
+      "description": "Open a docs site in the docs viewer (shown as a card) and get its contents: sections and pages, with links."
     },
     {
       "name": "read_doc_page",
-      "description": "Read one page of a docs site as clean text: headings, code, tables and callouts."
+      "description": "Read one page of a docs site as clean text (headings, code, tables, callouts), with its section and the previous and next pages."
     },
     {
       "name": "search_docs",
-      "description": "Find pages in a docs site by title, description and section, and on Sphinx sites (Python, Django, NumPy…) functions and classes by name (\"str.split\")."
+      "description": "Find pages of a docs site by title and section, and on Sphinx sites functions and classes by name ('str.split'); not full text."
     },
     {
       "name": "clip",
@@ -98,7 +98,7 @@
     },
     {
       "name": "search_clips",
-      "description": "Find the user's clips by words, kind or tag, newest first."
+      "description": "Find the user's clips by words, kind or tag, for things from earlier chats ('that table we made about…')."
     },
     {
       "name": "get_clip",
@@ -114,15 +114,15 @@
     },
     {
       "name": "export_data",
-      "description": "Give the user a copy of their MCPortal data."
+      "description": "Give the user a copy of their data: everything (mcportal), saved items as bookmarks, clips as Markdown, or sources as OPML."
     },
     {
       "name": "import_portal",
-      "description": "Add an MCPortal export file (format \"mcportal-export\") to the user's room: portals they don't have, saved items and clips."
+      "description": "Add an MCPortal export to the user's room: portals they don't have, saved items and clips; nothing is removed or moved."
     },
     {
       "name": "account_settings",
-      "description": "Link to the user's MCPortal account page, where they sign in with GitHub to download everything or delete their account."
+      "description": "Link to the user's account page, where they sign in with GitHub to download everything or delete their account."
     },
     {
       "name": "record_reading",
@@ -134,7 +134,7 @@
     },
     {
       "name": "list_reading",
-      "description": "List recent unfinished reading (actually opened, not completed), newest opened first."
+      "description": "What the user was reading: pages they opened and haven't finished, most recent first ('what was I in the middle of?')."
     }
   ],
   "tools_generated": false,

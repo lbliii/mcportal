@@ -6,10 +6,12 @@
  *
  *   node scripts/footprint.ts            per-tool estimates (~4 characters a token)
  *   node scripts/footprint.ts --exact    the Claude API's token counter (needs credentials)
+ *   node scripts/footprint.ts --ceilings write test/footprint-ceilings.json from today's sizes
  *
  * Profiles: a local server; a hosted account that hasn't used sharing yet; an active one.
  */
 import Anthropic from '@anthropic-ai/sdk';
+import { writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { handleMessage } from '../src/mcp.ts';
 import { MemoryProfileStore } from '../src/store.ts';
@@ -84,6 +86,14 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   }
   console.log('');
   for (const p of PROFILES) console.log(`${p.padEnd(14)} ${String(results[p].tools.length).padStart(2)} tools, ${results[p].toolTokens} + ${results[p].instructionTokens} instructions = ${results[p].total} tokens (estimate)`);
+  if (process.argv.includes('--ceilings')) {
+    const ceilings = {
+      totals: Object.fromEntries(PROFILES.map((p) => [p, results[p].total])),
+      tools: Object.fromEntries(active.tools.map((t) => [t.name, t.tokens]).sort(([a], [b]) => String(a).localeCompare(String(b)))),
+    };
+    await writeFile(new URL('../test/footprint-ceilings.json', import.meta.url), `${JSON.stringify(ceilings, null, 2)}\n`);
+    console.log('Wrote test/footprint-ceilings.json');
+  }
   if (process.argv.includes('--exact')) {
     const model = process.argv.find((a) => a.startsWith('--model='))?.split('=')[1] ?? 'claude-opus-5-5';
     for (const p of PROFILES) console.log(`${p.padEnd(14)} ${await exact(p, model)} tokens (counted by the API for ${model})`);

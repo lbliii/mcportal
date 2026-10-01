@@ -52,10 +52,7 @@ export const SOCIAL_TOOLS: ToolDef[] = [
     title: 'Open a space',
     access: 'read',
     available: socialEntry,
-    description: [
-      "Open someone's MCPortal Space by handle, or the user's own Space without one: their name, bio and Space title, their posts (what they shared, as a grid), and the sources they recommend, which the user can add to their own room.",
-      'Use it when the user asks to see someone\'s space, page or profile, or their own ("what does my space look like").',
-    ].join(' '),
+    description: "Open someone's Space by handle, or the user's own without one, as a card: their profile, what they shared, and the sources they recommend.",
     inputSchema: { type: 'object', additionalProperties: false, properties: { handle: handleProp } },
     annotations: { readOnlyHint: true },
     _meta: { ui: { resourceUri: ROOM_URI } },
@@ -90,11 +87,7 @@ export const SOCIAL_TOOLS: ToolDef[] = [
     title: 'Share with followers',
     access: 'write',
     available: socialActive,
-    description: [
-      'Share one of the user\'s saved links (savedUrl) or clips (clipId) with a note, to their followers (default) or everyone on MCPortal (audience "mcportal").',
-      'Only when the user asks to share. If you write the note, show it to them and share only after they approve those exact words.',
-      'Needs a public profile (set_public_profile). The content is copied as it is now.',
-    ].join(' '),
+    description: "Share one of the user's saved links (savedUrl) or clips (clipId) with a note, to their followers or everyone on MCPortal. Only when they ask; if you write the note, share only after they approve its exact words.",
     inputSchema: {
       type: 'object',
       additionalProperties: false,
@@ -163,7 +156,7 @@ export const SOCIAL_TOOLS: ToolDef[] = [
     title: 'List shares',
     access: 'read',
     available: socialActive,
-    description: 'Without handle: the user\'s own shares. With handle: what that person shared that the user may see. Newest first.',
+    description: "The user's own shares (without handle), or what someone shared that the user may see.",
     inputSchema: {
       type: 'object',
       additionalProperties: false,
@@ -189,12 +182,7 @@ export const SOCIAL_TOOLS: ToolDef[] = [
     title: 'Follow, mute or block someone',
     access: 'write',
     available: socialEntry,
-    description: [
-      'follow / unfollow a person by handle (their shares then appear in the user\'s Following portal; the first follow adds that portal);',
-      'mute / unmute (hide their shares from the user\'s Following portal);',
-      'block / unblock (they can\'t follow the user or see their shares, and the user doesn\'t see theirs; blocking removes follows both ways).',
-      'Only when the user asks.',
-    ].join(' '),
+    description: "Follow, unfollow, mute or unmute a person by handle, or block or unblock them, only when the user asks. Following puts their shares in a Following portal; blocking removes follows both ways and hides each from the other.",
     inputSchema: {
       type: 'object',
       required: ['handle', 'action'],
@@ -253,7 +241,7 @@ export const SOCIAL_TOOLS: ToolDef[] = [
     title: 'Report a share or person',
     access: 'write',
     available: socialEntry,
-    description: 'Report a share (shareId) or a person (handle) to the MCPortal admins, with a short reason. Only when the user asks. Suggest blocking too if they don\'t want to see them.',
+    description: "Report a share (shareId) or a person (handle) to the admins with a short reason, only when the user asks. Suggest blocking too.",
     inputSchema: {
       type: 'object',
       required: ['reason'],
