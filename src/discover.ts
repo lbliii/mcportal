@@ -13,10 +13,13 @@ import { HN_FEEDS } from './adapters/hn.ts';
 import { parseFeed } from './adapters/rss.ts';
 import { parseAttrs, tokenize } from './lib/html.ts';
 import { clean, decodeEntities, safeHttpUrl } from './lib/text.ts';
-import type { Fetcher, SourceKind } from './types.ts';
+import type { Fetcher } from './types.ts';
+
+/** The sources MCPortal fetches itself, which find_source can offer. */
+export type FetchedSource = 'hn' | 'rss' | 'github' | 'docs';
 
 export interface SourceCandidate {
-  source: Exclude<SourceKind, 'saved'>;
+  source: FetchedSource;
   config: Record<string, unknown>;
   title: string;
   /** How it was found: native integration, known-site recipe, the page's own feed link, or a probed path. */

@@ -14,6 +14,7 @@
  *
  * Plain script, inlined into room.html by roomHtml(); tests load it with vm.
  */
+/** @typedef {() => number} ArtRandom A seeded generator of numbers in [0, 1). */
 const portalArt = (() => {
   // paper, ink a, ink b, darkest ink, accent
   const INKS = [
@@ -28,13 +29,13 @@ const portalArt = (() => {
   ];
   const W = 160, H = 84;
 
-  /** FNV-1a: a stable 32-bit hash of a key. */
+  /** FNV-1a: a stable 32-bit hash of a key. @param {string} s */
   function hash(s) {
     let h = 2166136261;
     for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
     return h >>> 0;
   }
-  /** mulberry32: well mixed from the first draw, so seeds that differ by a character diverge. */
+  /** mulberry32: well mixed from the first draw, so seeds that differ by a character diverge. @param {number} seed @returns {ArtRandom} */
   function random(seed) {
     let t = seed >>> 0;
     return () => {
@@ -44,19 +45,25 @@ const portalArt = (() => {
       return ((z ^ (z >>> 14)) >>> 0) / 4294967296;
     };
   }
-  const n = (v) => (Math.round(v * 10) / 10).toString();
+  const n = (/** @type {number} */ v) => (Math.round(v * 10) / 10).toString();
   // Pattern and clip ids must be unique in the document.
   let seq = 0;
   const id = () => `pa${++seq}`;
 
+  /** @param {number} cx @param {number} cy @param {number} rad */
   const dot = (cx, cy, rad) => { const q = n(rad); return `M${n(cx - rad)} ${n(cy)}a${q} ${q} 0 1 0 ${n(2 * rad)} 0a${q} ${q} 0 1 0 ${n(-2 * rad)} 0`; };
+  /** @param {number} cx @param {number} w @param {number} h */
   const archPath = (cx, w, h) => { const a = w / 2, yT = H - h + a; return `M${n(cx - a)} ${H}V${n(yT)}A${n(a)} ${n(a)} 0 0 1 ${n(cx + a)} ${n(yT)}V${H}Z`; };
+  /** @param {number} px @param {number} py @param {number} cx @param {number} w @param {number} h */
   const inArch = (px, py, cx, w, h) => {
     const a = w / 2, yT = H - h + a;
     if (py > H || Math.abs(px - cx) > a) return false;
     return py >= yT || Math.hypot(px - cx, py - yT) <= a;
   };
-  /** Back (false) or front (true) half of a tilted ellipse, so a ring can pass behind and in front. */
+  /**
+   * Back (false) or front (true) half of a tilted ellipse, so a ring can pass behind and in front.
+   * @param {number} cx @param {number} cy @param {number} rx @param {number} ry @param {number} deg @param {boolean} front
+   */
   const ring = (cx, cy, rx, ry, deg, front) => {
     const a = (deg * Math.PI) / 180, co = Math.cos(a), si = Math.sin(a);
     let d = '';
@@ -66,22 +73,26 @@ const portalArt = (() => {
     }
     return d;
   };
+  /** @param {number} step @param {number} rad */
   const screen = (step, rad) => {
     const pid = id();
     return { pid, def: `<pattern id="${pid}" width="${step}" height="${step}" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><circle class="ac" cx="${step / 2}" cy="${step / 2}" r="${rad}"/></pattern>` };
   };
   const paper = `<rect class="ap" width="${W}" height="${H}"/>`;
-  const keyline = (d) => `<path class="sc" d="${d}" fill="none" stroke-width="1.3" transform="translate(1.6 -1.1)"/>`;
+  const keyline = (/** @type {string} */ d) => `<path class="sc" d="${d}" fill="none" stroke-width="1.3" transform="translate(1.6 -1.1)"/>`;
 
   // Each motif keeps its composition but varies per item: where it sits (cropping at the
   // edge like a paperback cover), how big it is, and which side the small body is on.
+  /** @param {ArtRandom} r @param {number} lo @param {number} hi */
   const between = (r, lo, hi) => lo + r() * (hi - lo);
-  const side = (r) => (r() < 0.5 ? -1 : 1);
+  const side = (/** @type {ArtRandom} */ r) => (r() < 0.5 ? -1 : 1);
 
   const MOTIFS = {
+    /** @param {ArtRandom} r */
     arches(r) {
       const cx = between(r, 22, 138), k = between(r, 0.72, 1.08), layers = r() < 0.5 ? 3 : 4, s = screen(3.2, 0.7);
-      const size = (i) => [84 - i * 20, 82 - i * 14].map((v) => v * k);
+      // An arch layer's [width, height]: mapping a pair gives a pair.
+      const size = (/** @type {number} */ i) => /** @type {[number, number]} */ ([84 - i * 20, 82 - i * 14].map((v) => v * k));
       const outer = archPath(cx, ...size(0));
       const fills = ['aa', 'ab', 'aa', 'ac'];
       let body = `<circle class="ax" cx="${n(cx + side(r) * between(r, 16, 34) * k)}" cy="${n(between(r, 14, 34))}" r="${n(between(r, 10, 16))}"/>`
@@ -89,6 +100,7 @@ const portalArt = (() => {
       for (let i = 1; i < layers; i++) body += `<path class="${i === layers - 1 ? 'ac' : fills[i]}" d="${archPath(cx, ...size(i))}"/>`;
       return `<defs>${s.def}</defs>${paper}${body}${keyline(outer)}`;
     },
+    /** @param {ArtRandom} r */
     orbits(r) {
       const cx = between(r, 26, 134), cy = between(r, 26, 58), R = between(r, 15, 26), tilt = between(r, -28, 28);
       const rx = R * between(r, 1.8, 2.3), ry = R * between(r, 0.35, 0.55), s = screen(3, 0.9), clip = id(), lit = side(r);
@@ -104,6 +116,7 @@ const portalArt = (() => {
         + `<circle class="ax" cx="${n(cx + orbit * Math.cos(a))}" cy="${n(cy + orbit * 0.7 * Math.sin(a))}" r="${n(between(r, 3.5, 5.5))}"/>`
         + keyline(dot(cx, cy, R));
     },
+    /** @param {ArtRandom} r */
     portal(r) {
       const cx = between(r, 30, 130), k = between(r, 0.78, 1.08), tilt = between(r, -32, 32), s = screen(3.2, 0.75);
       const w = 58 * k, h = 76 * k, cy = H - h * between(r, 0.35, 0.6), rx = w * between(r, 0.95, 1.2), ry = between(r, 10, 16);
@@ -114,6 +127,7 @@ const portalArt = (() => {
         + `<path class="sb" d="${ring(cx, cy, rx, ry, tilt, true)}" fill="none" stroke-width="3"/>`
         + keyline(door);
     },
+    /** @param {ArtRandom} r */
     gravity(r) {
       // A dot screen pushed outward around a moon, as if the grid were bent by its pull.
       const cx = between(r, 22, 138), cy = between(r, 18, 66), R = between(r, 8, 13), pull = 20 * R;
@@ -130,6 +144,7 @@ const portalArt = (() => {
       return `${paper}<path class="aa" d="${d}"/><circle class="ac" cx="${n(cx)}" cy="${n(cy)}" r="${n(R)}"/><circle class="ab" cx="${n(cx - lit * 3)}" cy="${n(cy - 3)}" r="${n(R)}"/>`
         + `<circle class="ax" cx="${n(cx + orbit * Math.cos(a))}" cy="${n(cy + orbit * Math.sin(a))}" r="${n(between(r, 2.8, 4))}"/>`;
     },
+    /** @param {ArtRandom} r */
     doorway(r) {
       // A dot field outside; through the door, a starfield knocked out of the dark.
       const cx = between(r, 24, 136), w = between(r, 40, 64), h = between(r, 58, 80);
@@ -148,9 +163,10 @@ const portalArt = (() => {
     },
   };
 
-  const NAMES = Object.keys(MOTIFS);
+  // Object.keys widens to string[]; these are exactly MOTIFS' own keys.
+  const NAMES = /** @type {Array<keyof typeof MOTIFS>} */ (Object.keys(MOTIFS));
   const COUNT = INKS.length * NAMES.length;
-  const parts = (style) => ({ ink: INKS[style % INKS.length], motif: NAMES[Math.floor(style / INKS.length) % NAMES.length] });
+  const parts = (/** @type {number} */ style) => ({ ink: INKS[style % INKS.length], motif: NAMES[Math.floor(style / INKS.length) % NAMES.length] });
 
   /**
    * Styles for a portal's sources, in display order. Each source takes the free style
@@ -158,6 +174,7 @@ const portalArt = (() => {
    * just before it; ties go to the style its key hashes to (then the next ones after it).
    * So the first eight sources get eight ink sets and the first five get all five motifs,
    * and adding a portal never restyles the ones before it.
+   * @param {string[]} keys @returns {number[]}
    */
   function styles(keys) {
     const taken = new Set(), inkUse = INKS.map(() => 0), motifUse = NAMES.map(() => 0);
@@ -181,7 +198,7 @@ const portalArt = (() => {
     });
   }
 
-  /** The scene for one item: the source's style, placed by the item's key. */
+  /** The scene for one item: the source's style, placed by the item's key. @param {number} style @param {string} itemKey */
   function draw(style, itemKey) {
     const { ink: [p, a, b, c, accent], motif } = parts(style);
     const body = MOTIFS[motif](random(hash(`${style}\n${itemKey}`)));
@@ -189,7 +206,7 @@ const portalArt = (() => {
   }
 
   /** A style's lead ink (its set's first ink after paper): the source's colour in the room. */
-  const leadOf = (style) => INKS[style % INKS.length][1];
+  const leadOf = (/** @type {number} */ style) => INKS[style % INKS.length][1];
 
-  return { styles, draw, leadOf, motifOf: (style) => parts(style).motif, inkOf: (style) => style % INKS.length };
+  return { styles, draw, leadOf, motifOf: (/** @type {number} */ style) => parts(style).motif, inkOf: (/** @type {number} */ style) => style % INKS.length };
 })();

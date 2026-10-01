@@ -16,7 +16,8 @@
     "snapshot": "node scripts/snapshot.ts snapshot.html",
     "brand": "node scripts/brand.ts",
     "demo": "MCPORTAL_FIXTURES=1 MCPORTAL_DATA_DIR=.demo-data node bin/mcportal.mjs",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && node scripts/check-ui.ts",
+    "typecheck:ui": "node scripts/check-ui.ts",
     "design": "node scripts/design.ts",
     "design:check": "node scripts/design.ts --check"
   },

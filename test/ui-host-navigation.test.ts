@@ -51,7 +51,7 @@ test('returning to a room restores lane/column scroll and focus without reloadin
   let focused = false;
   const nodes: any = { grid: lane, reader: { hidden: false, classList: { remove() {} } }, roomName: {} };
   const positions: unknown[] = [];
-  const context = vm.createContext({ $: (id: string) => nodes[id], state: { profile: { name: 'My room' } }, root: { classList: { remove() {} } }, document: { activeElement: { focus: () => { focused = true; } } }, window: { scrollX: 0, scrollY: 150, scrollTo: (...args: unknown[]) => positions.push(args) } });
+  const context = vm.createContext({ $: (id: string) => nodes[id], $$: (selector: string, from: { querySelectorAll(s: string): unknown[] }) => from.querySelectorAll(selector), state: { profile: { name: 'My room' } }, root: { classList: { remove() {} } }, document: { activeElement: { focus: () => { focused = true; } } }, window: { scrollX: 0, scrollY: 150, scrollTo: (...args: unknown[]) => positions.push(args) } });
   vm.runInContext(`let readerGeneration = 0, roomNavigation = null, articleUrl = null, clipId = null, docsArgs = null, spaceHandle = null, docsState = null; ${shipped('rememberRoomNavigation')} ${shipped('closeReader')} rememberRoomNavigation();`, context);
   lane.hidden = true; lane.scrollLeft = 0; column.scrollTop = 0;
   await vm.runInContext('closeReader()', context);

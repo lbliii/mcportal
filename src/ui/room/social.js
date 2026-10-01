@@ -2,6 +2,10 @@
   // ------------------------------------------------------------ clips
   // Clips are structured data from our own server; every piece is still built as
   // DOM text. Images are <img src="data:…">, so nothing inside an SVG can run.
+  /** @typedef {ToolResults['open_space']['space']} Space */
+  /** A share to open: an Item of a following portal, or a post in a space. @typedef {{ title: string; share?: { id: string; kind: 'link' | 'clip' } }} ShareRef */
+
+  /** @param {ClipData} data */
   function clipBody(data) {
     if (data.kind === 'quote') return [el('p', { class: 'clip-quote' }, data.text), data.attribution ? el('p', { class: 'clip-attr' }, `— ${data.attribution}`) : null];
     if (data.kind === 'exchange') return data.turns.map((t) => el('div', { class: `turn ${t.speaker === 'user' ? 'user' : ''}` }, el('div', { class: 'speaker' }, t.speaker), el('div', { class: 'said' }, t.text)));
@@ -18,22 +22,26 @@
     return [el('div', { class: 'error' }, 'This clip can\'t be shown.')];
   }
 
+  /** @param {Clip} clip @param {boolean} withBack */
   function clipNodes(clip, withBack) {
+    /** @type {Partial<Clip['source']>} */
     const src = clip.source || {};
     const from = src.url ? (src.title || new URL(src.url).hostname) : src.kind === 'conversation' ? 'a conversation' : (src.title || '');
     const top = el('div', { class: 'reader-top' },
       iconButton('back', withBack ? 'Back to your room' : 'Open your room', closeReader, 'ib'),
-      src.url && isHttpUrl(src.url) ? iconButton('external', 'Open where it came from', () => openLink(src.url), 'ib') : null);
-    return [top, el('h1', null, clip.title),
+      src.url && isHttpUrl(src.url) ? iconButton('external', 'Open where it came from', () => openLink(/** @type {string} */ (src.url)), 'ib') : null);  // checked just before
+    // filter(Boolean) drops the nulls, leaving elements.
+    return /** @type {HTMLElement[]} */ ([top, el('h1', null, clip.title),
       el('div', { class: 'byline' }, [`${clip.kind[0].toUpperCase()}${clip.kind.slice(1)}`, from ? `from ${from}` : '', `clipped ${ago(clip.createdAt)}`].filter(Boolean).join(' · ')),
       clip.tags.length ? el('div', { class: 'clip-tags' }, clip.tags.map((t) => el('span', null, `#${t}`))) : null,
       clip.note ? el('p', { class: 'clip-note' }, clip.note) : null,
       el('div', { class: 'body' }, clipBody(clip.data)),
-      el('div', { class: 'row' }, el('button', { class: 'btn', onclick: (e) => { e.currentTarget.parentNode.replaceWith(composer({ clipId: clip.id }, clip.title)); } }, icon('share'), ' Share to your space')),
-      el('div', { class: 'prov' }, `Your clip ${clip.id}. Only you can see it until you share it.`)].filter(Boolean);
+      el('div', { class: 'row' }, el('button', { class: 'btn', onclick: (/** @type {MouseEvent} */ e) => { /** @type {HTMLElement} */ (/** @type {HTMLElement} */ (e.currentTarget).parentNode).replaceWith(composer({ clipId: clip.id }, clip.title)); } }, icon('share'), ' Share to your space')),  // the button's parent: this row
+      el('div', { class: 'prov' }, `Your clip ${clip.id}. Only you can see it until you share it.`)].filter(Boolean));
   }
 
   // This view belongs to a get_clip call: it is a clip card, not a room.
+  /** @param {Clip} clip */
   function showClipCard(clip) {
     root.classList.add('article-view');
     $('roomName').textContent = 'clip';
@@ -44,6 +52,7 @@
     setStatus('');
   }
 
+  /** @param {string} id */
   async function loadClipCard(id) {
     setStatus('Stand by…');
     try {
@@ -52,17 +61,19 @@
       setStatus('');
       $('grid').hidden = true;
       $('reader').hidden = false;
-      $('reader').replaceChildren(el('div', { class: 'error' }, `That clip has vanished into another dimension (${error.message}).`));
+      $('reader').replaceChildren(el('div', { class: 'error' }, `That clip has vanished into another dimension (${errorText(error)}).`));
     }
   }
 
+  /** @param {Item} item */
   async function openClip(item) {
     const reader = $('reader');
     rememberRoomNavigation();
     $('grid').hidden = true; reader.hidden = false; reader.scrollTop = 0; window.scrollTo(0, 0);
     reader.replaceChildren(el('div', { class: 'reader-top' }, iconButton('back', 'Back to your room', closeReader, 'ib')), el('h1', null, item.title), el('div', { class: 'byline' }, 'Stand by…'));
     try {
-      const clip = (await callTool('get_clip', { id: item.clip.id })).structuredContent.clip;
+      // Only clip items come here (openItem checks item.clip).
+      const clip = (await callTool('get_clip', { id: /** @type {NonNullable<Item['clip']>} */ (item.clip).id })).structuredContent.clip;
       reader.replaceChildren(...clipNodes(clip, true));
       if (!DEV) {
         hostRequest('ui/update-model-context', {
@@ -72,12 +83,13 @@
       }
     } catch (error) {
       reader.replaceChildren(el('div', { class: 'reader-top' }, iconButton('back', 'Back to your room', closeReader, 'ib')), el('h1', null, item.title),
-        el('div', { class: 'error' }, `That clip has vanished into another dimension (${error.message}).`));
+        el('div', { class: 'error' }, `That clip has vanished into another dimension (${errorText(error)}).`));
     }
   }
 
   // ------------------------------------------------------------ sharing into your space
   // The user writes the note here themselves, so nothing is posted in their name without them.
+  /** @param {Record<string, string | undefined>} target what to share: { clipId } or { savedUrl } @param {string} title */
   function composer(target, title) {
     const note = el('textarea', { placeholder: 'Add a note (optional): why it\'s worth a look', 'aria-label': 'Share note (optional)', maxlength: '500' });
     const audience = el('select', { class: 'btn', 'aria-label': 'Who sees this share' }, el('option', { value: 'followers' }, 'Followers'), el('option', { value: 'mcportal' }, 'Everyone on MCPortal'));
@@ -90,13 +102,14 @@
         await callTool('share', { ...target, note: note.value, audience: audience.value });
         box.replaceChildren(el('div', null, `Transmitted! ${audience.value === 'mcportal' ? 'Everyone on MCPortal' : 'Your followers'} will find it in your space.`));
       } catch (error) {
-        toast(error.message);
+        toast(errorText(error));
         go.disabled = false;
       }
     });
     return box;
   }
 
+  /** @param {Item} item */
   function openComposer(item) {
     const reader = $('reader');
     rememberRoomNavigation();
@@ -108,6 +121,7 @@
   // ------------------------------------------------------------ spaces
   const ACCENT = { blue: '#2563eb', teal: '#0d9488', green: '#16a34a', amber: '#d97706', orange: '#ea580c', rose: '#e11d48', violet: '#7c3aed', slate: '#475569' };
 
+  /** @param {SharedItem} post */
   function postPreview(post) {
     const c = post.clip ? post.clip.data : null;
     let hostName = '';
@@ -125,6 +139,7 @@
     return [top, el('div', { class: 'pc' }, body, post.note ? el('p', { class: 'pn' }, post.note) : null, el('div', { class: 'pm' }, meta.join(' · ')))];
   }
 
+  /** @param {Space} space @param {boolean} withBack @param {(e: MouseEvent) => void} [back] */
   function spaceNodes(space, withBack, back) {
     const name = space.spaceTitle || space.displayName || `@${space.handle}`;
     const follow = space.mine ? null : el('button', { class: 'btn follow', 'aria-pressed': String(space.following) }, space.following ? 'Following' : 'Follow');
@@ -136,25 +151,27 @@
         space.following = !space.following;
         space.followers += space.following ? 1 : -1;
         showSpace(space, withBack, back);
-      } catch (error) { toast(error.message); follow.disabled = false; }
+      } catch (error) { toast(errorText(error)); follow.disabled = false; }
     });
-    const reShow = (scroll) => { showSpace(space, withBack, back); $('reader').scrollTop = scroll || 0; };
+    const reShow = (/** @type {number} */ scroll) => { showSpace(space, withBack, back); $('reader').scrollTop = scroll || 0; };
     const posts = space.posts.map((post) => el('div', {
       class: 'post', role: 'button', tabindex: '0', title: 'Open',
       onclick: () => openShare({ title: post.title, share: { id: post.id, kind: post.kind } }, reShow),
-      onkeydown: (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) { e.preventDefault(); openShare({ title: post.title, share: { id: post.id, kind: post.kind } }, reShow); } },
+      onkeydown: (/** @type {KeyboardEvent} */ e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) { e.preventDefault(); openShare({ title: post.title, share: { id: post.id, kind: post.kind } }, reShow); } },
     }, postPreview(post)));
     const sources = space.sources.map((src) => {
       const add = space.mine ? null : el('button', { class: 'btn' }, 'Add');
       if (add) add.addEventListener('click', async () => {
         add.disabled = true;
         try { await callTool('add_portal', { source: src.source, config: src.config, title: src.title }); add.textContent = 'Added'; }
-        catch (error) { toast(error.message); add.disabled = false; }
+        catch (error) { toast(errorText(error)); add.disabled = false; }
       });
+      // An rss source carries an rss config: normalizeFeatured pairs them.
       return el('div', { class: 'source' }, el('span', { class: 'dot', style: `background:${loneColor(src.source, src.config)}` }),
-        el('div', { class: 'st' }, el('div', null, src.title), el('div', null, src.source === 'rss' ? (() => { try { return new URL(src.config.url).hostname.replace(/^www\./, ''); } catch { return 'feed'; } })() : src.source === 'docs' ? docsSourceLabel(src.config) : src.source === 'hn' ? 'Hacker News' : 'GitHub')), add);
+        el('div', { class: 'st' }, el('div', null, src.title), el('div', null, src.source === 'rss' ? (() => { try { return new URL(/** @type {Extract<PortalSpec, { source: 'rss' }>['config']} */ (src.config).url).hostname.replace(/^www\./, ''); } catch { return 'feed'; } })() : src.source === 'hn' ? 'Hacker News' : 'GitHub')), add);
     });
-    return [
+    // filter(Boolean) drops the nulls, leaving elements.
+    return /** @type {HTMLElement[]} */ ([
       withBack ? el('div', { class: 'reader-top' }, iconButton('back', 'Back to your room', back || closeReader, 'ib')) : null,
       el('div', { class: 'space-head' },
         el('h1', null, name),
@@ -166,12 +183,14 @@
       space.sources.length ? el('div', { class: 'sources' }, sources) : null,
       el('h2', null, 'Posts'),
       posts.length ? el('div', { class: 'posts' }, posts) : el('div', { class: 'empty' }, space.mine ? 'Your space stands empty, waiting. Share a saved item or a clip to put something in it.' : 'Nothing shared that you can see yet.'),
-    ].filter(Boolean);
+    ].filter(Boolean));
   }
 
+  /** @param {Space} space @param {boolean} withBack @param {(e: MouseEvent) => void} [back] */
   function showSpace(space, withBack, back) {
     const reader = $('reader');
-    reader.style.setProperty('--mp-space-accent', ACCENT[space.accent] || 'var(--mp-action-primary)');
+    // No accent reads ACCENT[undefined], which falls back to the default.
+    reader.style.setProperty('--mp-space-accent', ACCENT[/** @type {keyof typeof ACCENT} */ (space.accent)] || 'var(--mp-action-primary)');
     reader.classList.add('space');
     $('grid').hidden = true; reader.hidden = false;
     reader.replaceChildren(...spaceNodes(space, withBack, back));
@@ -179,12 +198,14 @@
   }
 
   // This view belongs to an open_space call: it is a space card.
+  /** @param {Space} space */
   function showSpaceCard(space) {
     root.classList.add('article-view');
     $('roomName').textContent = `@${space.handle}`;
     showSpace(space, false);
   }
 
+  /** @param {string} handle '' for your own space @param {boolean} asCard */
   async function loadSpace(handle, asCard) {
     setStatus('Stand by…');
     try {
@@ -192,27 +213,30 @@
       asCard ? showSpaceCard(space) : showSpace(space, true);
     } catch (error) {
       setStatus('');
-      toast(error.message);
+      toast(errorText(error));
     }
   }
 
   // ------------------------------------------------------------ shares
   // Other people's words: built as text like everything else, and labeled with who wrote them.
+  /** @param {SharedItem} share @param {boolean} withBack */
   function shareNodes(share, withBack) {
     const who = share.mine ? 'You' : `@${share.author.handle}`;
     const to = share.audience === 'mcportal' ? 'everyone on MCPortal' : 'followers';
     const top = el('div', { class: 'reader-top' },
       iconButton('back', withBack ? 'Back to your room' : 'Open your room', closeReader, 'ib'),
-      share.url && isHttpUrl(share.url) ? iconButton('external', 'Open the original', () => openLink(share.url), 'ib') : null);
+      share.url && isHttpUrl(share.url) ? iconButton('external', 'Open the original', () => openLink(/** @type {string} */ (share.url)), 'ib') : null);  // checked just before
     const body = share.clip ? clipBody(share.clip.data)
-      : share.url && isHttpUrl(share.url) ? [el('p', null, el('button', { class: 'btn', onclick: () => openLink(share.url) }, share.url))] : [];
-    return [top, el('h1', null, share.title),
+      : share.url && isHttpUrl(share.url) ? [el('p', null, el('button', { class: 'btn', onclick: () => openLink(/** @type {string} */ (share.url)) }, share.url))] : [];  // checked just before
+    // filter(Boolean) drops the nulls, leaving elements.
+    return /** @type {HTMLElement[]} */ ([top, el('h1', null, share.title),
       el('div', { class: 'byline' }, [`${who} shared ${share.kind === 'clip' ? `a ${share.clip ? share.clip.kind : 'clip'}` : 'a link'}`, `with ${to}`, ago(share.createdAt)].join(' · ')),
       share.note ? el('p', { class: 'share-note' }, share.note) : null,
       el('div', { class: 'body' }, body),
-      el('div', { class: 'prov' }, share.hiddenAt ? 'An admin hid this share; only you can see it.' : `Shared on MCPortal. ${share.mine ? '' : 'Written by another user.'}`)].filter(Boolean);
+      el('div', { class: 'prov' }, share.hiddenAt ? 'An admin hid this share; only you can see it.' : `Shared on MCPortal. ${share.mine ? '' : 'Written by another user.'}`)].filter(Boolean));
   }
 
+  /** @param {SharedItem} share */
   function showShareCard(share) {
     root.classList.add('article-view');
     $('roomName').textContent = 'shared';
@@ -223,6 +247,7 @@
     setStatus('');
   }
 
+  /** @param {string} id */
   async function loadShareCard(id) {
     setStatus('Stand by…');
     try {
@@ -231,23 +256,25 @@
       setStatus('');
       $('grid').hidden = true;
       $('reader').hidden = false;
-      $('reader').replaceChildren(el('div', { class: 'error' }, `That share has vanished into another dimension (${error.message}).`));
+      $('reader').replaceChildren(el('div', { class: 'error' }, `That share has vanished into another dimension (${errorText(error)}).`));
     }
   }
 
+  /** @param {ShareRef} item @param {(scroll: number) => void} [back] back to the space, at this scroll position */
   async function openShare(item, back) {
     const reader = $('reader');
     const scroll = reader.scrollTop;
     reader.classList.remove('space');
     rememberRoomNavigation();
     $('grid').hidden = true; reader.hidden = false; reader.scrollTop = 0; window.scrollTo(0, 0);
-    reader.replaceChildren(el('div', { class: 'reader-top' }, iconButton('back', 'Back', back || closeReader, 'ib')), el('h1', null, item.title), el('div', { class: 'byline' }, 'Stand by…'));
+    reader.replaceChildren(el('div', { class: 'reader-top' }, iconButton('back', 'Back', back ? () => back(scroll) : closeReader, 'ib')), el('h1', null, item.title), el('div', { class: 'byline' }, 'Stand by…'));
     try {
-      const nodes = shareNodes((await callTool('get_share', { id: item.share.id })).structuredContent.share, true);
+      // Only shares come here: openItem checks item.share, and space posts always carry one.
+      const nodes = shareNodes((await callTool('get_share', { id: /** @type {NonNullable<ShareRef['share']>} */ (item.share).id })).structuredContent.share, true);
       if (back) nodes[0].replaceChildren(iconButton('back', 'Back to the space', () => back(scroll), 'ib'), ...[...nodes[0].children].slice(1));
       reader.replaceChildren(...nodes);
     } catch (error) {
       reader.replaceChildren(el('div', { class: 'reader-top' }, iconButton('back', 'Back to your room', closeReader, 'ib')), el('h1', null, item.title),
-        el('div', { class: 'error' }, `That share has vanished into another dimension (${error.message}).`));
+        el('div', { class: 'error' }, `That share has vanished into another dimension (${errorText(error)}).`));
     }
   }

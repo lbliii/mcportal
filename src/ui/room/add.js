@@ -6,6 +6,7 @@
     if (open) $('addInput').focus();
   }
 
+  /** @param {string} query */
   async function findSources(query) {
     const hint = $('addHint'), list = $('addResults');
     hint.textContent = 'Looking…'; list.replaceChildren();
@@ -15,7 +16,7 @@
         ? (data.candidates.length === 1 ? 'A signal! Open this door?' : `${data.candidates.length} signals from the void! Pick one.`)
         : (data.hint || "Nothing but static. No feed lurks behind that door; try the site's home page or another address.");
       list.replaceChildren(...data.candidates.map((c) => {
-        const sub = c.source === 'rss' ? c.config.url : c.source === 'docs' ? docsSourceLabel(c.config) : c.source === 'github' ? `GitHub · ${c.config.repo || c.config.query}` : `Hacker News · ${c.config.feed}`;
+        const sub = c.source === 'rss' ? c.config.url : c.source === 'docs' ? docsSourceLabel(c.config) : c.source === 'github' ? `GitHub · ${c.config.mode === 'releases' ? c.config.repo : c.config.query}` : `Hacker News · ${c.config.feed}`;
         const add = el('button', { class: 'btn', onclick: () => addCandidate(c, add) }, 'Add');
         return el('li', { class: 'cand' },
           el('span', { class: 'dot', style: `background:${loneColor(c.source, c.config)}` }),
@@ -26,10 +27,14 @@
           add);
       }));
     } catch (error) {
-      hint.textContent = `Curses! Couldn't look that up: ${error.message}`;
+      hint.textContent = `Curses! Couldn't look that up: ${errorText(error)}`;
     }
   }
 
+  /**
+   * @param {ToolResults['find_source']['candidates'][number]} c
+   * @param {HTMLButtonElement} button
+   */
   async function addCandidate(c, button) {
     button.disabled = true; button.textContent = 'Adding…';
     try {
@@ -39,11 +44,11 @@
       drawLayout();
       toggleAdd(false); $('addInput').value = ''; $('addResults').replaceChildren();
       toast(`It's alive! ${data.portal.title} has joined your room.`);
-      const node = document.querySelector(`[data-portal="${CSS.escape(data.portalId)}"]`);
+      const node = $first(`[data-portal="${CSS.escape(data.portalId)}"]`);
       if (node) node.scrollIntoView({ behavior: scrollBehavior(), block: 'nearest', inline: 'start' });
     } catch (error) {
       button.disabled = false; button.textContent = 'Add';
-      toast(error.message.replace(/^Not added: /, ''));
+      toast(errorText(error).replace(/^Not added: /, ''));
     }
   }
 
@@ -54,12 +59,12 @@
     catch { toast('Attach the OPML file in the chat and ask your agent to import it'); }
   }
   $('opmlFile').addEventListener('change', async () => {
-    const file = $('opmlFile').files && $('opmlFile').files[0];
+    const file = $('opmlFile').files?.[0];
     if (!file) return;
     if (file.size > 1_000_000) { toast('That file is over 1 MB'); return; }
     const status = root.classList.contains('welcome-view') ? el('div', { class: 'building' }) : null;
     if (status) $('welcome').append(status);
-    const say = (t) => (status ? (status.textContent = t) : setStatus(t));
+    const say = (/** @type {string} */ t) => (status ? (status.textContent = t) : setStatus(t));
     say('Smuggling your subscriptions through the portal…');
     try {
       const text = await file.text();
@@ -72,7 +77,7 @@
       toast(summary);
     } catch (error) {
       say('');
-      toast(`Curses! The import failed: ${error.message}`);
+      toast(`Curses! The import failed: ${errorText(error)}`);
     }
   });
   $('btnImportOpml').addEventListener('click', () => pickOpml());

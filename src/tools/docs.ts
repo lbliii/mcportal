@@ -14,6 +14,7 @@ import { clean } from '../lib/text.ts';
 import { findPortal, LIMITS } from '../profile.ts';
 import { FRESHNESS, loadDocSite } from '../sources.ts';
 import { ok, toolError, toolFailure, untrusted, ROOM_URI, type ToolContext, type ToolDef } from './kit.ts';
+import type { ToolResults } from './results.ts';
 import type { ArticleBlock, Provenance } from '../types.ts';
 
 /** How much of a page the model gets as text; the app gets every block. */
@@ -117,7 +118,7 @@ export const DOCS_TOOLS: ToolDef[] = [
           docs: config.url,
           provenance: { source: 'docs', endpoint: site.toc.url, fetchedAt, cached, ttlSeconds: FRESHNESS.docs },
           ...(page ? { page } : {}),
-        });
+        } satisfies ToolResults['open_docs']);
       } catch (error) {
         return failed('Could not open those docs', error);
       }
@@ -161,7 +162,7 @@ export const DOCS_TOOLS: ToolDef[] = [
           ...(where.prev ? { prev: where.prev } : {}),
           ...(where.next ? { next: where.next } : {}),
           provenance,
-        });
+        } satisfies ToolResults['read_doc_page']);
       } catch (error) {
         return failed(`Could not read ${clean(url, 200)}`, error);
       }
@@ -188,9 +189,9 @@ export const DOCS_TOOLS: ToolDef[] = [
       try {
         const { site } = await siteFor(args, ctx);
         const hits = searchDocs(site, query, typeof args.limit === 'number' ? args.limit : 20);
-        if (!hits.length) return ok(`Nothing in ${site.title} matches "${query}" by title. Try other words, or open_docs to browse.`, { hits: [], site: { title: site.title, toc: site.toc } });
+        if (!hits.length) return ok(`Nothing in ${site.title} matches "${query}" by title. Try other words, or open_docs to browse.`, { hits: [], site: { title: site.title, toc: site.toc } } satisfies ToolResults['search_docs']);
         const lines = hits.map((h) => `- ${h.title}${h.kind === 'symbol' ? ` (${h.role})` : h.section ? ` (in ${h.section})` : ''} <${h.url}>`);
-        return ok(`${hits.length} match(es) in ${site.title}:\n${untrusted(site.toc.url, lines.join('\n'))}`, { hits, site: { title: site.title, toc: site.toc } });
+        return ok(`${hits.length} match(es) in ${site.title}:\n${untrusted(site.toc.url, lines.join('\n'))}`, { hits, site: { title: site.title, toc: site.toc } } satisfies ToolResults['search_docs']);
       } catch (error) {
         return failed('Could not search those docs', error);
       }

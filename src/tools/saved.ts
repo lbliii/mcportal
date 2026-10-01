@@ -8,11 +8,12 @@ import { describeLayout, findPortal, findSavedPortal, httpUrl, LIMITS, normalize
 import { pinnedPortal, savedPortal } from '../sources.ts';
 import type { ProfileChange } from '../store.ts';
 import { ok, toolError, toolFailure, untrusted, type CallToolResult, type ToolDef } from './kit.ts';
+import type { ToolResults } from './results.ts';
 
 /** What the saving tools return: the model gets a fenced summary, the app gets state to redraw. */
 function savedResult(text: string, profile: Profile, layoutChanged: boolean): CallToolResult {
   const spec = findSavedPortal(profile);
-  return ok(text, { saved: profile.saved, profile, layoutChanged, portal: spec ? savedPortal(spec, profile.saved) : null });
+  return ok(text, { saved: profile.saved, profile, layoutChanged, portal: spec ? savedPortal(spec, profile.saved) : null } satisfies ToolResults['save_item']);
 }
 
 export const SAVED_TOOLS: ToolDef[] = [

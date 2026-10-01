@@ -24,7 +24,7 @@ async function viewer() {
     el: (_tag: string, _attrs: unknown, text: string) => text,
   });
   vm.runInContext(`let docsArgs = { docs: 'acme/widgets' }; let toolRunning = true; let gotInitialResult = false;
-    ${fn('showAppError')}\n${fn('showDocsCard')}\n${fn('onHostNotification')}
+    ${fn('errorText')}\n${fn('showAppError')}\n${fn('showDocsCard')}\n${fn('onHostNotification')}
     function dispatch(params) { try { onHostNotification('ui/notifications/tool-result', params); } catch (error) { showAppError('Could not display the tool result', error); } }`, context);
   return { context, nodes, shown, errors, statuses };
 }

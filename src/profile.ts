@@ -246,11 +246,19 @@ export function normalizeSourceConfig<S extends SourceKind>(source: S, raw: unkn
   return normalize(isRecord(raw) ? raw : {}, where);
 }
 
-/** A stored portal from validated parts. The one place a source and its config are paired up. */
-function portalOf<S extends SourceKind>(id: string, source: S, title: string | undefined, config: SourceConfigs[S]): PortalSpec {
-  const portal: PortalOf<S> = title ? { id, source, title, config } : { id, source, config };
-  // PortalOf<S> is a member of the PortalSpec union for every S; TypeScript can't see that through a generic.
-  return portal as PortalOf<SourceKind> as PortalSpec;
+/** A source paired with its validated settings: narrowing on `source` types `config`. */
+export type SourceSettings<K extends SourceKind = SourceKind> = { [S in K]: { source: S; config: SourceConfigs[S] } }[K];
+
+/** A source and its settings, validated. The one place a source and its config are paired up. */
+export function sourceSettings<S extends SourceKind>(source: S, raw: unknown, where: string): SourceSettings<S> {
+  const settings = { source, config: normalizeSourceConfig(source, raw, where) };
+  // { source: S; config: SourceConfigs[S] } is a member of the union for every S; TypeScript can't see that through a generic.
+  return settings as unknown as SourceSettings<S>;
+}
+
+/** A stored portal from validated parts. */
+function portalOf(id: string, title: string | undefined, settings: SourceSettings): PortalSpec {
+  return title ? { id, title, ...settings } : { id, ...settings };
 }
 
 /** Validate and normalize a whole profile. Throws ProfileError with a readable message. */
@@ -277,7 +285,7 @@ export function validateProfile(input: unknown, now = new Date()): Profile {
       let id = slug(typeof pRaw.id === 'string' && pRaw.id ? pRaw.id : title ?? `${source}-${ci}-${pi}`) || `${source}-${ci}-${pi}`;
       while (seen.has(id)) id = `${id}-2`;
       seen.add(id);
-      return portalOf(id, source, title, normalizeSourceConfig(source, pRaw.config, where));
+      return portalOf(id, title, sourceSettings(source, pRaw.config, where));
     });
     return { width: clampInt(colRaw.width, 1, 4, 1), panels: portals };
   });
