@@ -17,6 +17,7 @@ import { buildOpml } from './opml.ts';
 import { LIMITS, normalizePinnedItems, normalizeSaved, ProfileError, validateProfile, type PortalSpec, type Profile } from './profile.ts';
 import type { PublicProfile } from './public-profiles.ts';
 import type { SharedItem, Social } from './social.ts';
+import type { ReadingStore, ReadingState } from './reading.ts';
 import type { ProfileStore } from './store.ts';
 import { addPortalTo } from './tools.ts';
 import type { ArticleBlock } from './types.ts';
@@ -39,6 +40,7 @@ export interface PortalExport {
   exportedAt: string;
   profile: Profile;
   clips: Clip[];
+  reading?: ReadingState[];
   publicProfile: Pick<PublicProfile, 'handle' | 'displayName' | 'bio'> | null;
   /** Your shares (with the content as shared) and who you follow, by handle. Not imported. */
   shares?: Array<Omit<SharedItem, 'author' | 'mine'>>;
@@ -47,6 +49,7 @@ export interface PortalExport {
 
 export interface ExportSources {
   store: ProfileStore;
+  reading?: ReadingStore;
   clips?: ClipStore;
   publicProfile?: PublicProfile;
   social?: Social;
@@ -81,6 +84,7 @@ export async function buildExport(format: ExportFormat, userId: string, from: Ex
     exportedAt: now.toISOString(),
     profile,
     clips,
+    reading: await from.reading?.list(userId, { limit: 1000 }) ?? [],
     publicProfile: p ? { handle: p.handle, ...(p.displayName ? { displayName: p.displayName } : {}), ...(p.bio ? { bio: p.bio } : {}) } : null,
   };
   if (from.social) {
@@ -251,7 +255,7 @@ export function parseExport(text: string): PortalExport {
 }
 
 /** Add an export to a room. Never removes or rearranges anything. */
-export async function importExport(data: PortalExport, userId: string, to: { store: ProfileStore; clips?: ClipStore }): Promise<ImportResult> {
+export async function importExport(data: PortalExport, userId: string, to: { store: ProfileStore; reading?: ReadingStore; clips?: ClipStore }): Promise<ImportResult> {
   const result: ImportResult = { portalsAdded: 0, portalsSkipped: [], layoutAdopted: false, savedAdded: 0, clipsAdded: 0, clipsSkipped: 0, clipErrors: [] };
   const before = await to.store.get(userId);
   let incoming: Profile | undefined;
@@ -315,6 +319,7 @@ export async function importExport(data: PortalExport, userId: string, to: { sto
       }
     }
   }
+  if (to.reading && Array.isArray(data.reading)) await to.reading.import(userId, data.reading);
   return result;
 }
 

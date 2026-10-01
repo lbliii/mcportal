@@ -8,13 +8,14 @@ import { fileURLToPath } from 'node:url';
 import { authorize, localActor, toolAction } from './access.ts';
 import { budgetMessage, toolCost } from './lib/budget.ts';
 import { SERVER_ICONS } from './brand-icons.ts';
+import { READING_TOOLS } from './reading-tools.ts';
 import { ACCOUNT_TOOLS } from './account-tools.ts';
 import { CLIP_TOOLS } from './clip-tools.ts';
 import { DOCS_TOOLS } from './docs-tools.ts';
 import { SOCIAL_TOOLS } from './social-tools.ts';
 import { publicToolList, toolError, TOOLS as PORTAL_TOOLS, ROOM_URI, type ToolContext } from './tools.ts';
 
-export const TOOLS = [...PORTAL_TOOLS, ...DOCS_TOOLS, ...CLIP_TOOLS, ...ACCOUNT_TOOLS, ...SOCIAL_TOOLS];
+export const TOOLS = [...PORTAL_TOOLS, ...DOCS_TOOLS, ...CLIP_TOOLS, ...ACCOUNT_TOOLS, ...SOCIAL_TOOLS, ...READING_TOOLS];
 
 export const SERVER_INFO = { name: 'mcportal', title: 'MCPortal', version: '0.3.0' };
 export const SUPPORTED_PROTOCOL_VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05'];

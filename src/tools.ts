@@ -13,6 +13,7 @@ import type { ClipStore } from './clips.ts';
 import type { ExportFormat } from './portability.ts';
 import type { PublicProfiles } from './public-profiles.ts';
 import type { Social } from './social.ts';
+import type { ReadingStore } from './reading.ts';
 import type { ProfileStore } from './store.ts';
 import type { Actor } from './access.ts';
 import type { UsageBudget } from './lib/budget.ts';
@@ -23,6 +24,7 @@ export const ROOM_URI = 'ui://mcportal/room.html';
 
 export interface ToolContext extends SourceDeps {
   store: ProfileStore;
+  reading?: ReadingStore;
   /** The user's clips. Absent where clips aren't set up; the clip tools then refuse. */
   clips?: ClipStore;
   /** Handles and public profiles: hosted only (local MCPortal has no social layer). */

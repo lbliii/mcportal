@@ -27,6 +27,7 @@ import { ProfileError } from './profile.ts';
 import { buildExport, describeImport, EXPORT_FORMATS, importExport, parseExport, type ExportFile, type ExportFormat } from './portability.ts';
 import type { PublicProfiles } from './public-profiles.ts';
 import type { Social } from './social.ts';
+import type { ReadingStore } from './reading.ts';
 import type { ProfileStore } from './store.ts';
 
 const SESSION_MS = 3600 * 1000;
@@ -40,6 +41,7 @@ export interface AccountDeps {
   accounts: Accounts;
   oauth: OAuthServer;
   store: ProfileStore;
+  reading?: ReadingStore;
   clips?: ClipStore;
   publicProfiles?: PublicProfiles;
   social?: Social;
@@ -123,8 +125,9 @@ function sendFile(res: ServerResponse, file: ExportFile): void {
  * profile (its handle stays held for 30 days), shares, follows, mutes and blocks
  * (reports they filed stay, anonymized), sign-in tokens, and the account.
  */
-export async function deleteAccountData(accountId: string, deps: Pick<AccountDeps, 'accounts' | 'oauth' | 'store' | 'clips' | 'publicProfiles' | 'social'>, by = accountId): Promise<{ clips: number; tokens: number }> {
+export async function deleteAccountData(accountId: string, deps: Pick<AccountDeps, 'accounts' | 'oauth' | 'store' | 'reading' | 'clips' | 'publicProfiles' | 'social'>, by = accountId): Promise<{ clips: number; tokens: number }> {
   await deps.store.delete(accountId);
+  await deps.reading?.deleteAll(accountId);
   const clips = deps.clips ? await deps.clips.deleteAll(accountId) : 0;
   await deps.social?.forget(accountId);
   await deps.publicProfiles?.remove(accountId);

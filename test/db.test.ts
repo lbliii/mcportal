@@ -110,7 +110,7 @@ test('pg clips: round-trip, search, tags, paging, isolation, limits; v1 upgrades
   await db.query(`UPDATE mcportal_meta SET value = '1' WHERE key = 'schema_version'`);
   await ensureSchema(db);
   const version = await db.query<{ value: string }>(`SELECT value FROM mcportal_meta WHERE key = 'schema_version'`);
-  assert.equal(version.rows[0]!.value, '3');
+  assert.equal(version.rows[0]!.value, '4');
 
   const t0 = new Date('2026-09-01T00:00:00Z');
   const a = buildClip({ kind: 'quote', text: 'Point-in-time recovery, 100% of the time', tags: ['infra'] }, t0);
@@ -173,7 +173,7 @@ test('pg social: shares, feed rules, relations, hiding, reports, forget; schema 
   const { PublicProfiles } = await import('../src/public-profiles.ts');
   const { memoryPersistence } = await import('../src/accounts.ts');
   const version = await db.query<{ value: string }>(`SELECT value FROM mcportal_meta WHERE key = 'schema_version'`);
-  assert.equal(version.rows[0]!.value, '3');
+  assert.equal(version.rows[0]!.value, '4');
   let now = Date.parse('2026-10-01T00:00:00Z');
   const profiles = new PublicProfiles(memoryPersistence());
   for (const [id, handle] of [['pa', 'pg_alice'], ['pb', 'pg_bob'], ['pc', 'pg_carol']]) await profiles.set(id!, { handle });
@@ -203,4 +203,26 @@ test('pg social: shares, feed rules, relations, hiding, reports, forget; schema 
   await social.forget('pa');
   assert.equal(await store.countShares('pa'), 0);
   assert.deepEqual(await store.outgoing('blocks', 'pa'), []);
+});
+
+
+test('pg reading: concurrent incremental events, restart, isolation, import and deletion', { skip }, async () => {
+  const { PgReadingStore } = await import('../src/db.ts');
+  const store = new PgReadingStore(db);
+  const url = 'https://example.com/docs';
+  await store.record('reader', { url, status: 'opened', anchor: { heading: 'Install', block: 2 }, progress: 0.3 });
+  await Promise.all(Array.from({ length: 10 }, () => new PgReadingStore(db).record('reader', { url: url + '#heading', status: 'seen' })));
+  const restarted = new PgReadingStore(db);
+  assert.equal((await restarted.get('reader', url))?.progress, 0.3);
+  assert.equal((await restarted.get('reader', url))?.status, 'opened');
+  await store.record('reader', { url, status: 'read' });
+  assert.deepEqual(await restarted.list('reader', { unfinished: true }), []);
+  await store.record('reader', { url, status: 'opened', anchor: null });
+  assert.equal((await restarted.get('reader', url))?.readAt, undefined);
+  assert.equal((await restarted.get('reader', url))?.anchor, undefined);
+  assert.equal(await store.import('reader2', await store.list('reader')), 1);
+  assert.equal(await store.import('reader2', await store.list('reader')), 0);
+  await store.deleteAll('reader');
+  assert.deepEqual(await store.list('reader'), []);
+  assert.equal((await store.list('reader2')).length, 1);
 });
