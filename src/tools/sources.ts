@@ -5,14 +5,22 @@
 import { mapLimit } from '../lib/async.ts';
 import { errorStack, isAppError, userMessage } from '../lib/errors.ts';
 import { clean } from '../lib/text.ts';
-import { discover } from '../discover.ts';
+import { discover, type FetchedSource } from '../discover.ts';
 import { addPortalTo, columnOf, slugId, withLayout, spreadColumns } from '../layout.ts';
 import { buildOpml, OPML_LIMITS, parseOpml } from '../opml.ts';
-import { describeLayout, findPortal, LIMITS, SOURCES, type PortalInput, type Profile } from '../profile.ts';
+import { describeLayout, findPortal, LIMITS, sourceSettings, SOURCES, type SourceSettings, type PortalInput, type Profile } from '../profile.ts';
 import { findDocs, loadPortal, SOURCE_DOCS } from '../sources.ts';
 import type { Item, PortalResult, SourceKind } from '../types.ts';
 import { ok, toolError, toolFailure, untrusted, type ToolDef } from './kit.ts';
+import type { ToolResults } from './results.ts';
 import { itemLine, portalFor } from './room.ts';
+
+/** Where a candidate's items come from, for the untrusted-content label. */
+function sourceLabel(c: SourceSettings<FetchedSource>): string {
+  if (c.source === 'rss' || c.source === 'docs') return c.config.url;
+  if (c.source === 'github') return c.config.mode === 'releases' ? c.config.repo : `github search: ${c.config.query}`;
+  return 'hn';
+}
 
 /** Sources MCPortal fetches (or, for saved, reads) itself. Pinned portals only come from pin_portal. */
 const ADDABLE: SourceKind[] = SOURCES.filter((s) => s !== 'pinned');
@@ -78,14 +86,15 @@ export const SOURCE_TOOLS: ToolDef[] = [
         }
       }));
       const working = loaded.filter((c) => !c.error && c.items.length);
-      const candidates = working.map(({ items, error: _error, ...c }) => ({ ...c, preview: items.slice(0, 3) }));
+      // Each config as add_portal will store it, so the app reads typed, validated settings.
+      const candidates = working.map(({ items, error: _error, source, config, ...c }) => ({ ...c, ...sourceSettings(source, config, 'candidate'), preview: items.slice(0, 3) }));
       if (!candidates.length) {
         const why = found.hint ?? (loaded.length ? `Found ${loaded.length} possible feed(s), but none loaded: ${clean(loaded[0]!.error ?? 'empty feed', 160)}` : 'Nothing found.');
-        return ok(why, { candidates: [], hint: why });
+        return ok(why, { candidates: [], hint: why } satisfies ToolResults['find_source']);
       }
       const text = candidates.map((c, i) =>
-        untrusted(String(c.config.url ?? c.config.repo ?? c.source), [`${i + 1}. [${c.source}, via ${c.via}] ${c.title}`, `config: ${JSON.stringify(c.config)}`, ...c.preview.map(itemLine)].join('\n')));
-      return ok([`${candidates.length} working source(s). Add one with add_portal using its source and config.`, ...text].join('\n'), { candidates, hint: found.hint });
+        untrusted(sourceLabel(c), [`${i + 1}. [${c.source}, via ${c.via}] ${c.title}`, `config: ${JSON.stringify(c.config)}`, ...c.preview.map(itemLine)].join('\n')));
+      return ok([`${candidates.length} working source(s). Add one with add_portal using its source and config.`, ...text].join('\n'), { candidates, hint: found.hint } satisfies ToolResults['find_source']);
     },
   },
   {
@@ -137,7 +146,7 @@ export const SOURCE_TOOLS: ToolDef[] = [
       const placed = findPortal(added.profile, added.portalId)!;
       const portal = await portalFor(placed, added.profile, ctx);
       return ok(`Added "${portal.title}" (id ${added.portalId}) in column ${columnOf(added.profile, added.portalId)}.\nLayout now: ${describeLayout(added.profile)}`,
-        { profile: added.profile, portal, portalId: added.portalId });
+        { profile: added.profile, portal, portalId: added.portalId } satisfies ToolResults['add_portal']);
     },
   },
   {
@@ -217,7 +226,7 @@ export const SOURCE_TOOLS: ToolDef[] = [
         failed.length ? `${failed.length} didn't load: ${failed.slice(0, 5).map((f) => f.feed.title).join(', ')}${failed.length > 5 ? '…' : ''}.` : '',
         notTried > 0 || working.length < loaded.filter((l) => l.ok).length ? 'The room is full, so some feeds were left out; remove portals to make space.' : '',
       ].filter(Boolean);
-      return ok(lines.join('\n'), { profile, imported: addedCount, failed: failed.map((f) => ({ url: f.feed.url, title: f.feed.title, error: f.error })), total: feeds.length });
+      return ok(lines.join('\n'), { profile, imported: addedCount, failed: failed.map((f) => ({ url: f.feed.url, title: f.feed.title, error: f.error })), total: feeds.length } satisfies ToolResults['import_opml']);
     },
   },
   {

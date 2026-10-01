@@ -58,7 +58,7 @@
       if (b.type !== 'li') counters.fill(0);
       switch (b.type) {
         case 'h': {
-          const level = Math.min(4, Math.max(2, b.level || 2));
+          const level = /** @type {2 | 3 | 4} */ (Math.min(4, Math.max(2, b.level || 2)));
           const sig = b.level === 4 && typeof b.id === 'string' && /[.(]/.test(b.text);
           return el(`h${level}`, { class: sig ? 'sig' : null, 'data-anchor': typeof b.id === 'string' ? b.id : null }, spanNodes(b, scope, onLink));
         }

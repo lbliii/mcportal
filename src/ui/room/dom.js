@@ -1,10 +1,22 @@
   // room/dom.js: shared state and DOM helpers: el(), ago(), status line, toast
   // ------------------------------------------------------------ state + rendering
+  /** @type {RoomState} */
   const state = { profile: null, portals: new Map(), saved: new Set(), art: new Map() };   // art: portal id -> fallback art style
+
+  /** @typedef {Node | string | number | null | undefined | false} Child */
+  /**
+   * An element with attributes, listeners (on…) and children. Children are text or
+   * nodes, never HTML. An <a> with onclick and no href acts as a button.
+   * @template {keyof HTMLElementTagNameMap} K
+   * @param {K} tag
+   * @param {Record<string, any> | null} [attrs]
+   * @param {...(Child | Child[])} children
+   * @returns {HTMLElementTagNameMap[K]}
+   */
 
   function el(tag, attrs, ...children) {
     if (tag === 'a' && attrs && attrs.onclick && !attrs.href) attrs = { ...attrs, role: 'button', tabindex: '0', onkeydown: e => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click(); }
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); /** @type {HTMLElement} */ (e.currentTarget).click(); }
     } };
     const node = document.createElement(tag);
     if (attrs) for (const [k, v] of Object.entries(attrs)) {

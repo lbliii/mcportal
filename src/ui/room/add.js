@@ -15,7 +15,7 @@
         ? (data.candidates.length === 1 ? 'A signal! Open this door?' : `${data.candidates.length} signals from the void! Pick one.`)
         : (data.hint || "Nothing but static. No feed lurks behind that door; try the site's home page or another address.");
       list.replaceChildren(...data.candidates.map((c) => {
-        const sub = c.source === 'rss' ? c.config.url : c.source === 'docs' ? docsSourceLabel(c.config) : c.source === 'github' ? `GitHub · ${c.config.repo || c.config.query}` : `Hacker News · ${c.config.feed}`;
+        const sub = c.source === 'rss' ? c.config.url : c.source === 'docs' ? docsSourceLabel(c.config) : c.source === 'github' ? `GitHub · ${c.config.mode === 'releases' ? c.config.repo : c.config.query}` : `Hacker News · ${c.config.feed}`;
         const add = el('button', { class: 'btn', onclick: () => addCandidate(c, add) }, 'Add');
         return el('li', { class: 'cand' },
           el('span', { class: 'dot', style: `background:${loneColor(c.source, c.config)}` }),

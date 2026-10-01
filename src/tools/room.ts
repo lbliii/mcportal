@@ -9,6 +9,7 @@ import { describeDiff, describeLayout, diffProfiles, findPortal, normalizePins, 
 import { clipsPortal, clipsQuery, followingPortal, loadPortal, pinnedPortal, savedPortal } from '../sources.ts';
 import type { PortalResult } from '../types.ts';
 import { ok, toolError, toolFailure, untrusted, ROOM_URI, type ToolContext, type ToolDef } from './kit.ts';
+import type { ToolResults } from './results.ts';
 
 /** Any portal's current items: profile-backed ones from the profile and stores, the rest fetched (cached unless `force`). */
 export async function portalFor(spec: PortalInput, profile: Profile, ctx: ToolContext, force = false): Promise<PortalResult> {
@@ -81,10 +82,10 @@ export const ROOM_TOOLS: ToolDef[] = [
           `Starter packs (pick up to ${MAX_PACKS} with build_room): ${packs.map((p) => `${p.id} (${p.label}: ${p.sources.join(', ')})`).join('; ')}.`,
           'For interests no pack covers, build from the closest packs (or none), then use find_source and add_portal for specific sites, channels or feeds.',
         ].join('\n');
-        return ok(text, { profile, portals: [], onboarding: { packs, maxPacks: MAX_PACKS, rebuilding: profile.onboarded }, generatedAt: new Date().toISOString() });
+        return ok(text, { profile, portals: [], onboarding: { packs, maxPacks: MAX_PACKS, rebuilding: profile.onboarded }, generatedAt: new Date().toISOString() } satisfies ToolResults['open_room']);
       }
       const portals = await Promise.all(profile.columns.flatMap((c) => c.panels).map((p) => portalFor(p, profile, ctx)));
-      return ok(summarizePortals(profile, portals, notice), { profile, portals, notice, generatedAt: new Date().toISOString() });
+      return ok(summarizePortals(profile, portals, notice), { profile, portals, notice, generatedAt: new Date().toISOString() } satisfies ToolResults['open_room']);
     },
   },
   {
@@ -116,7 +117,7 @@ export const ROOM_TOOLS: ToolDef[] = [
           const profile = { ...before, onboarded: true, updatedAt: new Date().toISOString() };
           return { profile, result: profile };
         });
-        return ok(`Setup finished; kept the current layout: ${describeLayout(kept)}`, { profile: kept });
+        return ok(`Setup finished; kept the current layout: ${describeLayout(kept)}`, { profile: kept } satisfies ToolResults['build_room']);
       }
       // Sources in pack order, spread over at most 8 columns, packs kept together.
       const sources = ids.flatMap((id) => STARTER_PACKS.find((p) => p.id === id)!.portals);
@@ -126,7 +127,7 @@ export const ROOM_TOOLS: ToolDef[] = [
         return { profile: built, result: built };
       });
       const labels = ids.map((id) => STARTER_PACKS.find((p) => p.id === id)!.label);
-      return ok(`Built the room from ${labels.join(', ')}: ${sources.length} sources, ${layout} layout. Saved items kept (${profile.saved.length}).`, { profile });
+      return ok(`Built the room from ${labels.join(', ')}: ${sources.length} sources, ${layout} layout. Saved items kept (${profile.saved.length}).`, { profile } satisfies ToolResults['build_room']);
     },
   },
   {
@@ -212,7 +213,7 @@ export const ROOM_TOOLS: ToolDef[] = [
           `Profile not saved: it would remove ${saved.unapproved.join(', ')}. Keep those portals, or, only if the user explicitly asked to remove them, list them in removePortalIds.`,
         );
       }
-      return ok(`Saved. Changes: ${describeDiff(saved.diff)}.\nLayout now: ${describeLayout(saved.profile)}`, { profile: saved.profile, changes: saved.diff });
+      return ok(`Saved. Changes: ${describeDiff(saved.diff)}.\nLayout now: ${describeLayout(saved.profile)}`, { profile: saved.profile, changes: saved.diff } satisfies ToolResults['update_profile']);
     },
   },
   {
@@ -229,7 +230,7 @@ export const ROOM_TOOLS: ToolDef[] = [
       const spec = findPortal(profile, String(args.portalId ?? ''));
       if (!spec) return toolError(`No portal with id "${clean(args.portalId, 60)}"`, 'not_found');
       const portal = await portalFor(spec, profile, ctx, true);
-      return ok(`${portal.portalId}: ${portal.items.length} items`, { portal });
+      return ok(`${portal.portalId}: ${portal.items.length} items`, { portal } satisfies ToolResults['refresh_portal']);
     },
   },
 ];

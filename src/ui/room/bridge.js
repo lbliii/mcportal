@@ -98,7 +98,17 @@
     setStatus('View failed');
   }
 
+  /**
+   * Call one of our tools (through the host, or straight to /mcp in /preview) and
+   * return its result, typed by the server's contract (src/tools/results.ts).
+   * A tool error rejects with its message.
+   * @template {AppTool} K
+   * @param {K} name
+   * @param {Record<string, unknown>} [args]
+   * @returns {Promise<ToolResult<K>>}
+   */
   async function callTool(name, args = {}) {
+    /** @type {any} */
     let result;
     if (DEV) {
       const headers = { 'content-type': 'application/json', accept: 'application/json, text/event-stream' };

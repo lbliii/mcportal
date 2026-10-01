@@ -11,6 +11,7 @@ import { loadArticle } from '../sources.ts';
 import { thumbnail } from '../thumbnails.ts';
 import type { Article } from '../types.ts';
 import { ok, toolError, untrusted, ROOM_URI, type ToolDef } from './kit.ts';
+import type { ToolResults } from './results.ts';
 
 export const READER_TOOLS: ToolDef[] = [
   {
@@ -35,7 +36,7 @@ export const READER_TOOLS: ToolDef[] = [
       const text = blocksToText(article.blocks.slice(0, 60));
       const head = [`title: ${article.title}`, article.byline ? `byline: ${article.byline}` : ''].filter(Boolean).join('\n');
       const { saved } = await ctx.store.get(ctx.userId);
-      return ok(untrusted(article.url, `${head}\n\n${text}`), { article, saved: saved.some((s) => s.url === article.url) });
+      return ok(untrusted(article.url, `${head}\n\n${text}`), { article, saved: saved.some((s) => s.url === article.url) } satisfies ToolResults['read_article']);
     },
   },
   {
@@ -61,7 +62,7 @@ export const READER_TOOLS: ToolDef[] = [
       });
       const images: Record<string, string | null> = Object.fromEntries(fetched);
       const loaded = Object.values(images).filter(Boolean).length;
-      return ok(`${loaded} of ${urls.length} thumbnails loaded`, { images });
+      return ok(`${loaded} of ${urls.length} thumbnails loaded`, { images } satisfies ToolResults['get_thumbnails']);
     },
   },
 ];

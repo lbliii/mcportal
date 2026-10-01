@@ -63,6 +63,8 @@ export const UI_COMPILER_OPTIONS: ts.CompilerOptions = {
   moduleResolution: ts.ModuleResolutionKind.Bundler,
   allowImportingTsExtensions: true,
   lib: ['lib.es2023.d.ts', 'lib.dom.d.ts', 'lib.dom.iterable.d.ts'],
+  // Browser globals only: Node's would hide mistakes (its setTimeout, Buffer). Server modules
+  // imported for their data types may not check without them; their errors are skipped below.
   types: [],
   strict: false,
   skipLibCheck: true,
@@ -93,6 +95,8 @@ export async function checkUi(options: ts.CompilerOptions = UI_COMPILER_OPTIONS)
   for (const d of ts.getPreEmitDiagnostics(program)) {
     const message = ts.flattenDiagnosticMessageText(d.messageText, '\n');
     const page = pages.find((p) => p.name === d.file?.fileName);
+    // Server modules pulled in for their types are checked by the server's own tsc.
+    if (d.file && !page && d.file.fileName !== DECLARATIONS) continue;
     if (!d.file || !page || d.start === undefined) {
       problems.push({ file: d.file?.fileName ?? '(options)', line: 0, message });
       continue;

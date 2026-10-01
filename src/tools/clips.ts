@@ -9,6 +9,7 @@ import { clean } from '../lib/text.ts';
 import { clipsPortal, clipsQuery } from '../sources.ts';
 import { ensurePortal } from '../layout.ts';
 import { ok, toolError, toolFailure, untrusted, ROOM_URI, type ToolContext, type ToolDef } from './kit.ts';
+import type { ToolResults } from './results.ts';
 
 
 const noStore = () => toolError('Clips are not available on this server.', 'unavailable');
@@ -99,7 +100,7 @@ export const CLIP_TOOLS: ToolDef[] = [
         added ? 'Added a "Clips" portal to the room.' : '',
         untrusted(sourceLabel(clip), summaryLine(summary)),
       ].filter(Boolean).join('\n');
-      return ok(text, { clip: summary, profile, layoutChanged: added, portals: await clipPortals(ctx, ctx.clips, profile) });
+      return ok(text, { clip: summary, profile, layoutChanged: added, portals: await clipPortals(ctx, ctx.clips, profile) } satisfies ToolResults['clip']);
     },
   },
   {
@@ -152,7 +153,7 @@ export const CLIP_TOOLS: ToolDef[] = [
       const clip = await ctx.clips.get(ctx.userId, String(args.id ?? ''));
       if (!clip) return toolError(`No clip with id "${clean(args.id, 40)}". Use search_clips to find it.`, 'not_found');
       const head = [`${clip.kind} · ${clip.title}`, clip.tags.length ? `tags: ${clip.tags.join(', ')}` : '', clip.note ? `note: ${clip.note}` : '', `clipped ${clip.createdAt}`].filter(Boolean).join('\n');
-      return ok(`Showing clip ${clip.id} in a card.\n${untrusted(sourceLabel(clip), `${head}\n\n${clipText(clip.data)}`)}`, { clip });
+      return ok(`Showing clip ${clip.id} in a card.\n${untrusted(sourceLabel(clip), `${head}\n\n${clipText(clip.data)}`)}`, { clip } satisfies ToolResults['get_clip']);
     },
   },
   {

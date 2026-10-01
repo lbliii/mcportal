@@ -11,6 +11,7 @@ import { AUDIENCES, type SharedItem } from '../social.ts';
 import { isAppError } from '../lib/errors.ts';
 import { ensurePortal } from '../layout.ts';
 import { HOSTED_ONLY, ok, toolError, untrusted, ROOM_URI, type CallToolResult, type ToolContext, type ToolDef } from './kit.ts';
+import type { ToolResults } from './results.ts';
 
 export function shareLine(s: SharedItem): string {
   const who = s.mine ? 'you' : `@${s.author.handle}`;
@@ -77,7 +78,7 @@ export const SOCIAL_TOOLS: ToolDef[] = [
             ...posts.slice(0, 10).map(shareLine),
           ].filter(Boolean).join('\n')),
         ].join('\n');
-        return ok(text, { space });
+        return ok(text, { space } satisfies ToolResults['open_space']);
       } catch (error) {
         return fail(error);
       }
@@ -118,7 +119,7 @@ export const SOCIAL_TOOLS: ToolDef[] = [
           input = { kind: 'link', title: saved.title, url: saved.url, note: args.note, audience: args.audience };
         }
         const shared = await ctx.social.share(ctx.userId, input);
-        return ok(`Shared (id ${shared.id}).\n${untrusted('your share', shareLine(shared))}`, { share: shared });
+        return ok(`Shared (id ${shared.id}).\n${untrusted('your share', shareLine(shared))}`, { share: shared } satisfies ToolResults['share']);
       } catch (error) {
         return fail(error);
       }
@@ -150,7 +151,7 @@ export const SOCIAL_TOOLS: ToolDef[] = [
       const share = await ctx.social.get(ctx.userId, String(args.id ?? ''));
       if (!share) return toolError('That share isn\'t available.', 'not_found');
       const body = share.clip ? `\n\n${clipText(share.clip.data)}` : '';
-      return ok(`Showing share ${share.id} in a card.\n${untrusted(share.mine ? 'your share' : `a share by @${share.author.handle}`, `${shareLine(share)}${body}`)}`, { share });
+      return ok(`Showing share ${share.id} in a card.\n${untrusted(share.mine ? 'your share' : `a share by @${share.author.handle}`, `${shareLine(share)}${body}`)}`, { share } satisfies ToolResults['get_share']);
     },
   },
   {
@@ -206,7 +207,7 @@ export const SOCIAL_TOOLS: ToolDef[] = [
               const placed = ensurePortal(before, 'following', 'Following');
               return placed.added ? { profile: placed.profile, result: placed } : { result: placed };
             });
-            return ok(`Following @${target.handle}.${added ? ' Added a "Following" portal to the room.' : ''}`, { handle: target.handle, layoutChanged: added, profile });
+            return ok(`Following @${target.handle}.${added ? ' Added a "Following" portal to the room.' : ''}`, { handle: target.handle, layoutChanged: added, profile } satisfies ToolResults['relationship']);
           }
           case 'unfollow':
             return ok((await ctx.social.unfollow(ctx.userId, handle)) ? `Unfollowed @${clean(handle, 40).replace(/^@/, '')}.` : 'You weren\'t following them.', {});
