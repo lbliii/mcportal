@@ -150,13 +150,11 @@ export const ROOM_TOOLS: ToolDef[] = [
     title: 'Update room preferences',
     access: 'write',
     description: [
-      "Save the user's MCPortal layout. Send the COMPLETE profile (from get_profile) with only the changes the user asked for.",
-      'Columns are left to right; the portals in a column (its "panels" list) stack top to bottom; width is relative (1-4).',
-      'layout "columns" shows columns side by side; "shelves" shows each portal as a horizontally scrolling row, in column order. openIn "card" opens stories in a reader inside the room; "chat" opens each as its own reader card in the conversation.',
-      "Never move, retitle, or remove portals the user did not mention: their stated layout is a fixed rule. Removing a portal is refused unless its id is listed in removePortalIds, which you may only do when the user explicitly asked to remove it.",
-      'Saved items (bookmarks) are not part of this tool: they are kept as they are; use save_item and remove_saved for them. A portal with source "saved" shows them.',
-      'Likewise the items of "pinned" portals are kept; use pin_portal to add or refresh those.',
-      'After saving, tell the user what changed (the result lists it) and call open_room to show it.',
+      "Save the user's layout: send the COMPLETE profile from get_profile with only the changes they asked for.",
+      'Columns go left to right; the portals in a column ("panels") stack top to bottom.',
+      'Never move, retitle or remove portals the user didn\'t mention. A removal is refused unless the portal\'s id is in removePortalIds, only when the user asked to remove it.',
+      'Saved items and pinned portals\' items are kept as they are (save_item, pin_portal change them).',
+      'Then tell the user what changed (the result lists it) and call open_room.',
     ].join(' '),
     inputSchema: {
       type: 'object',
@@ -168,8 +166,8 @@ export const ROOM_TOOLS: ToolDef[] = [
           required: ['columns'],
           properties: {
             name: { type: 'string' },
-            layout: { type: 'string', enum: ['columns', 'shelves'] },
-            openIn: { type: 'string', enum: ['card', 'chat'] },
+            layout: { type: 'string', enum: ['columns', 'shelves'], description: 'columns side by side, or shelves: one sideways-scrolling row per portal' },
+            openIn: { type: 'string', enum: ['card', 'chat'], description: 'stories open in a reader in the room, or as their own card in the chat' },
             columns: {
               type: 'array',
               minItems: 1,
@@ -177,7 +175,7 @@ export const ROOM_TOOLS: ToolDef[] = [
               items: {
                 type: 'object',
                 required: ['panels'],
-                properties: { width: { type: 'integer', minimum: 1, maximum: 4 }, panels: { type: 'array', minItems: 1, maxItems: 4, items: portalSchema } },
+                properties: { width: { type: 'integer', minimum: 1, maximum: 4, description: 'relative' }, panels: { type: 'array', minItems: 1, maxItems: 4, items: portalSchema } },
               },
             },
           },

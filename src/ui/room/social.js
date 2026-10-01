@@ -29,15 +29,14 @@
     const from = src.url ? (src.title || new URL(src.url).hostname) : src.kind === 'conversation' ? 'a conversation' : (src.title || '');
     const top = el('div', { class: 'reader-top' },
       iconButton('back', withBack ? 'Back to your room' : 'Open your room', closeReader, 'ib'),
-      src.url && isHttpUrl(src.url) ? iconButton('external', 'Open where it came from', () => openLink(/** @type {string} */ (src.url)), 'ib') : null);  // checked just before
-    // filter(Boolean) drops the nulls, leaving elements.
-    return /** @type {HTMLElement[]} */ ([top, el('h1', null, clip.title),
+      src.url && isHttpUrl(src.url) ? iconButton('external', 'Open where it came from', () => openLink(src.url ?? ''), 'ib') : null);  // checked just before
+    return present([top, el('h1', null, clip.title),
       el('div', { class: 'byline' }, [`${clip.kind[0].toUpperCase()}${clip.kind.slice(1)}`, from ? `from ${from}` : '', `clipped ${ago(clip.createdAt)}`].filter(Boolean).join(' · ')),
       clip.tags.length ? el('div', { class: 'clip-tags' }, clip.tags.map((t) => el('span', null, `#${t}`))) : null,
       clip.note ? el('p', { class: 'clip-note' }, clip.note) : null,
       el('div', { class: 'body' }, clipBody(clip.data)),
       el('div', { class: 'row' }, el('button', { class: 'btn', onclick: (/** @type {MouseEvent} */ e) => { /** @type {HTMLElement} */ (/** @type {HTMLElement} */ (e.currentTarget).parentNode).replaceWith(composer({ clipId: clip.id }, clip.title)); } }, icon('share'), ' Share to your space')),  // the button's parent: this row
-      el('div', { class: 'prov' }, `Your clip ${clip.id}. Only you can see it until you share it.`)].filter(Boolean));
+      el('div', { class: 'prov' }, `Your clip ${clip.id}. Only you can see it until you share it.`)]);
   }
 
   // This view belongs to a get_clip call: it is a clip card, not a room.
@@ -170,8 +169,7 @@
       return el('div', { class: 'source' }, el('span', { class: 'dot', style: `background:${loneColor(src.source, src.config)}` }),
         el('div', { class: 'st' }, el('div', null, src.title), el('div', null, src.source === 'rss' ? (() => { try { return new URL(/** @type {Extract<PortalSpec, { source: 'rss' }>['config']} */ (src.config).url).hostname.replace(/^www\./, ''); } catch { return 'feed'; } })() : src.source === 'hn' ? 'Hacker News' : 'GitHub')), add);
     });
-    // filter(Boolean) drops the nulls, leaving elements.
-    return /** @type {HTMLElement[]} */ ([
+    return present([
       withBack ? el('div', { class: 'reader-top' }, iconButton('back', 'Back to your room', back || closeReader, 'ib')) : null,
       el('div', { class: 'space-head' },
         el('h1', null, name),
@@ -183,7 +181,7 @@
       space.sources.length ? el('div', { class: 'sources' }, sources) : null,
       el('h2', null, 'Posts'),
       posts.length ? el('div', { class: 'posts' }, posts) : el('div', { class: 'empty' }, space.mine ? 'Your space stands empty, waiting. Share a saved item or a clip to put something in it.' : 'Nothing shared that you can see yet.'),
-    ].filter(Boolean));
+    ]);
   }
 
   /** @param {Space} space @param {boolean} withBack @param {(e: MouseEvent) => void} [back] */
@@ -225,15 +223,14 @@
     const to = share.audience === 'mcportal' ? 'everyone on MCPortal' : 'followers';
     const top = el('div', { class: 'reader-top' },
       iconButton('back', withBack ? 'Back to your room' : 'Open your room', closeReader, 'ib'),
-      share.url && isHttpUrl(share.url) ? iconButton('external', 'Open the original', () => openLink(/** @type {string} */ (share.url)), 'ib') : null);  // checked just before
+      share.url && isHttpUrl(share.url) ? iconButton('external', 'Open the original', () => openLink(share.url ?? ''), 'ib') : null);  // checked just before
     const body = share.clip ? clipBody(share.clip.data)
-      : share.url && isHttpUrl(share.url) ? [el('p', null, el('button', { class: 'btn', onclick: () => openLink(/** @type {string} */ (share.url)) }, share.url))] : [];  // checked just before
-    // filter(Boolean) drops the nulls, leaving elements.
-    return /** @type {HTMLElement[]} */ ([top, el('h1', null, share.title),
+      : share.url && isHttpUrl(share.url) ? [el('p', null, el('button', { class: 'btn', onclick: () => openLink(share.url ?? '') }, share.url))] : [];  // checked just before
+    return present([top, el('h1', null, share.title),
       el('div', { class: 'byline' }, [`${who} shared ${share.kind === 'clip' ? `a ${share.clip ? share.clip.kind : 'clip'}` : 'a link'}`, `with ${to}`, ago(share.createdAt)].join(' · ')),
       share.note ? el('p', { class: 'share-note' }, share.note) : null,
       el('div', { class: 'body' }, body),
-      el('div', { class: 'prov' }, share.hiddenAt ? 'An admin hid this share; only you can see it.' : `Shared on MCPortal. ${share.mine ? '' : 'Written by another user.'}`)].filter(Boolean));
+      el('div', { class: 'prov' }, share.hiddenAt ? 'An admin hid this share; only you can see it.' : `Shared on MCPortal. ${share.mine ? '' : 'Written by another user.'}`)]);
   }
 
   /** @param {SharedItem} share */

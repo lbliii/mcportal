@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### For hosts and agents (interface changes)
+- **Arguments are checked:** every tool call is checked against the tool's `inputSchema` before it runs. A wrong type (`column: "2"`), an unknown argument or a missing required one is refused with `invalid_argument` and a sentence naming the problem, where some were silently ignored before. `pin_portal` still trims extra items and tags rather than refusing them.
+- **Error codes:** a failed call carries `structuredContent.error = { code, message, retryable }` (codes such as `not_found`, `conflict`, `limit_exceeded`, `rate_limited`, `unavailable`, `upstream_error`). A server bug reports `internal` with a reference, never its message.
+- **A smaller footprint:** a local MCPortal no longer lists the sharing, space and public-profile tools (they're hosted only), and the longest tool descriptions and the server instructions are shorter (the sharing rules are sent only where sharing exists). What MCPortal costs every conversation it's connected to drops from about 8,000 tokens to about 7,300 hosted and 5,700 local. `tools/list` is grouped by area.
+- **Removed `export_opml` (breaking):** `export_data` with `format: "opml"` exports sources as OPML.
+- **Version 0.4.0**, for the interface changes in this section.
+- **Admin API errors** are `{ error: code, error_description }`, like the OAuth endpoints.
+- **`find_source` candidates** carry validated settings, exactly as `add_portal` will store them.
+
+### Health, reliability and distribution
+- **No lost changes:** two tool calls at once can't overwrite each other's change to the room (also across server instances on Postgres), and a failed read of shared data can't replace it with an empty document.
+- **`/health` checks storage** and answers 503 when it can't reach it; the admin page shows today's usage and per-tool counters.
+- **Listing files:** `server.json` (MCP Registry) and `manifest.json` (an MCPB bundle for Claude desktop) are generated from the code by `node scripts/distribution.ts`, so their tools and version always match.
+
 ### Design system
 - **Shared tokens:** versioned, typed authoring source generates CSS, browser palettes and TypeScript exports for the room, reading/social cards, public site, account, OAuth and admin.
 - **Validated themes:** an exact host adapter repairs unreadable colour pairs, clears stale colours on theme changes, supports partial/reset inputs and follows system preferences until the host selects a scheme. Functional contrast no longer depends on native `contrast-color()`.

@@ -88,12 +88,8 @@ export const SAVED_TOOLS: ToolDef[] = [
     title: 'Pin results from another tool',
     access: 'write',
     description: [
-      "Show results from another tool the user has connected (Jira, Slack, Confluence, Drive, GitLab, a database, …) as a portal in their room.",
-      'You fetch the data with that tool, then pass the items here: MCPortal stores and shows them and never contacts the other service.',
-      'Keep each item short: a title, its link if there is one, a one-line summary, and up to 4 meta tags (status, assignee, priority).',
-      '"recipe" says how to fetch the items again in plain words (tool name and arguments), so the portal can be refreshed.',
-      'To refresh a pinned portal (e.g. the user asks, or presses its refresh button), read its recipe from get_profile (config.recipe), run it,',
-      'and call pin_portal with its portalId and the new items. A new portal only adds: nothing else moves, and it refuses duplicates.',
+      "Show results from another of the user's tools (Jira, Slack, Drive, a database, …) as a portal in their room: you fetch them with that tool and pass short items here; MCPortal never contacts it.",
+      'To refresh one, run the recipe from its config (get_profile) and pass its portalId with the new items. A new portal only adds; duplicates are refused.',
     ].join(' '),
     inputSchema: {
       type: 'object',
@@ -105,7 +101,7 @@ export const SAVED_TOOLS: ToolDef[] = [
         from: { type: 'string', description: 'Where the items come from, e.g. "Jira". Required for a new portal.' },
         recipe: {
           type: 'string',
-          description: 'How to fetch the items again, e.g. "jira_search with jql: assignee = currentUser() AND resolution = Unresolved ORDER BY updated DESC". Required for a new portal.',
+          description: 'How to fetch the items again: the tool and its arguments, e.g. "jira_search with jql: assignee = currentUser() AND resolution = Unresolved". Required for a new portal.',
         },
         items: {
           type: 'array',

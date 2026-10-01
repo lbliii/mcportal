@@ -63,3 +63,13 @@
   function errorText(error) {
     return error instanceof Error ? error.message : String(error);
   }
+
+  /**
+   * The entries that are there (drops null, undefined and false), typed as such.
+   * @template T
+   * @param {Array<T | null | undefined | false>} list
+   * @returns {T[]}
+   */
+  function present(list) {
+    return /** @type {T[]} */ (list.filter((x) => x !== null && x !== undefined && x !== false));
+  }

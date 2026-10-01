@@ -11,7 +11,7 @@
  * the types; src/ui/ui.d.ts brings in the server's own (data shapes, and the tool
  * results contract in src/tools/results.ts). Strict, like the server.
  */
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 
@@ -78,9 +78,32 @@ export interface UiProblem {
   message: string;
 }
 
-/** Every type error in the room's and the admin page's scripts, in strict mode, against their source files. */
+/**
+ * The most JSDoc casts (`/** @type {X} *\/ (expr)`) the UI may hold. Each is a place the
+ * types take our word for it, so this only goes down: lower it when you remove some.
+ */
+export const MAX_UI_CASTS = 51;
+
+const UI_SCRIPT_FILES = ['room.html', 'admin.html', 'art.js', 'design/theme.js', 'design/palettes.js', 'brand/icons.js'];
+
+/** Every JSDoc cast in the UI's scripts. */
+export async function uiCasts(): Promise<UiProblem[]> {
+  const room = (await readdir(uiPath('room'))).filter((f) => f.endsWith('.js')).map((f) => `room/${f}`);
+  const casts: UiProblem[] = [];
+  for (const file of [...UI_SCRIPT_FILES, ...room]) {
+    for (const [i, line] of (await readFile(uiPath(file), 'utf8')).split('\n').entries()) {
+      for (const _ of line.matchAll(/\/\*\* @type \{[^}]*\} \*\/ \(/g)) casts.push({ file: `src/ui/${file}`, line: i + 1, message: 'cast' });
+    }
+  }
+  return casts;
+}
+
+/** Every type error in the room's and the admin page's scripts, in strict mode, against their source files, and too many casts. */
 export async function checkUi(): Promise<UiProblem[]> {
-  return diagnose(UI_COMPILER_OPTIONS);
+  const problems = await diagnose(UI_COMPILER_OPTIONS);
+  const casts = await uiCasts();
+  if (casts.length > MAX_UI_CASTS) problems.push({ file: 'scripts/check-ui.ts', line: 0, message: `The UI has ${casts.length} JSDoc casts; the ceiling is ${MAX_UI_CASTS}. Type the value instead of casting it.` });
+  return problems;
 }
 
 /** Type errors under `options`, mapped back to the files they came from. */
@@ -118,6 +141,8 @@ export async function diagnose(options: ts.CompilerOptions): Promise<UiProblem[]
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const problems = await checkUi();
   for (const p of problems) console.error(`${p.file}:${p.line}  ${p.message.split('\n').join('\n    ')}`);
-  console.error(problems.length ? `${problems.length} type error(s) in the UI scripts` : 'UI scripts type-check');
+  const casts = (await uiCasts()).length;
+  console.error(problems.length ? `${problems.length} problem(s) in the UI scripts` : `UI scripts type-check (${casts} casts; ceiling ${MAX_UI_CASTS})`);
+  if (!problems.length && casts < MAX_UI_CASTS) console.error(`Casts went down: lower MAX_UI_CASTS in scripts/check-ui.ts to ${casts}.`);
   process.exitCode = problems.length ? 1 : 0;
 }

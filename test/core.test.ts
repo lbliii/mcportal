@@ -72,9 +72,14 @@ test('notifications get no response; unknown methods get -32601', async () => {
 });
 
 test('tools/list links open_room to the UI and hides app-only tools from the model', async () => {
-  const res = await rpc(ctx(), 'tools/list');
+  // A hosted server (with the social layer) lists every tool; a local one leaves out sharing and profiles.
+  const hosted = { social: {} as never, publicProfiles: {} as never };
+  const res = await rpc(ctx(hosted), 'tools/list');
   const tools = (res.result as any).tools as any[];
-  assert.deepEqual(tools.map((t) => t.name), ['open_room', 'build_room', 'get_profile', 'update_profile', 'refresh_portal', 'read_source', 'find_source', 'add_portal', 'list_sources', 'import_opml', 'export_opml', 'read_article', 'get_thumbnails', 'save_item', 'remove_saved', 'pin_portal', 'open_docs', 'read_doc_page', 'search_docs', 'clip', 'search_clips', 'get_clip', 'update_clip', 'delete_clip', 'get_public_profile', 'set_public_profile', 'remove_public_profile', 'export_data', 'import_portal', 'account_settings', 'open_space', 'share', 'unshare', 'get_share', 'list_shares', 'relationship', 'list_connections', 'report', 'record_reading', 'get_reading', 'list_reading']);
+  const local = ((await rpc(ctx(), 'tools/list')).result as any).tools.map((t: any) => t.name) as string[];
+  assert.ok(!local.includes('share') && !local.includes('open_space') && !local.includes('set_public_profile'), 'no sharing or profiles locally');
+  assert.equal(local.length, tools.length - 11);
+  assert.deepEqual(tools.map((t) => t.name), ['open_room', 'build_room', 'get_profile', 'update_profile', 'refresh_portal', 'read_source', 'find_source', 'add_portal', 'list_sources', 'import_opml', 'read_article', 'get_thumbnails', 'save_item', 'remove_saved', 'pin_portal', 'open_docs', 'read_doc_page', 'search_docs', 'clip', 'search_clips', 'get_clip', 'update_clip', 'delete_clip', 'get_public_profile', 'set_public_profile', 'remove_public_profile', 'export_data', 'import_portal', 'account_settings', 'open_space', 'share', 'unshare', 'get_share', 'list_shares', 'relationship', 'list_connections', 'report', 'record_reading', 'get_reading', 'list_reading']);
   assert.equal(tools.find((t) => t.name === 'open_room')._meta.ui.resourceUri, ROOM_URI);
   assert.deepEqual(tools.find((t) => t.name === 'refresh_portal')._meta.ui.visibility, ['app']);
   assert.equal(tools.find((t) => t.name === 'read_article')._meta.ui.resourceUri, ROOM_URI, 'reader renders as its own card');

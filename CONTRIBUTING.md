@@ -68,9 +68,13 @@ Install the repo as a local plugin, which includes the `/portal` command and ski
 - **Browser tests** (`test/ui-browser.test.ts`) drive the real room in headless Chrome against fixture data and fail on any page error. They skip without Chrome (`CHROME_PATH` points at one). A new view or flow gets a test there.
 - **Layout changes** go through `src/layout.ts` (`withLayout`, `addPortalTo`, `ensurePortal`), which never move or drop the user's other portals or saved items.
 
+## Versions and the tool interface
+
+Hosts cache tool lists and agents learn tool names, so the tool interface (names, arguments, results in `src/tools/results.ts`) is versioned with the package: a change that breaks it (a renamed or removed tool or argument, a stricter schema, a different result shape) raises the minor version while we're below 1.0 and gets a line under "For hosts and agents" in the changelog. `package.json` holds the version; `npm test` checks that `src/mcp.ts`, the plugin, `server.json` and `manifest.json` agree, and `node scripts/distribution.ts` regenerates the last two.
+
 ## Before opening a PR
 
-- `npm test` passes, and `npm run typecheck` passes if you touched types.
+- `npm run check` passes: typecheck (server and UI), design outputs, and every test. There's no hosted CI yet, so this is the gate. To run it before every push: `git config core.hooksPath .githooks`.
 - If you touched storage (`src/db.ts` and `src/db/`, `src/store.ts`, `src/auth/store.ts`), run the Postgres tests too. They're skipped unless `TEST_DATABASE_URL` is set, and each run uses its own schema:
 
   ```bash

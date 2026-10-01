@@ -214,7 +214,7 @@
     try {
       render(await api(`/admin/api/${action}`, { who, reason }));
       say(`Done: ${action} ${who}.`);
-    } catch (error) { say(/** @type {Error} */ (error).message, true); }
+    } catch (error) { say(error instanceof Error ? error.message : String(error), true); }
   }
 
   /** @param {string} path @param {{ id: string, action?: string }} body @param {string} question */
@@ -223,7 +223,7 @@
     try {
       render(await api(`/admin/api/${path}`, body));
       say('Done.');
-    } catch (error) { say(/** @type {Error} */ (error).message, true); }
+    } catch (error) { say(error instanceof Error ? error.message : String(error), true); }
   }
 
   $('inviteForm').addEventListener('submit', async (e) => {
@@ -238,7 +238,7 @@
       const invite = data.invites.find((i) => i.login === login.replace(/^@/, '').toLowerCase());
       say(`Invited @${login.replace(/^@/, '')}. Send them the message below.`);
       if (invite) showShare(invite);
-    } catch (error) { say(/** @type {Error} */ (error).message, true); }
+    } catch (error) { say(error instanceof Error ? error.message : String(error), true); }
   });
 
   (async () => {
@@ -248,7 +248,7 @@
       csrf = data.csrf; me = data.me;
       $('me').textContent = `signed in as @${me.login}`;
       render(data);
-    } catch (error) { say(/** @type {Error} */ (error).message, true); }
+    } catch (error) { say(error instanceof Error ? error.message : String(error), true); }
   })();
 })();
 </script>

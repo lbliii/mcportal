@@ -1,13 +1,13 @@
 /**
- * Source tools: read_source, find_source, add_portal, list_sources, and OPML in and
- * out (import_opml, export_opml). They find, preview and add what the room shows.
+ * Source tools: read_source, find_source, add_portal, list_sources, and OPML import
+ * (import_opml; export_data exports OPML). They find, preview and add what the room shows.
  */
 import { mapLimit } from '../lib/async.ts';
 import { errorStack, isAppError, userMessage } from '../lib/errors.ts';
 import { clean } from '../lib/text.ts';
 import { discover, type FetchedSource } from '../discover.ts';
 import { addPortalTo, columnOf, slugId, withLayout, spreadColumns } from '../layout.ts';
-import { buildOpml, OPML_LIMITS, parseOpml } from '../opml.ts';
+import { OPML_LIMITS, parseOpml } from '../opml.ts';
 import { describeLayout, findPortal, LIMITS, sourceSettings, SOURCES, type SourceSettings, type PortalInput, type Profile } from '../profile.ts';
 import { findDocs, loadPortal, SOURCE_DOCS } from '../sources.ts';
 import type { Item, PortalResult, SourceKind } from '../types.ts';
@@ -227,20 +227,6 @@ export const SOURCE_TOOLS: ToolDef[] = [
         notTried > 0 || working.length < loaded.filter((l) => l.ok).length ? 'The room is full, so some feeds were left out; remove portals to make space.' : '',
       ].filter(Boolean);
       return ok(lines.join('\n'), { profile, imported: addedCount, failed: failed.map((f) => ({ url: f.feed.url, title: f.feed.title, error: f.error })), total: feeds.length } satisfies ToolResults['import_opml']);
-    },
-  },
-  {
-    name: 'export_opml',
-    title: 'Export subscriptions (OPML)',
-    access: 'read',
-    description: 'Export the user\'s sources as OPML, which any feed reader can import. Offer it as a file, or show it if they ask. GitHub searches, saved items and pinned portals have no feed and are listed as skipped.',
-    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
-    annotations: { readOnlyHint: true },
-    async handler(_args, ctx) {
-      const profile = await ctx.store.get(ctx.userId);
-      const { opml, count, skipped } = buildOpml(profile);
-      const note = `${count} source(s) exported${skipped.length ? `; skipped (no feed): ${skipped.join(', ')}` : ''}.`;
-      return ok(`${note}\n\n${opml}`, { opml, count, skipped, filename: 'mcportal-subscriptions.opml' });
     },
   },
 ];

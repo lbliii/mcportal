@@ -1,0 +1,164 @@
+{
+  "manifest_version": "0.3",
+  "name": "mcportal",
+  "display_name": "MCPortal",
+  "version": "0.4.0",
+  "description": "Your personal, agent-composed reading room: portals onto Hacker News, GitHub and any RSS feed, arranged the way you ask, with reader view and no ads.",
+  "long_description": "MCPortal is your reading room inside your agent. Open it to see portals onto the sources you follow (any site with a feed, Hacker News, GitHub, documentation sites), arranged the way you ask. Read articles and docs without the clutter, save links, clip things from the conversation, and import or export your subscriptions. This bundle runs MCPortal on your computer: your room lives in ~/.mcportal and nothing is sent anywhere but the sites you follow.",
+  "author": {
+    "name": "Lawrence Lane",
+    "url": "https://github.com/lbliii/mcportal"
+  },
+  "homepage": "https://mcportal-production.up.railway.app",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lbliii/mcportal.git"
+  },
+  "icon": "src/site/icon-512.png",
+  "server": {
+    "type": "node",
+    "entry_point": "bin/mcportal.mjs",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/bin/mcportal.mjs",
+        "--stdio"
+      ],
+      "env": {}
+    }
+  },
+  "tools": [
+    {
+      "name": "open_room",
+      "description": "Open the user's MCPortal room: their portals onto their sources (Hacker News, GitHub, RSS, and data pinned from their other tools), arranged by their saved layout."
+    },
+    {
+      "name": "build_room",
+      "description": "Set up the user's room from up to 4 starter packs (ids from open_room's setup, e.g."
+    },
+    {
+      "name": "get_profile",
+      "description": "Return the user's saved MCPortal profile: the layout, and each portal with its source settings (each column stores its portals as panels)."
+    },
+    {
+      "name": "update_profile",
+      "description": "Save the user's layout: send the COMPLETE profile from get_profile with only the changes they asked for."
+    },
+    {
+      "name": "read_source",
+      "description": "Fetch items from one source without changing the room (for questions like \"what's new on Hacker News?\" or previewing a feed before adding it)."
+    },
+    {
+      "name": "find_source",
+      "description": "Work out what MCPortal can show for something the user wants to follow, and preview it."
+    },
+    {
+      "name": "add_portal",
+      "description": "Add one portal to the user's room."
+    },
+    {
+      "name": "list_sources",
+      "description": "Describe the source types MCPortal can show in a portal and the settings each accepts."
+    },
+    {
+      "name": "import_opml",
+      "description": "Bring the user's subscriptions in from another feed reader (Feedly, NetNewsWire, Inoreader…): pass the contents of their OPML export."
+    },
+    {
+      "name": "read_article",
+      "description": "Fetch a web page and return a clean reader-view version (title, byline, plain-text paragraphs)."
+    },
+    {
+      "name": "save_item",
+      "description": "Save a link to the user's MCPortal (a bookmark), or update the title or note of one already saved."
+    },
+    {
+      "name": "remove_saved",
+      "description": "Remove one link from the user's saved items."
+    },
+    {
+      "name": "pin_portal",
+      "description": "Show results from another of the user's tools (Jira, Slack, Drive, a database, …) as a portal in their room: you fetch them with that tool and pass short items here; MCPortal never contacts it."
+    },
+    {
+      "name": "open_docs",
+      "description": "Open a documentation site in the docs viewer (contents, search, the page, on-this-page), shown as its own card."
+    },
+    {
+      "name": "read_doc_page",
+      "description": "Read one page of a docs site as clean text: headings, code, tables and callouts."
+    },
+    {
+      "name": "search_docs",
+      "description": "Find pages in a docs site by title, description and section, and on Sphinx sites (Python, Django, NumPy…) functions and classes by name (\"str.split\")."
+    },
+    {
+      "name": "clip",
+      "description": "Keep something from this chat (or an article) in the user's clips, only when they ask to clip or keep it; a link to read later is save_item."
+    },
+    {
+      "name": "search_clips",
+      "description": "Find the user's clips by words, kind or tag, newest first."
+    },
+    {
+      "name": "get_clip",
+      "description": "Show one of the user's clips in full, as a card in the conversation (\"show me that table\")."
+    },
+    {
+      "name": "update_clip",
+      "description": "Change a clip's title, note or tags."
+    },
+    {
+      "name": "delete_clip",
+      "description": "Delete one of the user's clips."
+    },
+    {
+      "name": "export_data",
+      "description": "Give the user a copy of their MCPortal data."
+    },
+    {
+      "name": "import_portal",
+      "description": "Add an MCPortal export file (format \"mcportal-export\") to the user's room: portals they don't have, saved items and clips."
+    },
+    {
+      "name": "account_settings",
+      "description": "Link to the user's MCPortal account page, where they sign in with GitHub to download everything or delete their account."
+    },
+    {
+      "name": "record_reading",
+      "description": "Record explicit seen, opened or read activity for one URL."
+    },
+    {
+      "name": "get_reading",
+      "description": "Get the caller’s durable reading state for a URL; fragments share the same URL identity."
+    },
+    {
+      "name": "list_reading",
+      "description": "List recent unfinished reading (actually opened, not completed), newest opened first."
+    }
+  ],
+  "tools_generated": false,
+  "keywords": [
+    "workspace",
+    "dashboard",
+    "rss",
+    "hacker-news",
+    "github",
+    "reader",
+    "mcp-apps"
+  ],
+  "license": "UNLICENSED",
+  "privacy_policies": [
+    "https://mcportal-production.up.railway.app/privacy"
+  ],
+  "compatibility": {
+    "platforms": [
+      "darwin",
+      "win32",
+      "linux"
+    ],
+    "runtimes": {
+      "node": ">=22.18"
+    }
+  }
+}

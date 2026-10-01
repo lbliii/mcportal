@@ -141,7 +141,6 @@ The `/preview` page never contains secrets. With a static token it asks for the 
 | `refresh_portal` | app only | Reload one portal, bypassing cache |
 | `get_thumbnails` | app only | Fetch item pictures through the guarded fetcher as data URIs |
 | `import_opml` | model + app | Bring subscriptions from another reader: test-load each feed, build a new user's room from their folders or add to an existing one |
-| `export_opml` | model | Sources as OPML for any feed reader (GitHub searches, saved and pinned portals have no feed and are listed as skipped) |
 | `clip` | model | Keep a quote, exchange, note, table, image (SVG, PNG, JPEG, WebP) or link from the conversation; the first clip adds a Clips portal |
 | `search_clips` | model | Find clips by words, kind or tag, newest first |
 | `get_clip` | model + app | One clip in full; renders as its own clip card |

@@ -268,7 +268,7 @@ Some views need new data (a `docs` source, stored read state for `deck` and `wat
 | Reading | `open_room` · `get_profile` · `update_profile` · `find_source` · `add_portal` · `read_source` · `refresh_portal` (app) · `read_article` · `get_thumbnails` (app) · `list_sources` |
 | Collecting | `save_item` · `remove_saved` · `pin_portal` · `clip` · `search_clips` · `get_clip` · `update_clip` · `delete_clip` |
 | Social | `get_public_profile` · `set_public_profile` · `remove_public_profile` · `open_space` · `share` · `unshare` · `get_share` · `list_shares` · `relationship` · `list_connections` · `report` |
-| Onboarding & portability | `build_room` · `import_opml` · `export_opml` · `export_data` · `import_portal` · `account_settings` |
+| Onboarding & portability | `build_room` · `import_opml` · `export_data` · `import_portal` · `account_settings` |
 
 ## 8. Vocabulary (decided 2026-09-30)
 

@@ -10,7 +10,7 @@
     // Videos play at the source; pinned items are often internal pages reader view can't reach.
     const readable = item.url && portal.source !== 'github' && portal.source !== 'pinned' && !item.video;
     // openLink turns away anything that isn't a web address, a missing url included.
-    if (!readable) return openLink(/** @type {string} */ (item.url));
+    if (!readable) return openLink(item.url ?? '');
     const link = /** @type {ReadableItem} */ (item);   // readable: it has a url
     if (!DEV && state.profile && state.profile.openIn === 'chat') return openInChat(link, portal);
     return openReader(link, portal);
