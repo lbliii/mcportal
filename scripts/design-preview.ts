@@ -28,6 +28,9 @@ async function fixture(view:string){
 createServer(async(req,res)=>{try{
  const u=new URL(req.url??'/','http://127.0.0.1:8799');res.setHeader('content-type','text/html; charset=utf-8');
  if(u.pathname==='/app'){res.end(await roomHtml());return;}
+ if(u.pathname.startsWith('/admin/api/')){res.setHeader('content-type','application/json');
+  if(req.method!=='GET'||u.pathname!=='/admin/api/state'){res.statusCode=405;res.end(JSON.stringify({error:'Admin writes are disabled in the design fixture'}));return;}
+  res.end(JSON.stringify({csrf:'fixture',me:{accountId:'fixture',login:'design-review'},invites:[],accounts:[],reports:[],audit:[]}));return;}
  if(u.pathname==='/fixture'){res.setHeader('content-type','application/json');res.end(JSON.stringify(await fixture(u.searchParams.get('view')??'room')));return;}
  if(u.pathname==='/rpc'){let text='';for await(const chunk of req){text+=chunk;if(text.length>100000)throw new Error('Large request');}const msg=JSON.parse(text);
   res.setHeader('content-type','application/json');
