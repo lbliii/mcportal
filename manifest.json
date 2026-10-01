@@ -125,14 +125,6 @@
       "description": "Link to the user's account page, where they sign in with GitHub to download everything or delete their account."
     },
     {
-      "name": "record_reading",
-      "description": "Record explicit seen, opened or read activity for one URL."
-    },
-    {
-      "name": "get_reading",
-      "description": "Get the caller’s durable reading state for a URL; fragments share the same URL identity."
-    },
-    {
       "name": "list_reading",
       "description": "What the user was reading: pages they opened and haven't finished, most recent first ('what was I in the middle of?')."
     }

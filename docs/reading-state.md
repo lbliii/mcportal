@@ -4,8 +4,8 @@ Reading activity is separate from the layout profile. The server scopes every ca
 
 ## Tool contract
 
-- `record_reading({url, status, title?, anchor?, progress?})` returns `structuredContent.reading` as one record.
-- `get_reading({url})` returns a record or `null` in that field.
+- `record_reading({url, status, title?, anchor?, progress?})` returns `structuredContent.reading` as one record. App-only.
+- `get_reading({url})` returns a record or `null` in that field. App-only.
 - `list_reading({unfinished?, limit?})` returns an array in that field. Defaults: unfinished true, limit 20; tool maximum 100. Ordered by last-opened time (seen-only records use last-seen time), then URL. Unfinished means opened, excluding seen-only and explicitly completed records.
 
 A record has `url`, `status`, `lastSeenAt`, optional `title`, `lastOpenedAt`, `readAt`, `anchor: {heading?, block?}`, and `progress`. Times are server-generated ISO UTC strings. Blocks are nonnegative, zero-based indices; headings are text/ID resume hints of at most 300 characters. Positions are hints: readers should tolerate changed or missing headings/blocks. `anchor: null` clears the position. Omitted fields preserve previous values.
@@ -16,4 +16,13 @@ URL identity uses WHATWG URL normalization (host case/default ports), accepts on
 
 Stores retain at most 1000 recent records per account, evicting the least recently opened (or seen) when adding activity. Import is additive and fills remaining capacity; input is validated before reading records are written. File updates serialize within a server process and use atomic private-file replacement. Postgres incremental updates merge atomically across server processes. Deployments using files should run one writer per data directory, as with the existing file stores. File-to-Postgres moves use the account JSON export/import for reading history.
 
-This PR supplies the backend/API contract. A Continue Reading UI and automatic reader position events are separate integration work.
+## Who records reading
+
+The room's reader does; the model doesn't. `record_reading` and `get_reading` are app-only (`_meta.ui.visibility: ["app"]`), so the model never sees them, and `list_reading` ("what was I in the middle of?") is the model's way in. In the reader (`src/ui/room/reading.js`):
+
+- Opening an article calls `get_reading`, scrolls to the saved block unless the article was finished, then records `opened` with its title.
+- Scrolling measures where the user is (the first block on screen, and the share of blocks that have been on screen) and keeps the furthest point, so scrolling back up to leave doesn't lose it. That point is saved as `opened` with `progress` and `anchor.block` at most every 15 seconds, when the reader closes or another article opens, and when the page is hidden. Each save is one call against the usage budget.
+- Only the "Mark as read" button at the end of the article records `read`.
+- Failures are quiet: on a server without reading history the reader just doesn't track.
+
+Docs pages, clips and shares aren't tracked yet.

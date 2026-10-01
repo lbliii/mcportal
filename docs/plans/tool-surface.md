@@ -1,6 +1,6 @@
 # Plan: the tool surface for the long run
 
-Status: in progress (2026-10-01), revised after an adversarial review of a first plan that
+Status: built through "Then" (2026-10-01); "Later" waits for real usage, revised after an adversarial review of a first plan that
 merged tools to cut tokens. This plan optimizes for where hosts are going, not for one
 token count.
 

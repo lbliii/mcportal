@@ -11,6 +11,7 @@ import type { FetchedSource, SourceCandidate } from '../discover.ts';
 import type { Profile, ProfileDiff, SourceSettings } from '../profile.ts';
 import type { FeaturedSource, PublicProfile } from '../public-profiles.ts';
 import type { SharedItem } from '../social.ts';
+import type { ReadingState } from '../reading.ts';
 import type { Article, Item, PortalResult, Provenance } from '../types.ts';
 
 /** A starter pack as the welcome screen lists it. */
@@ -73,6 +74,9 @@ export type ToolResults = {
   get_share: { share: SharedItem };
   share: { share: SharedItem };
   relationship: { handle?: string; layoutChanged?: boolean; profile?: Profile };
+  record_reading: { reading: ReadingState };
+  get_reading: { reading: ReadingState | null };
+  list_reading: { reading: ReadingState[] };
 };
 
 /** A tool the room app calls, by name. */
