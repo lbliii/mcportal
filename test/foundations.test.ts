@@ -261,3 +261,16 @@ test('metrics and budget: per-tool counters from the dispatcher, and a budget sn
   assert.deepEqual(snap.today, [{ userId: 'u', used: 4 }], 'get_profile 1 + 1, refresh_portal 2');
   assert.equal(snap.global.used, 4);
 });
+
+test('github sign-in: an unreachable or failing GitHub is a failed sign-in, never a crash or upstream text', async () => {
+  const { githubIdentity, githubAuthorizeUrl } = await import('../src/auth/github.ts');
+  const { UpstreamError } = await import('../src/lib/errors.ts');
+  const app = { clientId: 'cid', clientSecret: 'secret' };
+  const down = async () => { throw new UpstreamError('upstream_unreachable', 'Could not reach github.com: ECONNRESET'); };
+  assert.deepEqual(await githubIdentity(down, app, 'code', 'https://x/cb'), { error: 'GitHub sign-in failed; try again in a moment' });
+  const refused = async (url: string) => ({ status: 401, url, contentType: 'application/json', text: '{"error":"<script>"}', truncated: false });
+  assert.deepEqual(await githubIdentity(refused, app, 'code', 'https://x/cb'), { error: 'GitHub sign-in failed' });
+  const url = new URL(githubAuthorizeUrl(app, 'https://x/cb', 'st8'));
+  assert.equal(url.searchParams.get('scope'), 'read:user');
+  assert.equal(url.searchParams.get('allow_signup'), null);
+});
