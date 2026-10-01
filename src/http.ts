@@ -21,9 +21,10 @@ import { DEFAULT_SUPPORT_URL, serveSite, type SiteConfig } from './site.ts';
 import { limitsFromEnv, UsageBudget, type BudgetLimits } from './lib/budget.ts';
 import type { TtlCache } from './lib/cache.ts';
 import { isLoopbackHost } from './lib/ip.ts';
-import { errorCode, errorStack } from './lib/errors.ts';
+import { errorCode, errorMessage, errorStack } from './lib/errors.ts';
 import { safeEqual } from './lib/ids.ts';
 import { createLogger, requestId, type Logger } from './lib/log.ts';
+import { ToolMetrics } from './lib/metrics.ts';
 import { readBody } from './lib/web.ts';
 import { handleMessage, RPC, rpcError, SERVER_INFO, roomHtml, type JsonRpcResponse } from './mcp.ts';
 import { FileClipStore, type ClipStore } from './clips.ts';
@@ -75,6 +76,8 @@ export interface AppDeps {
   accounts?: Accounts | undefined;
   /** Reported by /health. */
   storage?: 'files' | 'postgres' | undefined;
+  /** Throws when storage can't be reached; /health then answers 503. */
+  checkStorage?: (() => Promise<void>) | undefined;
 }
 
 function list(value: string | undefined): string[] {
@@ -121,6 +124,29 @@ function send(res: ServerResponse, status: number, body: string, type = 'applica
   res.end(body);
 }
 
+/** How long a storage check's answer is reused: platform health checks can be frequent. */
+const HEALTH_TTL_MS = 5_000;
+const HEALTH_TIMEOUT_MS = 2_000;
+
+/** The /health storage check: ok, or failing (logged), answered from a short cache. */
+function healthCheck(deps: AppDeps, log: Logger): () => Promise<'ok' | 'failing'> {
+  const now = deps.now ?? Date.now;
+  let last: { at: number; result: Promise<'ok' | 'failing'> } | undefined;
+  return () => {
+    if (last && now() - last.at < HEALTH_TTL_MS) return last.result;
+    const check = deps.checkStorage;
+    const result: Promise<'ok' | 'failing'> = !check ? Promise.resolve('ok') : Promise.race([
+      check().then(() => 'ok' as const),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`no answer in ${HEALTH_TIMEOUT_MS} ms`)), HEALTH_TIMEOUT_MS).unref()),
+    ]).catch((error: unknown) => {
+      log.error('health.storage_failing', { error: errorMessage(error) });
+      return 'failing' as const;
+    });
+    last = { at: now(), result };
+    return result;
+  };
+}
+
 /**
  * A plain-HTTP error (not JSON-RPC, not an HTML page), in the same shape as the OAuth
  * endpoints: { error: code, error_description: message }.
@@ -158,8 +184,10 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
     : undefined;
 
   // The admin page needs GitHub sign-in; without it, admins use the `mcportal admin` CLI.
-  const admin = oauth ? new AdminPanel(accounts, oauth, config.publicUrl, deps.now, { social: oauth && deps.publicProfiles ? deps.social : undefined, profiles: deps.publicProfiles }) : undefined;
   const budget = deps.budget ?? new UsageBudget(config.limits ?? {}, deps.now);
+  const metrics = new ToolMetrics(deps.now);
+  const admin = oauth ? new AdminPanel(accounts, oauth, config.publicUrl, deps.now, { social: oauth && deps.publicProfiles ? deps.social : undefined, profiles: deps.publicProfiles, budget, metrics }) : undefined;
+  const health = healthCheck(deps, log);
   const site: SiteConfig = { supportUrl: DEFAULT_SUPPORT_URL, ...config.site, publicUrl: config.publicUrl, inviteOnly: Boolean(oauth) && !accounts.openSignup };
   const reading = deps.reading ?? new FileReadingStore(config.dataDir);
   const clips = deps.clips ?? new FileClipStore(config.dataDir);
@@ -169,7 +197,7 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
   const account = oauth ? new AccountPage({ accounts, oauth, store: deps.store, reading, clips, publicProfiles, social, publicUrl: config.publicUrl, log, now: deps.now }) : undefined;
   const context = (userId: string, reqLog: Logger): ToolContext => ({
     log: reqLog,
-    store: deps.store, reading, clips, publicProfiles, social, fetcher: deps.fetcher, cache: deps.cache, userId, budget, actor: accounts.actor(userId),
+    store: deps.store, reading, clips, publicProfiles, social, fetcher: deps.fetcher, cache: deps.cache, userId, budget, metrics, actor: accounts.actor(userId),
     accountUrl: account?.url,
     uploadLink: account ? () => account.uploadLink(userId) : undefined,
     localFiles: !account && config.allowUnauthenticated && isLoopbackHost(config.host),
@@ -210,7 +238,10 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
   async function route(req: IncomingMessage, res: ServerResponse, url: URL, reqLog: Logger): Promise<void> {
     const hostname = hostnameOf(req.headers.host);
     // Health checks come from the platform with its own Host header.
-    if (url.pathname === '/health') return send(res, 200, JSON.stringify({ ok: true, ...SERVER_INFO, storage: deps.storage ?? 'files' }));
+    if (url.pathname === '/health') {
+      const storage = await health();
+      return send(res, storage === 'ok' ? 200 : 503, JSON.stringify({ ok: storage === 'ok', ...SERVER_INFO, storage: deps.storage ?? 'files', checks: { storage } }));
+    }
     if (!hostname || !config.allowedHosts.includes(hostname)) {
       return sendError(res, 421, 'unknown_host', 'Unknown host; set MCPORTAL_PUBLIC_URL or MCPORTAL_ALLOWED_HOSTS');
     }

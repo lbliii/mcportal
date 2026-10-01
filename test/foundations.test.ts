@@ -244,3 +244,20 @@ test('shared documents: cached reads, fresh atomic changes, and two instances ke
   await assert.rejects(c.get(), /connection reset/, 'no cache yet: the failure shows');
   await assert.rejects(c.update(() => {}), /connection reset/, 'a change never starts from nothing');
 });
+
+test('metrics and budget: per-tool counters from the dispatcher, and a budget snapshot', async () => {
+  const { ToolMetrics } = await import('../src/lib/metrics.ts');
+  const metrics = new ToolMetrics(() => 0);
+  const budget = new UsageBudget({ perMinute: 100, perDay: 100, globalPerDay: 1000 });
+  const c = ctx({ metrics, budget });
+  await call(c, 'get_profile');
+  await call(c, 'get_profile');
+  await call(c, 'refresh_portal', { portalId: 'nope' });
+  const stats = metrics.snapshot().tools;
+  assert.equal(stats[0]!.tool, 'get_profile');
+  assert.equal(stats[0]!.calls, 2);
+  assert.deepEqual(stats.find((t) => t.tool === 'refresh_portal')!.codes, { not_found: 1 });
+  const snap = budget.snapshot();
+  assert.deepEqual(snap.today, [{ userId: 'u', used: 4 }], 'get_profile 1 + 1, refresh_portal 2');
+  assert.equal(snap.global.used, 4);
+});

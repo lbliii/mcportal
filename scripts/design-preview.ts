@@ -30,7 +30,7 @@ createServer(async(req,res)=>{try{
  if(u.pathname==='/app'){res.end(await roomHtml());return;}
  if(u.pathname.startsWith('/admin/api/')){res.setHeader('content-type','application/json');
   if(req.method!=='GET'||u.pathname!=='/admin/api/state'){res.statusCode=405;res.end(JSON.stringify({error:'Admin writes are disabled in the design fixture'}));return;}
-  res.end(JSON.stringify({csrf:'fixture',me:{accountId:'fixture',login:'design-review'},invites:[],accounts:[],reports:[],audit:[]}));return;}
+  res.end(JSON.stringify({csrf:'fixture',me:{accountId:'fixture',login:'design-review'},invites:[],accounts:[],reports:[],audit:[],usage:{budget:{limits:{perMinute:120,perDay:3000,globalPerDay:60000},global:{used:1840,resetsAt:new Date(Date.now()+6*3600e3).toISOString()},today:[{userId:'github-1',login:'design-review',used:1210},{userId:'github-2',login:null,used:630}]},tools:{since:new Date(Date.now()-3600e3).toISOString(),tools:[{tool:'open_room',calls:212,outcomes:{ok:209,error:3},codes:{upstream_error:3},totalMs:0,maxMs:2210,avgMs:340},{tool:'find_source',calls:41,outcomes:{ok:37,invalid:4},codes:{invalid_argument:4},totalMs:0,maxMs:5120,avgMs:1890},{tool:'get_thumbnails',calls:398,outcomes:{ok:398},codes:{},totalMs:0,maxMs:900,avgMs:120}]}}}));return;}
  if(u.pathname==='/fixture'){res.setHeader('content-type','application/json');res.end(JSON.stringify(await fixture(u.searchParams.get('view')??'room')));return;}
  if(u.pathname==='/rpc'){let text='';for await(const chunk of req){text+=chunk;if(text.length>100000)throw new Error('Large request');}const msg=JSON.parse(text);
   res.setHeader('content-type','application/json');

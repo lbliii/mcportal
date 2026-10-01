@@ -378,6 +378,8 @@ test('admin page: browser-bound GitHub sign-in, admins only, CSRF and same-origi
 
     const state = JSON.parse((await raw(app.port, { path: '/admin/api/state', headers: { cookie: session } })).body);
     assert.equal(state.me.login, 'Lawrence');
+    assert.ok(state.usage.budget.limits.perDay > 0, 'the admin sees usage');
+    assert.ok(Array.isArray(state.usage.tools.tools));
     const post = (path: string, body: unknown, headers: Record<string, string> = {}) =>
       raw(app.port, { method: 'POST', path, headers: { 'content-type': 'application/json', cookie: session, ...headers }, body: JSON.stringify(body) });
 
