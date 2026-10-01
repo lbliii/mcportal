@@ -22,12 +22,13 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { AppError, errorCode, errorStack, type ErrorCode } from '../lib/errors.ts';
 import { safeEqual, secretToken, sha256Url } from '../lib/ids.ts';
 import { processLogger } from '../lib/log.ts';
+import { RateLimiter } from '../lib/rate-limit.ts';
 import { cookies, escapeHtml, readBody, redirect, sendHtml, sendJson } from '../lib/web.ts';
 import { page } from '../page.ts';
-import { fetchJson } from '../lib/safe-fetch.ts';
 import { clean } from '../lib/text.ts';
 import type { Fetcher } from '../types.ts';
 import { Accounts, makeBootstrap, memoryPersistence } from '../accounts.ts';
+import { githubAuthorizeUrl, githubIdentity, type GithubApp, type GithubIdentity } from './github.ts';
 import { CLIENT_LIMITS, type AuthStore, type Identity, type TokenRecord } from './store.ts';
 
 export const SCOPE = 'mcportal';
@@ -39,7 +40,7 @@ const MAX_CIMD = 200;
 
 export interface OAuthConfig {
   publicUrl: string;
-  github: { clientId: string; clientSecret: string };
+  github: GithubApp;
   /** GitHub logins (lowercase) or numeric ids allowed to sign in. Empty means anyone. */
   allowedGithubUsers: string[];
   /** Trust the last X-Forwarded-For hop for per-IP limits (true behind Railway's proxy). */
@@ -103,32 +104,6 @@ export function isAllowedRedirectUri(value: string): boolean {
     return url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
   } catch {
     return false;
-  }
-}
-
-/** Fixed-window counters per key, bounded in size. */
-export class RateLimiter {
-  private windows = new Map<string, { count: number; resetAt: number }>();
-  private limit: number;
-  private windowMs: number;
-  private now: () => number;
-
-  constructor(limit: number, windowMs: number, now: () => number = Date.now) {
-    this.limit = limit;
-    this.windowMs = windowMs;
-    this.now = now;
-  }
-
-  take(key: string): boolean {
-    const now = this.now();
-    let w = this.windows.get(key);
-    if (!w || w.resetAt <= now) {
-      if (this.windows.size > 10_000) this.windows.clear();
-      w = { count: 0, resetAt: now + this.windowMs };
-      this.windows.set(key, w);
-    }
-    w.count++;
-    return w.count <= this.limit;
   }
 }
 
@@ -446,13 +421,7 @@ export class OAuthServer {
     }
     const ghState = secretToken(24);
     this.githubStates.set(ghState, txnId);
-    const gh = new URL('https://github.com/login/oauth/authorize');
-    gh.searchParams.set('client_id', this.config.github.clientId);
-    gh.searchParams.set('redirect_uri', `${this.config.publicUrl}/oauth/callback`);
-    gh.searchParams.set('state', ghState);
-    gh.searchParams.set('scope', 'read:user');
-    gh.searchParams.set('allow_signup', 'true');
-    redirect(res, gh.href);
+    redirect(res, githubAuthorizeUrl(this.config.github, `${this.config.publicUrl}/oauth/callback`, ghState, { allowSignup: true }));
   }
 
   /**
@@ -468,12 +437,7 @@ export class OAuthServer {
     const ghState = `pg_${secretToken(24)}`;
     const browser = secretToken(24);
     setLimited(this.pageSignIns, ghState, { browser: sha256Url(browser), expiresAt: now + TXN_TTL_MS, done }, MAX_TXNS);
-    const gh = new URL('https://github.com/login/oauth/authorize');
-    gh.searchParams.set('client_id', this.config.github.clientId);
-    gh.searchParams.set('redirect_uri', `${this.config.publicUrl}/oauth/callback`);
-    gh.searchParams.set('state', ghState);
-    gh.searchParams.set('scope', 'read:user');
-    redirect(res, gh.href, { 'set-cookie': `${this.pageCookieName}=${browser}; Path=/oauth/callback; HttpOnly; SameSite=Lax; Max-Age=${TXN_TTL_MS / 1000}${this.secure ? '; Secure' : ''}` });
+    redirect(res, githubAuthorizeUrl(this.config.github, `${this.config.publicUrl}/oauth/callback`, ghState), { 'set-cookie': `${this.pageCookieName}=${browser}; Path=/oauth/callback; HttpOnly; SameSite=Lax; Max-Age=${TXN_TTL_MS / 1000}${this.secure ? '; Secure' : ''}` });
   }
 
   private get pageCookieName(): string {
@@ -531,35 +495,10 @@ export class OAuthServer {
     toClient({ code });
   }
 
-  /** Exchange a GitHub OAuth code for the user's numeric id and login. Never echoes upstream content. */
-  private async githubIdentity(ghCode: string): Promise<{ githubId: number; login: string } | { error: string }> {
+  /** The GitHub identity behind a sign-in code, or why there isn't one. */
+  private async githubIdentity(ghCode: string): Promise<GithubIdentity | { error: string }> {
     if (!this.config.github) return { error: 'GitHub sign-in is not configured' };
-    const exchange = await this.fetcher('https://github.com/login/oauth/access_token', {
-      method: 'POST',
-      headers: { accept: 'application/json', 'content-type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        client_id: this.config.github.clientId,
-        client_secret: this.config.github.clientSecret,
-        code: ghCode,
-        redirect_uri: `${this.config.publicUrl}/oauth/callback`,
-      }).toString(),
-      maxBytes: 16 * 1024,
-      maxRedirects: 0,
-    });
-    let ghToken: string | undefined;
-    try {
-      ghToken = (JSON.parse(exchange.text) as { access_token?: string }).access_token;
-    } catch {
-      ghToken = undefined;
-    }
-    if (exchange.status !== 200 || !ghToken) return { error: 'GitHub sign-in failed' };
-    const user = await fetchJson<{ id?: number; login?: string }>(this.fetcher, 'https://api.github.com/user', {
-      headers: { authorization: `Bearer ${ghToken}`, accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28' },
-      maxBytes: 64 * 1024,
-      maxRedirects: 0,
-    });
-    if (typeof user.id !== 'number' || typeof user.login !== 'string') return { error: 'Could not read GitHub profile' };
-    return { githubId: user.id, login: user.login };
+    return githubIdentity(this.fetcher, this.config.github, ghCode, `${this.config.publicUrl}/oauth/callback`);
   }
 
   private async token(req: IncomingMessage, res: ServerResponse): Promise<void> {

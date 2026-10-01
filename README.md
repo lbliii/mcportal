@@ -103,6 +103,8 @@ node bin/mcportal.mjs admin audit                  # who did what, when
 
 Check a deployment with: `MCPORTAL_URL=https://<your-domain>/mcp MCPORTAL_TOKEN=… npm run smoke`.
 
+**Health**: `GET /health` checks storage (Postgres answers, or the data directory is writable) and answers 503 when it can't reach it. **Usage**: the admin page shows today's budget use by account and per-tool call counts, errors and timings for the instance.
+
 **Logs** go to stderr, one event per line: `MCPORTAL_LOG_FORMAT=json` for a log platform, `MCPORTAL_LOG_LEVEL=debug|info|warn|error` (default `info`). Each HTTP request has an id, sent back as `x-request-id` and on every line it logs; a tool failure that is our bug says `reference <id>`, which finds its stack. Users appear only as a short hash.
 
 ## Security model

@@ -181,3 +181,26 @@ test('public pages: landing, privacy and support render without scripts; images 
     await app.close();
   }
 });
+
+test('/health checks storage: 503 when it fails, answered from a short cache', async () => {
+  let down = false;
+  let checks = 0;
+  const checkStorage = async () => { checks++; if (down) throw new Error('connection refused'); };
+  let now = 0;
+  const app = await startApp({ allowUnauthenticated: true }, undefined, { checkStorage, now: () => now });
+  try {
+    const ok = await raw(app.port, { path: '/health' });
+    assert.equal(ok.status, 200);
+    assert.deepEqual(JSON.parse(ok.body).checks, { storage: 'ok' });
+    down = true;
+    assert.equal((await raw(app.port, { path: '/health' })).status, 200, 'cached for a few seconds');
+    assert.equal(checks, 1);
+    now = 5_000;
+    const failing = await raw(app.port, { path: '/health' });
+    assert.equal(failing.status, 503);
+    assert.equal(JSON.parse(failing.body).ok, false);
+    assert.ok(failing.headers['x-request-id'], 'every response carries a request id');
+  } finally {
+    await app.close();
+  }
+});

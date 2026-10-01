@@ -44,6 +44,14 @@ export class UsageBudget {
     return w;
   }
 
+  /** Where usage stands now, for the admin page. */
+  snapshot(top = 20): BudgetSnapshot {
+    const now = this.now();
+    const global = this.global.resetAt > now ? this.global : { used: 0, resetAt: now + DAY };
+    const today = [...this.day].filter(([, w]) => w.resetAt > now).map(([userId, w]) => ({ userId, used: w.used })).sort((a, b) => b.used - a.used).slice(0, top);
+    return { limits: { ...this.limits }, global: { used: global.used, resetsAt: new Date(global.resetAt).toISOString() }, today };
+  }
+
   /** Charge `cost` to `userId`, or refuse without charging anything. */
   take(userId: string, cost: number): BudgetVerdict {
     const now = this.now();
@@ -59,6 +67,13 @@ export class UsageBudget {
     this.global.used += cost;
     return { ok: true };
   }
+}
+
+export interface BudgetSnapshot {
+  limits: BudgetLimits;
+  global: { used: number; resetsAt: string };
+  /** The heaviest users today, most first. */
+  today: Array<{ userId: string; used: number }>;
 }
 
 export function budgetMessage(v: Exclude<BudgetVerdict, { ok: true }>): string {

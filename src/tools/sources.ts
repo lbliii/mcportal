@@ -8,7 +8,7 @@ import { clean } from '../lib/text.ts';
 import { discover } from '../discover.ts';
 import { addPortalTo, columnOf, slugId, withLayout, spreadColumns } from '../layout.ts';
 import { buildOpml, OPML_LIMITS, parseOpml } from '../opml.ts';
-import { describeLayout, findPortal, LIMITS, SOURCES, type PortalSpec, type Profile } from '../profile.ts';
+import { describeLayout, findPortal, LIMITS, SOURCES, type PortalInput, type Profile } from '../profile.ts';
 import { findDocs, loadPortal, SOURCE_DOCS } from '../sources.ts';
 import type { Item, PortalResult, SourceKind } from '../types.ts';
 import { ok, toolError, toolFailure, untrusted, type ToolDef } from './kit.ts';
@@ -36,7 +36,7 @@ export const SOURCE_TOOLS: ToolDef[] = [
       const source = args.source as SourceKind;
       let portal: PortalResult;
       try {
-        const spec = { id: `preview-${source}`, source, config: (args.config as Record<string, unknown>) ?? {} };
+        const spec = { id: `preview-${source}`, source, config: args.config ?? {} };
         portal = await portalFor(spec, await ctx.store.get(ctx.userId), ctx);
       } catch (error) {
         return toolFailure(error, `Could not read ${source}: `);
@@ -65,7 +65,7 @@ export const SOURCE_TOOLS: ToolDef[] = [
       const query = clean(args.query, 500);
       if (!query) return toolError('find_source needs a "query"');
       const [found, docs] = await Promise.all([discover(query, ctx.fetcher), findDocs(query, ctx)]);
-      if (docs && 'config' in docs) found.candidates.unshift({ source: 'docs', config: docs.config as unknown as Record<string, unknown>, title: docs.title, via: 'docs' });
+      if (docs && 'config' in docs) found.candidates.unshift({ source: 'docs', config: { ...docs.config }, title: docs.title, via: 'docs' });
       else if (docs && !found.candidates.length) found.hint ??= docs.error;
       const loaded = await Promise.all(found.candidates.slice(0, 5).map(async (c, i): Promise<typeof c & { error?: string; items: Item[] }> => {
         try {
@@ -113,7 +113,7 @@ export const SOURCE_TOOLS: ToolDef[] = [
     async handler(args, ctx) {
       const source = args.source as SourceKind;
       const title = clean(args.title, 80) || undefined;
-      const config = (args.config as Record<string, unknown>) ?? {};
+      const config = args.config ?? {};
       const before = await ctx.store.get(ctx.userId);
       // Load it first: refuse sources that don't work, and name the portal after what it is.
       let trial: PortalResult;
@@ -123,7 +123,7 @@ export const SOURCE_TOOLS: ToolDef[] = [
         return toolFailure(error, 'Not added: ');
       }
       if (trial.error) return toolError(`Not added: it didn't load (${clean(trial.error, 160)}). Try find_source for a working address.`, trial.errorCode ?? 'upstream_error');
-      const spec: PortalSpec = { id: slugId(title ?? trial.title), source, ...(title !== undefined ? { title } : {}), config };
+      const spec: PortalInput = { id: slugId(title ?? trial.title), source, ...(title !== undefined ? { title } : {}), config };
       let added: ReturnType<typeof addPortalTo>;
       try {
         added = await ctx.store.update<ReturnType<typeof addPortalTo>>(ctx.userId, (current) => {
@@ -174,7 +174,7 @@ export const SOURCE_TOOLS: ToolDef[] = [
       const { title, feeds } = parseOpml(xml);
       if (!feeds.length) return toolError("No feeds found. Is that an OPML export? It should contain <outline xmlUrl=\"…\"> entries.");
       const before = await ctx.store.get(ctx.userId);
-      const have = new Set(before.columns.flatMap((c) => c.panels).map((p) => (p.source === 'rss' ? String((p.config as { url?: string }).url) : '')));
+      const have = new Set(before.columns.flatMap((c) => c.panels).map((p) => (p.source === 'rss' ? p.config.url : '')));
       const fresh = feeds.filter((f) => !have.has(f.url));
       const room = LIMITS.columns * LIMITS.portalsPerColumn - (before.onboarded ? before.columns.reduce((n, c) => n + c.panels.length, 0) : 0);
       // Test-load (6 at a time) only as many as could fit, in the file's order.
@@ -185,7 +185,7 @@ export const SOURCE_TOOLS: ToolDef[] = [
       });
       const working = loaded.filter((l) => l.ok).slice(0, Math.max(0, room));
       const failed = loaded.filter((l) => !l.ok);
-      const specs: PortalSpec[] = working.map((l) => {
+      const specs: PortalInput[] = working.map((l) => {
         const title = clean(l.feed.title || l.title, 80);
         return { id: slugId(l.feed.title || l.title || 'feed'), source: 'rss', ...(title ? { title } : {}), config: { url: l.feed.url, limit: 10 } };
       });

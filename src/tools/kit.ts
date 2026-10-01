@@ -12,6 +12,7 @@ import type { ClipStore } from '../clips.ts';
 import type { UsageBudget } from '../lib/budget.ts';
 import { AppError, ERROR_CODES, isAppError, type ErrorCode } from '../lib/errors.ts';
 import type { Logger } from '../lib/log.ts';
+import type { ToolMetrics } from '../lib/metrics.ts';
 import { clean } from '../lib/text.ts';
 import type { ExportFormat } from '../portability.ts';
 import type { PublicProfiles } from '../public-profiles.ts';
@@ -46,6 +47,8 @@ export interface ToolContext extends SourceDeps {
   actor?: Actor | undefined;
   /** Set by the dispatcher for each call, with the tool name and request id attached. */
   log?: Logger | undefined;
+  /** Per-tool counters for the admin page (hosted). */
+  metrics?: ToolMetrics | undefined;
 }
 
 export interface CallToolResult {

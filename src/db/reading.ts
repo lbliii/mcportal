@@ -1,6 +1,6 @@
 /** Reading state in mcportal_reading, one row per user and canonical URL. */
 import { AppError } from '../lib/errors.ts';
-import { canonicalReadingUrl, importedReading, nextReading, READING_LIMIT, validateReadingUpdate, type ReadingState, type ReadingStore, type ReadingUpdate } from '../reading.ts';
+import { canonicalReadingUrl, importedReading, nextReading, READING_LIMIT, readingPageSize, validateReadingUpdate, type ReadingState, type ReadingStore, type ReadingUpdate } from '../reading.ts';
 import type { Queryable } from './schema.ts';
 
 /** Atomic JSON updates preserve fields absent from incremental activity events. */
@@ -24,7 +24,7 @@ export class PgReadingStore implements ReadingStore {
     return rows[0]!.data;
   }
   async list(userId: string, options: { unfinished?: boolean; limit?: number } = {}) {
-    const limit = Math.min(READING_LIMIT, Math.max(1, Math.floor(Number(options.limit) || 20)));
+    const limit = readingPageSize(options.limit);
     const { rows } = await this.db.query<{ data: ReadingState }>(`SELECT data FROM mcportal_reading WHERE user_id=$1 ${options.unfinished ? "AND data->>'status' = 'opened'" : ''} ORDER BY COALESCE(data->>'lastOpenedAt', data->>'lastSeenAt') DESC, url LIMIT $2`, [userId, limit]);
     return rows.map(r => r.data);
   }

@@ -11,7 +11,7 @@ import {
 } from '../adapters/docs.ts';
 import { blocksToText } from '../lib/markdown.ts';
 import { clean } from '../lib/text.ts';
-import { findPortal, LIMITS, normalizeSourceConfig } from '../profile.ts';
+import { findPortal, LIMITS } from '../profile.ts';
 import { FRESHNESS, loadDocSite } from '../sources.ts';
 import { ok, toolError, toolFailure, untrusted, ROOM_URI, type ToolContext, type ToolDef } from './kit.ts';
 import type { ArticleBlock, Provenance } from '../types.ts';
@@ -33,12 +33,12 @@ async function siteFor(args: Record<string, unknown>, ctx: ToolContext): Promise
   if (typeof args.portalId === 'string' && args.portalId) {
     const spec = findPortal(profile, args.portalId);
     if (!spec || spec.source !== 'docs') throw new DocsError(`No docs portal with id "${clean(args.portalId, 60)}"`, 'not_found');
-    config = normalizeSourceConfig('docs', spec.config, spec.id) as DocsConfig;
+    config = spec.config;
   } else {
     const input = clean(args.docs, 500);
     if (!input) throw new DocsError('Say which docs: pass docs (an address or owner/repo) or portalId');
     const url = docsInputUrl(input);
-    const known = docsPortals.map((p) => normalizeSourceConfig('docs', p.config, p.id) as DocsConfig).find((c) => c.url === url || c.toc?.url === url);
+    const known = docsPortals.flatMap((p) => (p.source === 'docs' ? [p.config] : [])).find((c) => c.url === url || c.toc?.url === url);
     config = known ?? { url, limit: LIMITS.items };
   }
   const loaded = await loadDocSite(config, ctx);

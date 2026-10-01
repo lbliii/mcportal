@@ -6,7 +6,7 @@ import { DESIGN_CSS, PRIMITIVES_CSS } from './design/generated.ts';
  *   GET  /admin              the page (or a sign-in prompt)
  *   GET  /admin/login        sign in with GitHub (browser-bound; admins only)
  *   POST /admin/logout
- *   GET  /admin/api/state    accounts, invites, audit log, CSRF token
+ *   GET  /admin/api/state    accounts, invites, audit log, reports, usage, CSRF token
  *   POST /admin/api/{invite,uninvite,suspend,reinstate}
  *   POST /admin/api/report          { id, action: hide | dismiss }: resolve a report
  *   POST /admin/api/unhide          { id }: show a hidden share again
@@ -24,6 +24,8 @@ import type { Accounts } from './accounts.ts';
 import type { PublicProfiles } from './public-profiles.ts';
 import type { Social } from './social.ts';
 import type { OAuthServer } from './auth/oauth.ts';
+import type { UsageBudget } from './lib/budget.ts';
+import type { ToolMetrics } from './lib/metrics.ts';
 import { httpStatus, isAppError, type ErrorCode } from './lib/errors.ts';
 import { escapeHtml, readJson, redirect, sameOrigin, sendHtml, sendJson, sendJsonError } from './lib/web.ts';
 import { page } from './page.ts';
@@ -47,14 +49,27 @@ export class AdminPanel {
   private publicUrl: string;
   private social: Social | undefined;
   private profiles: PublicProfiles | undefined;
+  private budget: UsageBudget | undefined;
+  private metrics: ToolMetrics | undefined;
 
-  constructor(accounts: Accounts, oauth: OAuthServer, publicUrl: string, now: () => number = Date.now, moderation: { social?: Social | undefined; profiles?: PublicProfiles | undefined } = {}) {
+  constructor(accounts: Accounts, oauth: OAuthServer, publicUrl: string, now: () => number = Date.now, options: { social?: Social | undefined; profiles?: PublicProfiles | undefined; budget?: UsageBudget | undefined; metrics?: ToolMetrics | undefined } = {}) {
     this.accounts = accounts;
     this.oauth = oauth;
     this.publicUrl = publicUrl;
-    this.social = moderation.social;
-    this.profiles = moderation.profiles;
+    this.social = options.social;
+    this.profiles = options.profiles;
+    this.budget = options.budget;
+    this.metrics = options.metrics;
     this.sessions = new PageSessions('admin', { publicUrl, ttlMs: SESSION_MS, max: MAX_SESSIONS, now });
+  }
+
+  /** Usage on this instance: the budget (heaviest accounts today, by login) and per-tool counters. */
+  private usageView(): unknown {
+    const budget = this.budget?.snapshot();
+    return {
+      budget: budget && { ...budget, today: budget.today.map((u) => ({ ...u, login: this.accounts.actor(u.userId).login ?? null })) },
+      tools: this.metrics?.snapshot(),
+    };
   }
 
   /** Open reports and the last few resolved ones, with what they're about. */
@@ -176,7 +191,7 @@ export class AdminPanel {
     if (route === '/admin/api/state' && req.method === 'GET') {
       await this.accounts.load(true);
       const { accounts, invites } = await this.accounts.list();
-      sendJson(res, 200, { me: { login: current.session.login, accountId: current.session.accountId }, csrf: current.session.csrf, accounts, invites, audit: await this.accounts.auditLog(100), reports: await this.reportsView() });
+      sendJson(res, 200, { me: { login: current.session.login, accountId: current.session.accountId }, csrf: current.session.csrf, accounts, invites, audit: await this.accounts.auditLog(100), reports: await this.reportsView(), usage: this.usageView() });
       return true;
     }
 

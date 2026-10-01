@@ -7,19 +7,19 @@
  * www.dezeen.com (the bare domain returns 403 to servers). The docs pack's sources were
  * resolved with scripts/docs-probe.ts, which reads each table of contents and two pages.
  */
-import type { PortalSpec } from './profile.ts';
+import type { PortalInput } from './profile.ts';
 
 export interface StarterPack {
   id: string;
   label: string;
   blurb: string;
-  portals: PortalSpec[];
+  portals: PortalInput[];
 }
 
-const yt = (id: string, channel: string, title: string): PortalSpec => ({ id, source: 'rss', title, config: { url: `https://www.youtube.com/feeds/videos.xml?channel_id=${channel}`, limit: 10 } });
-const feed = (id: string, url: string, title: string): PortalSpec => ({ id, source: 'rss', title, config: { url, limit: 10 } });
+const yt = (id: string, channel: string, title: string): PortalInput => ({ id, source: 'rss', title, config: { url: `https://www.youtube.com/feeds/videos.xml?channel_id=${channel}`, limit: 10 } });
+const feed = (id: string, url: string, title: string): PortalInput => ({ id, source: 'rss', title, config: { url, limit: 10 } });
 /** A docs portal with its table of contents already found, so it opens without probing the site. */
-const docs = (id: string, url: string, kind: 'llms' | 'sphinx', toc: string, title: string): PortalSpec => ({ id, source: 'docs', title, config: { url, toc: { kind, url: toc }, limit: 30 } });
+const docs = (id: string, url: string, kind: 'llms' | 'sphinx', toc: string, title: string): PortalInput => ({ id, source: 'docs', title, config: { url, toc: { kind, url: toc }, limit: 30 } });
 
 export const STARTER_PACKS: StarterPack[] = [
   {

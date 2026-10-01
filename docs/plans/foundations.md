@@ -1,6 +1,6 @@
 # Plan: solid foundations before more features
 
-Status: phases 1–6 done (2026-10-01); follow-ups listed at the end. An audit of `src/` (excluding `src/ui`) found the code
+Status: done (2026-10-01). An audit of `src/` (excluding `src/ui`) found the code
 correct and well-tested, but held together by convention rather than contracts. This plan
 turns the conventions into code: one error vocabulary, one tool runtime, one logger, shared
 helpers, smaller files and a stricter compiler.
@@ -88,15 +88,20 @@ All of phases 1–6, plus:
 - `exactOptionalPropertyTypes` is on.
 - Fetch probes swallow only expected failures (AppErrors), so bugs surface.
 
-## Follow-ups
+## Follow-ups (done 2026-10-01)
 
-- Typed `PortalSpec.config` (a discriminated union by source); it drives most of the
-  remaining `as unknown as` casts.
-- One contract test suite run against both the file and Postgres stores (profiles,
-  clips, social, reading); their page-size caps still disagree (100 vs 200).
-- Document caches (`Accounts`, `PublicProfiles`, `DocumentSocialStore`) are per
-  process; with more than one hosted instance they go stale. Move them to rows, or
-  reload on write conflicts, before scaling out.
-- `/health` is static: add a storage check (and expose budget/limiter state to admins).
-- `auth/oauth.ts` (590 lines) could split the GitHub identity exchange from the
-  authorization server.
+- Typed `PortalSpec.config`: a discriminated union by source (`SourceConfigs`), with
+  `PortalInput` for raw specs; `normalizeSourceConfig` is a typed table.
+- `test/store-contract.test.ts` runs one contract against file, memory and Postgres
+  stores. It caught the social page cap (Postgres 200, files 100); limits for clip
+  quotas, social pages and reading pages are now defined once.
+- `SharedDocument` (`src/lib/document.ts`) replaces the per-class caches of accounts,
+  public profiles, social and OAuth: reads reload after a freshness window, changes
+  start from the stored copy and, on Postgres, hold a per-key advisory lock. A token
+  or client missing from the OAuth cache forces a reload.
+- `/health` checks storage (503 when failing, cached 5 s); the admin page shows
+  today's budget use and per-tool counters (`src/lib/metrics.ts`).
+- `auth/github.ts` and `lib/rate-limit.ts` split out of `auth/oauth.ts`.
+
+Still per instance, by design for now: the usage budget, rate limiters and tool
+counters live in memory, so with several instances each enforces and reports its own.

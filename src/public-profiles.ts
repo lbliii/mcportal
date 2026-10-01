@@ -12,11 +12,10 @@
  * it moves to tables when sharing needs joins. One server instance.
  */
 import type { AuthPersistence } from './auth/store.ts';
-import { readDocument } from './lib/document.ts';
+import { DOCUMENT_MAX_AGE_MS, SharedDocument } from './lib/document.ts';
 import { AppError, type AppErrorOptions, type ErrorCode } from './lib/errors.ts';
 import { clean } from './lib/text.ts';
-import { normalizeSourceConfig, ProfileError } from './profile.ts';
-import { KeyedMutex } from './store.ts';
+import { normalizeSourceConfig, ProfileError, type SourceConfigs } from './profile.ts';
 
 export const HANDLE_HOLD_MS = 30 * 24 * 3600 * 1000;
 const HANDLE = /^[a-z0-9_]{2,30}$/;
@@ -34,7 +33,7 @@ export type Accent = (typeof ACCENTS)[number];
 export interface FeaturedSource {
   title: string;
   source: 'rss' | 'hn' | 'github';
-  config: Record<string, unknown>;
+  config: SourceConfigs['rss' | 'hn' | 'github'];
 }
 
 export const MAX_FEATURED = 12;
@@ -69,9 +68,9 @@ export function normalizeFeatured(raw: PublicProfileInput['sources']): FeaturedS
   const seen = new Set<string>();
   for (const entry of raw ?? []) {
     if (entry.source !== 'rss' && entry.source !== 'hn' && entry.source !== 'github') continue;
-    let config: Record<string, unknown>;
+    let config: FeaturedSource['config'];
     try {
-      config = normalizeSourceConfig(entry.source, entry.config, 'featured source') as unknown as Record<string, unknown>;
+      config = normalizeSourceConfig(entry.source, entry.config, 'featured source');
     } catch (error) {
       if (error instanceof ProfileError) continue;
       throw error;
@@ -114,35 +113,31 @@ export function suggestHandle(login: string | undefined): string | undefined {
 }
 
 export class PublicProfiles {
-  private persistence: AuthPersistence;
-  private doc: Doc | null = null;
-  private mutex = new KeyedMutex();
+  private doc: SharedDocument<Doc>;
   private hidden: (accountId: string) => boolean;
   now: () => number;
 
   /** `hidden` says whose profiles others can't see (suspended accounts). */
   constructor(persistence: AuthPersistence, options: { hidden?: (accountId: string) => boolean; now?: () => number } = {}) {
-    this.persistence = persistence;
     this.hidden = options.hidden ?? (() => false);
     this.now = options.now ?? Date.now;
+    this.doc = new SharedDocument<Doc>(persistence, 'public profiles', (d) => ({ profiles: d.profiles ?? {}, held: d.held ?? {} }), {
+      maxAgeMs: DOCUMENT_MAX_AGE_MS,
+      now: () => this.now(),
+      // Released handles are held for a while; drop the holds that have run out.
+      beforeWrite: (doc) => {
+        const now = this.now();
+        for (const [h, hold] of Object.entries(doc.held)) if (hold.until <= now) delete doc.held[h];
+      },
+    });
   }
 
-  private async load(): Promise<Doc> {
-    if (this.doc) return this.doc;
-    const parsed = await readDocument<Doc>(this.persistence, 'public profiles');
-    this.doc = { profiles: parsed.profiles ?? {}, held: parsed.held ?? {} };
-    return this.doc;
+  private load(): Promise<Doc> {
+    return this.doc.get();
   }
 
   private write<T>(change: (doc: Doc) => T): Promise<T> {
-    return this.mutex.run('public-profiles', async () => {
-      const doc = await this.load();
-      const result = change(doc);
-      const now = this.now();
-      for (const [h, hold] of Object.entries(doc.held)) if (hold.until <= now) delete doc.held[h];
-      await this.persistence.write(JSON.stringify(doc));
-      return result;
-    });
+    return this.doc.update(change);
   }
 
   private owner(doc: Doc, handle: string): string | undefined {

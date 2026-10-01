@@ -102,7 +102,10 @@ async function callTool(params: Record<string, unknown>, ctx: ToolContext): Prom
   const started = Date.now();
   const done = (result: CallToolResult, outcome: string): CallToolResult => {
     const error = result.structuredContent?.error as { code?: string } | undefined;
-    log.info('tool.call', { outcome, code: result.isError ? error?.code : undefined, ms: Date.now() - started });
+    const code = result.isError ? error?.code : undefined;
+    const ms = Date.now() - started;
+    log.info('tool.call', { outcome, code, ms });
+    ctx.metrics?.record(name, outcome, ms, code);
     return result;
   };
 

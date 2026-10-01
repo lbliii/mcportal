@@ -4,7 +4,7 @@
  * other portals, and saved items always pass through untouched.
  */
 import type { ErrorCode } from './lib/errors.ts';
-import { findPortal, LIMITS, validateProfile, type ColumnSpec, type PortalSpec, type Profile } from './profile.ts';
+import { findPortal, LIMITS, validateProfile, type ColumnInput, type PortalInput, type PortalSpec, type Profile } from './profile.ts';
 
 /** A portal id from a title: lowercase words joined by dashes. */
 export function slugId(value: string): string {
@@ -15,14 +15,14 @@ export function slugId(value: string): string {
  * The profile with `changes` applied and validated. Saved items are kept exactly as
  * they were: validation normalizes the layout, never the user's bookmarks.
  */
-export function withLayout(profile: Profile, changes: Partial<Profile>): Profile {
+export function withLayout(profile: Profile, changes: Omit<Partial<Profile>, 'columns'> & { columns?: ColumnInput[] }): Profile {
   return { ...validateProfile({ ...profile, ...changes }), saved: profile.saved };
 }
 
 /** Portals in order, spread evenly over at most the column limit (a fresh room from packs or an import). */
-export function spreadColumns(portals: PortalSpec[]): ColumnSpec[] {
+export function spreadColumns(portals: PortalInput[]): ColumnInput[] {
   const perColumn = Math.ceil(portals.length / LIMITS.columns);
-  const columns: ColumnSpec[] = [];
+  const columns: ColumnInput[] = [];
   for (let i = 0; i < portals.length; i += perColumn) columns.push({ width: 1, panels: portals.slice(i, i + perColumn) });
   return columns;
 }
@@ -52,13 +52,13 @@ export function ensurePortal(profile: Profile, source: 'saved' | 'clips' | 'foll
  * Add one portal: into `column` (1-based; one past the last makes a new column),
  * else a new column, else the emptiest column. Refuses duplicates and full rooms.
  */
-export function addPortalTo(profile: Profile, spec: PortalSpec, column?: number): { profile: Profile; portalId: string } | { error: string; code: ErrorCode } {
+export function addPortalTo(profile: Profile, spec: PortalInput, column?: number): { profile: Profile; portalId: string } | { error: string; code: ErrorCode } {
   const key = (p: PortalSpec) => `${p.source}:${JSON.stringify({ ...p.config, limit: undefined })}`;
   const probe = validateProfile({ ...profile, columns: [{ panels: [spec] }] }).columns[0]!.panels[0]!;
   const dupe = profile.columns.flatMap((c) => c.panels).find((p) => key(p) === key(probe));
   if (dupe) return { error: `That source is already in the room as "${dupe.title ?? dupe.id}" (id ${dupe.id}).`, code: 'conflict' };
 
-  const columns = profile.columns.map((c) => ({ ...c, panels: [...c.panels] }));
+  const columns: ColumnInput[] = profile.columns.map((c) => ({ ...c, panels: [...c.panels] }));
   const n = columns.length;
   if (column !== undefined) {
     const target = columns[column - 1];

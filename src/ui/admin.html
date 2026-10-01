@@ -69,6 +69,12 @@
   <h2>Accounts</h2>
   <div class="wrap"><table><thead><tr><th>Account</th><th>GitHub</th><th>Status</th><th>Role</th><th>Joined via</th><th>Since</th><th></th></tr></thead><tbody id="accounts"></tbody></table></div>
 
+  <h2>Usage</h2>
+  <p class="muted" id="usageSummary">Usage on this server instance since it started.</p>
+  <div class="wrap"><table><thead><tr><th>Heaviest today</th><th>Units</th></tr></thead><tbody id="usageUsers"></tbody></table></div>
+  <p class="muted">Tool calls, busiest first:</p>
+  <div class="wrap"><table><thead><tr><th>Tool</th><th>Calls</th><th>Failed</th><th>Avg ms</th><th>Max ms</th><th>Errors</th></tr></thead><tbody id="usageTools"></tbody></table></div>
+
   <h2>Audit log</h2>
   <div class="wrap"><table><thead><tr><th>When</th><th>Action</th><th>Target</th><th>By</th><th>Detail</th></tr></thead><tbody id="audit"></tbody></table></div>
 </main>
@@ -156,8 +162,27 @@
         el('td', null, el('span', { class: 'actions' }, actions)));
     }) : [el('tr', null, el('td', { colspan: '6', class: 'empty' }, 'No reports.'))]));
 
+    // Usage comes with the page state only; actions leave it as it was.
+    if (data.usage) renderUsage(data.usage);
+
     $('audit').replaceChildren(...(data.audit.length ? data.audit.map((e) => el('tr', null,
       el('td', null, when(e.at)), el('td', null, e.action), el('td', null, e.target), el('td', null, e.actor), el('td', { class: 'muted' }, e.detail || ''))) : [el('tr', null, el('td', { colspan: '5', class: 'empty' }, 'Nothing yet.'))]));
+  }
+
+  function renderUsage(usage) {
+    const b = usage.budget;
+    $('usageSummary').textContent = b
+      ? `Today: ${b.global.used} of ${b.limits.globalPerDay} units for everyone (resets ${when(Date.parse(b.global.resetsAt))}); ${b.limits.perDay} per account, ${b.limits.perMinute} per minute. Counts are for this server instance since ${usage.tools ? when(Date.parse(usage.tools.since)) : 'it started'}.`
+      : 'No usage budget on this server.';
+    const users = b ? b.today : [];
+    $('usageUsers').replaceChildren(...(users.length ? users.map((u) => el('tr', null, el('td', null, u.login ? `@${u.login}` : el('code', null, u.userId)), el('td', null, String(u.used))))
+      : [el('tr', null, el('td', { colspan: '2', class: 'empty' }, 'No usage today.'))]));
+    const tools = usage.tools ? usage.tools.tools : [];
+    $('usageTools').replaceChildren(...(tools.length ? tools.map((t) => {
+      const failed = t.calls - (t.outcomes.ok || 0);
+      const codes = Object.entries(t.codes).sort((x, y) => y[1] - x[1]).map(([code, n]) => `${code} ×${n}`).join(', ');
+      return el('tr', null, el('td', null, el('code', null, t.tool)), el('td', null, String(t.calls)), el('td', null, String(failed)), el('td', null, String(t.avgMs)), el('td', null, String(t.maxMs)), el('td', { class: 'muted' }, codes));
+    }) : [el('tr', null, el('td', { colspan: '6', class: 'empty' }, 'No tool calls yet.'))]));
   }
 
   async function act(action, who, question, askReason) {

@@ -9,7 +9,7 @@ import type { Logger, LogFields } from './lib/log.ts';
 import { clean } from './lib/text.ts';
 import type { ClipSummary } from './clips.ts';
 import type { SharedItem } from './social.ts';
-import { normalizeSourceConfig, type ClipsConfig, type PortalSpec, type PinnedConfig, type PinnedData, type SavedItem } from './profile.ts';
+import { normalizeSourceConfig, type ClipsConfig, type PortalInput, type PinnedData, type SavedItem } from './profile.ts';
 import type { Article, Fetcher, Item, PortalResult, SourceKind } from './types.ts';
 
 /** Declared freshness per source, in seconds (Orrery-style freshness policy). */
@@ -42,8 +42,8 @@ function loadFailure(error: unknown, deps: SourceDeps, fields: LogFields): { err
 const DEFAULT_TITLES: Record<SourceKind, string> = { hn: 'Hacker News', rss: 'Feed', github: 'GitHub', docs: 'Docs', saved: 'Saved', pinned: 'Pinned', clips: 'Clips', following: 'Following' };
 
 /** Saved items come from the profile, not the network. */
-export function savedPortal(portal: PortalSpec, saved: SavedItem[]): PortalResult {
-  const { limit } = normalizeSourceConfig('saved', portal.config, portal.id) as { limit: number };
+export function savedPortal(portal: PortalInput, saved: SavedItem[]): PortalResult {
+  const { limit } = normalizeSourceConfig('saved', portal.config, portal.id);
   const items: Item[] = saved.slice(0, limit).map((s) => {
     let host = '';
     try { host = new URL(s.url).hostname.replace(/^www\./, ''); } catch { /* validated on save */ }
@@ -59,8 +59,8 @@ export function savedPortal(portal: PortalSpec, saved: SavedItem[]): PortalResul
 }
 
 /** Pinned items come from the profile too: the agent fetched them with another tool. */
-export function pinnedPortal(portal: PortalSpec, pins: Record<string, PinnedData>): PortalResult {
-  const { from, recipe, limit } = normalizeSourceConfig('pinned', portal.config, portal.id) as PinnedConfig;
+export function pinnedPortal(portal: PortalInput, pins: Record<string, PinnedData>): PortalResult {
+  const { from, recipe, limit } = normalizeSourceConfig('pinned', portal.config, portal.id);
   const pin = Object.hasOwn(pins, portal.id) ? pins[portal.id] : undefined;
   return {
     portalId: portal.id,
@@ -73,12 +73,12 @@ export function pinnedPortal(portal: PortalSpec, pins: Record<string, PinnedData
 }
 
 /** The query a clips portal runs against the clip store. */
-export function clipsQuery(portal: PortalSpec): ClipsConfig {
-  return normalizeSourceConfig('clips', portal.config, portal.id) as ClipsConfig;
+export function clipsQuery(portal: PortalInput): ClipsConfig {
+  return normalizeSourceConfig('clips', portal.config, portal.id);
 }
 
 /** Clips come from the clip store: the caller runs clipsQuery and passes the result. */
-export function clipsPortal(portal: PortalSpec, clips: ClipSummary[]): PortalResult {
+export function clipsPortal(portal: PortalInput, clips: ClipSummary[]): PortalResult {
   const { kind, tag } = clipsQuery(portal);
   const items: Item[] = clips.map((c) => {
     // A title taken from the first line would otherwise repeat at the start of the preview.
@@ -103,7 +103,7 @@ export function clipsPortal(portal: PortalSpec, clips: ClipSummary[]): PortalRes
 }
 
 /** Shares from people the user follows; the caller runs Social.feed and passes the result. */
-export function followingPortal(portal: PortalSpec, shares: SharedItem[]): PortalResult {
+export function followingPortal(portal: PortalInput, shares: SharedItem[]): PortalResult {
   const items: Item[] = shares.map((s) => ({
     id: s.id,
     title: s.title,
@@ -184,7 +184,7 @@ export function docsItems(site: DocSite, config: DocsConfig): Item[] {
   });
 }
 
-export async function loadPortal(portal: PortalSpec, deps: SourceDeps, force = false): Promise<PortalResult> {
+export async function loadPortal(portal: PortalInput, deps: SourceDeps, force = false): Promise<PortalResult> {
   if (portal.source === 'saved' || portal.source === 'pinned' || portal.source === 'clips' || portal.source === 'following') throw new AppError('invalid_argument', `${portal.source} portals are built from the profile, not fetched`);
   const config = normalizeSourceConfig(portal.source, portal.config, portal.id);
   let endpoint = '';

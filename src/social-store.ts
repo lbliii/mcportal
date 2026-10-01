@@ -4,10 +4,9 @@
  * src/db/social.ts. Stores only store; the rules live in Social (social.ts), which
  * re-exports this module.
  */
+import { DOCUMENT_MAX_AGE_MS, memoryPersistence, SharedDocument } from './lib/document.ts';
 import type { AuthPersistence } from './auth/store.ts';
-import { readDocument } from './lib/document.ts';
 import type { PageQuery, Relation, Report, Share } from './social.ts';
-import { KeyedMutex } from './store.ts';
 
 /** Storage only; no rules. */
 export interface SocialStore {
@@ -43,28 +42,23 @@ interface Doc {
 
 /** One document (memory, or a file / Postgres row via persistence). For tests and local servers. */
 export class DocumentSocialStore implements SocialStore {
-  private persistence: AuthPersistence | undefined;
-  private doc: Doc | null = null;
-  private mutex = new KeyedMutex();
+  private doc: SharedDocument<Doc>;
 
-  constructor(persistence?: AuthPersistence) {
-    this.persistence = persistence;
+  /** Without persistence, the document lives in memory. */
+  constructor(persistence: AuthPersistence = memoryPersistence()) {
+    this.doc = new SharedDocument<Doc>(persistence, 'social', (d) => ({
+      shares: d.shares ?? [],
+      relations: { follows: [], mutes: [], blocks: [], ...d.relations },
+      reports: d.reports ?? [],
+    }), { maxAgeMs: DOCUMENT_MAX_AGE_MS });
   }
 
-  private async load(): Promise<Doc> {
-    if (this.doc) return this.doc;
-    const parsed: Partial<Doc> = this.persistence ? await readDocument<Doc>(this.persistence, 'social') : {};
-    this.doc = { shares: parsed.shares ?? [], relations: { follows: [], mutes: [], blocks: [], ...parsed.relations }, reports: parsed.reports ?? [] };
-    return this.doc;
+  private load(): Promise<Doc> {
+    return this.doc.get();
   }
 
   private write<T>(change: (doc: Doc) => T): Promise<T> {
-    return this.mutex.run('social', async () => {
-      const doc = await this.load();
-      const result = change(doc);
-      await this.persistence?.write(JSON.stringify(doc));
-      return result;
-    });
+    return this.doc.update(change);
   }
 
   async addShare(share: Share): Promise<void> {

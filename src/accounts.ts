@@ -20,7 +20,7 @@
  * process) take effect. One server instance.
  */
 import type { AuthPersistence } from './auth/store.ts';
-import { memoryPersistence, readDocument } from './lib/document.ts';
+import { memoryPersistence, SharedDocument } from './lib/document.ts';
 import { AppError, errorMessage } from './lib/errors.ts';
 import { secretToken } from './lib/ids.ts';
 import { processLogger } from './lib/log.ts';
@@ -113,49 +113,40 @@ export function accountIdFor(githubId: number): string {
 }
 
 export class Accounts {
-  private persistence: AuthPersistence;
+  private store: SharedDocument<Doc>;
   private bootstrap: Bootstrap;
   private now: () => number;
-  private doc: Doc | null = null;
-  private loadedAt = 0;
-  private chain: Promise<unknown> = Promise.resolve();
 
   constructor(persistence: AuthPersistence, bootstrap: Bootstrap, now: () => number = Date.now) {
-    this.persistence = persistence;
     this.bootstrap = bootstrap;
     this.now = now;
-  }
-
-  /** Load (or reload, if stale) from persistence. Call before the sync checks are trusted. */
-  async load(force = false): Promise<void> {
-    if (!force && this.doc && this.now() - this.loadedAt < RELOAD_MS) return;
-    let parsed: Partial<Doc>;
-    try {
-      parsed = await readDocument<Doc>(this.persistence, 'accounts');
-    } catch (error) {
-      // A periodic reload keeps what it had; a write (force) must see the stored document or not happen.
-      if (!force && this.doc) {
-        processLogger().warn('accounts.reload_failed', { error: errorMessage(error) });
-        this.loadedAt = this.now();
-        return;
-      }
-      throw error;
-    }
-    this.doc = { accounts: parsed.accounts ?? {}, identities: parsed.identities ?? {}, invites: parsed.invites ?? {}, audit: parsed.audit ?? [] };
-    this.loadedAt = this.now();
-  }
-
-  /** Serialized read-modify-write against the freshest document. */
-  private write<T>(mutate: (doc: Doc) => T): Promise<T> {
-    const run = this.chain.then(async () => {
-      await this.load(true);
-      const result = mutate(this.doc!);
-      if (this.doc!.audit.length > AUDIT_MAX) this.doc!.audit.splice(0, this.doc!.audit.length - AUDIT_MAX);
-      await this.persistence.write(JSON.stringify(this.doc));
-      return result;
+    this.store = new SharedDocument<Doc>(persistence, 'accounts', (d) => ({ accounts: d.accounts ?? {}, identities: d.identities ?? {}, invites: d.invites ?? {}, audit: d.audit ?? [] }), {
+      maxAgeMs: RELOAD_MS,
+      now: () => this.now(),
+      beforeWrite: (doc) => {
+        if (doc.audit.length > AUDIT_MAX) doc.audit.splice(0, doc.audit.length - AUDIT_MAX);
+      },
     });
-    this.chain = run.catch(() => {});
-    return run;
+  }
+
+  /** The cached document, for the synchronous checks (null before the first load). */
+  private get doc(): Doc | null {
+    return this.store.peek() ?? null;
+  }
+
+  /** Load (or reload, if stale; always, with force) from persistence. Call before the sync checks are trusted. */
+  async load(force = false): Promise<void> {
+    await this.store.get(force ? 0 : RELOAD_MS);
+  }
+
+  /** Refresh in the background when stale; a failure is logged by the document and the cached copy stays. */
+  private refresh(): void {
+    this.load().catch((error: unknown) => processLogger().warn('accounts.reload_failed', { error: errorMessage(error) }));
+  }
+
+  /** Atomic read-modify-write against the stored document (never the cache). */
+  private write<T>(mutate: (doc: Doc) => T): Promise<T> {
+    return this.store.update(mutate);
   }
 
   /** Anyone with a GitHub account can sign in (no invite needed). */
@@ -178,7 +169,7 @@ export class Accounts {
 
   /** Sync check used on every request and token refresh (from the cached document). */
   isActive(id: GithubIdentity): boolean {
-    void this.load();   // refresh in the background when stale
+    this.refresh();
     const account = this.doc?.accounts[this.doc.identities[`github:${id.githubId}`] ?? ''];
     if (account && account.status !== 'active') return false;
     if (account?.via === 'invite') return true;
@@ -228,7 +219,7 @@ export class Accounts {
 
   /** Role and status for the access gate. Unknown accounts are plain active users (bootstrap/legacy). */
   actor(accountId: string): { accountId: string; role: Role; status: AccountStatus; login?: string } {
-    void this.load();
+    this.refresh();
     const account = this.doc?.accounts[accountId];
     if (account) return { accountId, role: account.role, status: account.status, ...(account.login ? { login: account.login } : {}) };
     const githubId = Number(accountId.replace(/^github-/, ''));

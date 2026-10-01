@@ -210,3 +210,67 @@ test('profiles: concurrent changes all land (update is atomic per user)', async 
     assert.deepEqual(saved, [...urls].sort(), `${store.constructor.name}: no save was lost`);
   }
 });
+
+test('portal configs: every stored portal has its source\'s full, typed settings', async () => {
+  const { normalizeSourceConfig, validateProfile } = await import('../src/profile.ts');
+  assert.deepEqual(normalizeSourceConfig('github', {}, 'x'), { mode: 'search', query: 'topic:mcp', sort: 'stars', limit: 10 });
+  assert.deepEqual(normalizeSourceConfig('github', { mode: 'releases', repo: 'a/b' }, 'x'), { mode: 'releases', repo: 'a/b', limit: 10 });
+  assert.deepEqual(normalizeSourceConfig('saved', { limit: 999 }, 'x'), { limit: 30 });
+  assert.throws(() => normalizeSourceConfig('pinned', {}, 'here'), /here: pinned needs/);
+  const profile = validateProfile({ columns: [{ panels: [{ source: 'hn', config: {} }, { source: 'github', config: { query: 'x' } }] }] });
+  const [hn, gh] = profile.columns[0]!.panels;
+  assert.ok(hn?.source === 'hn' && hn.config.feed === 'top');
+  assert.ok(gh?.source === 'github' && gh.config.mode === 'search' && gh.config.sort === 'stars');
+});
+
+test('shared documents: cached reads, fresh atomic changes, and two instances keep each other\'s changes', async () => {
+  const { SharedDocument } = await import('../src/lib/document.ts');
+  let now = 0;
+  const silent = createLogger({ write: () => {} });
+  const stored = memoryPersistence();
+  const open = () => new SharedDocument<{ n: number[] }>(stored, 'test', (d) => ({ n: d.n ?? [] }), { maxAgeMs: 1000, now: () => now, log: silent });
+  const [a, b] = [open(), open()];
+  await Promise.all(Array.from({ length: 10 }, (_, i) => (i % 2 ? a : b).update((d) => { d.n.push(i); })));
+  assert.deepEqual((await a.get(0)).n.sort((x, y) => x - y), [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], 'no change lost between instances');
+
+  await b.get(0);
+  await a.update((d) => { d.n.push(10); });
+  assert.equal((await b.get()).n.length, 10, 'b serves its cache within maxAgeMs');
+  now = 1000;
+  assert.equal((await b.get()).n.length, 11, 'and reloads after');
+
+  const flaky = { read: async () => { throw new Error('connection reset'); }, write: async () => {} };
+  const c = new SharedDocument<{ n: number[] }>(flaky, 'test', (d) => ({ n: d.n ?? [] }), { maxAgeMs: 1000, now: () => now, log: silent });
+  await assert.rejects(c.get(), /connection reset/, 'no cache yet: the failure shows');
+  await assert.rejects(c.update(() => {}), /connection reset/, 'a change never starts from nothing');
+});
+
+test('metrics and budget: per-tool counters from the dispatcher, and a budget snapshot', async () => {
+  const { ToolMetrics } = await import('../src/lib/metrics.ts');
+  const metrics = new ToolMetrics(() => 0);
+  const budget = new UsageBudget({ perMinute: 100, perDay: 100, globalPerDay: 1000 });
+  const c = ctx({ metrics, budget });
+  await call(c, 'get_profile');
+  await call(c, 'get_profile');
+  await call(c, 'refresh_portal', { portalId: 'nope' });
+  const stats = metrics.snapshot().tools;
+  assert.equal(stats[0]!.tool, 'get_profile');
+  assert.equal(stats[0]!.calls, 2);
+  assert.deepEqual(stats.find((t) => t.tool === 'refresh_portal')!.codes, { not_found: 1 });
+  const snap = budget.snapshot();
+  assert.deepEqual(snap.today, [{ userId: 'u', used: 4 }], 'get_profile 1 + 1, refresh_portal 2');
+  assert.equal(snap.global.used, 4);
+});
+
+test('github sign-in: an unreachable or failing GitHub is a failed sign-in, never a crash or upstream text', async () => {
+  const { githubIdentity, githubAuthorizeUrl } = await import('../src/auth/github.ts');
+  const { UpstreamError } = await import('../src/lib/errors.ts');
+  const app = { clientId: 'cid', clientSecret: 'secret' };
+  const down = async () => { throw new UpstreamError('upstream_unreachable', 'Could not reach github.com: ECONNRESET'); };
+  assert.deepEqual(await githubIdentity(down, app, 'code', 'https://x/cb'), { error: 'GitHub sign-in failed; try again in a moment' });
+  const refused = async (url: string) => ({ status: 401, url, contentType: 'application/json', text: '{"error":"<script>"}', truncated: false });
+  assert.deepEqual(await githubIdentity(refused, app, 'code', 'https://x/cb'), { error: 'GitHub sign-in failed' });
+  const url = new URL(githubAuthorizeUrl(app, 'https://x/cb', 'st8'));
+  assert.equal(url.searchParams.get('scope'), 'read:user');
+  assert.equal(url.searchParams.get('allow_signup'), null);
+});
