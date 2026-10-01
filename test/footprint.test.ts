@@ -1,18 +1,18 @@
 /**
- * What MCPortal costs every conversation it's connected to (scripts/footprint.ts).
- * These ceilings only go down: lower them when the footprint shrinks.
+ * What MCPortal costs a conversation that loads its tools up front (scripts/footprint.ts),
+ * per profile, estimated. Ceilings only go down: lower them when the footprint shrinks.
  */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { footprint } from '../scripts/footprint.ts';
+import { footprint, PROFILES, type Profile } from '../scripts/footprint.ts';
 
-/** Approximate tokens of tool list plus instructions, as the model sees them. */
-const CEILING = { hosted: 7321, local: 5691 };
+/** Estimated tokens of the tools (name, description, schema) and instructions the model sees. */
+const CEILING: Record<Profile, number> = { local: 4730, 'hosted-new': 5419, 'hosted-active': 5961 };
 
-for (const where of ['hosted', 'local'] as const) {
-  test(`footprint (${where}): the tool list and instructions stay within budget`, async () => {
-    const f = await footprint(where);
-    assert.ok(f.total <= CEILING[where], `${where}: ${f.total} tokens, over the ceiling of ${CEILING[where]}. Run node scripts/footprint.ts to see what grew.`);
-    if (f.total < CEILING[where]) console.log(`footprint (${where}) is ${f.total} tokens: lower CEILING.${where} in test/footprint.test.ts`);
+for (const profile of PROFILES) {
+  test(`footprint (${profile}): the tools and instructions stay within budget`, async () => {
+    const f = await footprint(profile);
+    assert.ok(f.total <= CEILING[profile], `${profile}: ${f.total} tokens, over the ceiling of ${CEILING[profile]}. Run node scripts/footprint.ts to see what grew.`);
+    if (f.total < CEILING[profile]) console.log(`footprint (${profile}) is ${f.total} tokens: lower its CEILING in test/footprint.test.ts`);
   });
 }

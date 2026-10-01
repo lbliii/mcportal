@@ -13,7 +13,7 @@ import { requestId, silentLogger, userRef } from './lib/log.ts';
 import { schemaProblem } from './lib/schema.ts';
 import { clean } from './lib/text.ts';
 import { findTool, toolAction, toolCost, TOOLS } from './tools/index.ts';
-import { hasSocial, publicToolList, toolError, ROOM_URI, type CallToolResult, type ToolContext } from './tools/kit.ts';
+import { hasSocial, publicToolList, reachOf, toolError, ROOM_URI, type CallToolResult, type ToolContext } from './tools/kit.ts';
 
 export { TOOLS };
 
@@ -171,7 +171,7 @@ export async function handleMessage(message: unknown, ctx: ToolContext): Promise
     case 'ping':
       return reply(req.id, {});
     case 'tools/list':
-      return reply(req.id, { tools: publicToolList(TOOLS, ctx) });
+      return reply(req.id, { tools: publicToolList(TOOLS, await reachOf(ctx)) });
     case 'tools/call': {
       const result = await callTool(params, ctx);
       return result ? reply(req.id, result) : rpcError(req.id, RPC.invalidParams, `Unknown tool: ${clean(params.name, 80)}`);

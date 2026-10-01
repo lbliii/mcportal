@@ -10,7 +10,7 @@
  */
 import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { serverSurface } from './eval-tools.ts';
+import { surface } from './footprint.ts';
 
 const ROOT = new URL('../', import.meta.url);
 const HOSTED = 'https://mcportal-production.up.railway.app';
@@ -22,7 +22,7 @@ interface Package { version: string; description: string; engines: { node: strin
 export async function distributionFiles(): Promise<Record<string, string>> {
   const pkg = JSON.parse(await readFile(new URL('package.json', ROOT), 'utf8')) as Package;
   const plugin = JSON.parse(await readFile(new URL('.claude-plugin/plugin.json', ROOT), 'utf8')) as { description: string; author: { name: string }; keywords: string[] };
-  const local = await serverSurface('local');
+  const local = await surface('local');
   const json = (value: unknown) => `${JSON.stringify(value, null, 2)}\n`;
 
   const server = {

@@ -10,7 +10,7 @@ import { homedir } from 'node:os';
 import { clean } from '../lib/text.ts';
 import { describeImport, EXPORT_FORMATS, importExport, parseExport, type ExportFormat } from '../portability.ts';
 import { ACCENTS, MAX_FEATURED, suggestHandle, type PublicProfile } from '../public-profiles.ts';
-import { hasProfiles, HOSTED_ONLY, ok, toolError, toolFailure, untrusted, type ToolDef } from './kit.ts';
+import { HOSTED_ONLY, socialActive, socialEntry, ok, toolError, toolFailure, untrusted, type ToolDef } from './kit.ts';
 
 function describeProfile(p: PublicProfile): string {
   return [
@@ -29,12 +29,15 @@ const FORMAT_DOCS: Record<ExportFormat, string> = {
   opml: 'sources as OPML for any feed reader',
 };
 
+/** Hosts load the tool list when a conversation starts, so tools an action unlocks arrive in the next one. */
+const UNLOCKS = 'Sharing (share, list_shares and the rest) is available from the next conversation.';
+
 export const ACCOUNT_TOOLS: ToolDef[] = [
   {
     name: 'get_public_profile',
     title: 'Get a public profile',
     access: 'read',
-    available: hasProfiles,
+    available: socialActive,
     description: [
       "Without handle: the user's own public profile, if they have one (they don't until they claim a handle), and a suggested handle.",
       'With handle: another MCPortal user\'s public profile (handle, name, bio).',
@@ -62,7 +65,7 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
     name: 'set_public_profile',
     title: 'Set your public profile and space',
     access: 'write',
-    available: hasProfiles,
+    available: socialEntry,
     description: [
       "Create or change the user's public profile and space: a handle (2-30 letters, digits or underscores), a display name, a short bio,",
       `the Space's title (e.g. "late-night reading"), an accent colour (${ACCENTS.join(', ')}), and featuredPortalIds: up to ${MAX_FEATURED} portals from their room (portal ids from get_profile) to recommend as "Sources I read" (feeds, Hacker News, GitHub; [] clears).`,
@@ -102,7 +105,7 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
           sources,
         });
         const skipped = sources ? sources.length - (profile.sources?.length ?? 0) : 0;
-        const head = created ? `Created your public profile as @${profile.handle}.` : released ? `Changed your handle from @${released} to @${profile.handle}. @${released} points to you for 30 days.` : 'Updated your public profile.';
+        const head = created ? `Created your public profile as @${profile.handle}. ${UNLOCKS}` : released ? `Changed your handle from @${released} to @${profile.handle}. @${released} points to you for 30 days.` : 'Updated your public profile.';
         return ok(`${head}\n${describeProfile(profile)}${skipped > 0 ? `\n${skipped} portal(s) weren't featured: only feeds, Hacker News and GitHub can be.` : ''}`, { profile });
       } catch (error) {
         return toolFailure(error, 'Not saved: ', '.');
@@ -113,7 +116,7 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
     name: 'remove_public_profile',
     title: 'Remove your public profile',
     access: 'write',
-    available: hasProfiles,
+    available: socialActive,
     description: "Make the user private again: removes their handle, name and bio. Only when they ask. Their handle stays reserved for them for 30 days.",
     inputSchema: { type: 'object', additionalProperties: false, properties: {} },
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },

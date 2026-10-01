@@ -20,25 +20,10 @@ import { TOOL_CASES, type ToolCase } from '../evals/tool-selection.ts';
 import { defaultProfile, validateProfile } from '../src/profile.ts';
 import { TOOLS } from '../src/tools/index.ts';
 import { handleMessage } from '../src/mcp.ts';
+import { surface as serverSurface, type ModelTool, type Profile } from './footprint.ts';
 import { TtlCache } from '../src/lib/cache.ts';
-import { createFixtureFetcher } from '../src/lib/fixture-fetch.ts';
 import { MemoryProfileStore } from '../src/store.ts';
 import type { ToolContext } from '../src/tools/kit.ts';
-
-interface McpTool { name: string; description: string; inputSchema: Record<string, unknown>; _meta?: { ui?: { visibility?: string[] } } }
-
-/** The tools and instructions a model sees from MCPortal on a hosted or local server. */
-export async function serverSurface(where: 'hosted' | 'local'): Promise<{ tools: McpTool[]; instructions: string }> {
-  const ctx: ToolContext = {
-    store: new MemoryProfileStore(), fetcher: createFixtureFetcher(), cache: new TtlCache(), userId: 'eval',
-    ...(where === 'hosted' ? { social: {} as never, publicProfiles: {} as never } : {}),
-  };
-  const list = (await handleMessage({ jsonrpc: '2.0', id: 1, method: 'tools/list' }, ctx)) as { result: { tools: McpTool[] } };
-  const init = (await handleMessage({ jsonrpc: '2.0', id: 2, method: 'initialize', params: { protocolVersion: '2025-06-18' } }, ctx)) as { result: { instructions: string } };
-  // App-only tools are hidden from the model by hosts.
-  const tools = list.result.tools.filter((t) => !t._meta?.ui?.visibility || t._meta.ui.visibility.includes('model'));
-  return { tools, instructions: init.result.instructions };
-}
 
 /** Does a call match the case? Strings match case-insensitively as substrings; lists must contain the expected entries. */
 export function judge(c: ToolCase, called: { name: string; input: Record<string, unknown> } | undefined): string | undefined {
@@ -55,14 +40,14 @@ export function judge(c: ToolCase, called: { name: string; input: Record<string,
   return undefined;
 }
 
-type Surface = Awaited<ReturnType<typeof serverSurface>>;
+type Surface = { tools: ModelTool[]; instructions: string };
 
 /** One request as a host would send it: MCPortal's tools and instructions (cached), then the conversation. */
 async function ask(client: Anthropic, model: string, effort: Effort, surface: Surface, messages: Anthropic.Beta.BetaMessageParam[]): Promise<Anthropic.Beta.BetaMessage> {
   const tools: Anthropic.Beta.BetaTool[] = surface.tools.map((t, i) => ({
     name: t.name,
     description: t.description,
-    input_schema: t.inputSchema as Anthropic.Beta.BetaTool.InputSchema,
+    input_schema: t.input_schema as Anthropic.Beta.BetaTool.InputSchema,
     // Cache the whole tool list and instructions: the same prefix for every request.
     ...(i === surface.tools.length - 1 ? { cache_control: { type: 'ephemeral' as const } } : {}),
   }));
@@ -84,11 +69,11 @@ type Effort = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 const toolCalls = (r: Anthropic.Beta.BetaMessage) => r.content.filter((b): b is Anthropic.Beta.BetaToolUseBlock => b.type === 'tool_use');
 
 /** Tool selection: the first call for each request. Returns [passed, total]. */
-async function selection(client: Anthropic, model: string, effort: Effort, only: string | undefined, surfaces: Record<'hosted' | 'local', Surface>): Promise<[number, number]> {
+async function selection(client: Anthropic, model: string, effort: Effort, only: string | undefined, surfaces: Record<Profile, Surface>): Promise<[number, number]> {
   const cases = TOOL_CASES.filter((c) => !only || c.prompt.includes(only) || String(c.tool).includes(only));
   let passed = 0;
   for (const c of cases) {
-    const response = await ask(client, model, effort, surfaces[c.where ?? 'hosted'], [{ role: 'user', content: c.prompt }]);
+    const response = await ask(client, model, effort, surfaces[c.where === 'local' ? 'local' : 'hosted-active'], [{ role: 'user', content: c.prompt }]);
     if (response.stop_reason === 'refusal') { console.log(`REFUSED  ${c.prompt}`); continue; }
     const call = toolCalls(response)[0];
     const problem = judge(c, call ? { name: call.name, input: call.input as Record<string, unknown> } : undefined);
@@ -125,7 +110,7 @@ async function run(): Promise<void> {
   const effort = (flag('effort') ?? 'medium') as Effort;
   const suite = flag('suite');
   const client = new Anthropic();
-  const surfaces = { hosted: await serverSurface('hosted'), local: await serverSurface('local') };
+  const surfaces = { local: await serverSurface('local'), 'hosted-new': await serverSurface('hosted-new'), 'hosted-active': await serverSurface('hosted-active') };
   let failed = 0;
   if (!suite || suite === 'selection') {
     const [passed, total] = await selection(client, model, effort, flag('only'), surfaces);
@@ -133,7 +118,7 @@ async function run(): Promise<void> {
     failed += total - passed;
   }
   if (!suite || suite === 'injection') {
-    const [passed, total] = await injection(client, model, effort, surfaces.hosted);
+    const [passed, total] = await injection(client, model, effort, surfaces['hosted-active']);
     console.log(`Injection: ${passed}/${total} resisted on ${model} (effort ${effort})`);
     failed += total - passed;
   }

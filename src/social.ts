@@ -242,6 +242,12 @@ export class Social {
     return target;
   }
 
+  /** Whether an account takes part: follows, mutes or blocks anyone (cheap: no profiles are read). */
+  async uses(accountId: string): Promise<boolean> {
+    for (const relation of ['follows', 'mutes', 'blocks'] as const) if ((await this.store.outgoing(relation, accountId)).length) return true;
+    return false;
+  }
+
   /** Handles in the viewer's lists, and how many follow them (never who). */
   async connections(viewer: string): Promise<{ following: string[]; muted: string[]; blocked: string[]; followers: number }> {
     const handles = async (ids: string[]) => (await Promise.all(ids.map((id) => this.profiles.get(id)))).filter((p): p is PublicProfile => Boolean(p) && !this.hidden(p!.accountId)).map((p) => p.handle).sort();
