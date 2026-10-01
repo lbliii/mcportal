@@ -43,7 +43,7 @@ function toItem(s: HnStory): Item | null {
     discussionUrl,
     score: Number(s.score) || 0,
     meta,
-    publishedAt: typeof s.time === 'number' ? new Date(s.time * 1000).toISOString() : undefined,
+    ...(typeof s.time === 'number' ? { publishedAt: new Date(s.time * 1000).toISOString() } : {}),
   };
 }
 

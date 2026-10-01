@@ -254,7 +254,7 @@ export class Accounts {
       delete doc.accounts[accountId];
       for (const [key, id] of Object.entries(doc.identities)) if (id === accountId) delete doc.identities[key];
       for (const [login, invite] of Object.entries(doc.invites)) if (invite.accountId === accountId) delete doc.invites[login];
-      doc.audit.push({ at: this.now(), actor: by, action: 'account.deleted', target: accountId, detail: account.login ? `@${account.login}` : undefined });
+      doc.audit.push({ at: this.now(), actor: by, action: 'account.deleted', target: accountId, ...(account.login ? { detail: `@${account.login}` } : {}) });
       return true;
     });
   }
@@ -296,7 +296,8 @@ export class Accounts {
       if (!account) throw new AppError('not_found', `No account for "${who}"`);
       account.status = status;
       account.updatedAt = this.now();
-      doc.audit.push({ at: account.updatedAt, actor: by, action: status === 'suspended' ? 'account.suspended' : 'account.reinstated', target: account.id, detail: clean(reason, 200) || undefined });
+      const detail = clean(reason, 200);
+      doc.audit.push({ at: account.updatedAt, actor: by, action: status === 'suspended' ? 'account.suspended' : 'account.reinstated', target: account.id, ...(detail ? { detail } : {}) });
       return account;
     });
   }
@@ -319,7 +320,8 @@ export class Accounts {
   /** Record an admin action taken elsewhere (moderation) in the audit log. */
   record(actor: string, action: string, target: string, detail?: string): Promise<void> {
     return this.write((doc) => {
-      doc.audit.push({ at: this.now(), actor, action, target, detail: clean(detail, 200) || undefined });
+      const cleaned = clean(detail, 200);
+      doc.audit.push({ at: this.now(), actor, action, target, ...(cleaned ? { detail: cleaned } : {}) });
     });
   }
 

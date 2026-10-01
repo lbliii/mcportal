@@ -28,7 +28,7 @@ export const FRESHNESS: Record<SourceKind | 'reader', number> = {
 export interface SourceDeps {
   fetcher: Fetcher;
   cache: TtlCache;
-  log?: Logger;
+  log?: Logger | undefined;
 }
 
 /** A source that failed to load becomes a portal error; a bug in our code is also logged with its stack. */
@@ -47,7 +47,7 @@ export function savedPortal(portal: PortalSpec, saved: SavedItem[]): PortalResul
   const items: Item[] = saved.slice(0, limit).map((s) => {
     let host = '';
     try { host = new URL(s.url).hostname.replace(/^www\./, ''); } catch { /* validated on save */ }
-    return { id: s.url, title: s.title, url: s.url, summary: s.note, meta: host ? [host] : [], publishedAt: s.savedAt };
+    return { id: s.url, title: s.title, url: s.url, ...(s.note !== undefined ? { summary: s.note } : {}), meta: host ? [host] : [], publishedAt: s.savedAt };
   });
   return {
     portalId: portal.id,
@@ -80,16 +80,19 @@ export function clipsQuery(portal: PortalSpec): ClipsConfig {
 /** Clips come from the clip store: the caller runs clipsQuery and passes the result. */
 export function clipsPortal(portal: PortalSpec, clips: ClipSummary[]): PortalResult {
   const { kind, tag } = clipsQuery(portal);
-  const items: Item[] = clips.map((c) => ({
-    id: c.id,
-    title: c.title,
+  const items: Item[] = clips.map((c) => {
     // A title taken from the first line would otherwise repeat at the start of the preview.
-    summary: c.note ? clean(c.note, 280) : c.preview.startsWith(c.title) ? c.preview.slice(c.title.length).trim() || undefined : c.preview,
-    meta: [c.kind, ...c.tags.slice(0, 3).map((t) => `#${t}`)],
-    publishedAt: c.createdAt,
-    ...(c.source.url ? { url: c.source.url } : {}),
-    clip: { id: c.id, kind: c.kind },
-  }));
+    const summary = c.note ? clean(c.note, 280) : c.preview.startsWith(c.title) ? c.preview.slice(c.title.length).trim() || undefined : c.preview;
+    return {
+      id: c.id,
+      title: c.title,
+      ...(summary !== undefined ? { summary } : {}),
+      meta: [c.kind, ...c.tags.slice(0, 3).map((t) => `#${t}`)],
+      publishedAt: c.createdAt,
+      ...(c.source.url ? { url: c.source.url } : {}),
+      clip: { id: c.id, kind: c.kind },
+    };
+  });
   return {
     portalId: portal.id,
     source: 'clips',

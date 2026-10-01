@@ -43,7 +43,7 @@ interface Doc {
 
 /** One document (memory, or a file / Postgres row via persistence). For tests and local servers. */
 export class DocumentSocialStore implements SocialStore {
-  private persistence?: AuthPersistence;
+  private persistence: AuthPersistence | undefined;
   private doc: Doc | null = null;
   private mutex = new KeyedMutex();
 

@@ -7,9 +7,9 @@ import { pkce, raw, startApp, type Running } from './helpers.ts';
 const CLIENT_REDIRECT = 'https://claude.ai/api/mcp/auth_callback';
 
 /** Fixture fetcher plus a fake GitHub and a fake client metadata document. */
-function fakeUpstreams(users: Record<string, { id: number; login: string }>): { fetcher: Fetcher; calls: Array<{ url: string; options?: FetchOptions }> } {
+function fakeUpstreams(users: Record<string, { id: number; login: string }>): { fetcher: Fetcher; calls: Array<{ url: string; options?: FetchOptions | undefined }> } {
   const fixtures = createFixtureFetcher();
-  const calls: Array<{ url: string; options?: FetchOptions }> = [];
+  const calls: Array<{ url: string; options?: FetchOptions | undefined }> = [];
   const fetcher: Fetcher = async (url, options) => {
     calls.push({ url, options });
     const reply = (status: number, body: unknown) => ({ status, url, contentType: 'application/json', text: JSON.stringify(body), truncated: false });

@@ -69,8 +69,8 @@ export const SOURCE_TOOLS: ToolDef[] = [
       else if (docs && !found.candidates.length) found.hint ??= docs.error;
       const loaded = await Promise.all(found.candidates.slice(0, 5).map(async (c, i): Promise<typeof c & { error?: string; items: Item[] }> => {
         try {
-          const portal = await loadPortal({ id: `candidate-${i}`, source: c.source, title: c.source === 'rss' ? undefined : c.title, config: c.config }, ctx);
-          return { ...c, title: portal.error || c.source !== 'rss' ? c.title : portal.title, error: portal.error, items: portal.items };
+          const portal = await loadPortal({ id: `candidate-${i}`, source: c.source, ...(c.source === 'rss' ? {} : { title: c.title }), config: c.config }, ctx);
+          return { ...c, title: portal.error || c.source !== 'rss' ? c.title : portal.title, ...(portal.error !== undefined ? { error: portal.error } : {}), items: portal.items };
         } catch (error) {
           // A config the source refuses (ProfileError); anything else is a bug, and logged.
           if (!isAppError(error)) ctx.log?.warn('find_source.candidate_failed', { source: c.source, error: errorStack(error) });
@@ -118,12 +118,12 @@ export const SOURCE_TOOLS: ToolDef[] = [
       // Load it first: refuse sources that don't work, and name the portal after what it is.
       let trial: PortalResult;
       try {
-        trial = await portalFor({ id: 'new', source, title, config }, before, ctx);
+        trial = await portalFor({ id: 'new', source, ...(title !== undefined ? { title } : {}), config }, before, ctx);
       } catch (error) {
         return toolFailure(error, 'Not added: ');
       }
       if (trial.error) return toolError(`Not added: it didn't load (${clean(trial.error, 160)}). Try find_source for a working address.`, trial.errorCode ?? 'upstream_error');
-      const spec: PortalSpec = { id: slugId(title ?? trial.title), source, title, config };
+      const spec: PortalSpec = { id: slugId(title ?? trial.title), source, ...(title !== undefined ? { title } : {}), config };
       let added: ReturnType<typeof addPortalTo>;
       try {
         added = await ctx.store.update<ReturnType<typeof addPortalTo>>(ctx.userId, (current) => {
@@ -185,7 +185,10 @@ export const SOURCE_TOOLS: ToolDef[] = [
       });
       const working = loaded.filter((l) => l.ok).slice(0, Math.max(0, room));
       const failed = loaded.filter((l) => !l.ok);
-      const specs: PortalSpec[] = working.map((l) => ({ id: slugId(l.feed.title || l.title || 'feed'), source: 'rss', title: clean(l.feed.title || l.title, 80) || undefined, config: { url: l.feed.url, limit: 10 } }));
+      const specs: PortalSpec[] = working.map((l) => {
+        const title = clean(l.feed.title || l.title, 80);
+        return { id: slugId(l.feed.title || l.title || 'feed'), source: 'rss', ...(title ? { title } : {}), config: { url: l.feed.url, limit: 10 } };
+      });
       if (!before.onboarded && !specs.length) return toolError(`None of the ${loaded.length} feeds tried loaded (${clean(failed[0]?.error, 120)}).`, 'upstream_error');
       // Group by folder, keeping the order folders first appear in their file.
       const folderOrder = [...new Set(working.map((l) => l.feed.category ?? ''))];

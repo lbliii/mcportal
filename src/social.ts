@@ -63,8 +63,8 @@ export interface Report {
 export type Relation = 'follows' | 'mutes' | 'blocks';
 
 export interface PageQuery {
-  limit?: number;
-  before?: string;
+  limit?: number | undefined;
+  before?: string | undefined;
 }
 
 /** A sharing or relationship request the rules refuse. Defaults to invalid_argument; pass a code when it's something else. */
@@ -145,7 +145,7 @@ export class Social {
     return out;
   }
 
-  async share(author: string, input: { kind: 'link' | 'clip'; title: string; url?: string; clip?: Clip; note?: unknown; audience?: unknown }): Promise<SharedItem> {
+  async share(author: string, input: { kind: 'link' | 'clip'; title: string; url?: string | undefined; clip?: Clip | undefined; note?: unknown; audience?: unknown }): Promise<SharedItem> {
     if (!(await this.profiles.get(author))) throw new SocialError('Sharing needs a public profile, so people know who shared it. Create one with set_public_profile first', 'failed_precondition');
     if ((await this.store.countShares(author)) >= SOCIAL_LIMITS.sharesPerUser) throw new SocialError(`You have ${SOCIAL_LIMITS.sharesPerUser} shares, the most MCPortal keeps. Remove some with unshare`, 'limit_exceeded');
     const audience: Audience = input.audience === 'mcportal' ? 'mcportal' : 'followers';
@@ -259,7 +259,7 @@ export class Social {
     return { followers: (await this.store.incoming('follows', accountId)).length, following: (await this.store.outgoing('follows', viewer)).includes(accountId), shares: visible.length };
   }
 
-  async report(reporter: string, target: { shareId?: string; handle?: string }, reason: unknown): Promise<Report> {
+  async report(reporter: string, target: { shareId?: string | undefined; handle?: string | undefined }, reason: unknown): Promise<Report> {
     const why = clean(reason, SOCIAL_LIMITS.reason);
     if (!why) throw new SocialError('Say briefly what is wrong');
     const open = (await this.store.reports('open', 10_000)).filter((r) => r.reporterId === reporter).length;

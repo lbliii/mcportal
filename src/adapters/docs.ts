@@ -37,7 +37,7 @@ export { fetchDocPage, learnedRoute, markdownPage, type DocPage, type PageRoute 
 /** What a user typed ("docs.stripe.com", "owner/repo", a folder link) as the URL a docs portal stores. */
 export function docsInputUrl(input: string): string {
   const github = parseGithubDocs(input);
-  return github ? githubTocUrl({ ...github, file: undefined }) : docsUrl(input).href;
+  return github ? githubTocUrl(github) : docsUrl(input).href;
 }
 
 /** "docs.stripe.com" or a page URL → an http(s) URL. */

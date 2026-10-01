@@ -49,10 +49,10 @@ export interface PortalExport {
 
 export interface ExportSources {
   store: ProfileStore;
-  reading?: ReadingStore;
-  clips?: ClipStore;
-  publicProfile?: PublicProfile;
-  social?: Social;
+  reading?: ReadingStore | undefined;
+  clips?: ClipStore | undefined;
+  publicProfile?: PublicProfile | undefined;
+  social?: Social | undefined;
 }
 
 async function allClips(clips: ClipStore | undefined, userId: string): Promise<Clip[]> {
@@ -285,7 +285,7 @@ function mergeProfile(before: Profile, incoming: Profile, counts: Pick<ImportRes
 }
 
 /** Add an export to a room. Never removes or rearranges anything. */
-export async function importExport(data: PortalExport, userId: string, to: { store: ProfileStore; reading?: ReadingStore; clips?: ClipStore }): Promise<ImportResult> {
+export async function importExport(data: PortalExport, userId: string, to: { store: ProfileStore; reading?: ReadingStore | undefined; clips?: ClipStore | undefined }): Promise<ImportResult> {
   const result: ImportResult = { portalsAdded: 0, portalsSkipped: [], layoutAdopted: false, savedAdded: 0, clipsAdded: 0, clipsSkipped: 0, clipErrors: [] };
   let incoming: Profile | undefined;
   try {

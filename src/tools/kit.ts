@@ -24,28 +24,28 @@ export const ROOM_URI = 'ui://mcportal/room.html';
 
 export interface ToolContext extends SourceDeps {
   store: ProfileStore;
-  reading?: ReadingStore;
+  reading?: ReadingStore | undefined;
   /** The user's clips. Absent where clips aren't set up; the clip tools then refuse. */
-  clips?: ClipStore;
+  clips?: ClipStore | undefined;
   /** Handles and public profiles: hosted only (local MCPortal has no social layer). */
-  publicProfiles?: PublicProfiles;
+  publicProfiles?: PublicProfiles | undefined;
   /** Shares, follows, mutes, blocks and reports: hosted only. */
-  social?: Social;
+  social?: Social | undefined;
   /** Hand an export to the user: a one-time download link (HTTP) or a file on disk (local). */
-  deliver?: (format: ExportFormat) => Promise<{ kind: 'link' | 'file'; where: string; summary: string }>;
+  deliver?: ((format: ExportFormat) => Promise<{ kind: 'link' | 'file'; where: string; summary: string }>) | undefined;
   /** The account page (download everything, delete the account), when the server has one. */
-  accountUrl?: string;
+  accountUrl?: string | undefined;
   /** A one-time page where the user uploads an export (hosted), so it never passes through the model. */
-  uploadLink?: () => string;
+  uploadLink?: (() => string) | undefined;
   /** Local MCPortal: imports may read an export file from this machine. */
-  localFiles?: boolean;
+  localFiles?: boolean | undefined;
   userId: string;
   /** Hosted server only: charged per tool call. Local stdio has none (unlimited). */
-  budget?: UsageBudget;
+  budget?: UsageBudget | undefined;
   /** Who is acting (role, status). Absent = the local owner. */
-  actor?: Actor;
+  actor?: Actor | undefined;
   /** Set by the dispatcher for each call, with the tool name and request id attached. */
-  log?: Logger;
+  log?: Logger | undefined;
 }
 
 export interface CallToolResult {

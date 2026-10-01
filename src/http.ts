@@ -39,9 +39,9 @@ export interface AppConfig {
   host: string;
   port: number;
   publicUrl: string;
-  staticToken?: string;
+  staticToken?: string | undefined;
   staticUser: string;
-  github?: { clientId: string; clientSecret: string };
+  github?: { clientId: string; clientSecret: string } | undefined;
   allowedGithubUsers: string[];
   allowedHosts: string[];
   allowedOrigins: string[];
@@ -50,31 +50,31 @@ export interface AppConfig {
   trustProxy: boolean;
   dataDir: string;
   /** Per-user tool budget (MCPORTAL_LIMIT_PER_MINUTE / _PER_DAY / _GLOBAL_PER_DAY). */
-  limits?: Partial<BudgetLimits>;
+  limits?: Partial<BudgetLimits> | undefined;
   /** The public pages: support link (MCPORTAL_SUPPORT_URL) and operator name (MCPORTAL_OPERATOR). */
-  site?: Pick<SiteConfig, 'supportUrl' | 'operator'>;
+  site?: Pick<SiteConfig, 'supportUrl' | 'operator'> | undefined;
 }
 
 export interface AppDeps {
   store: ProfileStore;
-  reading?: ReadingStore;
+  reading?: ReadingStore | undefined;
   /** Clips; defaults to files under the data directory. */
-  clips?: ClipStore;
+  clips?: ClipStore | undefined;
   /** Handles and public profiles (only with GitHub sign-in: a single-token server has no social layer). */
-  publicProfiles?: PublicProfiles;
+  publicProfiles?: PublicProfiles | undefined;
   /** Shares and follows (also only with GitHub sign-in). */
-  social?: Social;
+  social?: Social | undefined;
   fetcher: Fetcher;
   cache: TtlCache;
-  log?: Logger;
-  now?: () => number;
-  budget?: UsageBudget;
+  log?: Logger | undefined;
+  now?: (() => number) | undefined;
+  budget?: UsageBudget | undefined;
   /** Where OAuth state persists; defaults to auth.json in the data directory. */
-  authPersistence?: AuthPersistence;
+  authPersistence?: AuthPersistence | undefined;
   /** Accounts, invites and roles; defaults to accounts.json in the data directory with bootstrap from the env. */
-  accounts?: Accounts;
+  accounts?: Accounts | undefined;
   /** Reported by /health. */
-  storage?: 'files' | 'postgres';
+  storage?: 'files' | 'postgres' | undefined;
 }
 
 function list(value: string | undefined): string[] {
@@ -105,7 +105,7 @@ export function configFromEnv(env: NodeJS.ProcessEnv, dataDir: string): AppConfi
     trustProxy: env.MCPORTAL_TRUST_PROXY === '1' || Boolean(env.RAILWAY_ENVIRONMENT),
     dataDir,
     limits: limitsFromEnv(env),
-    site: { supportUrl: env.MCPORTAL_SUPPORT_URL || DEFAULT_SUPPORT_URL, operator: env.MCPORTAL_OPERATOR || undefined },
+    site: { supportUrl: env.MCPORTAL_SUPPORT_URL || DEFAULT_SUPPORT_URL, ...(env.MCPORTAL_OPERATOR ? { operator: env.MCPORTAL_OPERATOR } : {}) },
   };
   if (!hasAuth && !isLoopbackHost(host) && env.MCPORTAL_ALLOW_UNAUTHENTICATED !== '1') {
     throw new Error(

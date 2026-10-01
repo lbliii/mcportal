@@ -143,7 +143,8 @@ export const SAVED_TOOLS: ToolDef[] = [
             const spec = findPortal(before, portalId);
             if (!spec || spec.source !== 'pinned') return { result: { refused: toolError(`No pinned portal with id "${clean(args.portalId, 60)}". Leave out portalId to add a new one.`, 'not_found') } };
             const config = { ...spec.config, ...(from ? { from: args.from } : {}), ...(recipe ? { recipe: args.recipe } : {}) };
-            const columns = before.columns.map((c) => ({ ...c, panels: c.panels.map((p) => (p.id === portalId ? { ...p, title: title || spec.title, config } : p)) }));
+            const nextTitle = title || spec.title;
+            const columns = before.columns.map((c) => ({ ...c, panels: c.panels.map((p) => (p.id === portalId ? { ...p, ...(nextTitle !== undefined ? { title: nextTitle } : {}), config } : p)) }));
             const profile = withLayout(before, { columns, pins: { ...before.pins, [portalId]: pin } });
             return { profile, result: { profile, portalId } };
           }

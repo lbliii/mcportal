@@ -113,9 +113,9 @@ export class AuthStore {
     });
   }
 
-  async registerClient(input: { client_name?: string; redirect_uris: string[] }): Promise<ClientRecord> {
+  async registerClient(input: { client_name?: string | undefined; redirect_uris: string[] }): Promise<ClientRecord> {
     const now = Math.floor(this.now() / 1000);
-    const record: ClientRecord = { client_id: randomToken('mcpc'), client_name: input.client_name, redirect_uris: input.redirect_uris, created_at: now, last_used_at: now };
+    const record: ClientRecord = { client_id: randomToken('mcpc'), ...(input.client_name !== undefined ? { client_name: input.client_name } : {}), redirect_uris: input.redirect_uris, created_at: now, last_used_at: now };
     return this.write((d) => {
       d.clients[record.client_id] = record;
       return record;

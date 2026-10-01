@@ -54,13 +54,13 @@ export interface PublicProfile {
 }
 
 export interface PublicProfileInput {
-  handle?: string;
-  displayName?: string;
-  bio?: string;
-  spaceTitle?: string;
-  accent?: string;
+  handle?: string | undefined;
+  displayName?: string | undefined;
+  bio?: string | undefined;
+  spaceTitle?: string | undefined;
+  accent?: string | undefined;
   /** Replaces the featured list; [] clears it. */
-  sources?: Array<{ title?: string; source: string; config: unknown }>;
+  sources?: Array<{ title?: string; source: string; config: unknown }> | undefined;
 }
 
 /** Only sources MCPortal fetches itself can be featured; configs are re-validated. */

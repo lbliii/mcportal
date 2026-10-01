@@ -190,7 +190,7 @@ export function parseMarkdown(markdown: string, options: { base?: string } = {})
       if (callout?.lines?.some((l) => l.trim())) { // text before the code: show it first
         calloutBlock(callout.tone!, callout.label, callout.lines);
         callout.lines = [];
-        callout.label = undefined;
+        delete callout.label;
       }
       add({ type: 'pre', text: code.join('\n').slice(0, MARKDOWN_LIMITS.blockChars * 4), ...fenceInfo(info) });
       continue;

@@ -45,10 +45,10 @@ export class AdminPanel {
   private accounts: Accounts;
   private oauth: OAuthServer;
   private publicUrl: string;
-  private social?: Social;
-  private profiles?: PublicProfiles;
+  private social: Social | undefined;
+  private profiles: PublicProfiles | undefined;
 
-  constructor(accounts: Accounts, oauth: OAuthServer, publicUrl: string, now: () => number = Date.now, moderation: { social?: Social; profiles?: PublicProfiles } = {}) {
+  constructor(accounts: Accounts, oauth: OAuthServer, publicUrl: string, now: () => number = Date.now, moderation: { social?: Social | undefined; profiles?: PublicProfiles | undefined } = {}) {
     this.accounts = accounts;
     this.oauth = oauth;
     this.publicUrl = publicUrl;

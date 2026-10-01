@@ -76,19 +76,19 @@ export interface Clip extends ClipSummary {
 }
 
 export interface ClipQuery {
-  kind?: ClipKind;
-  tag?: string;
+  kind?: ClipKind | undefined;
+  tag?: string | undefined;
   /** Words that must all appear (title, note, tags, text). */
-  query?: string;
-  limit?: number;
+  query?: string | undefined;
+  limit?: number | undefined;
   /** Only clips created before this ISO time (paging). */
-  before?: string;
+  before?: string | undefined;
 }
 
 export interface ClipPatch {
-  title?: string;
-  note?: string;
-  tags?: string[];
+  title?: string | undefined;
+  note?: string | undefined;
+  tags?: string[] | undefined;
 }
 
 /** A clip that fails validation, or a clip limit reached. Defaults to invalid_argument; pass a code when it's something else. */

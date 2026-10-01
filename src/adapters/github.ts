@@ -78,25 +78,31 @@ export async function fetchGithub(config: GithubConfig, fetcher: Fetcher): Promi
     if (!Array.isArray(releases)) throw new UpstreamError('upstream_error', 'GitHub returned an unexpected response');
     return releases
       .filter((r) => r && !r.draft)
-      .map((r) => ({
-        id: String(r.id),
-        title: clean(r.name, 200) || clean(r.tag_name, 100),
-        url: safeHttpUrl(r.html_url),
-        meta: [clean(r.tag_name, 60), ...(r.prerelease ? ['pre-release'] : []), ...(r.author ? [`by ${clean(r.author.login, 40)}`] : [])],
-        publishedAt: r.published_at ?? undefined,
-        image: avatar(r.author?.avatar_url),
-      }));
+      .map((r) => {
+        const url = safeHttpUrl(r.html_url), image = avatar(r.author?.avatar_url);
+        return {
+          id: String(r.id),
+          title: clean(r.name, 200) || clean(r.tag_name, 100),
+          ...(url !== undefined ? { url } : {}),
+          meta: [clean(r.tag_name, 60), ...(r.prerelease ? ['pre-release'] : []), ...(r.author ? [`by ${clean(r.author.login, 40)}`] : [])],
+          ...(r.published_at != null ? { publishedAt: r.published_at } : {}),
+          ...(image !== undefined ? { image } : {}),
+        };
+      });
   }
   const data = await fetchJson<{ items: Repo[] }>(fetcher, url, { headers: githubHeaders() });
   if (!Array.isArray(data?.items)) throw new UpstreamError('upstream_error', 'GitHub returned an unexpected response');
-  return data.items.map((r) => ({
-    id: String(r.id),
-    title: clean(r.full_name, 140),
-    url: safeHttpUrl(r.html_url),
-    summary: clean(r.description, 240) || undefined,
-    score: Number(r.stargazers_count) || 0,
-    meta: [`★ ${compact(Number(r.stargazers_count) || 0)}`, ...(r.language ? [clean(r.language, 30)] : [])],
-    publishedAt: r.pushed_at,
-    image: avatar(r.owner?.avatar_url),
-  }));
+  return data.items.map((r) => {
+    const url = safeHttpUrl(r.html_url), summary = clean(r.description, 240), image = avatar(r.owner?.avatar_url);
+    return {
+      id: String(r.id),
+      title: clean(r.full_name, 140),
+      ...(url !== undefined ? { url } : {}),
+      ...(summary ? { summary } : {}),
+      score: Number(r.stargazers_count) || 0,
+      meta: [`★ ${compact(Number(r.stargazers_count) || 0)}`, ...(r.language ? [clean(r.language, 30)] : [])],
+      publishedAt: r.pushed_at,
+      ...(image !== undefined ? { image } : {}),
+    };
+  });
 }

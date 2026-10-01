@@ -45,13 +45,13 @@ export interface AccountDeps {
   accounts: Accounts;
   oauth: OAuthServer;
   store: ProfileStore;
-  reading?: ReadingStore;
-  clips?: ClipStore;
-  publicProfiles?: PublicProfiles;
-  social?: Social;
+  reading?: ReadingStore | undefined;
+  clips?: ClipStore | undefined;
+  publicProfiles?: PublicProfiles | undefined;
+  social?: Social | undefined;
   publicUrl: string;
-  log?: Logger;
-  now?: () => number;
+  log?: Logger | undefined;
+  now?: (() => number) | undefined;
 }
 
 const hash = sha256Hex;
@@ -66,8 +66,8 @@ async function readUpload(req: IncomingMessage): Promise<{ file?: Buffer; csrf?:
   const boundary = boundaryOf(req.headers['content-type']);
   if (!boundary) throw new AppError('invalid_argument', 'Upload the file with the form');
   const parts = parseMultipart(await readBody(req, MAX_UPLOAD), boundary);
-  const file = parts.get('file');
-  return { file: file && file.data.length ? file.data : undefined, csrf: parts.get('csrf')?.data.toString('utf8') };
+  const file = parts.get('file'), csrf = parts.get('csrf')?.data.toString('utf8');
+  return { ...(file && file.data.length ? { file: file.data } : {}), ...(csrf !== undefined ? { csrf } : {}) };
 }
 
 function uploadForm(action: string, csrf?: string): string {

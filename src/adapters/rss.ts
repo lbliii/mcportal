@@ -173,10 +173,10 @@ export function parseFeed(xml: string, limit = 20, baseUrl?: string): ParsedFeed
       ...(video ? { video: true } : {}),
       id: clean(htmlToText(tagText(block, bl, isAtom ? 'id' : 'guid') ?? ''), 300) || url || `${index}`,
       title: itemTitle,
-      url,
-      summary,
+      ...(url !== undefined ? { url } : {}),
+      ...(summary !== undefined ? { summary } : {}),
       meta,
-      publishedAt,
+      ...(publishedAt !== undefined ? { publishedAt } : {}),
     };
   });
 

@@ -225,11 +225,12 @@ export function extractArticle(html: string, baseUrl?: string, limits: { blocks:
         flush();
         const a = type === 'h' || type === 'pre' || type === 'p' || name === 'dt' ? parseAttrs(tok.attrs) : {};
         // A definition term with an id is an API signature (Sphinx: <dt id="os.path.join">); symbol links point at it.
-        const signature = name === 'dt' && !!a.id && ID.test(a.id);
+        const signatureId = name === 'dt' && a.id && ID.test(a.id) ? a.id : undefined;
         const callout = innerCallout();
         const isLabel = callout && type === 'p' && /\badmonition-title\b/.test(a.class ?? '');
-        current = { type: isLabel ? 'label' : signature ? 'h' : type === 'p' && quote > 0 ? 'quote' : type, zone: zone(), parts: [], ...(callout ? { callout } : {}), ...(name === 'li' && lists.length ? { list: lists.at(-1) } : {}) };
-        if (signature) { current.level = 4; current.id = a.id; }
+        const list = name === 'li' ? lists.at(-1) : undefined;
+        current = { type: isLabel ? 'label' : signatureId ? 'h' : type === 'p' && quote > 0 ? 'quote' : type, zone: zone(), parts: [], ...(callout ? { callout } : {}), ...(list !== undefined ? { list } : {}) };
+        if (signatureId) { current.level = 4; current.id = signatureId; }
         if (type === 'h') {
           current.level = Number(name[1]);
           const top = stack[stack.length - 1];
@@ -306,10 +307,11 @@ export function extractArticle(html: string, baseUrl?: string, limits: { blocks:
     blocks.push(b);
   }
   const wordCount = blocks.reduce((n, b) => n + words(b.text), 0);
+  const siteName = meta['og:site_name'], byline = meta.author || meta['article:author'];
   return {
     title,
-    siteName: meta['og:site_name'] || undefined,
-    byline: meta.author || meta['article:author'] || undefined,
+    ...(siteName ? { siteName } : {}),
+    ...(byline ? { byline } : {}),
     blocks,
     wordCount,
   };

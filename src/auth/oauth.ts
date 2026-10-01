@@ -392,7 +392,7 @@ export class OAuthServer {
     setLimited(
       this.txns,
       txnId,
-      { clientId: client.clientId, clientName: client.clientName, redirectUri, state, codeChallenge: challenge, resource, browserKey: sha256Url(browserSecret), decided: false, expiresAt: this.now() + TXN_TTL_MS },
+      { clientId: client.clientId, clientName: client.clientName, redirectUri, ...(state !== undefined ? { state } : {}), codeChallenge: challenge, resource, browserKey: sha256Url(browserSecret), decided: false, expiresAt: this.now() + TXN_TTL_MS },
       MAX_TXNS,
     );
     const cookie = `${this.cookieName}=${browserSecret}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${TXN_TTL_MS / 1000}${this.secure ? '; Secure' : ''}`;
