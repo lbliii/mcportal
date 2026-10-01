@@ -1,4 +1,5 @@
 /** The one-time move from the file store into an empty database. */
+import { processLogger } from '../lib/log.ts';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { validateProfile } from '../profile.ts';
@@ -14,8 +15,8 @@ export async function importFiles(db: Queryable, dataDir: string): Promise<{ ski
   let names: string[] = [];
   try {
     names = await readdir(dataDir);
-  } catch {
-    names = [];
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
   }
   let profiles = 0;
   let auth = false;
@@ -25,6 +26,7 @@ export async function importFiles(db: Queryable, dataDir: string): Promise<{ ski
     try {
       parsed = JSON.parse(await readFile(path.join(dataDir, name), 'utf8'));
     } catch {
+      processLogger().warn('storage.import_skipped', { file: name, why: 'unreadable' });
       continue;   // unreadable files stay on the volume for a human to look at
     }
     if (name === 'auth.json') {
@@ -35,6 +37,7 @@ export async function importFiles(db: Queryable, dataDir: string): Promise<{ ski
     try {
       validateProfile(parsed);
     } catch {
+      processLogger().warn('storage.import_skipped', { file: name, why: 'not a valid profile' });
       continue;
     }
     const userId = name.slice(0, -'.json'.length);

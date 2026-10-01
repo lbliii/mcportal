@@ -8,6 +8,8 @@ import { randomBytes } from 'node:crypto';
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
+import { errorMessage } from './lib/errors.ts';
+import { processLogger } from './lib/log.ts';
 import { defaultProfile, validateProfile, type Profile } from './profile.ts';
 
 /** What an update's change returns: the profile to save (none means no write) and what to hand back. */
@@ -102,7 +104,7 @@ export class FileProfileStore implements ProfileStore {
       return { ...validateProfile(parsed), updatedAt: typeof parsed.updatedAt === 'string' ? parsed.updatedAt : new Date().toISOString() };
     } catch (error) {
       const backup = file.replace(/\.json$/, `.corrupt-${Date.now()}.json`);
-      await rename(file, backup).catch(() => {});
+      await rename(file, backup).catch((error: unknown) => processLogger().warn('profile.backup_failed', { error: errorMessage(error) }));
       this.notices.set(userId, `Your saved layout couldn't be read (${(error as Error).message.slice(0, 120)}), so MCPortal restored the default layout. The old file was kept as ${path.basename(backup)}.`);
       return defaultProfile();
     }

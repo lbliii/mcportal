@@ -4,6 +4,7 @@
  * and parses it. Also the small helpers the GitHub and page modules share
  * (looksLikeMarkdown, titles from paths, getText).
  */
+import { isAppError } from '../../lib/errors.ts';
 import { inflateSync } from 'node:zlib';
 import { clean, decodeEntities, safeHttpUrl } from '../../lib/text.ts';
 import type { Fetcher } from '../../types.ts';
@@ -213,7 +214,8 @@ export async function getText(url: string, fetcher: Fetcher, maxBytes: number, a
   try {
     const res = await fetcher(url, { headers: { accept }, maxBytes, truncate: false });
     return res.status >= 200 && res.status < 300 ? { text: res.text, contentType: res.contentType, url: res.url || url } : null;
-  } catch {
+  } catch (error) {
+    if (!isAppError(error)) throw error;   // a blocked, failed or oversized fetch is "not here"; a bug isn't
     return null;
   }
 }

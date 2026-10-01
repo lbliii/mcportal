@@ -1,4 +1,4 @@
-import { UpstreamError } from '../lib/errors.ts';
+import { isAppError, UpstreamError } from '../lib/errors.ts';
 import { fetchJson } from '../lib/safe-fetch.ts';
 import { clean, hostOf, safeHttpUrl } from '../lib/text.ts';
 import type { Fetcher, Item } from '../types.ts';
@@ -54,7 +54,7 @@ export async function fetchHn(config: HnConfig, fetcher: Fetcher): Promise<Item[
     ids
       .filter((id): id is number => Number.isInteger(id))
       .slice(0, config.limit)
-      .map((id) => fetchJson<HnStory>(fetcher, `${HN_API}/item/${id}.json`).catch(() => null)),
+      .map((id) => fetchJson<HnStory>(fetcher, `${HN_API}/item/${id}.json`).catch((error: unknown) => { if (!isAppError(error)) throw error; return null; })),
   );
   // One malformed story must never take down the portal.
   return stories.flatMap((s) => {
