@@ -174,3 +174,22 @@ test('layout: withLayout keeps saved items exactly, whatever validation does to 
   assert.equal(next.layout, 'shelves');
   assert.equal(next.saved, saved, 'the same array, untouched');
 });
+
+test('page sessions: cookie carries an opaque token, sessions expire, CSRF is per session', async () => {
+  const { PageSessions } = await import('../src/page-sessions.ts');
+  let now = 0;
+  const sessions = new PageSessions('account', { publicUrl: 'https://mcportal.example', ttlMs: 1000, max: 2, now: () => now });
+  const setCookie = sessions.start('acct-1', 'alice');
+  assert.match(setCookie, /^__Host-mcportal_account=[A-Za-z0-9_-]{43}; Path=\/; HttpOnly; SameSite=Lax; Max-Age=1; Secure$/);
+  const req = { headers: { cookie: setCookie.split(';')[0] } } as never;
+  const current = sessions.current(req)!;
+  assert.equal(current.session.accountId, 'acct-1');
+  assert.equal(sessions.csrfMatches(current.session, current.session.csrf), true);
+  assert.equal(sessions.csrfMatches(current.session, ''), false);
+  assert.equal(sessions.csrfMatches(current.session, null), false);
+  sessions.endAll('acct-1');
+  assert.equal(sessions.current(req), undefined, 'signed out everywhere');
+  const again = { headers: { cookie: sessions.start('acct-1', 'alice').split(';')[0] } } as never;
+  now = 1000;
+  assert.equal(sessions.current(again), undefined, 'expired');
+});

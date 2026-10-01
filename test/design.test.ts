@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 import { buildDesign, compileTokens } from '../scripts/design.ts';
 import { BRAND, PALETTES } from '../src/design/generated.ts';
-import { page } from '../src/auth/oauth.ts';
+import { page } from '../src/page.ts';
 
 test('committed design outputs are deterministic and current', async()=>{
  const first=await buildDesign();assert.deepEqual(first,await buildDesign());

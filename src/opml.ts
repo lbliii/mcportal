@@ -4,6 +4,7 @@
  * theirs anywhere. Parsing reuses the linear-time HTML tokenizer (OPML is flat
  * XML), so hostile files can't blow up.
  */
+import { escapeHtml } from './lib/web.ts';
 import { REPO_PATTERN } from './adapters/github.ts';
 import { parseAttrs, tokenize } from './lib/html.ts';
 import { clean, decodeEntities, safeHttpUrl } from './lib/text.ts';
@@ -48,7 +49,8 @@ export function parseOpml(xml: string): { title: string; feeds: OpmlFeed[] } {
   return { title, feeds };
 }
 
-const xmlAttr = (s: string) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+/** XML text and attribute values: the HTML escaper is valid XML. */
+const xmlAttr = escapeHtml;
 
 /** A feed URL for a portal, if the source has one that other readers can use. */
 export function feedUrlFor(portal: PortalSpec): string | undefined {

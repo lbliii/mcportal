@@ -19,6 +19,7 @@ import type { SharedItem, Social } from './social.ts';
 import type { ReadingStore, ReadingState } from './reading.ts';
 import type { ProfileStore } from './store.ts';
 import { addPortalTo } from './layout.ts';
+import { escapeHtml } from './lib/web.ts';
 import type { ArticleBlock } from './types.ts';
 
 export const EXPORT_FORMATS = ['mcportal', 'bookmarks', 'clips', 'opml'] as const;
@@ -101,12 +102,11 @@ export async function buildExport(format: ExportFormat, userId: string, from: Ex
 
 // ---- bookmarks ----------------------------------------------------------------
 
-const html = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
 export function bookmarksHtml(profile: Profile): string {
   const items = profile.saved.map((s) => {
     const added = Math.floor(Date.parse(s.savedAt) / 1000);
-    return `        <DT><A HREF="${html(s.url)}" ADD_DATE="${added}">${html(s.title)}</A>${s.note ? `\n        <DD>${html(s.note)}` : ''}`;
+    return `        <DT><A HREF="${escapeHtml(s.url)}" ADD_DATE="${added}">${escapeHtml(s.title)}</A>${s.note ? `\n        <DD>${escapeHtml(s.note)}` : ''}`;
   });
   return [
     '<!DOCTYPE NETSCAPE-Bookmark-file-1>',

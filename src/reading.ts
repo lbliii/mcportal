@@ -1,8 +1,8 @@
 /** Durable activity, deliberately separate from layout/preferences. */
-import { createHash } from 'node:crypto';
 import { readFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { AppError } from './lib/errors.ts';
+import { sha256Hex } from './lib/ids.ts';
 import { atomicWrite, defaultDataDir, KeyedMutex } from './store.ts';
 
 const invalid = (message: string) => new AppError('invalid_argument', message);
@@ -90,7 +90,7 @@ export class FileReadingStore implements ReadingStore {
   private mutex = new KeyedMutex();
   private dir: string;
   constructor(dir = defaultDataDir()) { this.dir = dir; }
-  private file(userId: string) { return path.join(this.dir, 'reading', createHash('sha256').update(userId).digest('hex') + '.json'); }
+  private file(userId: string) { return path.join(this.dir, 'reading', sha256Hex(userId) + '.json'); }
   private async load(userId: string): Promise<ReadingState[]> {
     try { const raw = JSON.parse(await readFile(this.file(userId), 'utf8')); if (!Array.isArray(raw) || raw.length > READING_LIMIT) throw new Error('Invalid reading document'); return raw.map(importedReading); }
     catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []; throw error; }

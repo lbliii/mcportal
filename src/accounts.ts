@@ -19,10 +19,10 @@
  * memory; it's reloaded periodically so changes made by the admin CLI (another
  * process) take effect. One server instance.
  */
-import { randomBytes } from 'node:crypto';
 import type { AuthPersistence } from './auth/store.ts';
 import { memoryPersistence, readDocument } from './lib/document.ts';
-import { errorMessage } from './lib/errors.ts';
+import { AppError, errorMessage } from './lib/errors.ts';
+import { secretToken } from './lib/ids.ts';
 import { processLogger } from './lib/log.ts';
 import { clean } from './lib/text.ts';
 
@@ -268,12 +268,12 @@ export class Accounts {
 
   invite(login: string, by: string): Promise<Invite> {
     const l = login.trim().toLowerCase().replace(/^@/, '');
-    if (!LOGIN.test(l)) return Promise.reject(new Error(`"${login}" isn't a valid GitHub login`));
+    if (!LOGIN.test(l)) return Promise.reject(new AppError('invalid_argument', `"${login}" isn't a valid GitHub login`));
     return this.write((doc) => {
       const existing = doc.invites[l];
       if (existing && !existing.acceptedAt && existing.code) return existing;   // inviting again keeps the same link
-      if (Object.values(doc.accounts).some((a) => a.login === l)) throw new Error(`@${l} already has an account`);
-      const invite: Invite = { login: l, invitedBy: by, createdAt: this.now(), code: randomBytes(18).toString('base64url') };
+      if (Object.values(doc.accounts).some((a) => a.login === l)) throw new AppError('conflict', `@${l} already has an account`);
+      const invite: Invite = { login: l, invitedBy: by, createdAt: this.now(), code: secretToken(18) };
       doc.invites[l] = invite;
       doc.audit.push({ at: invite.createdAt, actor: by, action: 'invite.created', target: l });
       return invite;
@@ -293,7 +293,7 @@ export class Accounts {
   setStatus(who: string, status: AccountStatus, by: string, reason?: string): Promise<Account> {
     return this.write((doc) => {
       const account = this.find(doc, who);
-      if (!account) throw new Error(`No account for "${who}"`);
+      if (!account) throw new AppError('not_found', `No account for "${who}"`);
       account.status = status;
       account.updatedAt = this.now();
       doc.audit.push({ at: account.updatedAt, actor: by, action: status === 'suspended' ? 'account.suspended' : 'account.reinstated', target: account.id, detail: clean(reason, 200) || undefined });

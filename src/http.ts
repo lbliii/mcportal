@@ -8,7 +8,6 @@
  *     alone can't stop it because an attacker controls both headers);
  *   - never lets a malformed request crash the process.
  */
-import { timingSafeEqual } from 'node:crypto';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { OAuthServer } from './auth/oauth.ts';
 import { AuthStore, fileAuthPersistence, type AuthPersistence } from './auth/store.ts';
@@ -22,8 +21,10 @@ import { DEFAULT_SUPPORT_URL, serveSite, type SiteConfig } from './site.ts';
 import { limitsFromEnv, UsageBudget, type BudgetLimits } from './lib/budget.ts';
 import type { TtlCache } from './lib/cache.ts';
 import { isLoopbackHost } from './lib/ip.ts';
-import { AppError, errorCode, errorStack } from './lib/errors.ts';
+import { errorCode, errorStack } from './lib/errors.ts';
+import { safeEqual } from './lib/ids.ts';
 import { createLogger, requestId, type Logger } from './lib/log.ts';
+import { readBody } from './lib/web.ts';
 import { handleMessage, RPC, rpcError, SERVER_INFO, roomHtml, type JsonRpcResponse } from './mcp.ts';
 import { FileClipStore, type ClipStore } from './clips.ts';
 import { FileReadingStore, type ReadingStore } from './reading.ts';
@@ -114,27 +115,10 @@ export function configFromEnv(env: NodeJS.ProcessEnv, dataDir: string): AppConfi
   return config;
 }
 
-function tokenMatches(given: string, expected: string): boolean {
-  const a = Buffer.from(given);
-  const b = Buffer.from(expected);
-  return a.length === b.length && timingSafeEqual(a, b);
-}
-
 function send(res: ServerResponse, status: number, body: string, type = 'application/json', extra: Record<string, string> = {}): void {
   if (res.headersSent) return;
   res.writeHead(status, { 'content-type': type, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', ...extra });
   res.end(body);
-}
-
-async function readBody(req: IncomingMessage): Promise<string> {
-  let size = 0;
-  const chunks: Buffer[] = [];
-  for await (const chunk of req) {
-    size += (chunk as Buffer).length;
-    if (size > MAX_BODY_BYTES) throw new AppError('limit_exceeded', 'Body too large');
-    chunks.push(chunk as Buffer);
-  }
-  return Buffer.concat(chunks).toString('utf8');
 }
 
 /**
@@ -202,7 +186,7 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
     const header = req.headers.authorization ?? '';
     const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
     if (token) {
-      if (config.staticToken && tokenMatches(token, config.staticToken)) return config.staticUser;
+      if (config.staticToken && safeEqual(token, config.staticToken)) return config.staticUser;
       if (oauth) return oauth.authenticate(token);
       return undefined;
     }
@@ -266,7 +250,7 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
     }
     let payload: unknown;
     try {
-      payload = JSON.parse(await readBody(req));
+      payload = JSON.parse((await readBody(req, MAX_BODY_BYTES)).toString('utf8'));
     } catch (error) {
       const tooLarge = errorCode(error) === 'limit_exceeded';
       return send(res, tooLarge ? 413 : 400, JSON.stringify(rpcError(null, RPC.parseError, tooLarge ? 'Body too large' : 'Parse error')));

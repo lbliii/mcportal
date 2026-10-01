@@ -7,10 +7,10 @@
  * whole on every write, to a file (default) or a Postgres row (see db.ts); both
  * assume a single server instance.
  */
-import { createHash, randomBytes } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { readDocument, type DocumentPersistence } from '../lib/document.ts';
+import { secretToken, sha256Hex } from '../lib/ids.ts';
 import { atomicWrite, KeyedMutex } from '../store.ts';
 
 export const ACCESS_TTL_SECONDS = 3600;
@@ -71,12 +71,10 @@ export function fileAuthPersistence(dataDir: string, name = 'auth.json'): AuthPe
   };
 }
 
-export function hashToken(token: string): string {
-  return createHash('sha256').update(token).digest('hex');
-}
+export const hashToken = sha256Hex;
 
 export function randomToken(prefix: string): string {
-  return `${prefix}_${randomBytes(32).toString('base64url')}`;
+  return `${prefix}_${secretToken(32)}`;
 }
 
 export class AuthStore {
@@ -146,7 +144,7 @@ export class AuthStore {
   }
 
   async issueTokens(identity: Identity, clientId: string, resource: string, scope: string): Promise<IssuedTokens> {
-    const grantId = randomBytes(12).toString('base64url');
+    const grantId = secretToken(12);
     return this.write((d) => this.mint(d, identity, clientId, resource, scope, grantId));
   }
 

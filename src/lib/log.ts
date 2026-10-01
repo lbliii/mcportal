@@ -9,7 +9,8 @@
  * floor (default info). Fields are for ids, names, counts and timings: never tokens,
  * profile contents or third-party text. User ids are logged only as userRef() hashes.
  */
-import { createHash, randomBytes } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
+import { sha256Hex } from './ids.ts';
 
 export const LOG_LEVELS = ['debug', 'info', 'warn', 'error'] as const;
 export type LogLevel = (typeof LOG_LEVELS)[number];
@@ -97,5 +98,5 @@ export function requestId(): string {
 
 /** A stable, non-reversible handle for a user id, so logs can be correlated without naming anyone. */
 export function userRef(userId: string): string {
-  return createHash('sha256').update(`mcportal-log:${userId}`).digest('hex').slice(0, 10);
+  return sha256Hex(`mcportal-log:${userId}`).slice(0, 10);
 }
