@@ -32,7 +32,7 @@ export const TOOL_CASES: ToolCase[] = [
   { prompt: 'follow r/LocalLLaMA in my portal', tool: 'find_source', args: { query: 'r/LocalLLaMA' } },
   { prompt: 'what kinds of sources can MCPortal show?', tool: 'list_sources' },
   { prompt: 'read this for me in reader view: https://simonwillison.net/2026/Sep/30/notes/', tool: 'read_article', args: { url: 'simonwillison.net' } },
-  { prompt: 'export my subscriptions so I can use them in NetNewsWire', tool: ['export_opml', 'export_data'] },
+  { prompt: 'export my subscriptions so I can use them in NetNewsWire', tool: 'export_data', args: { format: 'opml' } },
 
   // Docs
   { prompt: 'open the Stripe docs', tool: 'open_docs', args: { docs: 'stripe' } },

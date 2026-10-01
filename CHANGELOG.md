@@ -5,7 +5,9 @@
 ### For hosts and agents (interface changes)
 - **Arguments are checked:** every tool call is checked against the tool's `inputSchema` before it runs. A wrong type (`column: "2"`), an unknown argument or a missing required one is refused with `invalid_argument` and a sentence naming the problem, where some were silently ignored before. `pin_portal` still trims extra items and tags rather than refusing them.
 - **Error codes:** a failed call carries `structuredContent.error = { code, message, retryable }` (codes such as `not_found`, `conflict`, `limit_exceeded`, `rate_limited`, `unavailable`, `upstream_error`). A server bug reports `internal` with a reference, never its message.
-- **Fewer tools where they can't work:** a local MCPortal no longer lists the sharing, space and public-profile tools (they're hosted only), which cuts what it costs every conversation from about 8,000 to 6,400 tokens. `tools/list` is grouped by area.
+- **A smaller footprint:** a local MCPortal no longer lists the sharing, space and public-profile tools (they're hosted only), and the longest tool descriptions and the server instructions are shorter (the sharing rules are sent only where sharing exists). What MCPortal costs every conversation it's connected to drops from about 8,000 tokens to about 7,300 hosted and 5,700 local. `tools/list` is grouped by area.
+- **Removed `export_opml` (breaking):** `export_data` with `format: "opml"` exports sources as OPML.
+- **Version 0.4.0**, for the interface changes in this section.
 - **Admin API errors** are `{ error: code, error_description }`, like the OAuth endpoints.
 - **`find_source` candidates** carry validated settings, exactly as `add_portal` will store them.
 
