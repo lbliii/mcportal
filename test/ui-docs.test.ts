@@ -33,7 +33,7 @@ test('open_docs host result makes a visible docs card using existing DOM element
   const v = await viewer();
   vm.runInContext(`dispatch({ structuredContent: { docs: 'acme/widgets', site: { sections: [] } } })`, v.context);
   assert.equal(v.errors.length, 0);
-  assert.equal(v.nodes.get('roomName')!.textContent, '· docs');
+  assert.equal(v.nodes.get('roomName')!.textContent, 'docs');
   assert.equal(v.nodes.get('reader')!.hidden, false);
   assert.equal(v.nodes.get('grid')!.hidden, true);
   assert.equal(v.nodes.get('welcome')!.hidden, true);

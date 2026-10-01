@@ -6,6 +6,7 @@
 - **Shared tokens:** versioned, typed authoring source generates CSS, browser palettes and TypeScript exports for the room, reading/social cards, public site, account, OAuth and admin.
 - **Validated themes:** an exact host adapter repairs unreadable colour pairs, clears stale colours on theme changes, supports partial/reset inputs and follows system preferences until the host selects a scheme. Functional contrast no longer depends on native `contrast-color()`.
 - **Consistent controls:** visible save actions, separate card-opening and metadata controls, shared focus/selection/target sizes, container-aware layouts and user text sizing. Brand artwork and images keep their colours.
+- **A lighter toolbar:** the layout control is a pill switch whose chosen half fills in, and pressed icons get a soft fill instead of an underline. Inline in a chat the header shows only the Portal mark; the wordmark returns in fullscreen or on wide screens.
 - **Regression workflow:** generation drift and contrast/lifecycle tests plus a reusable fixture MCP Apps host with an 80-case browser matrix. See [the guide](docs/design-system.md).
 
 ### Host themes
