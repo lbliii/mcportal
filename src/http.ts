@@ -24,6 +24,7 @@ import type { TtlCache } from './lib/cache.ts';
 import { isLoopbackHost } from './lib/ip.ts';
 import { handleMessage, RPC, rpcError, SERVER_INFO, roomHtml, type JsonRpcResponse, type Log } from './mcp.ts';
 import { FileClipStore, type ClipStore } from './clips.ts';
+import { FileReadingStore, type ReadingStore } from './reading.ts';
 import type { ProfileStore } from './store.ts';
 import type { ToolContext } from './tools.ts';
 import type { Fetcher } from './types.ts';
@@ -53,6 +54,7 @@ export interface AppConfig {
 
 export interface AppDeps {
   store: ProfileStore;
+  reading?: ReadingStore;
   /** Clips; defaults to files under the data directory. */
   clips?: ClipStore;
   /** Handles and public profiles (only with GitHub sign-in: a single-token server has no social layer). */
@@ -160,18 +162,19 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
   const admin = oauth ? new AdminPanel(accounts, oauth, config.publicUrl, deps.now, { social: oauth && deps.publicProfiles ? deps.social : undefined, profiles: deps.publicProfiles }) : undefined;
   const budget = deps.budget ?? new UsageBudget(config.limits ?? {}, deps.now);
   const site: SiteConfig = { supportUrl: DEFAULT_SUPPORT_URL, ...config.site, publicUrl: config.publicUrl, inviteOnly: Boolean(oauth) && !accounts.openSignup };
+  const reading = deps.reading ?? new FileReadingStore(config.dataDir);
   const clips = deps.clips ?? new FileClipStore(config.dataDir);
   const publicProfiles = oauth ? deps.publicProfiles : undefined;
   const social = oauth && publicProfiles ? deps.social : undefined;
   // The account page needs GitHub sign-in; without it, exports are written to the data directory.
-  const account = oauth ? new AccountPage({ accounts, oauth, store: deps.store, clips, publicProfiles, social, publicUrl: config.publicUrl, log, now: deps.now }) : undefined;
+  const account = oauth ? new AccountPage({ accounts, oauth, store: deps.store, reading, clips, publicProfiles, social, publicUrl: config.publicUrl, log, now: deps.now }) : undefined;
   const context = (userId: string): ToolContext => ({
-    store: deps.store, clips, publicProfiles, social, fetcher: deps.fetcher, cache: deps.cache, userId, budget, actor: accounts.actor(userId),
+    store: deps.store, reading, clips, publicProfiles, social, fetcher: deps.fetcher, cache: deps.cache, userId, budget, actor: accounts.actor(userId),
     accountUrl: account?.url,
     uploadLink: account ? () => account.uploadLink(userId) : undefined,
     localFiles: !account && config.allowUnauthenticated && isLoopbackHost(config.host),
     deliver: async (format) => {
-      if (!account) return deliverToFile(format, userId, { store: deps.store, clips }, config.dataDir);
+      if (!account) return deliverToFile(format, userId, { store: deps.store, reading, clips }, config.dataDir);
       // Built when the link is opened, so it's current and the big ones aren't built twice.
       const summary = { mcportal: 'everything', bookmarks: 'saved items', clips: 'clips as Markdown', opml: 'sources as OPML' }[format];
       return { kind: 'link', where: account.downloadLink(userId, format), summary };

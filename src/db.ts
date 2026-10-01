@@ -9,6 +9,7 @@
  * mcportal_kv (the OAuth, accounts and public-profiles documents), mcportal_meta
  * (schema version, import marker).
  */
+import { canonicalReadingUrl, importedReading, nextReading, READING_LIMIT, validateReadingUpdate, type ReadingState, type ReadingStore, type ReadingUpdate } from './reading.ts';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { AuthPersistence } from './auth/store.ts';
@@ -41,7 +42,7 @@ export async function connect(url: string, options: { searchPath?: string } = {}
   return pool as unknown as Queryable;
 }
 
-const SCHEMA_VERSION = '3';
+const SCHEMA_VERSION = '4';
 
 export async function ensureSchema(db: Queryable): Promise<void> {
   await db.query(`CREATE TABLE IF NOT EXISTS mcportal_meta (key text PRIMARY KEY, value text NOT NULL)`);
@@ -57,6 +58,7 @@ export async function ensureSchema(db: Queryable): Promise<void> {
     value jsonb NOT NULL,
     updated_at timestamptz NOT NULL DEFAULT now()
   )`);
+  await db.query(`CREATE TABLE IF NOT EXISTS mcportal_reading (user_id text NOT NULL, url text NOT NULL, data jsonb NOT NULL, PRIMARY KEY(user_id, url))`);
   // v2: clips. Content in `data`; `summary` is everything but the content, for lists.
   await db.query(`CREATE TABLE IF NOT EXISTS mcportal_clips (
     id text PRIMARY KEY,
@@ -381,4 +383,42 @@ export async function importFiles(db: Queryable, dataDir: string): Promise<{ ski
   }
   await db.query(`INSERT INTO mcportal_meta (key, value) VALUES ('imported_files', $1) ON CONFLICT (key) DO NOTHING`, [new Date().toISOString()]);
   return { skipped: false, profiles, auth };
+}
+
+/** Atomic JSON updates preserve fields absent from incremental activity events. */
+export class PgReadingStore implements ReadingStore {
+  private db: Queryable;
+  constructor(db: Queryable) { this.db = db; }
+  async get(userId: string, url: string) {
+    const { rows } = await this.db.query<{ data: ReadingState }>('SELECT data FROM mcportal_reading WHERE user_id = $1 AND url = $2', [userId, canonicalReadingUrl(url)]);
+    return rows[0]?.data;
+  }
+  async record(userId: string, input: ReadingUpdate) {
+    const update = validateReadingUpdate(input);
+    const next = nextReading(undefined, update);
+    const { rows } = await this.db.query<{ data: ReadingState }>(`
+      INSERT INTO mcportal_reading(user_id, url, data) VALUES ($1, $2, $3::jsonb)
+      ON CONFLICT(user_id, url) DO UPDATE SET data =
+        (CASE WHEN $5 THEN (CASE WHEN $4 = 'opened' THEN mcportal_reading.data - 'readAt' ELSE mcportal_reading.data END) - 'anchor' ELSE (CASE WHEN $4 = 'opened' THEN mcportal_reading.data - 'readAt' ELSE mcportal_reading.data END) END)
+        || (CASE WHEN $4 = 'seen' THEN $3::jsonb - 'status' ELSE $3::jsonb END)
+      RETURNING data`, [userId, update.url, JSON.stringify(next), update.status, update.anchor === null]);
+    await this.db.query(`DELETE FROM mcportal_reading WHERE user_id=$1 AND url IN (SELECT url FROM mcportal_reading WHERE user_id=$1 ORDER BY COALESCE(data->>'lastOpenedAt', data->>'lastSeenAt') DESC, url OFFSET $2)`, [userId, READING_LIMIT]);
+    return rows[0]!.data;
+  }
+  async list(userId: string, options: { unfinished?: boolean; limit?: number } = {}) {
+    const limit = Math.min(READING_LIMIT, Math.max(1, Math.floor(Number(options.limit) || 20)));
+    const { rows } = await this.db.query<{ data: ReadingState }>(`SELECT data FROM mcportal_reading WHERE user_id=$1 ${options.unfinished ? "AND data->>'status' = 'opened'" : ''} ORDER BY COALESCE(data->>'lastOpenedAt', data->>'lastSeenAt') DESC, url LIMIT $2`, [userId, limit]);
+    return rows.map(r => r.data);
+  }
+  async import(userId: string, raw: unknown[]) {
+    if (raw.length > READING_LIMIT) throw new Error('Too many reading records');
+    const states = raw.map(importedReading);
+    let count = 0;
+    for (const state of states) {
+      if ((await this.list(userId, { limit: READING_LIMIT })).length >= READING_LIMIT) break;
+      count += (await this.db.query(`INSERT INTO mcportal_reading(user_id,url,data) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`, [userId, state.url, JSON.stringify(state)])).rowCount ?? 0;
+    }
+    return count;
+  }
+  async deleteAll(userId: string) { await this.db.query('DELETE FROM mcportal_reading WHERE user_id=$1', [userId]); }
 }

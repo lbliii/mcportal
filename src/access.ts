@@ -43,6 +43,9 @@ export function authorize(actor: Actor, action: Action, resource: Resource = {})
  */
 export const TOOL_ACTIONS: Record<string, Action> = {
   get_profile: 'read',
+  get_reading: 'read',
+  list_reading: 'read',
+  record_reading: 'write',
   list_sources: 'read',
   open_room: 'fetch',
   read_source: 'fetch',
