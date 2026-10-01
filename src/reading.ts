@@ -64,8 +64,12 @@ export function nextReading(previous: ReadingState | undefined, input: ReadingUp
   else if (update.anchor !== undefined) next.anchor = update.anchor;
   return next;
 }
+/** How many records one list call returns: its limit, clamped (default 20). Every store applies it. */
+export function readingPageSize(limit: unknown): number {
+  return Math.min(READING_LIMIT, Math.max(1, Math.floor(Number(limit) || 20)));
+}
 export function readingList(states: ReadingState[], options: { unfinished?: boolean; limit?: number } = {}): ReadingState[] {
-  const limit = Math.min(READING_LIMIT, Math.max(1, Math.floor(Number(options.limit) || 20)));
+  const limit = readingPageSize(options.limit);
   return states.filter(s => !options.unfinished || s.status === 'opened').sort((a,b) => (b.lastOpenedAt ?? b.lastSeenAt).localeCompare(a.lastOpenedAt ?? a.lastSeenAt) || a.url.localeCompare(b.url)).slice(0, limit);
 }
 export function importedReading(raw: unknown): ReadingState {

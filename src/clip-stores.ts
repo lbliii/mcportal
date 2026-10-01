@@ -35,10 +35,10 @@ export function filterClips(clips: Clip[], query: ClipQuery = {}): ClipSummary[]
     .map(summaryOf);
 }
 
-function overLimit(existing: ClipSummary[], adding: Clip): string | undefined {
-  if (existing.length >= CLIP_LIMITS.perUser) return `You have ${CLIP_LIMITS.perUser} clips, the most MCPortal keeps. Delete some first.`;
-  const bytes = existing.reduce((sum, c) => sum + c.bytes, 0);
-  if (bytes + adding.bytes > CLIP_LIMITS.bytesPerUser) return `Your clips use ${Math.round(bytes / 1e6)} MB of the ${CLIP_LIMITS.bytesPerUser / 1e6} MB allowed. Delete some (large images first).`;
+/** Why a user at `usage` can't add `adding` more bytes of clips, or undefined if they can. Every store applies it. */
+export function clipQuotaProblem(usage: { count: number; bytes: number }, adding: number): string | undefined {
+  if (usage.count >= CLIP_LIMITS.perUser) return `You have ${CLIP_LIMITS.perUser} clips, the most MCPortal keeps. Delete some first.`;
+  if (usage.bytes + adding > CLIP_LIMITS.bytesPerUser) return `Your clips use ${Math.round(usage.bytes / 1e6)} MB of the ${CLIP_LIMITS.bytesPerUser / 1e6} MB allowed. Delete some (large images first).`;
   return undefined;
 }
 
@@ -59,7 +59,7 @@ abstract class DocumentClipStore implements ClipStore {
 
   add(userId: string, clip: Clip): Promise<void> {
     return this.edit(userId, (clips) => {
-      const refused = overLimit(clips, clip);
+      const refused = clipQuotaProblem({ count: clips.length, bytes: clips.reduce((sum, c) => sum + c.bytes, 0) }, clip.bytes);
       if (refused) throw new ClipError(refused, 'limit_exceeded');
       return { clips: [clip, ...clips.filter((c) => c.id !== clip.id)], result: undefined };
     });

@@ -1,5 +1,6 @@
 /** Shares, follows, mutes, blocks and reports in their own tables. */
 import type { PageQuery, Relation, Report, Share, SocialStore } from '../social.ts';
+import { limitOf } from '../social-store.ts';
 import type { Queryable } from './schema.ts';
 
 const RELATION_TABLES: Record<Relation, string> = { follows: 'mcportal_follows', mutes: 'mcportal_mutes', blocks: 'mcportal_blocks' };
@@ -46,7 +47,7 @@ export class PgSocialStore implements SocialStore {
       values.push(query.before);
       where.push(`created_at < $${values.length}`);
     }
-    values.push(Math.min(200, Math.max(1, Math.round(Number(query.limit) || 30))));
+    values.push(limitOf(query));
     const { rows } = await this.db.query<{ data: Share; hidden_at: Date | null }>(
       `SELECT data, hidden_at FROM mcportal_shares WHERE ${where.join(' AND ')} ORDER BY created_at DESC LIMIT $${values.length}`, values);
     return rows.map((r) => this.row(r));
