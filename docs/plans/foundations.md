@@ -1,6 +1,6 @@
 # Plan: solid foundations before more features
 
-Status: in progress (2026-10-01). An audit of `src/` (excluding `src/ui`) found the code
+Status: phases 1–6 done (2026-10-01); follow-ups listed at the end. An audit of `src/` (excluding `src/ui`) found the code
 correct and well-tested, but held together by convention rather than contracts. This plan
 turns the conventions into code: one error vocabulary, one tool runtime, one logger, shared
 helpers, smaller files and a stricter compiler.
@@ -74,7 +74,29 @@ Each phase lands as its own commit with `npm test` and `npm run typecheck` green
    `ui/room/*` fragments (via the existing include mechanism), `adapters/docs.ts` into
    `adapters/docs/*`, `db.ts` into `db/*`, `lib/markdown.ts` inline and MDX parts.
 
-Later, separately: `ProfileStore.update(fn)` for atomic read-modify-write; one
-`DocumentStore` replacing `AuthPersistence` for non-auth documents; shared contract tests
-for file and Postgres stores; typed `PortalSpec.config`; deduplicating page sessions between
-the account and admin pages.
+## Done
+
+All of phases 1–6, plus:
+
+- `ProfileStore.update(fn)`: atomic read-modify-write (per-user mutex on files and
+  memory; a transaction with a per-user advisory lock on Postgres). Every
+  read-modify-write site uses it, so concurrent tool calls no longer lose changes.
+- `src/lib/document.ts`: accounts, public profiles, social and OAuth documents never
+  treat a failed or corrupt read as empty (that could overwrite everyone's data).
+- `src/page-sessions.ts` replaces the account and admin pages' duplicated sessions
+  and CSRF; admin and plain HTTP errors share `{ error: code, error_description }`.
+- `exactOptionalPropertyTypes` is on.
+- Fetch probes swallow only expected failures (AppErrors), so bugs surface.
+
+## Follow-ups
+
+- Typed `PortalSpec.config` (a discriminated union by source); it drives most of the
+  remaining `as unknown as` casts.
+- One contract test suite run against both the file and Postgres stores (profiles,
+  clips, social, reading); their page-size caps still disagree (100 vs 200).
+- Document caches (`Accounts`, `PublicProfiles`, `DocumentSocialStore`) are per
+  process; with more than one hosted instance they go stale. Move them to rows, or
+  reload on write conflicts, before scaling out.
+- `/health` is static: add a storage check (and expose budget/limiter state to admins).
+- `auth/oauth.ts` (590 lines) could split the GitHub identity exchange from the
+  authorization server.
