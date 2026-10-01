@@ -70,7 +70,7 @@ Install the repo as a local plugin, which includes the `/portal` command and ski
 
 ## Before opening a PR
 
-- `npm test` passes, and `npm run typecheck` passes if you touched types.
+- `npm run check` passes: typecheck (server and UI), design outputs, and every test. There's no hosted CI yet, so this is the gate. To run it before every push: `git config core.hooksPath .githooks`.
 - If you touched storage (`src/db.ts` and `src/db/`, `src/store.ts`, `src/auth/store.ts`), run the Postgres tests too. They're skipped unless `TEST_DATABASE_URL` is set, and each run uses its own schema:
 
   ```bash

@@ -19,7 +19,8 @@
     "typecheck": "tsc --noEmit && node scripts/check-ui.ts",
     "typecheck:ui": "node scripts/check-ui.ts",
     "design": "node scripts/design.ts",
-    "design:check": "node scripts/design.ts --check"
+    "design:check": "node scripts/design.ts --check",
+    "check": "npm run typecheck && npm run design:check && npm test"
   },
   "devDependencies": {
     "@resvg/resvg-js": "^2.6.2",

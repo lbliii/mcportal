@@ -1,0 +1,4 @@
+#!/bin/sh
+# Runs the same checks CI would. Enable with: git config core.hooksPath .githooks
+# Skip once with: git push --no-verify
+exec npm run check --silent

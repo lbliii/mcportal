@@ -33,7 +33,7 @@
       } catch { toast('The chat is beyond our reach. Tell your agent there instead.'); }
     };
     describe.addEventListener('keydown', (e) => { if (e.key === 'Enter') askAgent(); });
-    $('welcome').replaceChildren(.../** @type {Node[]} */ ([   // filter(Boolean) drops the nulls
+    $('welcome').replaceChildren(...present([
       /** @type {Element} */ ($('brandBadge').content.firstElementChild).cloneNode(true),   // the template holds the badge
       el('h1', null, rebuilding ? 'Start over' : 'Choose your destiny!'),
       el('p', { class: 'lede' }, rebuilding
@@ -48,7 +48,7 @@
       DEV ? null : el('div', { class: 'ask' },
         el('p', { class: 'lede' }, 'Into something stranger? Describe it and your agent will hunt down the sources.'),
         el('div', { class: 'add-row' }, describe, el('button', { class: 'btn', onclick: askAgent }, 'Ask your agent'))),
-    ].filter(Boolean)));
+    ]));
     $('welcome').hidden = false;
   }
 
@@ -184,7 +184,7 @@
 
   /** @param {HTMLElement} node a picture element, with data-img */
   function showPicture(node) {
-    const url = /** @type {string} */ (node.dataset.img);   // only picture elements (with data-img) come here
+    const url = (node.dataset.img ?? '');   // only picture elements (with data-img) come here
     if (!pictures.has(url)) return false;
     const data = pictures.get(url);
     const img = /** @type {HTMLImageElement | null} */ (node.tagName === 'IMG' ? node : $first('img', node));
@@ -197,7 +197,7 @@
       if (!e.isIntersecting) continue;
       const node = /** @type {HTMLElement} */ (e.target);   // only picture elements are observed
       seen.unobserve(node);
-      if (!showPicture(node)) { wanted.add(/** @type {string} */ (node.dataset.img)); clearTimeout(pictureTimer); pictureTimer = setTimeout(loadPictures, 60); }
+      if (!showPicture(node)) { wanted.add((node.dataset.img ?? '')); clearTimeout(pictureTimer); pictureTimer = setTimeout(loadPictures, 60); }
     }
   }, { rootMargin: '200px' });
 
@@ -212,7 +212,7 @@
     } catch {
       for (const u of batch) pictures.set(u, null);
     }
-    for (const node of $$('[data-img]')) if (batch.includes(/** @type {string} */ (node.dataset.img))) showPicture(node);   // selected by data-img
+    for (const node of $$('[data-img]')) if (batch.includes((node.dataset.img ?? ''))) showPicture(node);   // selected by data-img
     pictureBusy = false;
     if (wanted.size) loadPictures();
   }
@@ -221,7 +221,7 @@
   // without waiting on visibility (which never fires in a hidden or background frame).
   /** @param {HTMLElement} portalNode */
   function primePictures(portalNode, count = 6) {
-    const urls = [...new Set([...$$('[data-img]', portalNode)].map((n) => /** @type {string} */ (n.dataset.img)))].slice(0, count);   // selected by data-img
+    const urls = [...new Set([...$$('[data-img]', portalNode)].map((n) => (n.dataset.img ?? '')))].slice(0, count);   // selected by data-img
     for (const u of urls) if (!pictures.has(u)) wanted.add(u);
     if (wanted.size) { clearTimeout(pictureTimer); pictureTimer = setTimeout(loadPictures, 30); }
   }
@@ -299,7 +299,7 @@
 
   function markSaved() {
     for (const b of $$('[data-save-url]')) {
-      const on = state.saved.has(/** @type {string} */ (b.dataset.saveUrl));   // selected by data-save-url
+      const on = state.saved.has((b.dataset.saveUrl ?? ''));   // selected by data-save-url
       b.setAttribute('aria-pressed', String(on));
       b.title = on ? 'Saved (click to remove)' : 'Save to your room';
       b.setAttribute('aria-label', on ? 'Remove from saved' : 'Save to your room');
@@ -308,7 +308,7 @@
 
   /** @param {Saveable} item one with a url @param {string} source */
   async function toggleSaved(item, source) {
-    const url = /** @type {string} */ (item.url);   // saveButton only offers it for items with a url
+    const url = item.url ?? '';   // saveButton only offers it for items with a url
     const was = state.saved.has(url);
     was ? state.saved.delete(url) : state.saved.add(url);   // optimistic
     markSaved();
@@ -359,7 +359,7 @@
   /** @param {Item} item @param {PortalResult} portal */
   function renderItem(item, portal) {
     const { out, byline } = compactMeta(item);
-    if (item.url) out.push(el('button', { class: 'mi go', title: 'Open the original', 'aria-label': 'Open the original', onclick: () => openLink(/** @type {string} */ (item.url)) }, icon('external')));   // checked just before
+    if (item.url) out.push(el('button', { class: 'mi go', title: 'Open the original', 'aria-label': 'Open the original', onclick: () => openLink(item.url ?? '') }, icon('external')));   // checked just before
     out.push(saveButton(item, portal.source));
     if (portal.source === 'saved' && item.url) out.push(el('button', { class: 'mi go', title: 'Share to your space', 'aria-label': 'Share to your space', onclick: () => openComposer(item) }, icon('share')));
     const avatar = item.image && item.image.kind === 'avatar' ? avatarImg(item) : null;
