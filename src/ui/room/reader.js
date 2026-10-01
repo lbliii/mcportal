@@ -118,6 +118,7 @@
     reader.hidden = false; reader.scrollTop = 0;
     reader.replaceChildren(...articleNodes(a, null, false));
     setStatus('');
+    trackReading(a.url, a.title, reader);
   }
 
   /** @param {string} url */
@@ -146,6 +147,7 @@
       if (generation !== readerGeneration) return;
       const a = result.structuredContent.article;
       reader.replaceChildren(...articleNodes(a, portal.title, true));
+      trackReading(a.url, a.title, reader);
       if (!DEV) {
         const safeTitle = String(a.title).replace(/[\u0000-\u001f\u007f\u2028\u2029"]/g, ' ').slice(0, 160);
         hostRequest('ui/update-model-context', {

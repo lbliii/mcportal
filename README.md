@@ -10,7 +10,7 @@
 
 ```
 you: /portal put GitHub on the left and add Simon Willison's blog
-agent: get_profile → update_profile → open_room
+agent: arrange_room → find_source → add_portal → open_room
        ┌──────────────┬──────────────┬──────────────┐
        │ GitHub       │ Hacker News  │ Simon W.     │   ← ui://mcportal/room.html
        └──────────────┴──────────────┴──────────────┘
@@ -114,7 +114,7 @@ Check a deployment with: `MCPORTAL_URL=https://<your-domain>/mcp MCPORTAL_TOKEN=
 | SSRF to localhost, private networks or cloud metadata | Every outbound socket connects only after its resolved address passes a public-IP check, inside the DNS lookup itself (no rebinding window). IPv6 is allowlisted to global unicast, so mapped, NAT64 and 6to4 forms can't sneak through. Redirects are re-checked, and credentials are dropped on cross-host hops. |
 | Hostile pages or feeds hanging the server | Linear-time tokenizer; input, block and total-text caps; bounded cache. 3 MB adversarial inputs parse in well under 100 ms. |
 | Prompt injection from third-party content | Adapters emit single-line plain text only. Tool results wrap third-party text in `<untrusted-content id="random">` fences. The UI never uses `innerHTML` and only opens http(s) links. |
-| An agent "tidying" the user's layout | `update_profile` refuses to drop portals unless their ids are passed in `removePortalIds`, and it reports every move, retitle and reconfigure. |
+| An agent "tidying" the user's layout | `arrange_room` changes only what it names, all or nothing, and reports every change; removing a portal is its own call, `remove_portal`, which hosts can ask the user to approve. |
 | Exposed server | Binds to 127.0.0.1 by default and refuses a public bind without auth. The Host header allowlist blocks DNS rebinding; tokens are compared in constant time and never read from query strings on `/mcp`. |
 | OAuth abuse | PKCE S256 required. Exact pre-registered redirect URIs only; errors before consent render a page and never redirect. MCPortal's own consent screen names the client. Consent is bound to the browser that loaded it (SameSite cookie, checked again on the GitHub callback) and must be same-origin, so a pre-fetched consent can't be approved cross-site. Codes are single-use. Refresh tokens rotate, and reusing a spent one revokes the whole grant. Tokens are audience-bound. The allowlist (login or numeric id) is re-checked on every request and every refresh. Registration, authorize and token endpoints are rate limited per IP. |
 | Stalled or slow upstreams | One timeout covers connect, headers and body, including gzip, deflate and brotli bodies (decompressors are wired with `pipeline()` so an abort tears them down). |
@@ -133,15 +133,15 @@ The `/preview` page never contains secrets. With a static token it asks for the 
 | `add_portal` | model + app | Add one portal without moving anything else; refuses duplicates and sources that don't load |
 | `pin_portal` | model | Show results the agent fetched with another connected tool (Jira, Slack, Confluence, …) as a portal, or refresh one by `portalId`. Stored, never fetched by MCPortal |
 | `save_item` / `remove_saved` | model + app | Bookmark a link (with an optional note), or remove one |
-| `get_profile` | model | Read the saved layout |
-| `update_profile` | model | Save a complete, validated layout (`removePortalIds` for explicit removals; can't touch saved or pinned items) |
+| `arrange_room` | model + app | Change the room by naming each change: move portals, set column widths, retitle, change a portal's settings, rename the room, layout and where stories open. All or nothing; nothing else changes |
+| `remove_portal` | model | Remove portals by id or title (a pinned portal takes its items with it) |
 | `read_source` | model + app | Preview any source without changing the layout |
 | `read_article` | model + app | Reader view for one URL; renders as its own reader card |
 | `list_sources` | model | Source types and their settings |
 | `refresh_portal` | app only | Reload one portal, bypassing cache |
 | `get_thumbnails` | app only | Fetch item pictures through the guarded fetcher as data URIs |
 | `import_opml` | model + app | Bring subscriptions from another reader: test-load each feed, build a new user's room from their folders or add to an existing one |
-| `clip` | model | Keep a quote, exchange, note, table, image (SVG, PNG, JPEG, WebP) or link from the conversation; the first clip adds a Clips portal |
+| `clip` | model | Keep a quote, exchange, note, table, image (SVG, PNG, JPEG, WebP) or link from the conversation as `content` text (exchanges as `turns`); the first clip adds a Clips portal |
 | `search_clips` | model | Find clips by words, kind or tag, newest first |
 | `get_clip` | model + app | One clip in full; renders as its own clip card |
 | `update_clip` / `delete_clip` | model | Change a clip's title, note or tags, or delete it |

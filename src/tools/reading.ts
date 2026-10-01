@@ -1,13 +1,16 @@
 /**
  * Reading history tools: record_reading, get_reading, list_reading (docs/reading-state.md).
  * They touch only the caller's own history, and only on explicit signals: seen, opened, read.
+ * The room's reader records and resumes reading (record_reading, get_reading are app-only);
+ * the model asks what the user was reading (list_reading).
  */
 import { validateReadingUpdate, type ReadingUpdate } from '../reading.ts';
-import { ok, toolError, toolFailure, type CallToolResult, type ToolDef } from './kit.ts';
+import { ok, toolError, toolFailure, ROOM_URI, type CallToolResult, type ToolDef } from './kit.ts';
+import type { ToolResults } from './results.ts';
 
 const NO_HISTORY = 'Reading history is unavailable.';
 
-function result(value: unknown): CallToolResult {
+function result<K extends 'record_reading' | 'get_reading' | 'list_reading'>(value: ToolResults[K]['reading']): CallToolResult {
   return ok(JSON.stringify(value), { reading: value });
 }
 
@@ -17,7 +20,7 @@ export const READING_TOOLS: ToolDef[] = [
     title: 'Record reading activity',
     access: 'write',
     description: [
-      'Record explicit seen, opened or read activity for one URL. Seen means visible; opened means actually opened; only explicit read means completed.',
+      "The room's reader records what the user does with one URL: seen (visible), opened (actually opened), read (only when they mark it read).",
       'Progress (0–1) never implies read. Heading/block anchors are resume hints. Updates only the caller’s reading history.',
     ].join(' '),
     inputSchema: {
@@ -37,11 +40,12 @@ export const READING_TOOLS: ToolDef[] = [
       },
     },
     annotations: { readOnlyHint: false, destructiveHint: false },
+    _meta: { ui: { resourceUri: ROOM_URI, visibility: ['app'] } },
     async handler(args, ctx) {
       const reading = ctx.reading;
       if (!reading) return toolError(NO_HISTORY, 'unavailable');
       try {
-        return result(await reading.record(ctx.userId, validateReadingUpdate(args as unknown as ReadingUpdate)));
+        return result<'record_reading'>(await reading.record(ctx.userId, validateReadingUpdate(args as unknown as ReadingUpdate)));
       } catch (error) {
         return toolFailure(error);
       }
@@ -51,14 +55,15 @@ export const READING_TOOLS: ToolDef[] = [
     name: 'get_reading',
     title: 'Get reading position',
     access: 'read',
-    description: 'Get the caller’s durable reading state for a URL; fragments share the same URL identity.',
+    description: 'Where the user left off in a URL, so the reader can resume there; fragments share the same URL identity.',
     inputSchema: { type: 'object', required: ['url'], additionalProperties: false, properties: { url: { type: 'string' } } },
     annotations: { readOnlyHint: true },
+    _meta: { ui: { resourceUri: ROOM_URI, visibility: ['app'] } },
     async handler(args, ctx) {
       const reading = ctx.reading;
       if (!reading) return toolError(NO_HISTORY, 'unavailable');
       try {
-        return result((await reading.get(ctx.userId, String(args.url ?? ''))) ?? null);
+        return result<'get_reading'>((await reading.get(ctx.userId, String(args.url ?? ''))) ?? null);
       } catch (error) {
         return toolFailure(error);
       }
@@ -68,7 +73,7 @@ export const READING_TOOLS: ToolDef[] = [
     name: 'list_reading',
     title: 'Continue reading',
     access: 'read',
-    description: 'List recent unfinished reading (actually opened, not completed), newest opened first. Set unfinished=false to include seen and completed items. At most 100 items per call.',
+    description: "What the user was reading: pages they opened and haven't finished, most recent first ('what was I in the middle of?').",
     inputSchema: {
       type: 'object',
       additionalProperties: false,
@@ -78,7 +83,7 @@ export const READING_TOOLS: ToolDef[] = [
     async handler(args, ctx) {
       const reading = ctx.reading;
       if (!reading) return toolError(NO_HISTORY, 'unavailable');
-      return result(await reading.list(ctx.userId, { unfinished: args.unfinished !== false, limit: Math.min(100, Number(args.limit) || 20) }));
+      return result<'list_reading'>(await reading.list(ctx.userId, { unfinished: args.unfinished !== false, limit: Math.min(100, Number(args.limit) || 20) }));
     },
   },
 ];

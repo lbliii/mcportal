@@ -203,6 +203,7 @@
   }
   async function closeReader() {
     readerGeneration++;
+    if (stopReading) stopReading();
     articleUrl = null; clipId = null; docsArgs = null; spaceHandle = null; docsState = null;
     root.classList.remove('article-view');
     $('reader').classList.remove('space', 'docs', 'toc-open');

@@ -39,8 +39,7 @@ const call = (name: string, args: Record<string, unknown> = {}) =>
 
 if (packs) await call('build_room', { packs, layout: layout ?? 'columns' });
 else if (layout) {
-  const profile = (((await call('get_profile'))?.result as any)?.structuredContent?.profile ?? {}) as Record<string, unknown>;
-  await call('update_profile', { profile: { ...profile, layout } });
+  await call('arrange_room', { layout });
 }
 const room = await call('open_room');
 const portals = ((room?.result as any)?.structuredContent?.portals ?? []) as Array<{ items: Array<{ url?: string }>; source: string }>;

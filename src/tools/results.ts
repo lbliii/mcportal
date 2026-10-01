@@ -11,6 +11,7 @@ import type { FetchedSource, SourceCandidate } from '../discover.ts';
 import type { Profile, ProfileDiff, SourceSettings } from '../profile.ts';
 import type { FeaturedSource, PublicProfile } from '../public-profiles.ts';
 import type { SharedItem } from '../social.ts';
+import type { ReadingState } from '../reading.ts';
 import type { Article, Item, PortalResult, Provenance } from '../types.ts';
 
 /** A starter pack as the welcome screen lists it. */
@@ -54,7 +55,8 @@ export type SpaceResult = {
 export type ToolResults = {
   open_room: RoomResult;
   build_room: { profile: Profile };
-  update_profile: { profile: Profile; changes: ProfileDiff };
+  arrange_room: { profile: Profile; changes: ProfileDiff };
+  remove_portal: { profile: Profile; changes: ProfileDiff };
   refresh_portal: { portal: PortalResult };
   find_source: { candidates: Array<SourceSettings<FetchedSource> & Omit<SourceCandidate, 'source' | 'config'> & { preview: Item[] }>; hint?: string | undefined };
   add_portal: { profile: Profile; portal: PortalResult; portalId: string };
@@ -72,6 +74,9 @@ export type ToolResults = {
   get_share: { share: SharedItem };
   share: { share: SharedItem };
   relationship: { handle?: string; layoutChanged?: boolean; profile?: Profile };
+  record_reading: { reading: ReadingState };
+  get_reading: { reading: ReadingState | null };
+  list_reading: { reading: ReadingState[] };
 };
 
 /** A tool the room app calls, by name. */

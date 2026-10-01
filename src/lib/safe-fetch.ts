@@ -23,7 +23,7 @@ import type { FetchOptions, FetchResponse, Fetcher } from '../types.ts';
 import { AppError, UpstreamError, upstreamStatus, type AppErrorOptions } from './errors.ts';
 import { isPublicAddress } from './ip.ts';
 
-export const USER_AGENT = 'MCPortal/0.4 (+https://github.com/lbliii/mcportal)';
+export const USER_AGENT = 'MCPortal/0.5 (+https://github.com/lbliii/mcportal)';
 
 /**
  * The fetch boundary refused or gave up. `code` says why: fetch_blocked (not a

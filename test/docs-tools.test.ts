@@ -241,3 +241,16 @@ test('open_docs renders as its own docs card; the Developer docs pack builds a r
     ['stripe-docs', 'docs', 'llms'], ['railway-docs', 'docs', 'llms'], ['python-docs', 'docs', 'sphinx'], ['nextjs-docs', 'docs', 'llms'],
   ]);
 });
+
+test('read_doc_page: a long page comes in parts, and the last part says nothing more', async () => {
+  const long = `# Long\n\n${Array.from({ length: 60 }, (_, i) => `Paragraph ${i} ${'words '.repeat(60)}`).join('\n\n')}`;
+  const c: ToolContext = { store: new MemoryProfileStore({ t: { ...defaultProfile(), onboarded: true } }), cache: new TtlCache(), userId: 't', fetcher: mapFetcher({ 'https://docs.example.com/llms.txt': '# Example\n\n## A\n\n- [Long](https://docs.example.com/long.md)\n- [B](https://docs.example.com/b.md)\n- [C](https://docs.example.com/c.md)\n', 'https://docs.example.com/long.md': long }) };
+  const first = await call(c, 'read_doc_page', { docs: 'https://docs.example.com/llms.txt', url: 'https://docs.example.com/long.md' });
+  const total = Number(first.content[0]!.text.match(/part 1 of (\d+)/)?.[1]);
+  assert.ok(total >= 2, first.content[0]!.text.slice(-200));
+  assert.ok(first.content[0]!.text.length < 12_000);
+  const last = await call(c, 'read_doc_page', { docs: 'https://docs.example.com/llms.txt', url: 'https://docs.example.com/long.md', part: total });
+  assert.match(last.content[0]!.text, new RegExp(`part ${total} of ${total}`));
+  assert.doesNotMatch(last.content[0]!.text, /for more/);
+  assert.ok(last.structuredContent.page.blocks.length > 50, 'the app still gets the whole page');
+});

@@ -3,7 +3,7 @@
  * Clips come only from explicit requests, and everything read back from them is
  * fenced as untrusted: a quote from an article can carry instructions.
  */
-import { buildClip, CLIP_KINDS, CLIP_LIMITS, clampLimit, clipText, queryWords, summaryOf, type Clip, type ClipKind, type ClipStore, type ClipSummary } from '../clips.ts';
+import { buildClip, fromContent, CLIP_KINDS, CLIP_LIMITS, clampLimit, clipText, queryWords, summaryOf, type Clip, type ClipKind, type ClipStore, type ClipSummary } from '../clips.ts';
 import type { Profile } from '../profile.ts';
 import { clean } from '../lib/text.ts';
 import { clipsPortal, clipsQuery } from '../sources.ts';
@@ -38,7 +38,7 @@ export const CLIP_TOOLS: ToolDef[] = [
     access: 'write',
     description: [
       "Keep something from this chat (or an article) in the user's clips, only when they ask to clip or keep it; a link to read later is save_item.",
-      'Pick the kind and fill only its fields, copying text verbatim. Give a short title, the user\'s own words as note, and tags if they named any.',
+      'Copy the content verbatim. Give a short title, the user\'s own words as note, and tags if they named any.',
       'The first clip adds a Clips portal to the room; say so.',
     ].join(' '),
     inputSchema: {
@@ -56,7 +56,7 @@ export const CLIP_TOOLS: ToolDef[] = [
           properties: { kind: { type: 'string', enum: ['conversation', 'article', 'web'] }, url: { type: 'string' }, title: { type: 'string' } },
           description: 'Where it came from, e.g. { kind: "article", url, title }',
         },
-        text: { type: 'string', description: 'quote' },
+        content: { type: 'string', description: 'Every kind but exchange: the quote; a note in markdown; a markdown table; the link url; an image as SVG markup or a PNG, JPEG or WebP data: URI' },
         attribution: { type: 'string', description: 'quote: who said it' },
         turns: {
           type: 'array',
@@ -64,13 +64,6 @@ export const CLIP_TOOLS: ToolDef[] = [
           items: { type: 'object', required: ['speaker', 'text'], additionalProperties: false, properties: { speaker: { type: 'string' }, text: { type: 'string' } } },
           description: 'exchange: speaker is "user", "assistant" or a name',
         },
-        markdown: { type: 'string', description: 'note: an explanation or summary, in markdown' },
-        table: { type: 'string', description: 'table, as markdown' },
-        columns: { type: 'array', items: { type: 'string' }, description: 'table' },
-        rows: { type: 'array', items: { type: 'array', items: { type: 'string' } }, description: 'table' },
-        svg: { type: 'string', description: 'image: a chart or diagram from the chat, as SVG markup' },
-        image: { type: 'string', description: 'image: a PNG, JPEG or WebP data: URI' },
-        url: { type: 'string', description: 'link' },
       },
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
@@ -78,7 +71,7 @@ export const CLIP_TOOLS: ToolDef[] = [
       if (!ctx.clips) return noStore();
       let clip: Clip;
       try {
-        clip = buildClip(args);
+        clip = buildClip(fromContent(args));
         await ctx.clips.add(ctx.userId, clip);
       } catch (error) {
         return toolFailure(error, 'Not clipped: ');
@@ -101,10 +94,7 @@ export const CLIP_TOOLS: ToolDef[] = [
     name: 'search_clips',
     title: 'Search clips',
     access: 'read',
-    description: [
-      "Find the user's clips by words, kind or tag, newest first. Returns summaries; use get_clip for the full content.",
-      'Use it when the user refers to something from an earlier chat ("that table we made about…", "what did we decide about…").',
-    ].join(' '),
+    description: "Find the user's clips by words, kind or tag, for things from earlier chats ('that table we made about…'). Returns summaries; get_clip shows one in full.",
     inputSchema: {
       type: 'object',
       additionalProperties: false,

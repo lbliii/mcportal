@@ -76,13 +76,13 @@ test('dispatcher: bad arguments, refusals and limits come back as coded tool err
   assert.equal(invalid.isError, true);
   assert.deepEqual(errorOf(invalid), { code: 'invalid_argument', message: "add_portal wasn't called: column must be a whole number.", retryable: false });
 
-  const denied = await call(ctx({ actor: { accountId: 'u', role: 'user', status: 'suspended' } }), 'get_profile');
+  const denied = await call(ctx({ actor: { accountId: 'u', role: 'user', status: 'suspended' } }), 'list_sources');
   assert.equal(errorOf(denied).code, 'forbidden');
 
   const budget = new UsageBudget({ perMinute: 1, perDay: 100, globalPerDay: 100 });
   const c = ctx({ budget });
-  assert.equal((await call(c, 'get_profile')).isError, undefined);
-  const limited = await call(c, 'get_profile');
+  assert.equal((await call(c, 'list_sources')).isError, undefined);
+  const limited = await call(c, 'list_sources');
   assert.equal(errorOf(limited).code, 'rate_limited');
   assert.equal(errorOf(limited).retryable, true);
   assert.equal(errorOf(limited).details?.scope, 'minute');
@@ -101,14 +101,14 @@ test('dispatcher: a bug is logged with its stack and reported by reference, neve
     update: async () => { throw new TypeError('secret internal detail'); },
     delete: async () => {},
   };
-  const result = await call(ctx({ store: broken, log: createLogger({ format: 'json', write: (l) => lines.push(l) }) }), 'get_profile');
+  const result = await call(ctx({ store: broken, log: createLogger({ format: 'json', write: (l) => lines.push(l) }) }), 'open_room');
   const error = errorOf(result);
   assert.equal(error.code, 'internal');
   assert.doesNotMatch(result.content[0]!.text, /secret/);
   assert.match(result.content[0]!.text, new RegExp(`reference ${error.details?.ref}`));
   const crash = lines.map((l) => JSON.parse(l)).find((l) => l.event === 'tool.crashed');
   assert.equal(crash.ref, error.details?.ref);
-  assert.equal(crash.tool, 'get_profile');
+  assert.equal(crash.tool, 'open_room');
   assert.match(crash.error, /TypeError: secret internal detail/);
   const done = lines.map((l) => JSON.parse(l)).find((l) => l.event === 'tool.call');
   assert.equal(done.outcome, 'crashed');
@@ -250,15 +250,15 @@ test('metrics and budget: per-tool counters from the dispatcher, and a budget sn
   const metrics = new ToolMetrics(() => 0);
   const budget = new UsageBudget({ perMinute: 100, perDay: 100, globalPerDay: 1000 });
   const c = ctx({ metrics, budget });
-  await call(c, 'get_profile');
-  await call(c, 'get_profile');
+  await call(c, 'list_sources');
+  await call(c, 'list_sources');
   await call(c, 'refresh_portal', { portalId: 'nope' });
   const stats = metrics.snapshot().tools;
-  assert.equal(stats[0]!.tool, 'get_profile');
+  assert.equal(stats[0]!.tool, 'list_sources');
   assert.equal(stats[0]!.calls, 2);
   assert.deepEqual(stats.find((t) => t.tool === 'refresh_portal')!.codes, { not_found: 1 });
   const snap = budget.snapshot();
-  assert.deepEqual(snap.today, [{ userId: 'u', used: 4 }], 'get_profile 1 + 1, refresh_portal 2');
+  assert.deepEqual(snap.today, [{ userId: 'u', used: 4 }], 'list_sources 1 + 1, refresh_portal 2');
   assert.equal(snap.global.used, 4);
 });
 

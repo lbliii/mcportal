@@ -75,11 +75,11 @@ export interface ToolDef {
   /** What the tool does, for the access gate: read your data, change it, or cause outbound fetches. */
   access: Exclude<Action, 'admin'>;
   /**
-   * Whether this server can run the tool for this caller (e.g. sharing needs the hosted
-   * social layer). Tools that can't are left out of tools/list, so they cost the model
-   * nothing; a call anyway still gets a clear `unavailable` error. Default: always.
+   * Whether to list the tool for this caller, given what the server can do and what the
+   * account uses (`Reach`). Tools left out cost the model nothing; a call anyway still
+   * runs (or gets a clear `unavailable` error). Default: always listed.
    */
-  available?: (ctx: ToolContext) => boolean;
+  available?: (reach: Reach) => boolean;
   /** Budget units per call (default 1); a function when it depends on the arguments. */
   cost?: number | ((args: Record<string, unknown>) => number);
   handler: (args: Record<string, unknown>, ctx: ToolContext) => Promise<CallToolResult>;
@@ -110,10 +110,28 @@ export function need<T>(value: T | undefined, why: string): T {
   return value;
 }
 
-/** Available where the hosted social layer is (sharing, follows, spaces). */
+/**
+ * What a caller can reach, for listing tools. social: 'none' on a server without the
+ * social layer; 'new' for an account that hasn't taken part yet (no handle, follows,
+ * mutes or blocks); 'active' once it has.
+ */
+export interface Reach {
+  social: 'none' | 'new' | 'active';
+}
+
 export const hasSocial = (ctx: ToolContext): boolean => Boolean(ctx.social && ctx.publicProfiles);
-/** Available where public profiles are. */
-export const hasProfiles = (ctx: ToolContext): boolean => Boolean(ctx.publicProfiles);
+
+/** The caller's reach (one profile read and, for an account without a handle, one relations read). */
+export async function reachOf(ctx: ToolContext): Promise<Reach> {
+  if (!ctx.social || !ctx.publicProfiles) return { social: 'none' };
+  if (await ctx.publicProfiles.get(ctx.userId)) return { social: 'active' };
+  return { social: (await ctx.social.uses(ctx.userId)) ? 'active' : 'new' };
+}
+
+/** Listed on servers with the social layer: the ways in (open a space, follow, claim a handle, report). */
+export const socialEntry = (reach: Reach): boolean => reach.social !== 'none';
+/** Listed once the account takes part in the social layer. */
+export const socialActive = (reach: Reach): boolean => reach.social === 'active';
 
 /** Why the social and public-profile tools refuse on a local server. */
 export const HOSTED_ONLY = {
@@ -136,6 +154,6 @@ export function untrusted(label: string, body: string): string {
   ].join('\n');
 }
 
-export function publicToolList(tools: readonly ToolDef[], ctx?: ToolContext): Array<Omit<ToolDef, 'handler' | 'access' | 'cost' | 'available'>> {
-  return tools.filter((t) => !ctx || !t.available || t.available(ctx)).map(({ handler: _handler, access: _access, cost: _cost, available: _available, ...tool }) => tool);
+export function publicToolList(tools: readonly ToolDef[], reach?: Reach): Array<Omit<ToolDef, 'handler' | 'access' | 'cost' | 'available'>> {
+  return tools.filter((t) => !reach || !t.available || t.available(reach)).map(({ handler: _handler, access: _access, cost: _cost, available: _available, ...tool }) => tool);
 }

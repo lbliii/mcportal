@@ -112,6 +112,60 @@ test('browser: an item opens in the reader, and home returns to the room', { ski
   assert.deepEqual(page.problems, []);
 });
 
+/** The reading record for the article, once `ready` says it's there. */
+async function readingWhen(ready: (r: any) => boolean): Promise<any> {
+  for (let i = 0; i < 10; i++) {   // each call spends the budget the room needs too
+    const r = (await tool('get_reading', { url: ARTICLE })).reading;
+    if (r && ready(r)) return r;
+    await new Promise((done) => setTimeout(done, 200));
+  }
+  return (await tool('get_reading', { url: ARTICLE })).reading;
+}
+
+/** A tool called straight over /mcp, as the model would. */
+async function tool(name: string, args: Record<string, unknown>): Promise<any> {
+  const res = await fetch(`${app.base}/mcp`, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }) });
+  return (await res.json()).result.structuredContent;
+}
+
+test('browser: the reader records opening and position, resumes there, and marks read only when asked', { skip }, async () => {
+  const openArticle = async () => {
+    await openRoom();
+    await page.click('[data-portal="saved"] .item-main');
+    await page.waitFor(`document.querySelector('#reader .mark-read')`, 'the article and its Mark as read button');
+    await page.eval(`document.getElementById('reader').style.maxHeight = '220px'`);   // a small window, so the fixture article scrolls
+  };
+  await openArticle();
+  const opened = await readingWhen((r) => r.status === 'opened');
+  assert.equal(opened?.status, 'opened', 'opening records it, no model involved');
+  assert.equal(opened.readAt, undefined);
+  await new Promise((done) => setTimeout(done, 200));   // the reader starts watching once it has recorded the open
+
+  // Scroll halfway, then leave (Back scrolls up to itself first): the furthest point is saved on the way out.
+  const scrolled = await page.eval<number>(`(() => { const r = document.getElementById('reader'); r.scrollTop = (r.scrollHeight - r.clientHeight) / 3; return r.scrollTop; })()`);
+  assert.ok(scrolled > 0, 'the article is long enough to scroll');
+  await new Promise((done) => setTimeout(done, 600));   // a reader pauses there
+  await page.click('#reader [aria-label="Back to your room"]');
+  await page.waitFor(`!document.getElementById('grid').hidden`, 'the room to come back');
+  const left = await readingWhen((r) => r.anchor?.block > 0);
+  assert.ok(left?.anchor?.block > 0, 'its position was saved');
+  assert.ok(left.progress > 0 && left.progress < 1, `progress ${left.progress}`);
+  assert.equal(left.status, 'opened', 'progress never means read');
+
+  // Coming back picks up there.
+  await openArticle();
+  await page.waitFor(`document.getElementById('toast').textContent.includes('where you left off')`, 'the resume notice');
+  assert.ok(await page.eval<number>(`document.getElementById('reader').scrollTop || window.scrollY`) > 0, 'scrolled to where they were');
+
+  await page.eval(`document.querySelector('#reader .mark-read').click()`);
+  await page.waitFor(`document.querySelector('#reader .mark-read').textContent === 'Read'`, 'the button to say Read');
+  const read = (await tool('get_reading', { url: ARTICLE })).reading;
+  assert.equal(read.status, 'read');
+  assert.ok(read.readAt);
+  assert.deepEqual((await tool('list_reading', {})).reading.map((r: any) => r.url), [], 'finished reading is not "in the middle of"');
+  assert.deepEqual(page.problems, []);
+});
+
 test('browser: a docs portal opens the docs viewer with its contents and a page', { skip }, async () => {
   await openRoom();
   await page.click('[data-portal="docs"] .item-main');

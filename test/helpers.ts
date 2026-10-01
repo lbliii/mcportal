@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { mkdtemp } from 'node:fs/promises';
+import { mkdtemp, rm } from 'node:fs/promises';
 import type { Server } from 'node:http';
 import { request } from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -20,6 +20,7 @@ export interface Running {
 }
 
 export async function startApp(overrides: Partial<AppConfig> = {}, fetcher: Fetcher = createFixtureFetcher(), deps: Partial<AppDeps> = {}): Promise<Running> {
+  const ownDir = overrides.dataDir === undefined;
   const dataDir = overrides.dataDir ?? (await mkdtemp(path.join(tmpdir(), 'mcportal-http-')));
   const config: AppConfig = {
     host: '127.0.0.1',
@@ -37,7 +38,12 @@ export async function startApp(overrides: Partial<AppConfig> = {}, fetcher: Fetc
   const server = createApp(config, { store: new MemoryProfileStore(), fetcher, cache: new TtlCache(), log: silentLogger, ...deps });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const port = (server.address() as AddressInfo).port;
-  return { base: `http://127.0.0.1:${port}`, port, server, close: () => new Promise((r) => server.close(() => r())) };
+  // Closing also removes the data directory this made (a test that passed its own keeps it).
+  const close = async () => {
+    await new Promise<void>((r) => server.close(() => r()));
+    if (ownDir) await rm(dataDir, { recursive: true, force: true });
+  };
+  return { base: `http://127.0.0.1:${port}`, port, server, close };
 }
 
 /** Raw HTTP request so tests can set any Host/Origin header. */

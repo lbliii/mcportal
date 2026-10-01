@@ -71,7 +71,7 @@ test('access: suspended accounts do nothing; admin actions need the role; owners
   assert.equal(authorize(admin, 'admin', { ownerId: 'b' }).ok, true);
   assert.equal(authorize(me, 'admin').ok, false);
   assert.equal(authorize({ ...me, status: 'suspended' }, 'read', { ownerId: 'a' }).ok, false);
-  assert.equal(toolAction('get_profile'), 'read');
+  assert.equal(toolAction('list_sources'), 'read');
   assert.equal(toolAction('save_item'), 'write');
   assert.equal(toolAction('some_future_tool'), 'write', 'unknown tools are treated as writes');
   assert.equal(localActor('default').status, 'active');
@@ -79,11 +79,11 @@ test('access: suspended accounts do nothing; admin actions need the role; owners
 
 test('access: the gate runs before every tool call', async () => {
   const ctx = { store: new MemoryProfileStore(), fetcher: createFixtureFetcher(), cache: new TtlCache(), userId: 'a', actor: { accountId: 'a', role: 'user' as const, status: 'suspended' as const } };
-  const res = await handleMessage({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'get_profile', arguments: {} } }, ctx);
+  const res = await handleMessage({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'open_room', arguments: {} } }, ctx);
   const result = (res as { result: { isError?: boolean; content: Array<{ text: string }> } }).result;
   assert.equal(result.isError, true);
   assert.match(result.content[0]!.text, /suspended/);
   // An actor for someone else's portal is refused too (tools never act across accounts).
-  const other = await handleMessage({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'get_profile', arguments: {} } }, { ...ctx, actor: { accountId: 'b', role: 'user', status: 'active' } });
+  const other = await handleMessage({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'open_room', arguments: {} } }, { ...ctx, actor: { accountId: 'b', role: 'user', status: 'active' } });
   assert.match((other as { result: { content: Array<{ text: string }> } }).result.content[0]!.text, /someone else/);
 });

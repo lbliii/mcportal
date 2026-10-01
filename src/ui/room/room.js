@@ -372,7 +372,7 @@
 
   // Pinned portals hold data the agent fetched with another tool, so only the agent can
   // refresh them: the button asks it in the conversation. Only the portal id goes into
-  // the message (ids are [a-z0-9-] slugs); the agent reads the recipe from get_profile.
+  // the message (ids are [a-z0-9-] slugs); the agent reads the recipe from open_room.
   /** @param {PortalResult} portal */
   function refreshButton(portal) {
     if (!portal.pin) return iconButton('refresh', `Refresh ${portal.title}`, () => refreshPortal(portal.portalId));

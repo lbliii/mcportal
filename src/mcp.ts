@@ -13,11 +13,11 @@ import { requestId, silentLogger, userRef } from './lib/log.ts';
 import { schemaProblem } from './lib/schema.ts';
 import { clean } from './lib/text.ts';
 import { findTool, toolAction, toolCost, TOOLS } from './tools/index.ts';
-import { hasSocial, publicToolList, toolError, ROOM_URI, type CallToolResult, type ToolContext } from './tools/kit.ts';
+import { hasSocial, publicToolList, reachOf, toolError, ROOM_URI, type CallToolResult, type ToolContext } from './tools/kit.ts';
 
 export { TOOLS };
 
-export const SERVER_INFO = { name: 'mcportal', title: 'MCPortal', version: '0.4.0' };
+export const SERVER_INFO = { name: 'mcportal', title: 'MCPortal', version: '0.5.0' };
 export const SUPPORTED_PROTOCOL_VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05'];
 export const MCP_APP_MIME = 'text/html;profile=mcp-app';
 
@@ -40,7 +40,7 @@ const UI_DIR = new URL('./ui/', import.meta.url);
 /** Files inlined into the room where it says <!--include:name--> or /*include:name*\/, so the page stays self-contained. */
 export const UI_INCLUDES = [
   'design/tokens.css', 'design/primitives.css', 'design/palettes.js', 'design/theme.js', 'art.js', 'brand/icons.js', 'brand/mark-line.svg', 'brand/badge.svg', 'brand/wordmark.svg',
-  'room/room.css', 'room/bridge.js', 'room/dom.js', 'room/room.js', 'room/reader.js', 'room/docs.js', 'room/social.js', 'room/add.js', 'room/toolbar.js', 'room/boot.js',
+  'room/room.css', 'room/bridge.js', 'room/dom.js', 'room/room.js', 'room/reader.js', 'room/reading.js', 'room/docs.js', 'room/social.js', 'room/add.js', 'room/toolbar.js', 'room/boot.js',
 ];
 
 /** JSON that is safe to embed inside a <script> element. */
@@ -171,7 +171,7 @@ export async function handleMessage(message: unknown, ctx: ToolContext): Promise
     case 'ping':
       return reply(req.id, {});
     case 'tools/list':
-      return reply(req.id, { tools: publicToolList(TOOLS, ctx) });
+      return reply(req.id, { tools: publicToolList(TOOLS, await reachOf(ctx)) });
     case 'tools/call': {
       const result = await callTool(params, ctx);
       return result ? reply(req.id, result) : rpcError(req.id, RPC.invalidParams, `Unknown tool: ${clean(params.name, 80)}`);

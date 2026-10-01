@@ -160,6 +160,7 @@
   .reader-top { display: flex; gap: var(--mp-space-2); align-items: center; margin: -6px 0 10px -6px; }
   .reader h1 { font-size: 24px; line-height: 1.25; margin: 6px 0 6px; letter-spacing: -0.01em; }
   .reader .byline { color: var(--mp-text-secondary); margin-bottom: 18px; }
+  .reader .read-end { display: flex; justify-content: center; margin: var(--mp-space-20) 0 var(--mp-space-10); }
   .reader .body p, .reader .body li { font-size: var(--mp-type-15); line-height: 1.65; margin: 0 0 14px; }
   .reader .body h2 { font-size: 17px; margin: 22px 0 8px; }
   .reader .body pre { background: var(--mp-surface-canvas); border: 1px solid var(--mp-border-control); border-radius: var(--mp-radius-control); padding: var(--mp-space-10) var(--mp-space-12); overflow-x: auto; font: var(--mp-type-12-5)/1.5 var(--mp-font-mono, ui-monospace, "SF Mono", Menlo, monospace); }

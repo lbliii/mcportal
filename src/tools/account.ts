@@ -10,7 +10,7 @@ import { homedir } from 'node:os';
 import { clean } from '../lib/text.ts';
 import { describeImport, EXPORT_FORMATS, importExport, parseExport, type ExportFormat } from '../portability.ts';
 import { ACCENTS, MAX_FEATURED, suggestHandle, type PublicProfile } from '../public-profiles.ts';
-import { hasProfiles, HOSTED_ONLY, ok, toolError, toolFailure, untrusted, type ToolDef } from './kit.ts';
+import { HOSTED_ONLY, socialActive, socialEntry, ok, toolError, toolFailure, untrusted, type ToolDef } from './kit.ts';
 
 function describeProfile(p: PublicProfile): string {
   return [
@@ -22,23 +22,16 @@ function describeProfile(p: PublicProfile): string {
   ].filter(Boolean).join('\n');
 }
 
-const FORMAT_DOCS: Record<ExportFormat, string> = {
-  mcportal: 'everything (layout, sources, saved items, clips, public profile) as one JSON file another MCPortal can import',
-  bookmarks: 'saved items as a bookmarks file for browsers and bookmark managers',
-  clips: 'clips as Markdown files (with images) in a .tar.gz, for Obsidian, Notion or a folder',
-  opml: 'sources as OPML for any feed reader',
-};
+/** Hosts load the tool list when a conversation starts, so tools an action unlocks arrive in the next one. */
+const UNLOCKS = 'Sharing (share, list_shares and the rest) is available from the next conversation.';
 
 export const ACCOUNT_TOOLS: ToolDef[] = [
   {
     name: 'get_public_profile',
     title: 'Get a public profile',
     access: 'read',
-    available: hasProfiles,
-    description: [
-      "Without handle: the user's own public profile, if they have one (they don't until they claim a handle), and a suggested handle.",
-      'With handle: another MCPortal user\'s public profile (handle, name, bio).',
-    ].join(' '),
+    available: socialActive,
+    description: "The user's own public profile and a suggested handle (without handle), or another user's (with handle).",
     inputSchema: { type: 'object', additionalProperties: false, properties: { handle: { type: 'string', description: 'e.g. "@someone"' } } },
     annotations: { readOnlyHint: true },
     async handler(args, ctx) {
@@ -62,23 +55,18 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
     name: 'set_public_profile',
     title: 'Set your public profile and space',
     access: 'write',
-    available: hasProfiles,
-    description: [
-      "Create or change the user's public profile and space: a handle (2-30 letters, digits or underscores), a display name, a short bio,",
-      `the Space's title (e.g. "late-night reading"), an accent colour (${ACCENTS.join(', ')}), and featuredPortalIds: up to ${MAX_FEATURED} portals from their room (portal ids from get_profile) to recommend as "Sources I read" (feeds, Hacker News, GitHub; [] clears).`,
-      'Only when the user asks. It is how other MCPortal users find them; nothing else in their room becomes public.',
-      'A changed handle keeps pointing to them for 30 days and nobody else can take it meanwhile.',
-    ].join(' '),
+    available: socialEntry,
+    description: "Create or change the user's public profile and Space, only when they ask: handle, name, bio, Space title, accent colour and featured portals ('Sources I read'). It's how other MCPortal users find them; nothing else in their room becomes public. An old handle keeps pointing to them for 30 days.",
     inputSchema: {
       type: 'object',
       additionalProperties: false,
       properties: {
-        handle: { type: 'string', description: 'Required the first time' },
+        handle: { type: 'string', description: '2-30 letters, digits or underscores; needed the first time' },
         displayName: { type: 'string', maxLength: 50 },
         bio: { type: 'string', maxLength: 160 },
         spaceTitle: { type: 'string', maxLength: 60 },
         accent: { type: 'string', enum: [...ACCENTS, ''] },
-        featuredPortalIds: { type: 'array', maxItems: MAX_FEATURED, items: { type: 'string' } },
+        featuredPortalIds: { type: 'array', maxItems: MAX_FEATURED, items: { type: 'string' }, description: 'Ids (from open_room) of feed, Hacker News or GitHub portals to recommend; [] clears' },
       },
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
@@ -90,7 +78,7 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
           const portals = (await ctx.store.get(ctx.userId)).columns.flatMap((c) => c.panels);
           const ids = args.featuredPortalIds.map(String);
           const unknown = ids.filter((id) => !portals.some((p) => p.id === id));
-          if (unknown.length) return toolError(`Not saved: no portal with id ${unknown.map((u) => clean(u, 40)).join(', ')} (see get_profile).`, 'not_found');
+          if (unknown.length) return toolError(`Not saved: no portal with id ${unknown.map((u) => clean(u, 40)).join(', ')} (see open_room).`, 'not_found');
           sources = ids.map((id) => portals.find((p) => p.id === id)!).map((p) => ({ title: p.title ?? p.id, source: p.source, config: p.config }));
         }
         const { profile, created, released } = await ctx.publicProfiles.set(ctx.userId, {
@@ -102,7 +90,7 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
           sources,
         });
         const skipped = sources ? sources.length - (profile.sources?.length ?? 0) : 0;
-        const head = created ? `Created your public profile as @${profile.handle}.` : released ? `Changed your handle from @${released} to @${profile.handle}. @${released} points to you for 30 days.` : 'Updated your public profile.';
+        const head = created ? `Created your public profile as @${profile.handle}. ${UNLOCKS}` : released ? `Changed your handle from @${released} to @${profile.handle}. @${released} points to you for 30 days.` : 'Updated your public profile.';
         return ok(`${head}\n${describeProfile(profile)}${skipped > 0 ? `\n${skipped} portal(s) weren't featured: only feeds, Hacker News and GitHub can be.` : ''}`, { profile });
       } catch (error) {
         return toolFailure(error, 'Not saved: ', '.');
@@ -113,7 +101,7 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
     name: 'remove_public_profile',
     title: 'Remove your public profile',
     access: 'write',
-    available: hasProfiles,
+    available: socialActive,
     description: "Make the user private again: removes their handle, name and bio. Only when they ask. Their handle stays reserved for them for 30 days.",
     inputSchema: { type: 'object', additionalProperties: false, properties: {} },
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
@@ -128,11 +116,7 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
     title: 'Export your data',
     access: 'read',
     cost: 5,
-    description: [
-      "Give the user a copy of their MCPortal data. Formats: ",
-      EXPORT_FORMATS.map((f) => `${f}: ${FORMAT_DOCS[f]}`).join('; '),
-      '. On the hosted MCPortal this returns a download link that works once, for 15 minutes; locally it writes a file and returns its path. Show the link or path to the user as is.',
-    ].join(''),
+    description: "Give the user a copy of their data: everything (mcportal), saved items as bookmarks, clips as Markdown, or sources as OPML. Hosted: a one-time download link (15 minutes); local: a file path. Show it to them as is.",
     inputSchema: { type: 'object', required: ['format'], additionalProperties: false, properties: { format: { type: 'string', enum: EXPORT_FORMATS } } },
     annotations: { readOnlyHint: true },
     async handler(args, ctx) {
@@ -151,12 +135,7 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
     title: 'Import an MCPortal export',
     access: 'write',
     cost: 20,
-    description: [
-      'Add an MCPortal export file (format "mcportal-export") to the user\'s room: portals they don\'t have, saved items and clips. Only adds; nothing is removed or moved. A brand-new room takes the exported layout as is.',
-      'Usually call it with no arguments: on the hosted MCPortal that returns a one-time upload link for the user to pick the file, so it never has to pass through the conversation. Show them the link as is.',
-      'On a local MCPortal, pass path (a .json file on this machine). Pass data (the file\'s text) only for a small export that is already in the conversation.',
-      'For subscriptions from another feed reader, use import_opml instead.',
-    ].join(' '),
+    description: "Add an MCPortal export to the user's room: portals they don't have, saved items and clips; nothing is removed or moved. Hosted: call with no arguments for a one-time upload link and show it as is. Local: pass path. Pass data only for a small export already in the chat. Feed-reader subscriptions go through import_opml.",
     inputSchema: {
       type: 'object',
       additionalProperties: false,
@@ -193,7 +172,7 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
     name: 'account_settings',
     title: 'Account page',
     access: 'read',
-    description: "Link to the user's MCPortal account page, where they sign in with GitHub to download everything or delete their account. Use it when they ask to delete their account: deletion only happens there, never through a tool.",
+    description: "Link to the user's account page, where they sign in with GitHub to download everything or delete their account. Deleting an account only happens there, never through a tool.",
     inputSchema: { type: 'object', additionalProperties: false, properties: {} },
     annotations: { readOnlyHint: true },
     async handler(_args, ctx) {

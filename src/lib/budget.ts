@@ -1,7 +1,7 @@
 /**
  * Per-user usage budget for the hosted server. Tools cost units roughly in
  * proportion to the outbound work they cause (find_source probes several URLs;
- * get_profile fetches nothing); each tool declares its cost in its ToolDef. Each user gets a per-minute burst allowance and a
+ * reading the profile fetches nothing); each tool declares its cost in its ToolDef. Each user gets a per-minute burst allowance and a
  * daily allowance, and all users share a global daily cap so one busy day can't
  * run up the hosting bill. Fixed windows, in memory: one instance, resets on deploy.
  */

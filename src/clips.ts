@@ -180,7 +180,7 @@ export function normalizeImage(image: unknown, svg: unknown): { mime: ImageMime;
     base64 = Buffer.from(svg.trim(), 'utf8').toString('base64');
   } else if (typeof image === 'string') {
     const m = image.trim().match(/^data:([a-z+/.-]+);base64,([A-Za-z0-9+/=\s]+)$/i);
-    if (!m) throw new ClipError('image must be a data: URI (data:image/png;base64,…), { mime, data }, or pass svg as markup.');
+    if (!m) throw new ClipError('image must be a data: URI (data:image/png;base64,…), { mime, data }, or SVG markup.');
     mime = m[1]!.toLowerCase();
     base64 = m[2]!;
   } else if (isRecord(image)) {
@@ -298,6 +298,26 @@ export function newClipId(): string {
 }
 
 /** Validate what the agent sent and build a clip. Throws ClipError with a readable message. */
+/**
+ * The clip tool's input as buildClip takes it: one `content` text for every kind but an
+ * exchange (turns), read by kind: a quote's text, a note's markdown, a markdown table, a
+ * link's url, or an image as SVG markup or a data: URI.
+ */
+export function fromContent(input: Record<string, unknown>): Record<string, unknown> {
+  const { content, ...rest } = input;
+  if (rest.kind === 'exchange') return rest;
+  if (!CLIP_KINDS.includes(rest.kind as ClipKind)) return rest;   // buildClip says which kinds there are
+  if (typeof content !== 'string' || !content.trim()) throw new ClipError(`A ${rest.kind as string} clip needs content.`);
+  switch (rest.kind) {
+    case 'quote': return { ...rest, text: content };
+    case 'note': return { ...rest, markdown: content };
+    case 'table': return { ...rest, table: content };
+    case 'link': return { ...rest, url: content.trim() };
+    case 'image': return content.trimStart().startsWith('<') ? { ...rest, svg: content } : { ...rest, image: content.trim() };
+  }
+  return rest;
+}
+
 export function buildClip(input: Record<string, unknown>, now = new Date(), id = newClipId()): Clip {
   const kind = input.kind as ClipKind;
   if (!CLIP_KINDS.includes(kind)) throw new ClipError(`kind must be one of ${CLIP_KINDS.join(', ')}`);

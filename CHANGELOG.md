@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Version 0.5.0: a tool surface for the long run (breaking)
+See [the plan](docs/plans/tool-surface.md).
+- **Edit by patch (breaking):** `arrange_room` replaces `update_profile`. It takes only the changes you name (`move`, `width`, `retitle`, `configure`, `name`, `layout`, `openIn`), applies them all or none, and can't touch anything it isn't given, so "never drop a portal you weren't asked to" is a guarantee rather than a rule for the model. `remove_portal` is its own call, marked destructive, so hosts can ask before it runs. Portals are named by id or exact title. `get_profile` is gone: the room and its ids come from `open_room`. The room app's layout switch uses `arrange_room` too.
+- **One `content` for clips (breaking):** `clip` takes the clip as `content` text for every kind but an exchange: a quote, a note in markdown, a markdown table, a link's url, or an image as SVG markup or a data: URI. Exchanges keep `turns` and quotes keep `attribution`. `text`, `markdown`, `table`, `columns`, `rows`, `svg`, `image` and `url` are gone.
+- **Social tools for people who use them:** a hosted account sees the ways in (`open_space`, `relationship`, `report`, `set_public_profile`) until it has a handle or follows, mutes or blocks someone; then the rest. Hosts cache the tool list per conversation, so the rest arrive in the next one, and the result that unlocks them says so.
+- **Budgeted results:** `read_doc_page` returns long pages in parts (`part: 2` for the next), `read_article` gives the model the first part (the reader card has the rest), and `open_room` summarizes each portal's first items.
+- **Shorter definitions:** descriptions and schema prose are rewritten to stand alone when a host's tool search surfaces one tool. Counted as the model sees them (name, description, input schema), about 3,600 tokens local, 4,100 hosted and 4,600 for an active social account (with the reading tools app-only, below), down from 4,700 and 6,000. Each tool has a token ceiling in `test/footprint-ceilings.json`; `npm run footprint -- --exact` asks the Claude API's counter.
+- **The reader records reading:** opening an article in the room's reader records it, scrolling saves the furthest point reached (at most every 15 seconds and on leaving), coming back picks up there, and only "Mark as read" marks it read. `record_reading` and `get_reading` are app-only now; the model asks `list_reading`. See [docs/reading-state.md](docs/reading-state.md).
+- **A frozen eval:** `evals/tool-selection.ts` cases never change; renames are declared in `evals/renames.ts`, runs repeat (`--runs`) and results are recorded (`--record`) and compared (`--compare`).
+
 ### For hosts and agents (interface changes)
 - **Arguments are checked:** every tool call is checked against the tool's `inputSchema` before it runs. A wrong type (`column: "2"`), an unknown argument or a missing required one is refused with `invalid_argument` and a sentence naming the problem, where some were silently ignored before. `pin_portal` still trims extra items and tags rather than refusing them.
 - **Error codes:** a failed call carries `structuredContent.error = { code, message, retryable }` (codes such as `not_found`, `conflict`, `limit_exceeded`, `rate_limited`, `unavailable`, `upstream_error`). A server bug reports `internal` with a reference, never its message.
