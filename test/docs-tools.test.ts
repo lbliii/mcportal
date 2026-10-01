@@ -185,6 +185,11 @@ test('tools: find_source offers the docs, add_portal keeps them, the portal list
 test('tools: open_docs, read_doc_page and search_docs; pages are fenced and scoped to their site', async () => {
   const c = await docsCtx();
   const opened = await call(c, 'open_docs', { docs: 'docs.example.dev' });
+  assert.equal(opened.structuredContent.provenance.source, 'docs');
+  assert.equal(opened.structuredContent.provenance.cached, false);
+  assert.ok(opened.structuredContent.provenance.fetchedAt);
+  const again = await call(c, 'open_docs', { docs: 'docs.example.dev' });
+  assert.equal(again.structuredContent.provenance.cached, true);
   assert.match(opened.content[0]!.text, /^Stripe Documentation: 1 sections, 10 pages/);
   assert.match(opened.content[0]!.text, /<untrusted-content[\s\S]*- Testing <https:\/\/docs\.stripe\.com\/testing\.md>/);
 
