@@ -58,6 +58,13 @@ Install the repo as a local plugin, which includes the `/portal` command and ski
 /plugin install mcportal@mcportal
 ```
 
+## How the server code fits together
+
+- **Tools** live in `src/tools/`, one module per area. Each `ToolDef` declares its `access` (`read`, `write` or `fetch`, for the access gate) and its budget `cost`; `test/foundations.test.ts` checks every tool does, and that `readOnlyHint` agrees. Arguments are checked against `inputSchema` before the handler runs, so keep the schema exactly as strict as the handler: if the handler trims or normalizes something, the schema shouldn't refuse it.
+- **Errors**: throw an `AppError` (`src/lib/errors.ts`) or one of its subclasses with a code from `ERROR_CODES` for anything expected. Branch on `error.code`, never on message text. In a handler, `toolFailure(error, 'Not added: ')` turns an expected error into a tool error and rethrows bugs. Anything that isn't an `AppError` is treated as a bug: logged with its stack, shown to the user only as a reference.
+- **Logs**: use the `Logger` you're given (`ctx.log` in tools, `deps.log` elsewhere), with an event name and flat fields: `log.warn('source.failed', { source, code })`. Never log tokens, profile contents, third-party text or raw user ids (`userRef()` hashes one).
+- **Layout changes** go through `src/layout.ts` (`withLayout`, `addPortalTo`, `ensurePortal`), which never move or drop the user's other portals or saved items.
+
 ## Before opening a PR
 
 - `npm test` passes, and `npm run typecheck` passes if you touched types.

@@ -21,13 +21,14 @@ agent: get_profile → update_profile → open_room
 | Piece | Where | What it does |
 |---|---|---|
 | MCP server | `src/http.ts`, `src/mcp.ts`, `src/server.ts`, `bin/mcportal.mjs` | Streamable HTTP (`/mcp`) and stdio. No runtime dependencies locally; the hosted server adds `pg` for Postgres. |
-| Tools | `src/tools.ts` | See the tool reference below |
-| Room app | `src/ui/room.html` | Columns lane and picture shelves, welcome and starter packs, add-a-source sheet, saved items, reader view and reader cards, lazy thumbnails, provenance toggle, fullscreen. Self-contained; its icon set is inline |
+| Tools | `src/tools/` | One module per area (room, sources, saved, reader, docs, clips, account, social, reading); `kit.ts` is the shared runtime and `index.ts` the registry. See the tool reference below |
+| Room app | `src/ui/room.html`, `src/ui/room/` | Columns lane and picture shelves, welcome and starter packs, add-a-source sheet, saved items, reader view and reader cards, lazy thumbnails, provenance toggle, fullscreen. Self-contained; its icon set is inline |
 | Discovery | `src/discover.ts` | Turns a site, feed URL, `r/subreddit`, `owner/repo`, YouTube/Bluesky/Mastodon profile and more into sources that load |
 | Starter packs | `src/packs.ts` | Eight interest packs of four live-checked sources each, for a new user's first room |
 | Adapters | `src/adapters/` | Hacker News, GitHub (search, releases), RSS/Atom, reader view |
 | OAuth | `src/auth/` | Authorization server + resource server per the MCP auth spec, GitHub sign-in |
 | Boundaries | `src/lib/safe-fetch.ts`, `src/lib/ip.ts` | Outbound fetches can only connect to public IPs; size, time and redirect caps |
+| Errors and logs | `src/lib/errors.ts`, `src/lib/log.ts` | Stable error codes for every expected failure; leveled, structured logs to stderr |
 | Parsing | `src/lib/html.ts` | Linear-time HTML tokenizer used by reader view and feed summaries |
 | Profile | `src/profile.ts`, `src/store.ts` | Your layout as validated JSON, one file per user |
 | Plugin | `.claude-plugin/`, `.mcp.json`, `skills/portal/`, `commands/portal.md` | Claude Code / Cowork plugin; `/portal` command and routing skill |
@@ -101,6 +102,8 @@ node bin/mcportal.mjs admin audit                  # who did what, when
 ```
 
 Check a deployment with: `MCPORTAL_URL=https://<your-domain>/mcp MCPORTAL_TOKEN=… npm run smoke`.
+
+**Logs** go to stderr, one event per line: `MCPORTAL_LOG_FORMAT=json` for a log platform, `MCPORTAL_LOG_LEVEL=debug|info|warn|error` (default `info`). Each HTTP request has an id, sent back as `x-request-id` and on every line it logs; a tool failure that is our bug says `reference <id>`, which finds its stack. Users appear only as a short hash.
 
 ## Security model
 

@@ -479,3 +479,23 @@ export class FileClipStore extends DocumentClipStore {
     await atomicWrite(this.file(userId), `${JSON.stringify({ version: 1, clips })}\n`);
   }
 }
+
+/** Table rows the model gets as text; the clip card shows them all. */
+const MODEL_TABLE_ROWS = 100;
+
+/** The clip's content as text for the model. */
+export function clipText(data: ClipData): string {
+  switch (data.kind) {
+    case 'quote': return `${data.text}${data.attribution ? `\n— ${data.attribution}` : ''}`;
+    case 'exchange': return data.turns.map((t) => `${t.speaker}: ${t.text}`).join('\n\n');
+    case 'note': return data.blocks.map((b) => (b.type === 'h' ? `## ${b.text}` : b.type === 'li' ? `- ${b.text}` : b.type === 'quote' ? `> ${b.text}` : b.type === 'pre' ? `\`\`\`\n${b.text}\n\`\`\`` : b.text)).join('\n\n');
+    case 'table': {
+      const row = (cells: string[]) => `| ${cells.map((c) => c.replace(/\|/g, '\\|')).join(' | ')} |`;
+      const lines = [row(data.columns), row(data.columns.map(() => '---')), ...data.rows.slice(0, MODEL_TABLE_ROWS).map(row)];
+      if (data.rows.length > MODEL_TABLE_ROWS) lines.push(`(${data.rows.length - MODEL_TABLE_ROWS} more rows; the clip card shows them all)`);
+      return lines.join('\n');
+    }
+    case 'image': return `[${data.mime} image, ${Math.ceil(Buffer.from(data.data, 'base64').length / 1000)} KB: shown in the clip card]`;
+    case 'link': return data.url;
+  }
+}

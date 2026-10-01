@@ -18,22 +18,25 @@ import { createFixtureFetcher } from './lib/fixture-fetch.ts';
 import { safeFetch } from './lib/safe-fetch.ts';
 import { handleMessage, RPC, rpcError, type JsonRpcResponse } from './mcp.ts';
 import { defaultDataDir, FileProfileStore, type ProfileStore } from './store.ts';
-import type { ToolContext } from './tools.ts';
+import { errorStack } from './lib/errors.ts';
+import { loggerFromEnv, requestId } from './lib/log.ts';
+import type { ToolContext } from './tools/kit.ts';
 
-const log = (message: string) => process.stderr.write(`[mcportal] ${message}\n`);
+const log = loggerFromEnv();
 
 function runStdio(ctx: ToolContext): void {
   const rl = createInterface({ input: process.stdin, crlfDelay: Infinity });
   const pending = new Set<Promise<void>>();
   rl.on('line', (line) => {
     if (!line.trim()) return;
+    const lineCtx = { ...ctx, log: log.child({ req: requestId() }) };
     const work = (async () => {
       let response: JsonRpcResponse | JsonRpcResponse[] | null;
       try {
         const payload: unknown = JSON.parse(line);
         response = Array.isArray(payload)
-          ? (await Promise.all(payload.slice(0, 20).map((m) => handleMessage(m, ctx, log)))).filter((r): r is JsonRpcResponse => r !== null)
-          : await handleMessage(payload, ctx, log);
+          ? (await Promise.all(payload.slice(0, 20).map((m) => handleMessage(m, lineCtx)))).filter((r): r is JsonRpcResponse => r !== null)
+          : await handleMessage(payload, lineCtx);
       } catch {
         response = rpcError(null, RPC.parseError, 'Parse error');
       }
@@ -46,7 +49,7 @@ function runStdio(ctx: ToolContext): void {
   rl.on('close', () => {
     void Promise.allSettled([...pending]).then(() => process.exit(0));
   });
-  log(`stdio ready (data: ${defaultDataDir()})`);
+  log.info('stdio.ready', { data: defaultDataDir() });
 }
 
 /** Postgres when DATABASE_URL is set (hosted), otherwise files in the data directory. */
@@ -57,13 +60,13 @@ async function openStorage(dataDir: string): Promise<{ store: ProfileStore; read
   const db = await connect(url);
   await ensureSchema(db);
   const imported = await importFiles(db, dataDir);
-  if (!imported.skipped) log(`imported from ${dataDir}: ${imported.profiles} profile(s)${imported.auth ? ', OAuth state' : ''}`);
+  if (!imported.skipped) log.info('storage.imported', { from: dataDir, profiles: imported.profiles, auth: imported.auth });
   return { store: new PgProfileStore(db), reading: new PgReadingStore(db), clips: new PgClipStore(db), authPersistence: pgAuthPersistence(db), accountsPersistence: pgAuthPersistence(db, 'accounts'), profilesPersistence: pgAuthPersistence(db, 'public-profiles'), social: new PgSocialStore(db), storage: 'postgres' };
 }
 
 export function main(argv = process.argv): void {
   void start(argv).catch((error) => {
-    log(`startup failed: ${(error as Error).stack ?? error}`);
+    log.error('startup.failed', { error: errorStack(error) });
     process.exitCode = 1;
   });
 }
@@ -75,11 +78,11 @@ async function start(argv: string[]): Promise<void> {
     process.exitCode = await runAdmin(argv.slice(adminAt + 1), defaultDataDir());
     return;
   }
-  process.on('unhandledRejection', (error) => log(`unhandled rejection: ${(error as Error)?.stack ?? error}`));
-  process.on('uncaughtException', (error) => log(`uncaught exception: ${error.stack ?? error}`));
+  process.on('unhandledRejection', (error) => log.error('process.unhandled_rejection', { error: errorStack(error) }));
+  process.on('uncaughtException', (error) => log.error('process.uncaught_exception', { error: errorStack(error) }));
 
   const fixtures = process.env.MCPORTAL_FIXTURES === '1';
-  if (fixtures) log('fixtures mode: serving canned data from test/fixtures (no network)');
+  if (fixtures) log.info('fixtures.on', { note: 'serving canned data from test/fixtures (no network)' });
   const dataDir = defaultDataDir();
   const fetcher = fixtures ? createFixtureFetcher() : safeFetch;
   const cache = new TtlCache();
@@ -98,7 +101,7 @@ async function start(argv: string[]): Promise<void> {
   try {
     config = configFromEnv(process.env, dataDir);
   } catch (error) {
-    log((error as Error).message);
+    log.error('config.invalid', { error: (error as Error).message });
     process.exitCode = 1;
     return;
   }
@@ -111,8 +114,8 @@ async function start(argv: string[]): Promise<void> {
   const server = createApp(config, { store, reading, clips, publicProfiles, social, fetcher, cache, log, authPersistence, storage, accounts });
   server.listen(config.port, config.host, () => {
     const mode = config.github ? `GitHub OAuth${config.allowedGithubUsers.length ? ` (allowed: ${config.allowedGithubUsers.join(', ')})` : ' (any GitHub user)'}` : config.staticToken ? 'static token' : 'no auth (loopback only)';
-    log(`http on ${config.host}:${config.port}  public URL: ${config.publicUrl}  auth: ${mode}  storage: ${storage === 'postgres' ? 'postgres' : dataDir}`);
-    if (config.allowUnauthenticated) log(`preview: ${config.publicUrl}/preview`);
+    log.info('http.ready', { host: config.host, port: config.port, publicUrl: config.publicUrl, auth: mode, storage: storage === 'postgres' ? 'postgres' : dataDir });
+    if (config.allowUnauthenticated) log.info('preview.ready', { url: `${config.publicUrl}/preview` });
   });
 }
 

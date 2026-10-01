@@ -18,6 +18,7 @@
 import { randomBytes } from 'node:crypto';
 import type { AuthPersistence } from './auth/store.ts';
 import { ClipError, cleanText, type Clip } from './clips.ts';
+import { readDocument } from './lib/document.ts';
 import { AppError, type AppErrorOptions, type ErrorCode } from './lib/errors.ts';
 import { clean } from './lib/text.ts';
 import type { PublicProfile, PublicProfiles } from './public-profiles.ts';
@@ -118,13 +119,7 @@ export class DocumentSocialStore implements SocialStore {
 
   private async load(): Promise<Doc> {
     if (this.doc) return this.doc;
-    let parsed: Partial<Doc> = {};
-    try {
-      const raw = await this.persistence?.read();
-      parsed = raw ? (JSON.parse(raw) as Partial<Doc>) : {};
-    } catch (error) {
-      process.stderr.write(`[mcportal] social document unreadable, starting empty: ${(error as Error).message}\n`);
-    }
+    const parsed: Partial<Doc> = this.persistence ? await readDocument<Doc>(this.persistence, 'social') : {};
     this.doc = { shares: parsed.shares ?? [], relations: { follows: [], mutes: [], blocks: [], ...parsed.relations }, reports: parsed.reports ?? [] };
     return this.doc;
   }

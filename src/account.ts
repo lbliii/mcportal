@@ -22,6 +22,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Accounts } from './accounts.ts';
 import { cookies, escapeHtml, page, redirect, safeEqual, sendHtml, type OAuthServer } from './auth/oauth.ts';
 import type { ClipStore } from './clips.ts';
+import type { Logger } from './lib/log.ts';
 import { boundaryOf, parseMultipart } from './lib/multipart.ts';
 import { ProfileError } from './profile.ts';
 import { buildExport, describeImport, EXPORT_FORMATS, importExport, parseExport, type ExportFile, type ExportFormat } from './portability.ts';
@@ -46,7 +47,7 @@ export interface AccountDeps {
   publicProfiles?: PublicProfiles;
   social?: Social;
   publicUrl: string;
-  log?: (message: string) => void;
+  log?: Logger;
   now?: () => number;
 }
 
@@ -189,7 +190,7 @@ export class AccountPage {
     if (!upload.file) return sendHtml(res, 400, page('No file', `<p>Pick your MCPortal export file (a .json). <a href="${back}">Go back</a>.</p>`));
     try {
       const result = await importExport(parseExport(upload.file.toString('utf8')), userId, this.deps);
-      this.deps.log?.(`import: ${result.portalsAdded} portals, ${result.savedAdded} saved, ${result.clipsAdded} clips`);
+      this.deps.log?.info('account.import', { portals: result.portalsAdded, saved: result.savedAdded, clips: result.clipsAdded });
       const lines = describeImport(result).split('\n').map((l) => `<p>${escapeHtml(l)}</p>`).join('');
       sendHtml(res, 200, page('Imported', `<h1>Imported</h1>${lines}<p>In Claude, ask <i>“open my room”</i> to see it.</p>`));
     } catch (error) {
@@ -357,7 +358,7 @@ ${uploadForm('/account/import', s.csrf)}
       for (const [k, s] of this.sessions) if (s.accountId === accountId) this.sessions.delete(k);
       for (const [k, d] of this.downloads) if (d.userId === accountId) this.downloads.delete(k);
       for (const [k, u] of this.uploads) if (u.userId === accountId) this.uploads.delete(k);
-      this.deps.log?.(`account deleted (${done.clips} clips, ${done.tokens} token records)`);
+      this.deps.log?.info('account.deleted', { clips: done.clips, tokens: done.tokens });
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'set-cookie': this.cookie('', 0), 'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'" });
       res.end(page('Account deleted', '<h1>Your account is deleted</h1><p>Your room, saved items, clips, public profile, shares and follows are gone, and you\'re signed out everywhere. Remove MCPortal from your Claude connectors too.</p>'));
       return true;

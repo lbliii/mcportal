@@ -9,7 +9,7 @@ import { createFixtureFetcher } from '../src/lib/fixture-fetch.ts';
 import { handleMessage } from '../src/mcp.ts';
 import { defaultProfile } from '../src/profile.ts';
 import { MemoryProfileStore } from '../src/store.ts';
-import type { ToolContext } from '../src/tools.ts';
+import type { ToolContext } from '../src/tools/kit.ts';
 
 const PNG_1PX = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
 const SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10"/></svg>';
@@ -113,7 +113,7 @@ test('clips are refused over the limits, with a readable reason', async () => {
   await refuse({ kind: 'quote', text: 'x'.repeat(CLIP_LIMITS.text + 1) }, /too long/);
   await refuse({ kind: 'quote' }, /needs text/);
   await refuse({ kind: 'poem', text: 'hi' }, /kind must be one of/);
-  await refuse({ kind: 'exchange', turns: Array.from({ length: CLIP_LIMITS.turns + 1 }, () => ({ speaker: 'user', text: 'hi' })) }, /at most 20 turns/);
+  await refuse({ kind: 'exchange', turns: Array.from({ length: CLIP_LIMITS.turns + 1 }, () => ({ speaker: 'user', text: 'hi' })) }, /at most 20/);
   await refuse({ kind: 'table', columns: Array.from({ length: 51 }, (_, i) => `c${i}`), rows: [] }, /at most 50 columns/);
   await refuse({ kind: 'table', columns: ['a'], rows: Array.from({ length: 501 }, () => ['x']) }, /at most 500 rows/);
   await refuse({ kind: 'table', columns: ['a'], rows: [['x'.repeat(2001)]] }, /at most 2000 characters/);

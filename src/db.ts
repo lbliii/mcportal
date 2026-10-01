@@ -16,6 +16,7 @@ import type { AuthPersistence } from './auth/store.ts';
 import type { PageQuery, Relation, Report, Share, SocialStore } from './social.ts';
 import { CLIP_LIMITS, ClipError, clampLimit, normalizeTags, patchClip, queryWords, searchTextOf, summaryOf, type Clip, type ClipPatch, type ClipQuery, type ClipStore, type ClipSummary } from './clips.ts';
 import { AppError } from './lib/errors.ts';
+import { processLogger } from './lib/log.ts';
 import { defaultProfile, validateProfile, type Profile } from './profile.ts';
 import type { ProfileStore } from './store.ts';
 
@@ -39,7 +40,7 @@ export async function connect(url: string, options: { searchPath?: string } = {}
     connectionTimeoutMillis: 10_000,
     ...(options.searchPath ? { options: `-c search_path=${options.searchPath}` } : {}),
   });
-  pool.on('error', (error) => process.stderr.write(`[mcportal] postgres pool error: ${error.message}\n`));
+  pool.on('error', (error) => processLogger().error('postgres.pool_error', { error: error.message }));
   return pool as unknown as Queryable;
 }
 

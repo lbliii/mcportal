@@ -6,7 +6,7 @@ import path from 'node:path';
 import { FileReadingStore, canonicalReadingUrl, nextReading } from '../src/reading.ts';
 import { MemoryProfileStore } from '../src/store.ts';
 import { buildExport, importExport, parseExport } from '../src/portability.ts';
-import { READING_TOOLS } from '../src/reading-tools.ts';
+import { READING_TOOLS } from '../src/tools/reading.ts';
 import { TtlCache } from '../src/lib/cache.ts';
 
 async function fixture(t: TestContext) {

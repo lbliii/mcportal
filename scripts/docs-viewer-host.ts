@@ -12,7 +12,7 @@ const ctx={store:new MemoryProfileStore(), cache:new TtlCache(),fetcher:safeFetc
 http.createServer(async(req,res)=>{
 try {
 if(req.url==='/app'){res.setHeader('content-type','text/html');res.end(await roomHtml());return;}
-if(req.url==='/rpc'){let body='';for await(const chunk of req)body+=chunk;res.setHeader('content-type','application/json');res.end(JSON.stringify(await handleMessage(JSON.parse(body),ctx,console.log)));return;}
+if(req.url==='/rpc'){let body='';for await(const chunk of req)body+=chunk;res.setHeader('content-type','application/json');res.end(JSON.stringify(await handleMessage(JSON.parse(body),ctx)));return;}
 res.setHeader('content-type','text/html');res.end(`<!doctype html><title>Docs MCP host harness</title><form><input aria-label="Docs address" size="100" value="https://github.com/fastapi/fastapi/blob/HEAD/docs/en/docs/tutorial/first-steps.md"><button>Open docs</button></form><button id="bad">Malformed result</button><iframe title="MCPortal app" src="/app" style="width:100%;height:900px;border:0"></iframe><script>
 const frame=document.querySelector('iframe');let ready=false;let queued=null;
 const send=(method,params)=>frame.contentWindow.postMessage({jsonrpc:'2.0',method,params},'*');

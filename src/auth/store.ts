@@ -10,6 +10,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { readDocument, type DocumentPersistence } from '../lib/document.ts';
 import { atomicWrite, KeyedMutex } from '../store.ts';
 
 export const ACCESS_TTL_SECONDS = 3600;
@@ -52,11 +53,8 @@ interface Data {
   tokens: Record<string, TokenRecord>;
 }
 
-/** Where the OAuth document lives. `read` returns undefined when nothing is stored yet. */
-export interface AuthPersistence {
-  read(): Promise<string | undefined>;
-  write(json: string): Promise<void>;
-}
+/** Where a JSON document lives (OAuth state, and the accounts, profiles and social documents). */
+export type AuthPersistence = DocumentPersistence;
 
 export function fileAuthPersistence(dataDir: string, name = 'auth.json'): AuthPersistence {
   const file = path.join(dataDir, name);
@@ -95,14 +93,8 @@ export class AuthStore {
 
   private async load(): Promise<Data> {
     if (this.data) return this.data;
-    try {
-      const raw = await this.persistence.read();
-      const parsed = (raw ? JSON.parse(raw) : {}) as Partial<Data>;
-      this.data = { clients: parsed.clients ?? {}, tokens: parsed.tokens ?? {} };
-    } catch (error) {
-      process.stderr.write(`[mcportal] auth store unreadable, starting empty: ${(error as Error).message}\n`);
-      this.data = { clients: {}, tokens: {} };
-    }
+    const parsed = await readDocument<Data>(this.persistence, 'OAuth');
+    this.data = { clients: parsed.clients ?? {}, tokens: parsed.tokens ?? {} };
     return this.data;
   }
 

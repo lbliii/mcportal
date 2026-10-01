@@ -4,7 +4,7 @@
  */
 import {createServer} from 'node:http';
 import {readFile} from 'node:fs/promises';
-import {roomHtml,handleMessage,scriptJson} from '../src/mcp.ts';
+import {roomHtml,handleMessage} from '../src/mcp.ts';
 import {MemoryProfileStore} from '../src/store.ts';
 import {defaultProfile} from '../src/profile.ts';
 import {createFixtureFetcher} from '../src/lib/fixture-fetch.ts';

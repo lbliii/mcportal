@@ -21,6 +21,9 @@
  */
 import { randomBytes } from 'node:crypto';
 import type { AuthPersistence } from './auth/store.ts';
+import { memoryPersistence, readDocument } from './lib/document.ts';
+import { errorMessage } from './lib/errors.ts';
+import { processLogger } from './lib/log.ts';
 import { clean } from './lib/text.ts';
 
 export type AccountStatus = 'active' | 'suspended';
@@ -103,10 +106,7 @@ export function bootstrapFromEnv(env: NodeJS.ProcessEnv, allowOverride?: string[
 }
 
 /** In-memory persistence, for tests and for OAuth setups without an accounts store. */
-export function memoryPersistence(): AuthPersistence {
-  let value: string | undefined;
-  return { read: async () => value, write: async (json) => { value = json; } };
-}
+export { memoryPersistence };
 
 export function accountIdFor(githubId: number): string {
   return `github-${githubId}`;
@@ -129,12 +129,17 @@ export class Accounts {
   /** Load (or reload, if stale) from persistence. Call before the sync checks are trusted. */
   async load(force = false): Promise<void> {
     if (!force && this.doc && this.now() - this.loadedAt < RELOAD_MS) return;
-    const raw = await this.persistence.read().catch(() => undefined);
-    let parsed: Partial<Doc> = {};
+    let parsed: Partial<Doc>;
     try {
-      parsed = raw ? (JSON.parse(raw) as Partial<Doc>) : {};
-    } catch {
-      process.stderr.write('[mcportal] accounts document unreadable; starting from bootstrap config only\n');
+      parsed = await readDocument<Doc>(this.persistence, 'accounts');
+    } catch (error) {
+      // A periodic reload keeps what it had; a write (force) must see the stored document or not happen.
+      if (!force && this.doc) {
+        processLogger().warn('accounts.reload_failed', { error: errorMessage(error) });
+        this.loadedAt = this.now();
+        return;
+      }
+      throw error;
     }
     this.doc = { accounts: parsed.accounts ?? {}, identities: parsed.identities ?? {}, invites: parsed.invites ?? {}, audit: parsed.audit ?? [] };
     this.loadedAt = this.now();

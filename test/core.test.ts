@@ -14,12 +14,13 @@ import { handleMessage, MCP_APP_MIME, roomHtml, scriptJson, SERVER_INFO, UI_INCL
 import { buildBrand } from '../scripts/brand.ts';
 import { defaultProfile, ProfileError, validateProfile } from '../src/profile.ts';
 import { FileProfileStore, MemoryProfileStore } from '../src/store.ts';
-import { ROOM_URI, type ToolContext } from '../src/tools.ts';
+import { ROOM_URI, type ToolContext } from '../src/tools/kit.ts';
 import { pageFeeds, recipesFor } from '../src/discover.ts';
 import { parseFeed } from '../src/adapters/rss.ts';
 import { STARTER_PACKS } from '../src/packs.ts';
 import { buildOpml, parseOpml } from '../src/opml.ts';
-import { toolCost, UsageBudget } from '../src/lib/budget.ts';
+import { UsageBudget } from '../src/lib/budget.ts';
+import { toolCost } from '../src/tools/index.ts';
 import type { Fetcher } from '../src/types.ts';
 
 /** A user who has already set up their portal (the sample layout). Use newUser() for onboarding. */
@@ -73,7 +74,7 @@ test('notifications get no response; unknown methods get -32601', async () => {
 test('tools/list links open_room to the UI and hides app-only tools from the model', async () => {
   const res = await rpc(ctx(), 'tools/list');
   const tools = (res.result as any).tools as any[];
-  assert.deepEqual(tools.map((t) => t.name), ['open_room', 'build_room', 'get_profile', 'update_profile', 'read_source', 'refresh_portal', 'read_article', 'get_thumbnails', 'import_opml', 'export_opml', 'find_source', 'add_portal', 'pin_portal', 'save_item', 'remove_saved', 'list_sources', 'open_docs', 'read_doc_page', 'search_docs', 'clip', 'search_clips', 'get_clip', 'update_clip', 'delete_clip', 'get_public_profile', 'set_public_profile', 'remove_public_profile', 'export_data', 'import_portal', 'account_settings', 'open_space', 'share', 'unshare', 'get_share', 'list_shares', 'relationship', 'list_connections', 'report', 'record_reading', 'get_reading', 'list_reading']);
+  assert.deepEqual(tools.map((t) => t.name), ['open_room', 'build_room', 'get_profile', 'update_profile', 'refresh_portal', 'read_source', 'find_source', 'add_portal', 'list_sources', 'import_opml', 'export_opml', 'read_article', 'get_thumbnails', 'save_item', 'remove_saved', 'pin_portal', 'open_docs', 'read_doc_page', 'search_docs', 'clip', 'search_clips', 'get_clip', 'update_clip', 'delete_clip', 'get_public_profile', 'set_public_profile', 'remove_public_profile', 'export_data', 'import_portal', 'account_settings', 'open_space', 'share', 'unshare', 'get_share', 'list_shares', 'relationship', 'list_connections', 'report', 'record_reading', 'get_reading', 'list_reading']);
   assert.equal(tools.find((t) => t.name === 'open_room')._meta.ui.resourceUri, ROOM_URI);
   assert.deepEqual(tools.find((t) => t.name === 'refresh_portal')._meta.ui.visibility, ['app']);
   assert.equal(tools.find((t) => t.name === 'read_article')._meta.ui.resourceUri, ROOM_URI, 'reader renders as its own card');
@@ -385,10 +386,10 @@ test('get_thumbnails: oversized WordPress uploads go through Photon; timeouts ar
   const fetcher: Fetcher = async (target, options = {}) => {
     calls.push(target);
     const u = new URL(target);
-    if (u.hostname === 'www.thisiscolossal.com') throw new BoundaryError(`Response exceeded ${options.maxBytes} bytes`);   // ignores ?w=
+    if (u.hostname === 'www.thisiscolossal.com') throw new BoundaryError(`Response exceeded ${options.maxBytes} bytes`, 'fetch_too_large');   // ignores ?w=
     if (u.hostname === 'i0.wp.com') return { status: 200, url: target, contentType: 'image/png', text: png.toString('base64'), truncated: false };
     if (u.hostname === 'slow.example.org') {
-      if (down) throw new BoundaryError('Timed out fetching slow.example.org');
+      if (down) throw new BoundaryError('Timed out fetching slow.example.org', 'fetch_timeout');
       return { status: 200, url: target, contentType: 'image/png', text: png.toString('base64'), truncated: false };
     }
     return { status: 404, url: target, contentType: 'text/plain', text: '', truncated: false };

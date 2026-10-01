@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { authorize, localActor, toolAction } from '../src/access.ts';
+import { authorize, localActor } from '../src/access.ts';
+import { toolAction } from '../src/tools/index.ts';
 import { Accounts, makeBootstrap, memoryPersistence } from '../src/accounts.ts';
 import { TtlCache } from '../src/lib/cache.ts';
 import { createFixtureFetcher } from '../src/lib/fixture-fetch.ts';

@@ -8,21 +8,17 @@
 import {
   DocsError, docsInputUrl, fetchDocPage, inDocsScope, loadDocs, originalUrl, parseGithubDocs, searchDocs, githubRawUrl,
   type DocPage, type DocPageRef, type DocsConfig, type DocSection, type DocSite,
-} from './adapters/docs.ts';
-import { blocksToText } from './lib/markdown.ts';
-import { clean } from './lib/text.ts';
-import { findPortal, LIMITS, normalizeSourceConfig } from './profile.ts';
-import { FRESHNESS, loadDocSite } from './sources.ts';
-import { toolError, untrusted, ROOM_URI, type CallToolResult, type ToolContext, type ToolDef } from './tools.ts';
-import type { ArticleBlock, Provenance } from './types.ts';
+} from '../adapters/docs.ts';
+import { blocksToText } from '../lib/markdown.ts';
+import { clean } from '../lib/text.ts';
+import { findPortal, LIMITS, normalizeSourceConfig } from '../profile.ts';
+import { FRESHNESS, loadDocSite } from '../sources.ts';
+import { ok, toolError, toolFailure, untrusted, ROOM_URI, type ToolContext, type ToolDef } from './kit.ts';
+import type { ArticleBlock, Provenance } from '../types.ts';
 
 /** How much of a page the model gets as text; the app gets every block. */
 const MODEL_CHARS = 30_000;
 const OUTLINE_LINES = 250;
-
-function ok(text: string, structuredContent: Record<string, unknown>): CallToolResult {
-  return { content: [{ type: 'text', text }], structuredContent };
-}
 
 const siteArgs = {
   docs: { type: 'string', description: 'The docs: a docs site address ("docs.stripe.com", "nextjs.org/docs"), a GitHub repo ("owner/repo") or a link to a docs folder in one' },
@@ -89,12 +85,14 @@ function outlineText(site: DocSite): string {
   return lines.join('\n');
 }
 
-const failed = (what: string, error: unknown) => toolError(`${what}: ${clean((error as Error).message, 200)}`);
+const failed = (what: string, error: unknown) => toolFailure(error, `${what}: `);
 
 export const DOCS_TOOLS: ToolDef[] = [
   {
     name: 'open_docs',
     title: 'Open a docs site',
+    access: 'fetch',
+    cost: 2,
     description: [
       'Open a documentation site in the docs viewer (contents, search, the page, on-this-page), shown as its own card. Also returns the table of contents: its sections and pages, with links. Works with docs sites (via their llms.txt, Sphinx inventory or sitemap)',
       'and with GitHub repos whose docs are markdown ("owner/repo", or a link to a docs folder or file). For a nested docs index (a page marked as one), pass its URL.',
@@ -128,6 +126,8 @@ export const DOCS_TOOLS: ToolDef[] = [
   {
     name: 'read_doc_page',
     title: 'Read a docs page',
+    access: 'fetch',
+    cost: 2,
     description: [
       'Read one page of a docs site as clean text: headings, code, tables and callouts. Pass the page url (from open_docs, search_docs or a docs portal) and the docs it belongs to',
       '(docs or portalId). Only pages of that site can be read. Also returns the section and the previous and next pages.',
@@ -144,7 +144,7 @@ export const DOCS_TOOLS: ToolDef[] = [
       const url = clean(args.url, 2000).replace(/#.*$/, '');
       try {
         const { site } = await siteFor(args, ctx);
-        if (!inDocsScope(site, url)) return toolError(`${clean(url, 200)} isn't part of ${site.title}. Use read_article for other pages.`);
+        if (!inDocsScope(site, url)) return toolError(`${clean(url, 200)} isn't part of ${site.title}. Use read_article for other pages.`, 'invalid_argument');
         const where = position(site, url);
         const load = async () => where.ref?.index ? indexPage(await loadDocs({ kind: 'llms', url }, ctx.fetcher), url) : fetchDocPage(url, ctx.fetcher, where.ref ? { title: where.ref.title } : {});
         const result = await ctx.cache.get(`docpage:${url}`, FRESHNESS.reader, load);
@@ -170,6 +170,7 @@ export const DOCS_TOOLS: ToolDef[] = [
   {
     name: 'search_docs',
     title: 'Search a docs site',
+    access: 'fetch',
     description: [
       'Find pages in a docs site by title, description and section, and on Sphinx sites (Python, Django, NumPy…) functions and classes by name ("str.split").',
       'Pass the docs (docs or portalId) and a query; results link to pages to read with read_doc_page. Searches titles, not full page text.',

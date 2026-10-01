@@ -12,6 +12,7 @@
  * it moves to tables when sharing needs joins. One server instance.
  */
 import type { AuthPersistence } from './auth/store.ts';
+import { readDocument } from './lib/document.ts';
 import { AppError, type AppErrorOptions, type ErrorCode } from './lib/errors.ts';
 import { clean } from './lib/text.ts';
 import { normalizeSourceConfig, ProfileError } from './profile.ts';
@@ -128,14 +129,8 @@ export class PublicProfiles {
 
   private async load(): Promise<Doc> {
     if (this.doc) return this.doc;
-    try {
-      const raw = await this.persistence.read();
-      const parsed = (raw ? JSON.parse(raw) : {}) as Partial<Doc>;
-      this.doc = { profiles: parsed.profiles ?? {}, held: parsed.held ?? {} };
-    } catch (error) {
-      process.stderr.write(`[mcportal] public profiles unreadable, starting empty: ${(error as Error).message}\n`);
-      this.doc = { profiles: {}, held: {} };
-    }
+    const parsed = await readDocument<Doc>(this.persistence, 'public profiles');
+    this.doc = { profiles: parsed.profiles ?? {}, held: parsed.held ?? {} };
     return this.doc;
   }
 

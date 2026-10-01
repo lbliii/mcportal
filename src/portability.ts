@@ -11,15 +11,14 @@
  * that aren't already kept. Everything in an import is untrusted and re-validated.
  */
 import { gzipSync } from 'node:zlib';
-import { buildClip, ClipError, CLIP_KINDS, type Clip, type ClipStore } from './clips.ts';
-import { clipText } from './clip-tools.ts';
+import { buildClip, ClipError, CLIP_KINDS, clipText, type Clip, type ClipStore } from './clips.ts';
 import { buildOpml } from './opml.ts';
 import { LIMITS, normalizePinnedItems, normalizeSaved, ProfileError, validateProfile, type PortalSpec, type Profile } from './profile.ts';
 import type { PublicProfile } from './public-profiles.ts';
 import type { SharedItem, Social } from './social.ts';
 import type { ReadingStore, ReadingState } from './reading.ts';
 import type { ProfileStore } from './store.ts';
-import { addPortalTo } from './tools.ts';
+import { addPortalTo } from './layout.ts';
 import type { ArticleBlock } from './types.ts';
 
 export const EXPORT_FORMATS = ['mcportal', 'bookmarks', 'clips', 'opml'] as const;

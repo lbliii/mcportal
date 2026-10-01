@@ -5,17 +5,17 @@
  */
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { authorize, localActor, toolAction } from './access.ts';
-import { budgetMessage, toolCost } from './lib/budget.ts';
+import { authorize, localActor } from './access.ts';
 import { SERVER_ICONS } from './brand-icons.ts';
-import { READING_TOOLS } from './reading-tools.ts';
-import { ACCOUNT_TOOLS } from './account-tools.ts';
-import { CLIP_TOOLS } from './clip-tools.ts';
-import { DOCS_TOOLS } from './docs-tools.ts';
-import { SOCIAL_TOOLS } from './social-tools.ts';
-import { publicToolList, toolError, TOOLS as PORTAL_TOOLS, ROOM_URI, type ToolContext } from './tools.ts';
+import { budgetMessage } from './lib/budget.ts';
+import { errorStack, isAppError } from './lib/errors.ts';
+import { requestId, silentLogger, userRef } from './lib/log.ts';
+import { schemaProblem } from './lib/schema.ts';
+import { clean } from './lib/text.ts';
+import { findTool, toolAction, toolCost, TOOLS } from './tools/index.ts';
+import { publicToolList, toolError, ROOM_URI, type CallToolResult, type ToolContext } from './tools/kit.ts';
 
-export const TOOLS = [...PORTAL_TOOLS, ...DOCS_TOOLS, ...CLIP_TOOLS, ...ACCOUNT_TOOLS, ...SOCIAL_TOOLS, ...READING_TOOLS];
+export { TOOLS };
 
 export const SERVER_INFO = { name: 'mcportal', title: 'MCPortal', version: '0.3.0' };
 export const SUPPORTED_PROTOCOL_VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05'];
@@ -89,10 +89,50 @@ export function rpcError(id: JsonRpcRequest['id'], code: number, message: string
   return { jsonrpc: '2.0', id: id ?? null, error: { code, message } };
 }
 
-export type Log = (message: string) => void;
+/**
+ * One tools/call: find the tool, check its arguments against its inputSchema, ask the
+ * access gate, charge the budget, run it. Expected failures come back as coded tool
+ * errors; anything else is a bug, logged with its stack and reported with a reference.
+ */
+async function callTool(params: Record<string, unknown>, ctx: ToolContext): Promise<CallToolResult | undefined> {
+  const name = String(params.name ?? '');
+  const tool = findTool(name);
+  if (!tool) return undefined;
+  const log = (ctx.log ?? silentLogger).child({ tool: name, user: userRef(ctx.userId) });
+  const started = Date.now();
+  const done = (result: CallToolResult, outcome: string): CallToolResult => {
+    const error = result.structuredContent?.error as { code?: string } | undefined;
+    log.info('tool.call', { outcome, code: result.isError ? error?.code : undefined, ms: Date.now() - started });
+    return result;
+  };
+
+  const args = params.arguments ?? {};
+  const problem = schemaProblem(tool.inputSchema, args);
+  if (problem) return done(toolError(`${name} wasn't called: ${problem}.`, 'invalid_argument'), 'invalid');
+  const input = args as Record<string, unknown>;
+
+  // The one gate: every tool acts on the caller's own room.
+  const decision = authorize(ctx.actor ?? localActor(ctx.userId), toolAction(name), { ownerId: ctx.userId });
+  if (!decision.ok) return done(toolError(decision.reason, 'forbidden'), 'denied');
+  if (ctx.budget) {
+    const verdict = ctx.budget.take(ctx.userId, toolCost(name, input));
+    if (!verdict.ok) {
+      return done(toolError(budgetMessage(verdict), 'rate_limited', { scope: verdict.scope, retryAfterSeconds: verdict.retryAfterSeconds }), 'limited');
+    }
+  }
+  try {
+    const result = await tool.handler(input, { ...ctx, log });
+    return done(result, result.isError ? 'error' : 'ok');
+  } catch (error) {
+    if (isAppError(error) && error.code !== 'internal') return done(toolError(clean(error.message, 500), error.code, error.details), 'error');
+    const ref = requestId();
+    log.error('tool.crashed', { ref, error: errorStack(error) });
+    return done(toolError(`${name} failed: something went wrong on our side (reference ${ref}).`, 'internal', { ref }), 'crashed');
+  }
+}
 
 /** Handle one JSON-RPC message. Returns null for notifications. */
-export async function handleMessage(message: unknown, ctx: ToolContext, log: Log = () => {}): Promise<JsonRpcResponse | null> {
+export async function handleMessage(message: unknown, ctx: ToolContext): Promise<JsonRpcResponse | null> {
   if (typeof message !== 'object' || message === null || (message as JsonRpcRequest).jsonrpc !== '2.0') {
     return rpcError(null, RPC.invalidRequest, 'Invalid JSON-RPC message');
   }
@@ -125,32 +165,8 @@ export async function handleMessage(message: unknown, ctx: ToolContext, log: Log
     case 'tools/list':
       return reply(req.id, { tools: publicToolList(TOOLS) });
     case 'tools/call': {
-      const name = String(params.name ?? '');
-      const tool = TOOLS.find((t) => t.name === name);
-      if (!tool) return rpcError(req.id, RPC.invalidParams, `Unknown tool: ${name}`);
-      const args = (params.arguments as Record<string, unknown> | undefined) ?? {};
-      // The one gate: every tool acts on the caller's own room.
-      const decision = authorize(ctx.actor ?? localActor(ctx.userId), toolAction(name), { ownerId: ctx.userId });
-      if (!decision.ok) {
-        log(`tools/call ${name} denied: ${decision.reason}`);
-        return reply(req.id, toolError(decision.reason));
-      }
-      if (ctx.budget) {
-        const verdict = ctx.budget.take(ctx.userId, toolCost(name, args));
-        if (!verdict.ok) {
-          log(`tools/call ${name} limited (${verdict.scope}, retry in ${verdict.retryAfterSeconds}s)`);
-          return reply(req.id, toolError(budgetMessage(verdict)));
-        }
-      }
-      const started = Date.now();
-      try {
-        const result = await tool.handler(args, ctx);
-        log(`tools/call ${name} ${result.isError ? 'error' : 'ok'} ${Date.now() - started}ms`);
-        return reply(req.id, result);
-      } catch (error) {
-        log(`tools/call ${name} threw: ${(error as Error).stack ?? error}`);
-        return reply(req.id, toolError(`${name} failed: ${(error as Error).message}`));
-      }
+      const result = await callTool(params, ctx);
+      return result ? reply(req.id, result) : rpcError(req.id, RPC.invalidParams, `Unknown tool: ${clean(params.name, 80)}`);
     }
     case 'resources/list':
       return reply(req.id, {

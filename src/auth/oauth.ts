@@ -21,6 +21,8 @@ import { DESIGN_CSS, PRIMITIVES_CSS } from '../design/generated.ts';
  */
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { errorStack } from '../lib/errors.ts';
+import { processLogger } from '../lib/log.ts';
 import { fetchJson } from '../lib/safe-fetch.ts';
 import { clean } from '../lib/text.ts';
 import type { Fetcher } from '../types.ts';
@@ -365,7 +367,7 @@ export class OAuthServer {
       return true;
     } catch (error) {
       const e = error instanceof OAuthError ? error : new OAuthError('server_error', 'Unexpected error', 500);
-      if (!(error instanceof OAuthError)) process.stderr.write(`[mcportal] oauth error: ${(error as Error).stack ?? error}\n`);
+      if (!(error instanceof OAuthError)) processLogger().error('oauth.crashed', { route, error: errorStack(error) });
       if (route === '/oauth/authorize' || route === '/oauth/callback') {
         sendHtml(res, e.status, page('Sign-in problem', `<h1>Sign-in problem</h1><p>${escapeHtml(e.message)}</p>`));
       } else {

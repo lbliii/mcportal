@@ -8,6 +8,7 @@ import path from 'node:path';
 import { createApp, type AppConfig, type AppDeps } from '../src/http.ts';
 import { TtlCache } from '../src/lib/cache.ts';
 import { createFixtureFetcher } from '../src/lib/fixture-fetch.ts';
+import { silentLogger } from '../src/lib/log.ts';
 import { MemoryProfileStore } from '../src/store.ts';
 import type { Fetcher } from '../src/types.ts';
 
@@ -33,7 +34,7 @@ export async function startApp(overrides: Partial<AppConfig> = {}, fetcher: Fetc
     ...overrides,
     dataDir,
   };
-  const server = createApp(config, { store: new MemoryProfileStore(), fetcher, cache: new TtlCache(), log: () => {}, ...deps });
+  const server = createApp(config, { store: new MemoryProfileStore(), fetcher, cache: new TtlCache(), log: silentLogger, ...deps });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const port = (server.address() as AddressInfo).port;
   return { base: `http://127.0.0.1:${port}`, port, server, close: () => new Promise((r) => server.close(() => r())) };
