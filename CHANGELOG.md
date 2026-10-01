@@ -2,9 +2,15 @@
 
 ## Unreleased
 
+### Design system
+- **Shared tokens:** versioned, typed authoring source generates CSS, browser palettes and TypeScript exports for the room, reading/social cards, public site, account, OAuth and admin.
+- **Validated themes:** an exact host adapter repairs unreadable colour pairs, clears stale colours on theme changes, supports partial/reset inputs and follows system preferences until the host selects a scheme. Functional contrast no longer depends on native `contrast-color()`.
+- **Consistent controls:** visible save actions, separate card-opening and metadata controls, shared focus/selection/target sizes, container-aware layouts and user text sizing. Brand artwork and images keep their colours.
+- **Regression workflow:** generation drift and contrast/lifecycle tests plus a reusable fixture MCP Apps host with an 80-case browser matrix. See [the guide](docs/design-system.md).
+
 ### Host themes
 - **Visible on every host backing:** inline welcome tiles and room content paint their own theme-matched background, fixing dark text disappearing over a black iframe until hover.
-- **Adaptive contrast:** browsers with CSS `contrast-color()` derive text, muted text, borders and hover colours when host tokens are absent. Explicit host palettes still apply, with light/dark fallbacks, increased-contrast and forced-colour support. Host tokens cannot overwrite internal room palette or layout variables.
+- **Adaptive contrast:** a shared luminance resolver derives readable text, muted text, borders and surface colours when host tokens are absent or inconsistent, with light/dark fallbacks, increased-contrast and forced-colour support. Host tokens cannot overwrite internal room palette or layout variables.
 
 ### Vocabulary
 - **Room and portals:** your whole setup is now your **room**, and each window onto a source is a **portal** (it was called a panel). The app, tool descriptions, server instructions, skill, web pages and README use the new words. "Open my portal" still opens the room. See the glossary and rename plan in [docs/product-map.md](docs/product-map.md).

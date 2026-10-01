@@ -1,3 +1,4 @@
+import { DESIGN_CSS, PRIMITIVES_CSS } from './design/generated.ts';
 /**
  * The admin page (identity plan, phase 2): invites, suspensions and the audit
  * log in a browser. Deliberately not MCP: nothing a model reads can reach it.
@@ -187,7 +188,7 @@ export class AdminPanel {
         return true;
       }
       const nonce = randomBytes(16).toString('base64');
-      const html = (await readFile(ADMIN_HTML, 'utf8')).replaceAll('__NONCE__', nonce);
+      const html = (await readFile(ADMIN_HTML, 'utf8')).replace('/*MCPORTAL_DESIGN*/', DESIGN_CSS + PRIMITIVES_CSS).replaceAll('__NONCE__', nonce);
       sendHtml(res, 200, html, {
         'content-security-policy': `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; form-action 'self'; frame-ancestors 'none'; base-uri 'none'`,
       });

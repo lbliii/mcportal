@@ -185,7 +185,7 @@ const portalArt = (() => {
   function draw(style, itemKey) {
     const { ink: [p, a, b, c, accent], motif } = parts(style);
     const body = MOTIFS[motif](random(hash(`${style}\n${itemKey}`)));
-    return `<svg xmlns="http://www.w3.org/2000/svg" class="art" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false" style="--ink-p:${p};--ink-a:${a};--ink-b:${b};--ink-c:${c};--ink-x:${accent}">${body}</svg>`;
+    return `<svg xmlns="http://www.w3.org/2000/svg" class="art" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false" style="--mp-art-ink-p:${p};--mp-art-ink-a:${a};--mp-art-ink-b:${b};--mp-art-ink-c:${c};--mp-art-ink-x:${accent}">${body}</svg>`;
   }
 
   /** A style's lead ink (its set's first ink after paper): the source's colour in the room. */

@@ -1,3 +1,4 @@
+import { DESIGN_CSS, PRIMITIVES_CSS } from '../design/generated.ts';
 /**
  * OAuth 2.1 for the hosted MCP server, following the MCP authorization spec:
  *
@@ -84,9 +85,12 @@ export function escapeHtml(value: string): string {
 
 export function page(title: string, body: string): string {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)}</title>
-<style>body{font:15px/1.5 system-ui,-apple-system,sans-serif;max-width:460px;margin:12vh auto;padding:0 20px;color:#1b1b1a}h1{font-size:20px}
-.card{border:1px solid #e3e3de;border-radius:12px;padding:20px 22px}.muted{color:#6a6a66;font-size:13px}code{background:#f3f3ef;padding:1px 5px;border-radius:4px;word-break:break-all}
-button{font:inherit;padding:8px 16px;border-radius:8px;border:1px solid #d4d4ce;background:#fff;cursor:pointer;margin-right:8px}button.primary{background:#1f4fd8;color:#fff;border-color:#1f4fd8}</style>
+<style>${DESIGN_CSS}
+body{font:var(--mp-type-15)/var(--mp-line-body) var(--mp-font-ui);max-width:460px;margin:12vh auto;padding:0 var(--mp-space-20);background:var(--mp-surface-canvas);color:var(--mp-text-primary)}h1{font-size:var(--mp-type-20)}
+.card{border:1px solid var(--mp-border-divider);border-radius:var(--mp-radius-lg);padding:var(--mp-space-20)}.muted{color:var(--mp-text-secondary);font-size:var(--mp-type-13)}code{background:var(--mp-surface-inset);padding:1px 5px;border-radius:var(--mp-radius-xs);word-break:break-all}
+button{font:inherit;padding:var(--mp-space-8) var(--mp-space-16);border-radius:var(--mp-radius-control);border:1px solid var(--mp-border-control);background:var(--mp-surface-input);cursor:pointer;margin-right:var(--mp-space-8)}button.primary{background:var(--mp-action-primary);color:var(--mp-action-on-primary);border-color:var(--mp-action-primary)}
+button.danger{background:var(--mp-action-danger);color:var(--mp-action-on-danger);border-color:var(--mp-action-danger)}
+${PRIMITIVES_CSS}</style>
 </head><body><div class="card">${body}</div></body></html>`;
 }
 

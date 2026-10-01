@@ -133,6 +133,7 @@ How MCPortal is part of the agent, not only something displayed next to it.
 | Feature set | Features | Status |
 |---|---|---|
 | **Brand** | Portal mark, line mark, badge, Jost Bold wordmark, lockups, app icon, social card; "Your liminal webspace." | ✅ |
+| **Design system** | Shared primitive/semantic/component tokens, validated host palettes, adaptive contrast, accessible states, and reusable browser fixtures ([guide](design-system.md), [plan](plans/design-system.md)) | ✅ |
 | **Web pages** | Landing `/`, `/privacy`, `/support`, `/account`, `/admin`, OAuth consent, `/preview` (dev) | ✅ |
 | **Distribution** | Claude connector directory; Show HN | 🗺 |
 

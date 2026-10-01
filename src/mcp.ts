@@ -32,7 +32,7 @@ const INSTRUCTIONS = [
 
 const UI_DIR = new URL('./ui/', import.meta.url);
 /** Files inlined into the room where it says <!--include:name--> or /*include:name*\/, so the page stays self-contained. */
-const UI_INCLUDES = ['art.js', 'brand/icons.js', 'brand/mark-line.svg', 'brand/badge.svg', 'brand/wordmark.svg'];
+const UI_INCLUDES = ['design/tokens.css', 'design/primitives.css', 'design/palettes.js', 'design/theme.js', 'art.js', 'brand/icons.js', 'brand/mark-line.svg', 'brand/badge.svg', 'brand/wordmark.svg'];
 
 /** JSON that is safe to embed inside a <script> element. */
 export function scriptJson(value: unknown): string {

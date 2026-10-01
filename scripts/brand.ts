@@ -21,12 +21,13 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { BRAND } from '../src/design/generated.ts';
 import opentype, { type Font, type Path } from 'opentype.js';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 
 /** The house ink set ("atomic", also the first set in src/ui/art.js). */
-export const INK = { paper: '#F2E6CF', teal: '#2A8C82', mustard: '#E0A526', ink: '#1F2A36', brick: '#C4452C' };
+export const INK = BRAND;
 
 const r2 = (v: number) => Number(v.toFixed(2)).toString();
 

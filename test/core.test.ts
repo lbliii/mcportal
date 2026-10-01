@@ -410,7 +410,7 @@ test('fallback art: distinct styles per source, varied placement per item, inlin
   assert.deepEqual([...new Set(Array.from({ length: 40 }, (_, i) => art.motifOf(i)))].sort(), ['arches', 'doorway', 'gravity', 'orbits', 'portal']);
   // A source's colour in the room is its art's lead ink, so the first eight sources get eight colours.
   assert.equal(new Set(styles.slice(0, 8).map(art.leadOf)).size, 8);
-  assert.ok(styles.every((st) => /^#[0-9A-F]{6}$/.test(art.leadOf(st)) && art.draw(st, 'x').includes(`--ink-a:${art.leadOf(st)}`)), 'the lead ink is the one the art prints with');
+  assert.ok(styles.every((st) => /^#[0-9A-F]{6}$/.test(art.leadOf(st)) && art.draw(st, 'x').includes(`--mp-art-ink-a:${art.leadOf(st)}`)), 'the lead ink is the one the art prints with');
 
   // Drawing: deterministic, and neighbouring items land in visibly different places.
   const style = Array.from({ length: 40 }, (_, i) => i).find((i) => art.motifOf(i) === 'arches')!;

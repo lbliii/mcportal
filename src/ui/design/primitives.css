@@ -1,0 +1,42 @@
+/* Shared functional controls. Surface-specific layout belongs with the surface. */
+:root { container-type: inline-size; }
+*, *::before, *::after { box-sizing: border-box; }
+html, body { background: var(--mp-surface-canvas); color: var(--mp-text-primary); }
+body { font-family: var(--mp-font-ui); line-height: var(--mp-line-ui); }
+button, input, textarea, select { font: inherit; color: inherit; }
+button, [role="button"], summary, input, select { min-height: var(--mp-control-minimum); }
+button, [role="button"] { min-width: var(--mp-control-minimum); }
+button, input, textarea, select { border-color: var(--mp-border-control); }
+input, textarea, select { background: var(--mp-surface-input); color: var(--mp-text-primary); }
+input::placeholder, textarea::placeholder { color: var(--mp-text-placeholder); opacity: 1; }
+button { cursor: pointer; }
+button:disabled { cursor: default; }
+a { color: var(--mp-text-link); }
+:is(button, a, input, textarea, select, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--mp-focus-ring) !important;
+  outline-offset: 2px !important;
+}
+button:active:not(:disabled), [role="button"]:active { background: var(--mp-surface-pressed); }
+button.primary:is(:hover, :active), .btn.primary:is(:hover, :active), .btn.follow:is(:hover, :active) { background: var(--mp-action-primary); color: var(--mp-action-on-primary); filter: none; }
+button.danger:is(:hover, :active) { background: var(--mp-action-danger); color: var(--mp-action-on-danger); }
+[aria-busy="true"] { cursor: progress; }
+@media (pointer: coarse) {
+  :root { --mp-control-height: var(--mp-control-touch); --mp-control-minimum: var(--mp-control-touch); }
+}
+@media (prefers-contrast: more) {
+  :root { --mp-text-secondary: var(--mp-text-primary) !important; --mp-text-placeholder: var(--mp-text-primary) !important; --mp-border-control: var(--mp-text-primary) !important; }
+}
+@media (forced-colors: active) {
+  :root {
+    --mp-surface-canvas: Canvas !important; --mp-surface-card: Canvas !important; --mp-surface-inset: Canvas !important;
+    --mp-surface-raised: Canvas !important; --mp-surface-input: Canvas !important; --mp-surface-hover: Canvas !important;
+    --mp-surface-selected: Canvas !important; --mp-surface-pressed: Canvas !important;
+    --mp-text-primary: CanvasText !important; --mp-text-secondary: CanvasText !important; --mp-text-placeholder: CanvasText !important;
+    --mp-text-link: LinkText !important; --mp-border-control: ButtonText !important; --mp-border-divider: CanvasText !important;
+    --mp-action-primary: ButtonText !important; --mp-action-on-primary: ButtonFace !important; --mp-focus-ring: Highlight !important;
+  }
+  [aria-pressed="true"], .current { outline: 2px solid Highlight; outline-offset: -3px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0s !important; animation-duration: 0s !important; }
+}
