@@ -6,6 +6,7 @@ import { clean } from '../lib/text.ts';
 import { addPortalTo, columnOf, ensurePortal, slugId, withLayout } from '../layout.ts';
 import { describeLayout, findPortal, findSavedPortal, httpUrl, LIMITS, normalizePinnedItems, validateProfile, type PinnedConfig, type Profile, type SavedItem } from '../profile.ts';
 import { pinnedPortal, savedPortal } from '../sources.ts';
+import type { ProfileChange } from '../store.ts';
 import { ok, toolError, toolFailure, untrusted, type CallToolResult, type ToolDef } from './kit.ts';
 
 /** What the saving tools return: the model gets a fenced summary, the app gets state to redraw. */
@@ -39,19 +40,20 @@ export const SAVED_TOOLS: ToolDef[] = [
     async handler(args, ctx) {
       const url = httpUrl(args.url);
       if (!url) return toolError('save_item needs an http(s) "url"');
-      const before = await ctx.store.get(ctx.userId);
-      const existing = before.saved.find((s) => s.url === url);
-      const entry: Record<string, unknown> = {
-        ...existing,
-        url,
-        title: args.title ?? existing?.title,
-        note: args.note ?? existing?.note,
-        source: args.source ?? existing?.source,
-        savedAt: existing?.savedAt ?? new Date().toISOString(),
-      };
-      const withItem = validateProfile({ ...before, saved: [entry, ...before.saved.filter((s) => s.url !== url)] });
-      const { profile, added } = ensurePortal(withItem, 'saved', 'Saved');
-      await ctx.store.put(ctx.userId, profile);
+      const { profile, added, existing } = await ctx.store.update(ctx.userId, (before) => {
+        const existing = before.saved.find((s) => s.url === url);
+        const entry: Record<string, unknown> = {
+          ...existing,
+          url,
+          title: args.title ?? existing?.title,
+          note: args.note ?? existing?.note,
+          source: args.source ?? existing?.source,
+          savedAt: existing?.savedAt ?? new Date().toISOString(),
+        };
+        const withItem = validateProfile({ ...before, saved: [entry, ...before.saved.filter((s) => s.url !== url)] });
+        const { profile, added } = ensurePortal(withItem, 'saved', 'Saved');
+        return { profile, result: { profile, added, existing } };
+      });
       const item = profile.saved[0] as SavedItem;
       const text = [
         existing ? 'Updated a saved item.' : `Saved. ${profile.saved.length} saved item(s).`,
@@ -71,10 +73,12 @@ export const SAVED_TOOLS: ToolDef[] = [
     async handler(args, ctx) {
       const url = httpUrl(args.url);
       if (!url) return toolError('remove_saved needs an http(s) "url"');
-      const before = await ctx.store.get(ctx.userId);
-      if (!before.saved.some((s) => s.url === url)) return savedResult('That link was not saved; nothing changed.', before, false);
-      const profile = { ...before, saved: before.saved.filter((s) => s.url !== url), updatedAt: new Date().toISOString() };
-      await ctx.store.put(ctx.userId, profile);
+      const { profile, removed } = await ctx.store.update(ctx.userId, (before) => {
+        if (!before.saved.some((s) => s.url === url)) return { result: { profile: before, removed: false } };
+        const profile = { ...before, saved: before.saved.filter((s) => s.url !== url), updatedAt: new Date().toISOString() };
+        return { profile, result: { profile, removed: true } };
+      });
+      if (!removed) return savedResult('That link was not saved; nothing changed.', profile, false);
       return savedResult(`Removed. ${profile.saved.length} saved item(s) left.`, profile, false);
     },
   },
@@ -126,38 +130,39 @@ export const SAVED_TOOLS: ToolDef[] = [
       if (!Array.isArray(args.items)) return toolError('pin_portal needs "items" (an empty list is fine)');
       const items = normalizePinnedItems(args.items);
       const pin = { items, pinnedAt: new Date().toISOString() };
-      const before = await ctx.store.get(ctx.userId);
-      let profile: Profile;
-      let portalId: string;
+      const title = clean(args.title, 80);
+      const from = clean(args.from, 40);
+      const recipe = clean(args.recipe, 500);
+      const refreshing = args.portalId !== undefined;
+      if (!refreshing && (!title || !from || !recipe)) return toolError('A new pinned portal needs "title", "from" and "recipe". To refresh one, pass its portalId.');
+      let outcome: { profile: Profile; portalId: string } | { refused: CallToolResult };
       try {
-        if (args.portalId !== undefined) {
-          portalId = String(args.portalId);
-          const spec = findPortal(before, portalId);
-          if (!spec || spec.source !== 'pinned') return toolError(`No pinned portal with id "${clean(args.portalId, 60)}". Leave out portalId to add a new one.`, 'not_found');
-          const config = { ...spec.config, ...(clean(args.from, 40) ? { from: args.from } : {}), ...(clean(args.recipe, 500) ? { recipe: args.recipe } : {}) };
-          const title = clean(args.title, 80) || spec.title;
-          const columns = before.columns.map((c) => ({ ...c, panels: c.panels.map((p) => (p.id === portalId ? { ...p, title, config } : p)) }));
-          profile = withLayout(before, { columns, pins: { ...before.pins, [portalId]: pin } });
-        } else {
-          const title = clean(args.title, 80);
-          const from = clean(args.from, 40);
-          const recipe = clean(args.recipe, 500);
-          if (!title || !from || !recipe) return toolError('A new pinned portal needs "title", "from" and "recipe". To refresh one, pass its portalId.');
+        outcome = await ctx.store.update(ctx.userId, (before): ProfileChange<typeof outcome> => {
+          if (refreshing) {
+            const portalId = String(args.portalId);
+            const spec = findPortal(before, portalId);
+            if (!spec || spec.source !== 'pinned') return { result: { refused: toolError(`No pinned portal with id "${clean(args.portalId, 60)}". Leave out portalId to add a new one.`, 'not_found') } };
+            const config = { ...spec.config, ...(from ? { from: args.from } : {}), ...(recipe ? { recipe: args.recipe } : {}) };
+            const columns = before.columns.map((c) => ({ ...c, panels: c.panels.map((p) => (p.id === portalId ? { ...p, title: title || spec.title, config } : p)) }));
+            const profile = withLayout(before, { columns, pins: { ...before.pins, [portalId]: pin } });
+            return { profile, result: { profile, portalId } };
+          }
           const added = addPortalTo(before, { id: slugId(title), source: 'pinned', title, config: { from, recipe } }, typeof args.column === 'number' ? args.column : undefined);
-          if ('error' in added) return toolError(`Not pinned: ${added.error}${added.code === 'conflict' ? ' To refresh it, pass that portalId.' : ''}`, added.code);
-          portalId = added.portalId;
-          profile = { ...added.profile, pins: { ...added.profile.pins, [portalId]: pin } };
-        }
+          if ('error' in added) return { result: { refused: toolError(`Not pinned: ${added.error}${added.code === 'conflict' ? ' To refresh it, pass that portalId.' : ''}`, added.code) } };
+          const profile = { ...added.profile, pins: { ...added.profile.pins, [added.portalId]: pin } };
+          return { profile, result: { profile, portalId: added.portalId } };
+        });
       } catch (error) {
         return toolFailure(error, 'Not pinned: ');
       }
-      await ctx.store.put(ctx.userId, profile);
+      if ('refused' in outcome) return outcome.refused;
+      const { profile, portalId } = outcome;
       const portal = pinnedPortal(findPortal(profile, portalId)!, profile.pins);
-      const { from } = findPortal(profile, portalId)!.config as unknown as PinnedConfig;
+      const { from: source } = findPortal(profile, portalId)!.config as unknown as PinnedConfig;
       const dropped = args.items.length - items.length;
-      const text = args.portalId !== undefined
-        ? `Refreshed "${portal.title}" (id ${portalId}): ${items.length} items from ${from}.`
-        : `Pinned "${portal.title}" (id ${portalId}) in column ${columnOf(profile, portalId)}: ${items.length} items from ${from}.\nLayout now: ${describeLayout(profile)}`;
+      const text = refreshing
+        ? `Refreshed "${portal.title}" (id ${portalId}): ${items.length} items from ${source}.`
+        : `Pinned "${portal.title}" (id ${portalId}) in column ${columnOf(profile, portalId)}: ${items.length} items from ${source}.\nLayout now: ${describeLayout(profile)}`;
       return ok(`${text}${dropped > 0 ? `\n${dropped} item(s) were left out (no title, or over ${LIMITS.items}).` : ''}`, { profile, portal, portalId });
     },
   },

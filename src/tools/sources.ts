@@ -126,12 +126,14 @@ export const SOURCE_TOOLS: ToolDef[] = [
       const spec: PortalSpec = { id: slugId(title ?? trial.title), source, title, config };
       let added: ReturnType<typeof addPortalTo>;
       try {
-        added = addPortalTo(before, spec, typeof args.column === 'number' ? args.column : undefined);
+        added = await ctx.store.update<ReturnType<typeof addPortalTo>>(ctx.userId, (current) => {
+          const result = addPortalTo(current, spec, typeof args.column === 'number' ? args.column : undefined);
+          return 'error' in result ? { result } : { profile: result.profile, result };
+        });
       } catch (error) {
         return toolFailure(error, 'Not added: ');
       }
       if ('error' in added) return toolError(`Not added: ${added.error}`, added.code);
-      await ctx.store.put(ctx.userId, added.profile);
       const placed = findPortal(added.profile, added.portalId)!;
       const portal = await portalFor(placed, added.profile, ctx);
       return ok(`Added "${portal.title}" (id ${added.portalId}) in column ${columnOf(added.profile, added.portalId)}.\nLayout now: ${describeLayout(added.profile)}`,
@@ -184,25 +186,27 @@ export const SOURCE_TOOLS: ToolDef[] = [
       const working = loaded.filter((l) => l.ok).slice(0, Math.max(0, room));
       const failed = loaded.filter((l) => !l.ok);
       const specs: PortalSpec[] = working.map((l) => ({ id: slugId(l.feed.title || l.title || 'feed'), source: 'rss', title: clean(l.feed.title || l.title, 80) || undefined, config: { url: l.feed.url, limit: 10 } }));
-      let profile: Profile;
-      if (!before.onboarded) {
-        // New user: their reader's folders become the room, in order, over up to 8 columns.
-        if (!specs.length) return toolError(`None of the ${loaded.length} feeds tried loaded (${clean(failed[0]?.error, 120)}).`, 'upstream_error');
-        // Group by folder, keeping the order folders first appear in their file.
-        const folderOrder = [...new Set(working.map((l) => l.feed.category ?? ''))];
-        const byCategory = [...working].sort((a, b) => folderOrder.indexOf(a.feed.category ?? '') - folderOrder.indexOf(b.feed.category ?? ''));
-        const ordered = byCategory.map((l) => specs[working.indexOf(l)]!);
-        profile = withLayout(before, { layout: 'shelves', columns: spreadColumns(ordered), onboarded: true });
-      } else {
-        profile = before;
-        for (const spec of specs) {
-          const added = addPortalTo(profile, spec);
-          if ('error' in added) break;
-          profile = added.profile;
+      if (!before.onboarded && !specs.length) return toolError(`None of the ${loaded.length} feeds tried loaded (${clean(failed[0]?.error, 120)}).`, 'upstream_error');
+      // Group by folder, keeping the order folders first appear in their file.
+      const folderOrder = [...new Set(working.map((l) => l.feed.category ?? ''))];
+      const byCategory = [...working].sort((a, b) => folderOrder.indexOf(a.feed.category ?? '') - folderOrder.indexOf(b.feed.category ?? ''));
+      const ordered = byCategory.map((l) => specs[working.indexOf(l)]!);
+      const { profile, addedCount } = await ctx.store.update(ctx.userId, (current) => {
+        let profile: Profile;
+        if (!current.onboarded) {
+          // New user: their reader's folders become the room, in order, over up to 8 columns.
+          profile = withLayout(current, { layout: 'shelves', columns: spreadColumns(ordered), onboarded: true });
+        } else {
+          profile = current;
+          for (const spec of specs) {
+            const added = addPortalTo(profile, spec);
+            if ('error' in added) break;
+            profile = added.profile;
+          }
         }
-      }
-      await ctx.store.put(ctx.userId, profile);
-      const addedCount = profile.columns.flatMap((c) => c.panels).length - (before.onboarded ? before.columns.flatMap((c) => c.panels).length : 0);
+        const addedCount = profile.columns.flatMap((c) => c.panels).length - (current.onboarded ? current.columns.flatMap((c) => c.panels).length : 0);
+        return { profile, result: { profile, addedCount } };
+      });
       const notTried = fresh.length - candidates.length;
       const lines = [
         `Imported ${addedCount} of ${feeds.length} feed(s)${title ? ` from "${title}"` : ''}.`,

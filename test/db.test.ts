@@ -59,6 +59,21 @@ test('pg profiles: concurrent writes all land, last one wins, rev counts every w
   assert.match((await store.get('busy')).name, /^v\d+$/);
 });
 
+test('pg profiles: concurrent updates from two instances all land (per-user lock)', { skip }, async () => {
+  const a = new PgProfileStore(db);
+  const b = new PgProfileStore(db);
+  const urls = Array.from({ length: 6 }, (_, i) => `https://example.com/${i}`);
+  await Promise.all(urls.map((url, i) => (i % 2 ? a : b).update('racy', (p) => {
+    const profile = validateProfile({ ...p, saved: [{ url, title: url }, ...p.saved] });
+    return { profile, result: undefined };
+  })));
+  assert.deepEqual((await a.get('racy')).saved.map((s) => s.url).sort(), urls);
+  assert.equal(await a.rev('racy'), urls.length, 'one revision per change, none lost');
+  // A change that decides not to write leaves the row alone.
+  assert.equal(await a.update('racy', () => ({ result: 'kept' })), 'kept');
+  assert.equal(await a.rev('racy'), urls.length);
+});
+
 test('pg profiles: an unreadable row is kept aside and the user gets the default plus a notice', { skip }, async () => {
   await db.query(`INSERT INTO mcportal_profiles (user_id, data) VALUES ('broken', $1)`, [JSON.stringify({ columns: 'nope' })]);
   const store = new PgProfileStore(db);

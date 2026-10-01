@@ -253,10 +253,40 @@ export function parseExport(text: string): PortalExport {
   return data as unknown as PortalExport;
 }
 
+/** `before` with an export's portals and saved items added (or its layout, for a room not set up yet). */
+function mergeProfile(before: Profile, incoming: Profile, counts: Pick<ImportResult, 'portalsAdded' | 'portalsSkipped' | 'layoutAdopted' | 'savedAdded'>): Profile {
+  let profile = before;
+  if (!before.onboarded) {
+    // A brand-new room takes the exported layout as it is.
+    profile = { ...incoming, saved: before.saved, onboarded: true };
+    counts.layoutAdopted = true;
+    counts.portalsAdded = incoming.columns.reduce((n, c) => n + c.panels.length, 0);
+  } else {
+    const have = new Set(before.columns.flatMap((c) => c.panels).map(portalKey));
+    for (const spec of incoming.columns.flatMap((c) => c.panels)) {
+      if (have.has(portalKey(spec))) continue;
+      const added = addPortalTo(profile, { ...spec, id: spec.id });
+      if ('error' in added) {
+        counts.portalsSkipped.push(`${spec.title ?? spec.id} (${added.error})`);
+        continue;
+      }
+      profile = added.profile;
+      const pinned = spec.source === 'pinned' ? incoming.pins[spec.id] : undefined;
+      if (pinned) profile = { ...profile, pins: { ...profile.pins, [added.portalId]: { items: normalizePinnedItems(pinned.items), pinnedAt: pinned.pinnedAt } } };
+      have.add(portalKey(spec));
+      counts.portalsAdded++;
+    }
+  }
+  const urls = new Set(profile.saved.map((s) => s.url));
+  const fresh = incoming.saved.filter((s) => !urls.has(s.url));
+  const merged = normalizeSaved([...profile.saved, ...fresh].sort((a, b) => (a.savedAt < b.savedAt ? 1 : -1)));
+  counts.savedAdded = merged.filter((s) => !urls.has(s.url)).length;
+  return { ...profile, saved: merged.slice(0, LIMITS.saved) };
+}
+
 /** Add an export to a room. Never removes or rearranges anything. */
 export async function importExport(data: PortalExport, userId: string, to: { store: ProfileStore; reading?: ReadingStore; clips?: ClipStore }): Promise<ImportResult> {
   const result: ImportResult = { portalsAdded: 0, portalsSkipped: [], layoutAdopted: false, savedAdded: 0, clipsAdded: 0, clipsSkipped: 0, clipErrors: [] };
-  const before = await to.store.get(userId);
   let incoming: Profile | undefined;
   try {
     incoming = isRecord(data.profile) ? validateProfile(data.profile) : undefined;
@@ -264,37 +294,18 @@ export async function importExport(data: PortalExport, userId: string, to: { sto
     if (!(error instanceof ProfileError)) throw error;
     result.portalsSkipped.push(`the layout (${error.message})`);
   }
-  let profile = before;
-  if (incoming && !before.onboarded) {
-    // A brand-new room takes the exported layout as it is.
-    profile = { ...incoming, saved: before.saved, onboarded: true };
-    result.layoutAdopted = true;
-    result.portalsAdded = incoming.columns.reduce((n, c) => n + c.panels.length, 0);
-  } else if (incoming) {
-    const have = new Set(before.columns.flatMap((c) => c.panels).map(portalKey));
-    for (const spec of incoming.columns.flatMap((c) => c.panels)) {
-      if (have.has(portalKey(spec))) continue;
-      const added = addPortalTo(profile, { ...spec, id: spec.id });
-      if ('error' in added) {
-        result.portalsSkipped.push(`${spec.title ?? spec.id} (${added.error})`);
-        continue;
-      }
-      profile = added.profile;
-      if (spec.source === 'pinned' && incoming.pins[spec.id]) {
-        profile = { ...profile, pins: { ...profile.pins, [added.portalId]: { items: normalizePinnedItems(incoming.pins[spec.id]!.items), pinnedAt: incoming.pins[spec.id]!.pinnedAt } } };
-      }
-      have.add(portalKey(spec));
-      result.portalsAdded++;
-    }
-  }
   if (incoming) {
-    const urls = new Set(profile.saved.map((s) => s.url));
-    const fresh = incoming.saved.filter((s) => !urls.has(s.url));
-    const merged = normalizeSaved([...profile.saved, ...fresh].sort((a, b) => (a.savedAt < b.savedAt ? 1 : -1)));
-    result.savedAdded = merged.filter((s) => !urls.has(s.url)).length;
-    profile = { ...profile, saved: merged.slice(0, LIMITS.saved) };
+    const from = incoming;
+    const merged = await to.store.update(userId, (before) => {
+      const counts = { portalsAdded: 0, portalsSkipped: [] as string[], layoutAdopted: false, savedAdded: 0 };
+      const profile = mergeProfile(before, from, counts);
+      return profile === before ? { result: counts } : { profile, result: counts };
+    });
+    result.portalsAdded = merged.portalsAdded;
+    result.portalsSkipped.push(...merged.portalsSkipped);
+    result.layoutAdopted = merged.layoutAdopted;
+    result.savedAdded = merged.savedAdded;
   }
-  if (profile !== before) await to.store.put(userId, profile);
 
   if (to.clips && Array.isArray(data.clips)) {
     const existing = await to.clips.list(userId, { limit: 100_000 });

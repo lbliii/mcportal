@@ -8,6 +8,25 @@ import { processLogger } from '../lib/log.ts';
 export interface Queryable {
   query<R = Record<string, unknown>>(text: string, values?: unknown[]): Promise<{ rows: R[]; rowCount: number | null }>;
   end?(): Promise<void>;
+  /** A dedicated connection, for a transaction (pg.Pool has it). */
+  connect?(): Promise<Queryable & { release(): void }>;
+}
+
+/** Run `work` in a transaction on its own connection (or straight on `db` if it can't give one). */
+export async function transaction<T>(db: Queryable, work: (tx: Queryable) => Promise<T>): Promise<T> {
+  if (!db.connect) return work(db);
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await work(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export async function connect(url: string, options: { searchPath?: string } = {}): Promise<Queryable> {

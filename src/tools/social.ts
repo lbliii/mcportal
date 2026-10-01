@@ -202,8 +202,10 @@ export const SOCIAL_TOOLS: ToolDef[] = [
         switch (args.action) {
           case 'follow': {
             const target = await ctx.social.follow(ctx.userId, handle);
-            const { profile, added } = ensurePortal(await ctx.store.get(ctx.userId), 'following', 'Following');
-            if (added) await ctx.store.put(ctx.userId, profile);
+            const { profile, added } = await ctx.store.update(ctx.userId, (before) => {
+              const placed = ensurePortal(before, 'following', 'Following');
+              return placed.added ? { profile: placed.profile, result: placed } : { result: placed };
+            });
             return ok(`Following @${target.handle}.${added ? ' Added a "Following" portal to the room.' : ''}`, { handle: target.handle, layoutChanged: added, profile });
           }
           case 'unfollow':

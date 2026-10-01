@@ -98,6 +98,7 @@ test('dispatcher: a bug is logged with its stack and reported by reference, neve
   const broken: ProfileStore = {
     get: async () => { throw new TypeError('secret internal detail'); },
     put: async () => {},
+    update: async () => { throw new TypeError('secret internal detail'); },
     delete: async () => {},
   };
   const result = await call(ctx({ store: broken, log: createLogger({ format: 'json', write: (l) => lines.push(l) }) }), 'get_profile');
@@ -192,4 +193,20 @@ test('page sessions: cookie carries an opaque token, sessions expire, CSRF is pe
   const again = { headers: { cookie: sessions.start('acct-1', 'alice').split(';')[0] } } as never;
   now = 1000;
   assert.equal(sessions.current(again), undefined, 'expired');
+});
+
+test('profiles: concurrent changes all land (update is atomic per user)', async () => {
+  const { mkdtemp } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const path = await import('node:path');
+  const { FileProfileStore } = await import('../src/store.ts');
+  const stores: ProfileStore[] = [new MemoryProfileStore({ u: { ...defaultProfile(), onboarded: true } }), new FileProfileStore(await mkdtemp(path.join(tmpdir(), 'mcportal-update-')))];
+  for (const store of stores) {
+    const c = ctx({ store });
+    const urls = Array.from({ length: 12 }, (_, i) => `https://example.com/${i}`);
+    const results = await Promise.all(urls.map((url) => call(c, 'save_item', { url, title: url })));
+    assert.ok(results.every((r) => !r.isError));
+    const saved = (await store.get('u')).saved.map((s) => s.url).sort();
+    assert.deepEqual(saved, [...urls].sort(), `${store.constructor.name}: no save was lost`);
+  }
 });

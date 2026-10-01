@@ -111,17 +111,20 @@ export const ROOM_TOOLS: ToolDef[] = [
       const unknown = ids.filter((id) => !STARTER_PACKS.some((p) => p.id === id));
       if (unknown.length) return toolError(`Unknown pack(s): ${unknown.join(', ')}. Packs: ${STARTER_PACKS.map((p) => p.id).join(', ')}`);
       if (ids.length > MAX_PACKS) return toolError(`Pick at most ${MAX_PACKS} packs`);
-      const before = await ctx.store.get(ctx.userId);
       if (!ids.length) {
-        const kept = { ...before, onboarded: true, updatedAt: new Date().toISOString() };
-        await ctx.store.put(ctx.userId, kept);
+        const kept = await ctx.store.update(ctx.userId, (before) => {
+          const profile = { ...before, onboarded: true, updatedAt: new Date().toISOString() };
+          return { profile, result: profile };
+        });
         return ok(`Setup finished; kept the current layout: ${describeLayout(kept)}`, { profile: kept });
       }
       // Sources in pack order, spread over at most 8 columns, packs kept together.
       const sources = ids.flatMap((id) => STARTER_PACKS.find((p) => p.id === id)!.portals);
       const layout = args.layout === 'columns' ? 'columns' : 'shelves';
-      const profile = withLayout(before, { layout, columns: spreadColumns(sources), onboarded: true });
-      await ctx.store.put(ctx.userId, profile);
+      const profile = await ctx.store.update(ctx.userId, (before) => {
+        const built = withLayout(before, { layout, columns: spreadColumns(sources), onboarded: true });
+        return { profile: built, result: built };
+      });
       const labels = ids.map((id) => STARTER_PACKS.find((p) => p.id === id)!.label);
       return ok(`Built the room from ${labels.join(', ')}: ${sources.length} sources, ${layout} layout. Saved items kept (${profile.saved.length}).`, { profile });
     },
@@ -193,21 +196,23 @@ export const ROOM_TOOLS: ToolDef[] = [
       } catch (error) {
         return toolFailure(error, 'Profile not saved: ');
       }
-      const before = await ctx.store.get(ctx.userId);
-      // Bookmarks and pinned items are never edited through the layout.
-      const pinnedIds = next.columns.flatMap((c) => c.panels).filter((p) => p.source === 'pinned').map((p) => p.id);
-      next = { ...next, saved: before.saved, pins: normalizePins(before.pins, pinnedIds) };
-      ctx.store.takeNotice?.(ctx.userId);
-      const diff = diffProfiles(before, next);
+      const asked = next;
       const allowed = new Set(Array.isArray(args.removePortalIds) ? args.removePortalIds.map(String) : []);
-      const unapproved = diff.removed.filter((id) => !allowed.has(id));
-      if (unapproved.length) {
+      ctx.store.takeNotice?.(ctx.userId);
+      const saved = await ctx.store.update<{ unapproved: string[] } | { profile: Profile; diff: ReturnType<typeof diffProfiles> }>(ctx.userId, (before) => {
+        // Bookmarks and pinned items are never edited through the layout.
+        const pinnedIds = asked.columns.flatMap((c) => c.panels).filter((p) => p.source === 'pinned').map((p) => p.id);
+        const profile = { ...asked, saved: before.saved, pins: normalizePins(before.pins, pinnedIds) };
+        const diff = diffProfiles(before, profile);
+        const unapproved = diff.removed.filter((id) => !allowed.has(id));
+        return unapproved.length ? { result: { unapproved } } : { profile, result: { profile, diff } };
+      });
+      if ('unapproved' in saved) {
         return toolError(
-          `Profile not saved: it would remove ${unapproved.join(', ')}. Keep those portals, or, only if the user explicitly asked to remove them, list them in removePortalIds.`,
+          `Profile not saved: it would remove ${saved.unapproved.join(', ')}. Keep those portals, or, only if the user explicitly asked to remove them, list them in removePortalIds.`,
         );
       }
-      await ctx.store.put(ctx.userId, next);
-      return ok(`Saved. Changes: ${describeDiff(diff)}.\nLayout now: ${describeLayout(next)}`, { profile: next, changes: diff });
+      return ok(`Saved. Changes: ${describeDiff(saved.diff)}.\nLayout now: ${describeLayout(saved.profile)}`, { profile: saved.profile, changes: saved.diff });
     },
   },
   {

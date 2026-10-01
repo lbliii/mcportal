@@ -88,9 +88,10 @@ export const CLIP_TOOLS: ToolDef[] = [
       } catch (error) {
         return toolFailure(error, 'Not clipped: ');
       }
-      const before = await ctx.store.get(ctx.userId);
-      const { profile, added } = ensurePortal(before, 'clips', 'Clips');
-      if (added) await ctx.store.put(ctx.userId, profile);
+      const { profile, added } = await ctx.store.update(ctx.userId, (before) => {
+        const placed = ensurePortal(before, 'clips', 'Clips');
+        return placed.added ? { profile: placed.profile, result: placed } : { result: placed };
+      });
       const { count } = await ctx.clips.usage(ctx.userId);
       const summary = summaryOf(clip);
       const text = [
