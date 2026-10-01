@@ -10,7 +10,7 @@ import { clipText, type ClipData } from '../clips.ts';
 import { AUDIENCES, type SharedItem } from '../social.ts';
 import { isAppError } from '../lib/errors.ts';
 import { ensurePortal } from '../layout.ts';
-import { HOSTED_ONLY, ok, toolError, untrusted, ROOM_URI, type CallToolResult, type ToolContext, type ToolDef } from './kit.ts';
+import { hasSocial, HOSTED_ONLY, ok, toolError, untrusted, ROOM_URI, type CallToolResult, type ToolContext, type ToolDef } from './kit.ts';
 import type { ToolResults } from './results.ts';
 
 export function shareLine(s: SharedItem): string {
@@ -51,6 +51,7 @@ export const SOCIAL_TOOLS: ToolDef[] = [
     name: 'open_space',
     title: 'Open a space',
     access: 'read',
+    available: hasSocial,
     description: [
       "Open someone's MCPortal Space by handle, or the user's own Space without one: their name, bio and Space title, their posts (what they shared, as a grid), and the sources they recommend, which the user can add to their own room.",
       'Use it when the user asks to see someone\'s space, page or profile, or their own ("what does my space look like").',
@@ -88,6 +89,7 @@ export const SOCIAL_TOOLS: ToolDef[] = [
     name: 'share',
     title: 'Share with followers',
     access: 'write',
+    available: hasSocial,
     description: [
       'Share one of the user\'s saved links (savedUrl) or clips (clipId) with a note, to their followers (default) or everyone on MCPortal (audience "mcportal").',
       'Only when the user asks to share. If you write the note, show it to them and share only after they approve those exact words.',
@@ -129,6 +131,7 @@ export const SOCIAL_TOOLS: ToolDef[] = [
     name: 'unshare',
     title: 'Remove a share',
     access: 'write',
+    available: hasSocial,
     description: "Remove one of the user's shares. Only when they ask.",
     inputSchema: { type: 'object', required: ['id'], additionalProperties: false, properties: { id: { type: 'string' } } },
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
@@ -142,6 +145,7 @@ export const SOCIAL_TOOLS: ToolDef[] = [
     name: 'get_share',
     title: 'Show a share',
     access: 'read',
+    available: hasSocial,
     description: 'Show one share in full (the note and the shared link or clip), as a card in the conversation. Ids come from the Following portal or list_shares.',
     inputSchema: { type: 'object', required: ['id'], additionalProperties: false, properties: { id: { type: 'string' } } },
     annotations: { readOnlyHint: true },
@@ -158,6 +162,7 @@ export const SOCIAL_TOOLS: ToolDef[] = [
     name: 'list_shares',
     title: 'List shares',
     access: 'read',
+    available: hasSocial,
     description: 'Without handle: the user\'s own shares. With handle: what that person shared that the user may see. Newest first.',
     inputSchema: {
       type: 'object',
@@ -183,6 +188,7 @@ export const SOCIAL_TOOLS: ToolDef[] = [
     name: 'relationship',
     title: 'Follow, mute or block someone',
     access: 'write',
+    available: hasSocial,
     description: [
       'follow / unfollow a person by handle (their shares then appear in the user\'s Following portal; the first follow adds that portal);',
       'mute / unmute (hide their shares from the user\'s Following portal);',
@@ -231,6 +237,7 @@ export const SOCIAL_TOOLS: ToolDef[] = [
     name: 'list_connections',
     title: 'Who you follow, mute and block',
     access: 'read',
+    available: hasSocial,
     description: 'The handles the user follows, mutes and blocks, and how many people follow them.',
     inputSchema: { type: 'object', additionalProperties: false, properties: {} },
     annotations: { readOnlyHint: true },
@@ -245,6 +252,7 @@ export const SOCIAL_TOOLS: ToolDef[] = [
     name: 'report',
     title: 'Report a share or person',
     access: 'write',
+    available: hasSocial,
     description: 'Report a share (shareId) or a person (handle) to the MCPortal admins, with a short reason. Only when the user asks. Suggest blocking too if they don\'t want to see them.',
     inputSchema: {
       type: 'object',

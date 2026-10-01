@@ -74,6 +74,12 @@ export interface ToolDef {
   _meta?: Record<string, unknown>;
   /** What the tool does, for the access gate: read your data, change it, or cause outbound fetches. */
   access: Exclude<Action, 'admin'>;
+  /**
+   * Whether this server can run the tool for this caller (e.g. sharing needs the hosted
+   * social layer). Tools that can't are left out of tools/list, so they cost the model
+   * nothing; a call anyway still gets a clear `unavailable` error. Default: always.
+   */
+  available?: (ctx: ToolContext) => boolean;
   /** Budget units per call (default 1); a function when it depends on the arguments. */
   cost?: number | ((args: Record<string, unknown>) => number);
   handler: (args: Record<string, unknown>, ctx: ToolContext) => Promise<CallToolResult>;
@@ -104,6 +110,11 @@ export function need<T>(value: T | undefined, why: string): T {
   return value;
 }
 
+/** Available where the hosted social layer is (sharing, follows, spaces). */
+export const hasSocial = (ctx: ToolContext): boolean => Boolean(ctx.social && ctx.publicProfiles);
+/** Available where public profiles are. */
+export const hasProfiles = (ctx: ToolContext): boolean => Boolean(ctx.publicProfiles);
+
 /** Why the social and public-profile tools refuse on a local server. */
 export const HOSTED_ONLY = {
   sharing: 'Sharing is part of the hosted MCPortal. This one runs on your machine, so there is nobody to share with.',
@@ -125,6 +136,6 @@ export function untrusted(label: string, body: string): string {
   ].join('\n');
 }
 
-export function publicToolList(tools: readonly ToolDef[]): Array<Omit<ToolDef, 'handler' | 'access' | 'cost'>> {
-  return tools.map(({ handler: _handler, access: _access, cost: _cost, ...tool }) => tool);
+export function publicToolList(tools: readonly ToolDef[], ctx?: ToolContext): Array<Omit<ToolDef, 'handler' | 'access' | 'cost' | 'available'>> {
+  return tools.filter((t) => !ctx || !t.available || t.available(ctx)).map(({ handler: _handler, access: _access, cost: _cost, available: _available, ...tool }) => tool);
 }
