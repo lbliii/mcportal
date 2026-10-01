@@ -7,6 +7,7 @@ import { HN_FEEDS, type HnConfig } from './adapters/hn.ts';
 import { docsInputUrl, TOC_KINDS, type DocsConfig, type TocKind } from './adapters/docs.ts';
 import { REPO_PATTERN, type GithubConfig } from './adapters/github.ts';
 import type { RssConfig } from './adapters/rss.ts';
+import { AppError, type AppErrorOptions, type ErrorCode } from './lib/errors.ts';
 import { clean } from './lib/text.ts';
 import { CLIP_KINDS, type ClipKind, type Item, type SourceKind } from './types.ts';
 
@@ -79,8 +80,13 @@ export interface Profile {
 export const LIMITS = { columns: 8, portalsPerColumn: 4, items: 30, saved: 200 } as const;
 export const SOURCES: SourceKind[] = ['hn', 'rss', 'github', 'docs', 'saved', 'pinned', 'clips', 'following'];
 
-export class ProfileError extends Error {
+/** A profile, layout or source config that fails validation. Defaults to invalid_argument; pass a code when it's something else. */
+export class ProfileError extends AppError {
   override name = 'ProfileError';
+
+  constructor(message: string, code: ErrorCode = 'invalid_argument', options?: AppErrorOptions) {
+    super(code, message, options);
+  }
 }
 
 export function defaultProfile(now = new Date()): Profile {

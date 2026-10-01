@@ -3,6 +3,7 @@
  * pass. Output is data only (no HTML), so the UI renders it without injection
  * risk and the agent can treat it as content, never as instructions.
  */
+import { AppError, upstreamStatus } from '../lib/errors.ts';
 import { parseAttrs, tokenize } from '../lib/html.ts';
 import { linkTarget, toneOf } from '../lib/markdown.ts';
 import { clean, decodeEntities, INLINE } from '../lib/text.ts';
@@ -320,9 +321,9 @@ export async function fetchArticle(url: string, fetcher: Fetcher): Promise<Extra
     maxBytes: READER_LIMITS.inputBytes,
     truncate: true,
   });
-  if (res.status < 200 || res.status >= 300) throw new Error(`Page responded ${res.status}`);
+  if (res.status < 200 || res.status >= 300) throw upstreamStatus('Page', res.status);
   if (res.contentType && !/html|xml|text\/plain/i.test(res.contentType)) {
-    throw new Error('Reader view only supports web pages');
+    throw new AppError('invalid_argument', 'Reader view only supports web pages');
   }
   return { ...extractArticle(res.text, res.url || url), finalUrl: res.url };
 }

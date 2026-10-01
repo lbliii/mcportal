@@ -15,6 +15,7 @@ import path from 'node:path';
 import type { AuthPersistence } from './auth/store.ts';
 import type { PageQuery, Relation, Report, Share, SocialStore } from './social.ts';
 import { CLIP_LIMITS, ClipError, clampLimit, normalizeTags, patchClip, queryWords, searchTextOf, summaryOf, type Clip, type ClipPatch, type ClipQuery, type ClipStore, type ClipSummary } from './clips.ts';
+import { AppError } from './lib/errors.ts';
 import { defaultProfile, validateProfile, type Profile } from './profile.ts';
 import type { ProfileStore } from './store.ts';
 
@@ -169,8 +170,8 @@ export class PgClipStore implements ClipStore {
 
   async add(userId: string, clip: Clip): Promise<void> {
     const { count, bytes } = await this.usage(userId);
-    if (count >= CLIP_LIMITS.perUser) throw new ClipError(`You have ${CLIP_LIMITS.perUser} clips, the most MCPortal keeps. Delete some first.`);
-    if (bytes + clip.bytes > CLIP_LIMITS.bytesPerUser) throw new ClipError(`Your clips use ${Math.round(bytes / 1e6)} MB of the ${CLIP_LIMITS.bytesPerUser / 1e6} MB allowed. Delete some (large images first).`);
+    if (count >= CLIP_LIMITS.perUser) throw new ClipError(`You have ${CLIP_LIMITS.perUser} clips, the most MCPortal keeps. Delete some first.`, 'limit_exceeded');
+    if (bytes + clip.bytes > CLIP_LIMITS.bytesPerUser) throw new ClipError(`Your clips use ${Math.round(bytes / 1e6)} MB of the ${CLIP_LIMITS.bytesPerUser / 1e6} MB allowed. Delete some (large images first).`, 'limit_exceeded');
     await this.db.query(
       `INSERT INTO mcportal_clips (id, user_id, kind, title, data, summary, tags, search_text, bytes, created_at, updated_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
@@ -411,7 +412,7 @@ export class PgReadingStore implements ReadingStore {
     return rows.map(r => r.data);
   }
   async import(userId: string, raw: unknown[]) {
-    if (raw.length > READING_LIMIT) throw new Error('Too many reading records');
+    if (raw.length > READING_LIMIT) throw new AppError('limit_exceeded', 'Too many reading records');
     const states = raw.map(importedReading);
     let count = 0;
     for (const state of states) {

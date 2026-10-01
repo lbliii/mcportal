@@ -12,6 +12,7 @@
  * it moves to tables when sharing needs joins. One server instance.
  */
 import type { AuthPersistence } from './auth/store.ts';
+import { AppError, type AppErrorOptions, type ErrorCode } from './lib/errors.ts';
 import { clean } from './lib/text.ts';
 import { normalizeSourceConfig, ProfileError } from './profile.ts';
 import { KeyedMutex } from './store.ts';
@@ -88,8 +89,13 @@ interface Doc {
   held: Record<string, { accountId: string; until: number }>;  // released handle -> previous owner
 }
 
-export class HandleError extends Error {
+/** A handle that is invalid, reserved or taken. Defaults to invalid_argument; pass a code when it's something else. */
+export class HandleError extends AppError {
   override name = 'HandleError';
+
+  constructor(message: string, code: ErrorCode = 'invalid_argument', options?: AppErrorOptions) {
+    super(code, message, options);
+  }
 }
 
 /** The handle as stored, or an error message saying what's wrong with it. */
@@ -187,9 +193,9 @@ export class PublicProfiles {
         if ('error' in checked) throw new HandleError(checked.error);
         if (checked.handle !== current?.handle) {
           const owner = this.owner(doc, checked.handle);
-          if (owner && owner !== accountId) throw new HandleError(`@${checked.handle} is taken`);
+          if (owner && owner !== accountId) throw new HandleError(`@${checked.handle} is taken`, 'conflict');
           const hold = doc.held[checked.handle];
-          if (hold && hold.until > this.now() && hold.accountId !== accountId) throw new HandleError(`@${checked.handle} was in use recently; try another`);
+          if (hold && hold.until > this.now() && hold.accountId !== accountId) throw new HandleError(`@${checked.handle} was in use recently; try another`, 'conflict');
           delete doc.held[checked.handle];
           if (current) {
             released = current.handle;

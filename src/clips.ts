@@ -12,6 +12,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { httpUrl } from './profile.ts';
 import { atomicWrite, defaultDataDir, KeyedMutex, safeFileId } from './store.ts';
+import { AppError, type AppErrorOptions, type ErrorCode } from './lib/errors.ts';
 import { parseMarkdownLite } from './lib/markdown.ts';
 import { clean } from './lib/text.ts';
 import { CLIP_KINDS, type ArticleBlock, type ClipKind } from './types.ts';
@@ -88,8 +89,13 @@ export interface ClipPatch {
   tags?: string[];
 }
 
-export class ClipError extends Error {
+/** A clip that fails validation, or a clip limit reached. Defaults to invalid_argument; pass a code when it's something else. */
+export class ClipError extends AppError {
   override name = 'ClipError';
+
+  constructor(message: string, code: ErrorCode = 'invalid_argument', options?: AppErrorOptions) {
+    super(code, message, options);
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -389,7 +395,7 @@ abstract class DocumentClipStore implements ClipStore {
   add(userId: string, clip: Clip): Promise<void> {
     return this.edit(userId, (clips) => {
       const refused = overLimit(clips, clip);
-      if (refused) throw new ClipError(refused);
+      if (refused) throw new ClipError(refused, 'limit_exceeded');
       return { clips: [clip, ...clips.filter((c) => c.id !== clip.id)], result: undefined };
     });
   }

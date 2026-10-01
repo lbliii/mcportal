@@ -315,7 +315,7 @@ export async function importExport(data: PortalExport, userId: string, to: { sto
       } catch (error) {
         if (!(error instanceof ClipError)) throw error;
         result.clipErrors.push(`${String(raw.title ?? raw.kind).slice(0, 60)}: ${error.message}`);
-        if (/clips, the most|MB allowed/.test(error.message)) break;
+        if (error.code === 'limit_exceeded') break;
       }
     }
   }

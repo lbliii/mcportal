@@ -17,7 +17,8 @@
  */
 import { randomBytes } from 'node:crypto';
 import type { AuthPersistence } from './auth/store.ts';
-import { cleanText, type Clip } from './clips.ts';
+import { ClipError, cleanText, type Clip } from './clips.ts';
+import { AppError, type AppErrorOptions, type ErrorCode } from './lib/errors.ts';
 import { clean } from './lib/text.ts';
 import type { PublicProfile, PublicProfiles } from './public-profiles.ts';
 import { KeyedMutex } from './store.ts';
@@ -62,8 +63,13 @@ export interface PageQuery {
   before?: string;
 }
 
-export class SocialError extends Error {
+/** A sharing or relationship request the rules refuse. Defaults to invalid_argument; pass a code when it's something else. */
+export class SocialError extends AppError {
   override name = 'SocialError';
+
+  constructor(message: string, code: ErrorCode = 'invalid_argument', options?: AppErrorOptions) {
+    super(code, message, options);
+  }
 }
 
 /** Storage only; no rules. */
@@ -256,9 +262,9 @@ export class Social {
   /** The account behind a handle that `viewer` may deal with (visible, not blocked either way). */
   async resolve(viewer: string, handle: string): Promise<PublicProfile> {
     const found = await this.profiles.byHandle(handle);
-    if (!found) throw new SocialError(`No MCPortal profile for @${clean(handle, 40).replace(/^@/, '')}`);
+    if (!found) throw new SocialError(`No MCPortal profile for @${clean(handle, 40).replace(/^@/, '')}`, 'not_found');
     if (found.profile.accountId !== viewer && (await this.blockedEitherWay(viewer, found.profile.accountId))) {
-      throw new SocialError(`No MCPortal profile for @${found.profile.handle}`);   // a block hides both ways, silently
+      throw new SocialError(`No MCPortal profile for @${found.profile.handle}`, 'not_found');   // a block hides both ways, silently
     }
     return found.profile;
   }
@@ -288,14 +294,15 @@ export class Social {
   }
 
   async share(author: string, input: { kind: 'link' | 'clip'; title: string; url?: string; clip?: Clip; note?: unknown; audience?: unknown }): Promise<SharedItem> {
-    if (!(await this.profiles.get(author))) throw new SocialError('Sharing needs a public profile, so people know who shared it. Create one with set_public_profile first');
-    if ((await this.store.countShares(author)) >= SOCIAL_LIMITS.sharesPerUser) throw new SocialError(`You have ${SOCIAL_LIMITS.sharesPerUser} shares, the most MCPortal keeps. Remove some with unshare`);
+    if (!(await this.profiles.get(author))) throw new SocialError('Sharing needs a public profile, so people know who shared it. Create one with set_public_profile first', 'failed_precondition');
+    if ((await this.store.countShares(author)) >= SOCIAL_LIMITS.sharesPerUser) throw new SocialError(`You have ${SOCIAL_LIMITS.sharesPerUser} shares, the most MCPortal keeps. Remove some with unshare`, 'limit_exceeded');
     const audience: Audience = input.audience === 'mcportal' ? 'mcportal' : 'followers';
     let note: string;
     try {
       note = cleanText(input.note, SOCIAL_LIMITS.note, 'note');
     } catch (error) {
-      throw new SocialError((error as Error).message.replace(/\.$/, ''));
+      if (!(error instanceof ClipError)) throw error;
+      throw new SocialError(error.message.replace(/\.$/, ''), error.code);
     }
     const share: Share = {
       id: newId('s'),
@@ -351,7 +358,7 @@ export class Social {
   async follow(viewer: string, handle: string): Promise<PublicProfile> {
     const target = await this.resolve(viewer, handle);
     if (target.accountId === viewer) throw new SocialError("You can't follow yourself");
-    if ((await this.store.outgoing('follows', viewer)).length >= SOCIAL_LIMITS.follows) throw new SocialError(`You follow ${SOCIAL_LIMITS.follows} people, the most MCPortal allows`);
+    if ((await this.store.outgoing('follows', viewer)).length >= SOCIAL_LIMITS.follows) throw new SocialError(`You follow ${SOCIAL_LIMITS.follows} people, the most MCPortal allows`, 'limit_exceeded');
     await this.store.relate('follows', viewer, target.accountId);
     return target;
   }
@@ -372,7 +379,7 @@ export class Social {
   /** Blocking also removes follows both ways. Unblocking doesn't restore them. */
   async block(viewer: string, handle: string, on: boolean): Promise<PublicProfile> {
     const found = await this.profiles.byHandle(handle);
-    if (!found) throw new SocialError(`No MCPortal profile for @${clean(handle, 40).replace(/^@/, '')}`);
+    if (!found) throw new SocialError(`No MCPortal profile for @${clean(handle, 40).replace(/^@/, '')}`, 'not_found');
     const target = found.profile;
     if (target.accountId === viewer) throw new SocialError("You can't block yourself");
     if (on) {
@@ -404,12 +411,12 @@ export class Social {
     const why = clean(reason, SOCIAL_LIMITS.reason);
     if (!why) throw new SocialError('Say briefly what is wrong');
     const open = (await this.store.reports('open', 10_000)).filter((r) => r.reporterId === reporter).length;
-    if (open >= SOCIAL_LIMITS.openReportsPerUser) throw new SocialError('You have many open reports; an admin will get to them');
+    if (open >= SOCIAL_LIMITS.openReportsPerUser) throw new SocialError('You have many open reports; an admin will get to them', 'limit_exceeded');
     let targetKind: Report['targetKind'];
     let targetId: string;
     if (target.shareId) {
       const share = await this.store.getShare(target.shareId);
-      if (!share || !(await this.canSee(reporter, share))) throw new SocialError('No such share');
+      if (!share || !(await this.canSee(reporter, share))) throw new SocialError('No such share', 'not_found');
       if (share.accountId === reporter) throw new SocialError("That's your own share; remove it with unshare");
       targetKind = 'share';
       targetId = share.id;

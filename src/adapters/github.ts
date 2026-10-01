@@ -1,3 +1,4 @@
+import { UpstreamError } from '../lib/errors.ts';
 import { fetchJson } from '../lib/safe-fetch.ts';
 import { clean, safeHttpUrl } from '../lib/text.ts';
 import type { Fetcher, Item } from '../types.ts';
@@ -74,7 +75,7 @@ export async function fetchGithub(config: GithubConfig, fetcher: Fetcher): Promi
   const url = githubEndpoint(config);
   if (config.mode === 'releases') {
     const releases = await fetchJson<Release[]>(fetcher, url, { headers: githubHeaders() });
-    if (!Array.isArray(releases)) throw new Error('GitHub returned an unexpected response');
+    if (!Array.isArray(releases)) throw new UpstreamError('upstream_error', 'GitHub returned an unexpected response');
     return releases
       .filter((r) => r && !r.draft)
       .map((r) => ({
@@ -87,7 +88,7 @@ export async function fetchGithub(config: GithubConfig, fetcher: Fetcher): Promi
       }));
   }
   const data = await fetchJson<{ items: Repo[] }>(fetcher, url, { headers: githubHeaders() });
-  if (!Array.isArray(data?.items)) throw new Error('GitHub returned an unexpected response');
+  if (!Array.isArray(data?.items)) throw new UpstreamError('upstream_error', 'GitHub returned an unexpected response');
   return data.items.map((r) => ({
     id: String(r.id),
     title: clean(r.full_name, 140),

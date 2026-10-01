@@ -36,7 +36,7 @@ async function siteFor(args: Record<string, unknown>, ctx: ToolContext): Promise
   let config: DocsConfig | undefined;
   if (typeof args.portalId === 'string' && args.portalId) {
     const spec = findPortal(profile, args.portalId);
-    if (!spec || spec.source !== 'docs') throw new DocsError(`No docs portal with id "${clean(args.portalId, 60)}"`);
+    if (!spec || spec.source !== 'docs') throw new DocsError(`No docs portal with id "${clean(args.portalId, 60)}"`, 'not_found');
     config = normalizeSourceConfig('docs', spec.config, spec.id) as DocsConfig;
   } else {
     const input = clean(args.docs, 500);

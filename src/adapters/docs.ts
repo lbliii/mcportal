@@ -16,6 +16,7 @@
  * Everything here is untrusted third-party text, returned as plain data.
  */
 import { inflateSync } from 'node:zlib';
+import { AppError, upstreamStatus, type AppErrorOptions, type ErrorCode } from '../lib/errors.ts';
 import { cleanDocsMarkdown, MARKDOWN_LIMITS, parseMarkdown } from '../lib/markdown.ts';
 import { clean, decodeEntities, safeHttpUrl } from '../lib/text.ts';
 import type { ArticleBlock, Fetcher } from '../types.ts';
@@ -85,8 +86,13 @@ export const DOCS_LIMITS = {
   symbols: 20_000,
 };
 
-export class DocsError extends Error {
+/** A docs site or page that can't be found, read or used. Defaults to invalid_argument; pass a code when it's something else. */
+export class DocsError extends AppError {
   override name = 'DocsError';
+
+  constructor(message: string, code: ErrorCode = 'invalid_argument', options?: AppErrorOptions) {
+    super(code, message, options);
+  }
 }
 
 // ---- validation ---------------------------------------------------------------
@@ -354,9 +360,9 @@ export function originalUrl(url: string): string {
 async function githubFiles(g: GithubDocs, fetcher: Fetcher): Promise<string[]> {
   const url = `${GITHUB_API}/repos/${g.owner}/${g.repo}/git/trees/${encodeURIComponent(g.ref)}?recursive=1`;
   const res = await fetcher(url, { headers: githubHeaders(), maxBytes: DOCS_LIMITS.treeBytes });
-  if (res.status === 404 || res.status === 409) throw new DocsError(`GitHub has no repository ${g.owner}/${g.repo}${g.ref === 'HEAD' ? '' : ` at ${g.ref}`} (or it's private or empty)`);
-  if (res.status === 403 || res.status === 429) throw new DocsError('GitHub is rate-limiting requests right now; try again in a few minutes');
-  if (res.status < 200 || res.status >= 300) throw new DocsError(`GitHub responded ${res.status}`);
+  if (res.status === 404 || res.status === 409) throw new DocsError(`GitHub has no repository ${g.owner}/${g.repo}${g.ref === 'HEAD' ? '' : ` at ${g.ref}`} (or it's private or empty)`, 'not_found');
+  if (res.status === 403 || res.status === 429) throw new DocsError('GitHub is rate-limiting requests right now; try again in a few minutes', 'rate_limited');
+  if (res.status < 200 || res.status >= 300) throw upstreamStatus('GitHub', res.status);
   const data = JSON.parse(res.text) as { tree?: Array<{ path?: unknown; type?: unknown }> };
   return (data.tree ?? []).filter((e) => e.type === 'blob' && typeof e.path === 'string').map((e) => e.path as string);
 }
@@ -424,7 +430,7 @@ export async function loadGithubDocs(tocUrl: string, fetcher: Fetcher): Promise<
     path = outlineDir && under(outlineDir).length >= 3 ? outlineDir : (DOCS_FOLDERS.find((dir) => under(dir).length >= 2) ?? '');
   }
   let files = path ? under(path) : all.filter((f) => !f.includes('/'));
-  if (!files.length) throw new DocsError(`No markdown found in ${g.owner}/${g.repo}${path ? `/${path}` : ''}`);
+  if (!files.length) throw new DocsError(`No markdown found in ${g.owner}/${g.repo}${path ? `/${path}` : ''}`, 'not_found');
 
   // Translated docs: keep English when the folder has several locale folders and an en/ one.
   const rel = (f: string) => (path ? f.slice(path.length + 1) : f);
@@ -660,7 +666,7 @@ export async function resolveDocs(input: string, fetcher: Fetcher): Promise<DocS
       }
     }
   }
-  throw new DocsError(`No docs index found for ${docsUrl(input).href}: tried llms.txt, a Sphinx objects.inv and a sitemap`);
+  throw new DocsError(`No docs index found for ${docsUrl(input).href}: tried llms.txt, a Sphinx objects.inv and a sitemap`, 'not_found');
 }
 
 // ---- scope ----------------------------------------------------------------------
@@ -811,5 +817,5 @@ export async function fetchDocPage(url: string, fetcher: Fetcher, options: { tit
       }
     }
   }
-  throw new DocsError(lastStatus >= 400 ? `Page responded ${lastStatus}` : 'No readable version of this page');
+  throw lastStatus >= 400 ? upstreamStatus('Page', lastStatus) : new DocsError('No readable version of this page', 'upstream_error');
 }

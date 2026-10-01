@@ -1,3 +1,4 @@
+import { UpstreamError } from '../lib/errors.ts';
 import { fetchJson } from '../lib/safe-fetch.ts';
 import { clean, hostOf, safeHttpUrl } from '../lib/text.ts';
 import type { Fetcher, Item } from '../types.ts';
@@ -48,7 +49,7 @@ function toItem(s: HnStory): Item | null {
 
 export async function fetchHn(config: HnConfig, fetcher: Fetcher): Promise<Item[]> {
   const ids = await fetchJson<unknown>(fetcher, hnEndpoint(config));
-  if (!Array.isArray(ids)) throw new Error('Hacker News returned an unexpected response');
+  if (!Array.isArray(ids)) throw new UpstreamError('upstream_error', 'Hacker News returned an unexpected response');
   const stories = await Promise.all(
     ids
       .filter((id): id is number => Number.isInteger(id))
