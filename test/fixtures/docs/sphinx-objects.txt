@@ -1,0 +1,7 @@
+# Sphinx inventory version 2
+# Project: Sphinx
+# Version: 1
+# The remainder of this file is compressed using zlib.
+usage/index std:doc -1 usage/index.html Using Sphinx
+usage/quickstart std:doc -1 usage/quickstart.html Getting started
+usage/configuration std:doc -1 usage/configuration.html Configuration
