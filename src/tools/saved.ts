@@ -4,7 +4,7 @@
  */
 import { clean } from '../lib/text.ts';
 import { addPortalTo, columnOf, ensurePortal, slugId, withLayout } from '../layout.ts';
-import { describeLayout, findPortal, findSavedPortal, httpUrl, LIMITS, normalizePinnedItems, validateProfile, type PinnedConfig, type Profile, type SavedItem } from '../profile.ts';
+import { describeLayout, findPortal, findSavedPortal, httpUrl, LIMITS, normalizePinnedItems, validateProfile, type Profile, type SavedItem } from '../profile.ts';
 import { pinnedPortal, savedPortal } from '../sources.ts';
 import type { ProfileChange } from '../store.ts';
 import { ok, toolError, toolFailure, untrusted, type CallToolResult, type ToolDef } from './kit.ts';
@@ -142,7 +142,7 @@ export const SAVED_TOOLS: ToolDef[] = [
             const portalId = String(args.portalId);
             const spec = findPortal(before, portalId);
             if (!spec || spec.source !== 'pinned') return { result: { refused: toolError(`No pinned portal with id "${clean(args.portalId, 60)}". Leave out portalId to add a new one.`, 'not_found') } };
-            const config = { ...spec.config, ...(from ? { from: args.from } : {}), ...(recipe ? { recipe: args.recipe } : {}) };
+            const config = { ...spec.config, ...(from ? { from } : {}), ...(recipe ? { recipe } : {}) };
             const nextTitle = title || spec.title;
             const columns = before.columns.map((c) => ({ ...c, panels: c.panels.map((p) => (p.id === portalId ? { ...p, ...(nextTitle !== undefined ? { title: nextTitle } : {}), config } : p)) }));
             const profile = withLayout(before, { columns, pins: { ...before.pins, [portalId]: pin } });
@@ -159,7 +159,8 @@ export const SAVED_TOOLS: ToolDef[] = [
       if ('refused' in outcome) return outcome.refused;
       const { profile, portalId } = outcome;
       const portal = pinnedPortal(findPortal(profile, portalId)!, profile.pins);
-      const { from: source } = findPortal(profile, portalId)!.config as unknown as PinnedConfig;
+      const placed = findPortal(profile, portalId);
+      const source = placed?.source === 'pinned' ? placed.config.from : from;
       const dropped = args.items.length - items.length;
       const text = refreshing
         ? `Refreshed "${portal.title}" (id ${portalId}): ${items.length} items from ${source}.`

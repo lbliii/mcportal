@@ -210,3 +210,15 @@ test('profiles: concurrent changes all land (update is atomic per user)', async 
     assert.deepEqual(saved, [...urls].sort(), `${store.constructor.name}: no save was lost`);
   }
 });
+
+test('portal configs: every stored portal has its source\'s full, typed settings', async () => {
+  const { normalizeSourceConfig, validateProfile } = await import('../src/profile.ts');
+  assert.deepEqual(normalizeSourceConfig('github', {}, 'x'), { mode: 'search', query: 'topic:mcp', sort: 'stars', limit: 10 });
+  assert.deepEqual(normalizeSourceConfig('github', { mode: 'releases', repo: 'a/b' }, 'x'), { mode: 'releases', repo: 'a/b', limit: 10 });
+  assert.deepEqual(normalizeSourceConfig('saved', { limit: 999 }, 'x'), { limit: 30 });
+  assert.throws(() => normalizeSourceConfig('pinned', {}, 'here'), /here: pinned needs/);
+  const profile = validateProfile({ columns: [{ panels: [{ source: 'hn', config: {} }, { source: 'github', config: { query: 'x' } }] }] });
+  const [hn, gh] = profile.columns[0]!.panels;
+  assert.ok(hn?.source === 'hn' && hn.config.feed === 'top');
+  assert.ok(gh?.source === 'github' && gh.config.mode === 'search' && gh.config.sort === 'stars');
+});

@@ -54,14 +54,13 @@ const xmlAttr = escapeHtml;
 
 /** A feed URL for a portal, if the source has one that other readers can use. */
 export function feedUrlFor(portal: PortalSpec): string | undefined {
-  const c = portal.config as Record<string, unknown>;
-  if (portal.source === 'rss' && typeof c.url === 'string') return c.url;
+  if (portal.source === 'rss') return portal.config.url;
   if (portal.source === 'hn') {
-    const feed = String(c.feed ?? 'top');
+    const { feed } = portal.config;
     return feed === 'top' ? 'https://news.ycombinator.com/rss' : `https://hnrss.org/${feed === 'new' ? 'newest' : feed}`;
   }
-  if (portal.source === 'github' && c.mode === 'releases' && typeof c.repo === 'string' && REPO_PATTERN.test(c.repo)) {
-    return `https://github.com/${c.repo}/releases.atom`;
+  if (portal.source === 'github' && portal.config.mode === 'releases' && REPO_PATTERN.test(portal.config.repo)) {
+    return `https://github.com/${portal.config.repo}/releases.atom`;
   }
   return undefined;   // GitHub searches, saved items and pinned results have no feed
 }

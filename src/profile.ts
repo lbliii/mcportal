@@ -11,17 +11,35 @@ import { AppError, type AppErrorOptions, type ErrorCode } from './lib/errors.ts'
 import { clean } from './lib/text.ts';
 import { CLIP_KINDS, type ClipKind, type Item, type SourceKind } from './types.ts';
 
-export interface PortalSpec {
+/** A portal as stored: its config is the validated settings of its source. */
+export interface PortalOf<S extends SourceKind> {
+  id: string;
+  source: S;
+  title?: string;
+  config: SourceConfigs[S];
+}
+
+/** Any stored portal. Narrow on `source` to get its config type. */
+export type PortalSpec = { [S in SourceKind]: PortalOf<S> }[SourceKind];
+
+/** A portal before validation (tool arguments, starter packs, discovery candidates). validateProfile turns it into a PortalSpec. */
+export interface PortalInput {
   id: string;
   source: SourceKind;
-  title?: string;
-  config: Record<string, unknown>;
+  title?: string | undefined;
+  config: unknown;
 }
 
 export interface ColumnSpec {
   /** Relative width (flex-grow), 1 to 4. */
   width: number;
   panels: PortalSpec[];
+}
+
+/** A column before validation. */
+export interface ColumnInput {
+  width?: number;
+  panels: Array<PortalInput | PortalSpec>;
 }
 
 /** columns: side-by-side portals. shelves: one horizontally scrolling row per portal. */
@@ -54,12 +72,31 @@ export interface PinnedConfig {
   limit: number;
 }
 
+/** Saved and following portals have only a length. */
+export interface LimitConfig {
+  limit: number;
+}
+
 /** A clips portal: optionally only one kind or one tag. */
 export interface ClipsConfig {
   kind?: ClipKind;
   tag?: string;
   limit: number;
 }
+
+/** Each source's validated settings. */
+export interface SourceConfigs {
+  hn: HnConfig;
+  rss: RssConfig;
+  github: GithubConfig;
+  docs: DocsConfig;
+  saved: LimitConfig;
+  pinned: PinnedConfig;
+  clips: ClipsConfig;
+  following: LimitConfig;
+}
+
+export type SourceConfig = SourceConfigs[SourceKind];
 
 export interface Profile {
   version: 1;
@@ -140,25 +177,31 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-export function normalizeSourceConfig(source: SourceKind, raw: unknown, where: string): HnConfig | RssConfig | GithubConfig | DocsConfig | PinnedConfig | ClipsConfig | { limit: number } {
-  const config = isRecord(raw) ? raw : {};
-  if (source === 'saved' || source === 'following') return { limit: clampInt(config.limit, 1, LIMITS.items, LIMITS.items) };
-  if (source === 'clips') {
+type Normalizer<S extends SourceKind> = (config: Record<string, unknown>, where: string) => SourceConfigs[S];
+
+const itemsLimit = (config: Record<string, unknown>) => ({ limit: clampInt(config.limit, 1, LIMITS.items, LIMITS.items) });
+/** Fetched sources default to 10 items. */
+const fetchLimit = (config: Record<string, unknown>) => clampInt(config.limit, 1, LIMITS.items, 10);
+
+const NORMALIZERS: { [S in SourceKind]: Normalizer<S> } = {
+  saved: itemsLimit,
+  following: itemsLimit,
+  clips(config, where) {
     if (config.kind !== undefined && !(CLIP_KINDS as readonly unknown[]).includes(config.kind)) throw new ProfileError(`${where}: clips kind must be one of ${CLIP_KINDS.join(', ')}`);
     const tag = typeof config.tag === 'string' ? config.tag.toLowerCase().replace(/^#/, '').replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 30) : '';
-    return { ...(config.kind ? { kind: config.kind as ClipKind } : {}), ...(tag ? { tag } : {}), limit: clampInt(config.limit, 1, LIMITS.items, LIMITS.items) };
-  }
-  if (source === 'pinned') {
+    return { ...(config.kind ? { kind: config.kind as ClipKind } : {}), ...(tag ? { tag } : {}), ...itemsLimit(config) };
+  },
+  pinned(config, where) {
     const from = clean(config.from, 40);
     const recipe = clean(config.recipe, 500);
     if (!from || !recipe) throw new ProfileError(`${where}: pinned needs "from" (where the items came from) and "recipe" (how to fetch them again)`);
-    return { from, recipe, limit: clampInt(config.limit, 1, LIMITS.items, LIMITS.items) };
-  }
-  if (source === 'docs') {
+    return { from, recipe, ...itemsLimit(config) };
+  },
+  docs(config, where) {
     let url: string | null = null;
     try { url = typeof config.url === 'string' ? httpUrl(docsInputUrl(config.url)) : null; } catch { /* not an address */ }
     if (!url) throw new ProfileError(`${where}: docs needs a "url": a docs address or a GitHub owner/repo`);
-    const docs: DocsConfig = { url, limit: clampInt(config.limit, 1, LIMITS.items, LIMITS.items) };
+    const docs: DocsConfig = { url, ...itemsLimit(config) };
     if (config.toc !== undefined) {
       const toc = isRecord(config.toc) ? config.toc : {};
       const tocUrl = httpUrl(toc.url);
@@ -168,16 +211,13 @@ export function normalizeSourceConfig(source: SourceKind, raw: unknown, where: s
     const section = clean(config.section, 120);
     if (section) docs.section = section;
     return docs;
-  }
-  const limit = clampInt(config.limit, 1, LIMITS.items, 10);
-  if (source === 'hn') {
+  },
+  hn(config, where) {
     const feed = (config.feed ?? 'top') as string;
-    if (!(HN_FEEDS as readonly string[]).includes(feed)) {
-      throw new ProfileError(`${where}: hn feed must be one of ${HN_FEEDS.join(', ')}`);
-    }
-    return { feed: feed as HnConfig['feed'], limit };
-  }
-  if (source === 'rss') {
+    if (!(HN_FEEDS as readonly string[]).includes(feed)) throw new ProfileError(`${where}: hn feed must be one of ${HN_FEEDS.join(', ')}`);
+    return { feed: feed as HnConfig['feed'], limit: fetchLimit(config) };
+  },
+  rss(config, where) {
     const url = typeof config.url === 'string' ? config.url.trim() : '';
     try {
       const parsed = new URL(url);
@@ -185,17 +225,32 @@ export function normalizeSourceConfig(source: SourceKind, raw: unknown, where: s
     } catch {
       throw new ProfileError(`${where}: rss needs a valid http(s) "url"`);
     }
-    return { url, limit };
-  }
-  const mode = config.mode === 'releases' ? 'releases' : 'search';
-  if (mode === 'releases') {
-    const repo = typeof config.repo === 'string' ? config.repo.trim() : '';
-    if (!REPO_PATTERN.test(repo)) throw new ProfileError(`${where}: github releases needs "repo" like "owner/name"`);
-    return { mode, repo, limit };
-  }
-  const query = typeof config.query === 'string' && config.query.trim() ? config.query.trim().slice(0, 256) : 'topic:mcp';
-  const sort = config.sort === 'updated' ? 'updated' : 'stars';
-  return { mode, query, sort, limit };
+    return { url, limit: fetchLimit(config) };
+  },
+  github(config, where) {
+    const limit = fetchLimit(config);
+    if (config.mode === 'releases') {
+      const repo = typeof config.repo === 'string' ? config.repo.trim() : '';
+      if (!REPO_PATTERN.test(repo)) throw new ProfileError(`${where}: github releases needs "repo" like "owner/name"`);
+      return { mode: 'releases', repo, limit };
+    }
+    const query = typeof config.query === 'string' && config.query.trim() ? config.query.trim().slice(0, 256) : 'topic:mcp';
+    const sort = config.sort === 'updated' ? 'updated' : 'stars';
+    return { mode: 'search', query, sort, limit };
+  },
+};
+
+/** A source's settings, validated and with defaults filled in. Throws ProfileError naming `where`. */
+export function normalizeSourceConfig<S extends SourceKind>(source: S, raw: unknown, where: string): SourceConfigs[S] {
+  const normalize: Normalizer<S> = NORMALIZERS[source];
+  return normalize(isRecord(raw) ? raw : {}, where);
+}
+
+/** A stored portal from validated parts. The one place a source and its config are paired up. */
+function portalOf<S extends SourceKind>(id: string, source: S, title: string | undefined, config: SourceConfigs[S]): PortalSpec {
+  const portal: PortalOf<S> = title ? { id, source, title, config } : { id, source, config };
+  // PortalOf<S> is a member of the PortalSpec union for every S; TypeScript can't see that through a generic.
+  return portal as PortalOf<SourceKind> as PortalSpec;
 }
 
 /** Validate and normalize a whole profile. Throws ProfileError with a readable message. */
@@ -222,8 +277,7 @@ export function validateProfile(input: unknown, now = new Date()): Profile {
       let id = slug(typeof pRaw.id === 'string' && pRaw.id ? pRaw.id : title ?? `${source}-${ci}-${pi}`) || `${source}-${ci}-${pi}`;
       while (seen.has(id)) id = `${id}-2`;
       seen.add(id);
-      const config = normalizeSourceConfig(source, pRaw.config, where) as unknown as Record<string, unknown>;
-      return title ? { id, source, title, config } : { id, source, config };
+      return portalOf(id, source, title, normalizeSourceConfig(source, pRaw.config, where));
     });
     return { width: clampInt(colRaw.width, 1, 4, 1), panels: portals };
   });

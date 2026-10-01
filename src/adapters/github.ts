@@ -5,13 +5,10 @@ import type { Fetcher, Item } from '../types.ts';
 
 export const GITHUB_API = 'https://api.github.com';
 
-export interface GithubConfig {
-  mode: 'search' | 'releases';
-  query?: string;
-  sort?: 'stars' | 'updated';
-  repo?: string;
-  limit: number;
-}
+/** A repository search, or one repository's releases. */
+export type GithubConfig =
+  | { mode: 'search'; query: string; sort: 'stars' | 'updated'; limit: number }
+  | { mode: 'releases'; repo: string; limit: number };
 
 /** owner/name, where neither segment is "." or ".." (no path traversal on api.github.com). */
 export const REPO_PATTERN = /^(?!\.{1,2}\/)[A-Za-z0-9_.-]+\/(?!\.{1,2}$)[A-Za-z0-9_.-]+$/;
@@ -40,12 +37,12 @@ interface Release {
 
 export function githubEndpoint(config: GithubConfig): string {
   if (config.mode === 'releases') {
-    const [owner, name] = (config.repo ?? '').split('/');
+    const [owner, name] = config.repo.split('/');
     return `${GITHUB_API}/repos/${encodeURIComponent(owner ?? '')}/${encodeURIComponent(name ?? '')}/releases?per_page=${config.limit}`;
   }
   const params = new URLSearchParams({
-    q: config.query ?? 'topic:mcp',
-    sort: config.sort ?? 'stars',
+    q: config.query,
+    sort: config.sort,
     order: 'desc',
     per_page: String(config.limit),
   });

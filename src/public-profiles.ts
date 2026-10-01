@@ -15,7 +15,7 @@ import type { AuthPersistence } from './auth/store.ts';
 import { readDocument } from './lib/document.ts';
 import { AppError, type AppErrorOptions, type ErrorCode } from './lib/errors.ts';
 import { clean } from './lib/text.ts';
-import { normalizeSourceConfig, ProfileError } from './profile.ts';
+import { normalizeSourceConfig, ProfileError, type SourceConfigs } from './profile.ts';
 import { KeyedMutex } from './store.ts';
 
 export const HANDLE_HOLD_MS = 30 * 24 * 3600 * 1000;
@@ -34,7 +34,7 @@ export type Accent = (typeof ACCENTS)[number];
 export interface FeaturedSource {
   title: string;
   source: 'rss' | 'hn' | 'github';
-  config: Record<string, unknown>;
+  config: SourceConfigs['rss' | 'hn' | 'github'];
 }
 
 export const MAX_FEATURED = 12;
@@ -69,9 +69,9 @@ export function normalizeFeatured(raw: PublicProfileInput['sources']): FeaturedS
   const seen = new Set<string>();
   for (const entry of raw ?? []) {
     if (entry.source !== 'rss' && entry.source !== 'hn' && entry.source !== 'github') continue;
-    let config: Record<string, unknown>;
+    let config: FeaturedSource['config'];
     try {
-      config = normalizeSourceConfig(entry.source, entry.config, 'featured source') as unknown as Record<string, unknown>;
+      config = normalizeSourceConfig(entry.source, entry.config, 'featured source');
     } catch (error) {
       if (error instanceof ProfileError) continue;
       throw error;

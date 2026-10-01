@@ -5,18 +5,18 @@
 import { clean } from '../lib/text.ts';
 import { spreadColumns, withLayout } from '../layout.ts';
 import { MAX_PACKS, packSummaries, STARTER_PACKS } from '../packs.ts';
-import { describeDiff, describeLayout, diffProfiles, findPortal, normalizePins, normalizeSourceConfig, SOURCES, validateProfile, type PortalSpec, type Profile } from '../profile.ts';
+import { describeDiff, describeLayout, diffProfiles, findPortal, normalizePins, normalizeSourceConfig, SOURCES, validateProfile, type PortalInput, type Profile } from '../profile.ts';
 import { clipsPortal, clipsQuery, followingPortal, loadPortal, pinnedPortal, savedPortal } from '../sources.ts';
 import type { PortalResult } from '../types.ts';
 import { ok, toolError, toolFailure, untrusted, ROOM_URI, type ToolContext, type ToolDef } from './kit.ts';
 
 /** Any portal's current items: profile-backed ones from the profile and stores, the rest fetched (cached unless `force`). */
-export async function portalFor(spec: PortalSpec, profile: Profile, ctx: ToolContext, force = false): Promise<PortalResult> {
+export async function portalFor(spec: PortalInput, profile: Profile, ctx: ToolContext, force = false): Promise<PortalResult> {
   if (spec.source === 'saved') return savedPortal(spec, profile.saved);
   if (spec.source === 'pinned') return pinnedPortal(spec, profile.pins);
   if (spec.source === 'clips') return clipsPortal(spec, ctx.clips ? await ctx.clips.list(ctx.userId, clipsQuery(spec)) : []);
   if (spec.source === 'following') {
-    const { limit } = normalizeSourceConfig('following', spec.config, spec.id) as { limit: number };
+    const { limit } = normalizeSourceConfig('following', spec.config, spec.id);
     return followingPortal(spec, ctx.social ? await ctx.social.feed(ctx.userId, { limit }) : []);
   }
   return loadPortal(spec, ctx, force);
