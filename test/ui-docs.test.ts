@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import vm from 'node:vm';
+import { roomHtml } from '../src/mcp.ts';
 
 // Exercise the shipped tool-result dispatcher and card setup, including real DOM ids.
 // Browser validation still checks the full layout and asynchronous page fetch.
 async function viewer() {
-  const html = await readFile(new URL('../src/ui/room.html', import.meta.url), 'utf8');
+  const html = await roomHtml();
   const ids = [...html.matchAll(/id="([^"]+)"/g)].map((m) => m[1]);
   const nodes = new Map(ids.map((id) => [id, { hidden: true, textContent: '', replaceChildren(...children: unknown[]) { this.textContent = children.join(' '); } }]));
   const fn = (name: string) => {
@@ -33,7 +33,7 @@ test('open_docs host result makes a visible docs card using existing DOM element
   const v = await viewer();
   vm.runInContext(`dispatch({ structuredContent: { docs: 'acme/widgets', site: { sections: [] } } })`, v.context);
   assert.equal(v.errors.length, 0);
-  assert.equal(v.nodes.get('roomName')!.textContent, '· docs');
+  assert.equal(v.nodes.get('roomName')!.textContent, 'docs');
   assert.equal(v.nodes.get('reader')!.hidden, false);
   assert.equal(v.nodes.get('grid')!.hidden, true);
   assert.equal(v.nodes.get('welcome')!.hidden, true);

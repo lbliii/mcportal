@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 import vm from 'node:vm';
+import { roomHtml } from '../src/mcp.ts';
 
 type Palette = Record<string, string>;
 type Theme = { resolve: (mode: string, vars?: Palette) => Palette; contrast: (a: string, b: string) => number; create: (root: unknown, opts: unknown) => { update: (ctx: unknown) => Palette; destroy: () => void }; HOST: Palette };
@@ -59,7 +60,7 @@ test('system preference is followed until a host selects a scheme',()=>{
 });
 
 test('shipped host handler applies themes while preserving display-mode negotiation',async()=>{
-  const html=await readFile(new URL('../src/ui/room.html',import.meta.url),'utf8');
+  const html=await roomHtml();
   const handler=html.match(/  function applyHostContext\(ctx\) \{[\s\S]*?\n  \}/)?.[0];assert.ok(handler);
   const {controller,root}=host(), expand={hidden:false}, modes:string[]=[];
   const apply=vm.runInNewContext(`${handler};applyHostContext`,{theme:controller,$:()=>expand,canFullscreen:true,setDisplayMode:(v:string)=>modes.push(v)});

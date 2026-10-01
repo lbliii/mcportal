@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import vm from 'node:vm';
+import { roomHtml } from '../src/mcp.ts';
 
-const html = await readFile(new URL('../src/ui/room.html', import.meta.url), 'utf8');
+const html = await roomHtml();
 function shipped(name: string) {
   const found = html.match(new RegExp(`  (?:async )?function ${name}\\([^]*?\\n  \\}`));
   assert.ok(found, name);

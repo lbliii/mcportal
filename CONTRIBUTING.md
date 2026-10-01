@@ -38,7 +38,7 @@ Your profile lives in `~/.mcportal/default.json`.
 `mcportal-dev.mjs` keeps Claude's connection open and runs the real server behind it. When a `.ts` file under `src/` changes, it restarts the server and replays the connection handshake, so Claude doesn't notice. What that means for your edits:
 
 - **Server code** (`src/**/*.ts`): live on the next tool call. No Claude restart needed.
-- **Room UI** (`src/ui/room.html`): read fresh each time a card opens. Ask Claude to open the room again to see changes. A card that's already in the chat is frozen, because it's sandboxed and can't reload itself.
+- **Room UI** (`src/ui/room.html`, with its styles and script split into fragments under `src/ui/room/*`, inlined by `roomHtml()` in `src/mcp.ts`; new fragments must be added to `UI_INCLUDES`): read fresh each time a card opens. Ask Claude to open the room again to see changes. A card that's already in the chat is frozen, because it's sandboxed and can't reload itself.
 - **Tool names, descriptions or schemas**: Claude may cache the tool list per session. Start a new chat, or restart Claude if a change doesn't show.
 
 Reload messages go to stderr, which shows up in Claude desktop's MCP logs. To run without hot reload, use `bin/mcportal.mjs` with `--stdio`.
