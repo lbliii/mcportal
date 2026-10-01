@@ -10,7 +10,7 @@ import { createFixtureFetcher } from '../src/lib/fixture-fetch.ts';
 import { isPublicAddress, parseV6 } from '../src/lib/ip.ts';
 import { assertPublicUrl, BoundaryError, guardedLookup } from '../src/lib/safe-fetch.ts';
 import { clean } from '../src/lib/text.ts';
-import { handleMessage, MCP_APP_MIME, scriptJson, SERVER_INFO } from '../src/mcp.ts';
+import { handleMessage, MCP_APP_MIME, roomHtml, scriptJson, SERVER_INFO, UI_INCLUDES } from '../src/mcp.ts';
 import { buildBrand } from '../scripts/brand.ts';
 import { defaultProfile, ProfileError, validateProfile } from '../src/profile.ts';
 import { FileProfileStore, MemoryProfileStore } from '../src/store.ts';
@@ -92,6 +92,23 @@ test('resources/read serves the self-contained room app', async () => {
   for (const [, script] of content.text.matchAll(/<script>([\s\S]*?)<\/script>/g)) new vm.Script(script); // throws on a syntax error
   const missing = await rpc(ctx(), 'resources/read', { uri: 'ui://nope' });
   assert.equal(missing.error?.code, -32602);
+});
+
+test('room fragments: every src/ui/room file is included, in order, and no include marker is left', async () => {
+  const fragments = (await readdir(new URL('../src/ui/room/', import.meta.url))).map((f) => `room/${f}`);
+  assert.ok(fragments.length >= 10, `found the room fragments (${fragments.length})`);
+  const page = await readFile(new URL('../src/ui/room.html', import.meta.url), 'utf8');
+  const html = await roomHtml();
+  assert.ok(!/include:/.test(html), 'no leftover include markers');
+  for (const name of fragments) {
+    assert.ok(UI_INCLUDES.includes(name), `${name} is listed in UI_INCLUDES`);
+    assert.ok(page.includes(`include:${name}*/`) || page.includes(`include:${name}-->`), `room.html includes ${name}`);
+    const text = (await readFile(new URL(`../src/ui/${name}`, import.meta.url), 'utf8')).trim();
+    assert.ok(html.includes(text), `${name} appears in the assembled page`);
+  }
+  // The script fragments share one closure; their order is evaluation order.
+  const order = [...page.matchAll(/\/\*include:(room\/[\w.]+\.js)\*\//g)].map((m) => m[1]);
+  assert.deepEqual(order, ['bridge', 'dom', 'room', 'reader', 'docs', 'social', 'add', 'toolbar', 'boot'].map((n) => `room/${n}.js`));
 });
 
 // ---------------------------------------------------------------- tools
@@ -450,9 +467,9 @@ test('brand: every icon the room asks for is in the generated set, drawn on the 
   const { ICONS, ICON_STROKE } = vm.runInNewContext(`${text['src/ui/brand/icons.js']}; ({ ICONS, ICON_STROKE })`);
   assert.equal(ICON_STROKE, 1.75);
   assert.match(text['brand/mark-line.svg']!, /stroke-width="1\.75"/, 'the Line mark shares the icon stroke');
-  const page = await readFile(new URL('../src/ui/room.html', import.meta.url), 'utf8');
+  const page = await roomHtml();
   const used = new Set([...page.matchAll(/(?:icon|iconButton)\('(\w+)'|data-icon="(\w+)"|icon\(full \? '(\w+)' : '(\w+)'\)/g)].flatMap((m) => m.slice(1).filter(Boolean)));
-  assert.ok(used.size >= 19, `found the icon names in room.html (${used.size})`);
+  assert.ok(used.size >= 19, `found the icon names in the assembled room (${used.size})`);
   for (const name of used) assert.ok(Object.hasOwn(ICONS, name), `icon "${name}" is missing from scripts/brand.ts`);
   for (const [name, { d, dot }] of Object.entries(ICONS) as [string, { d: string; dot?: number[] }][]) {
     const numbers = d.match(/-?\d*\.?\d+/g)!.map(Number);
