@@ -5,6 +5,10 @@
  *
  * Run them against Claude with scripts/eval-tools.ts; test/evals.test.ts checks the
  * cases themselves (the tools exist, the arguments fit their schemas) offline.
+ *
+ * Frozen: a case's prompt and intent never change, so results compare across versions.
+ * When the interface renames or replaces a tool, declare it in evals/renames.ts; the
+ * runner translates expectations through it. Add cases; don't edit them.
  */
 export interface ToolCase {
   /** What the user says. */
@@ -59,6 +63,17 @@ export const TOOL_CASES: ToolCase[] = [
 
   // Reading history
   { prompt: 'what was I in the middle of reading?', tool: 'list_reading' },
+
+  // Added 2026-10-01 (frozen from here): card reads, imports, layout edits, argument checks
+  { prompt: 'show me my clip c0a1b2c3d4e5 again', tool: 'get_clip', args: { id: 'c0a1b2c3d4e5' } },
+  { prompt: 'read the "Install" page of the docs at docs.example.com: https://docs.example.com/install.md', tool: ['read_doc_page', 'open_docs'], args: { docs: 'docs.example.com' } },
+  { prompt: 'import these subscriptions: <?xml version="1.0"?><opml version="2.0"><body><outline text="Simon Willison" xmlUrl="https://simonwillison.net/atom/everything/"/></body></opml>', tool: 'import_opml' },
+  { prompt: 'import my MCPortal export from ~/Downloads/mcportal-export.json', tool: 'import_portal', args: { path: 'mcportal-export.json' }, where: 'local' },
+  { prompt: 'remove the Simon Willison portal from my room', tool: 'get_profile' },
+  { prompt: 'make my GitHub column wider', tool: 'get_profile' },
+  { prompt: 'rename my room to "mornings"', tool: 'get_profile' },
+  // No Jira tool is connected: the right first move is to say so, not pin invented items.
+  { prompt: 'pin my open Jira bugs to my room', tool: null },
 
   // Not for MCPortal
   { prompt: "what's 17 times 23?", tool: null },
