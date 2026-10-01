@@ -222,3 +222,25 @@ test('portal configs: every stored portal has its source\'s full, typed settings
   assert.ok(hn?.source === 'hn' && hn.config.feed === 'top');
   assert.ok(gh?.source === 'github' && gh.config.mode === 'search' && gh.config.sort === 'stars');
 });
+
+test('shared documents: cached reads, fresh atomic changes, and two instances keep each other\'s changes', async () => {
+  const { SharedDocument } = await import('../src/lib/document.ts');
+  let now = 0;
+  const silent = createLogger({ write: () => {} });
+  const stored = memoryPersistence();
+  const open = () => new SharedDocument<{ n: number[] }>(stored, 'test', (d) => ({ n: d.n ?? [] }), { maxAgeMs: 1000, now: () => now, log: silent });
+  const [a, b] = [open(), open()];
+  await Promise.all(Array.from({ length: 10 }, (_, i) => (i % 2 ? a : b).update((d) => { d.n.push(i); })));
+  assert.deepEqual((await a.get(0)).n.sort((x, y) => x - y), [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], 'no change lost between instances');
+
+  await b.get(0);
+  await a.update((d) => { d.n.push(10); });
+  assert.equal((await b.get()).n.length, 10, 'b serves its cache within maxAgeMs');
+  now = 1000;
+  assert.equal((await b.get()).n.length, 11, 'and reloads after');
+
+  const flaky = { read: async () => { throw new Error('connection reset'); }, write: async () => {} };
+  const c = new SharedDocument<{ n: number[] }>(flaky, 'test', (d) => ({ n: d.n ?? [] }), { maxAgeMs: 1000, now: () => now, log: silent });
+  await assert.rejects(c.get(), /connection reset/, 'no cache yet: the failure shows');
+  await assert.rejects(c.update(() => {}), /connection reset/, 'a change never starts from nothing');
+});

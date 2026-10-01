@@ -9,9 +9,9 @@
  */
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { readDocument, type DocumentPersistence } from '../lib/document.ts';
+import { SharedDocument, type DocumentPersistence } from '../lib/document.ts';
 import { secretToken, sha256Hex } from '../lib/ids.ts';
-import { atomicWrite, KeyedMutex } from '../store.ts';
+import { atomicWrite } from '../lib/files.ts';
 
 export const ACCESS_TTL_SECONDS = 3600;
 export const REFRESH_TTL_SECONDS = 30 * 24 * 3600;
@@ -77,40 +77,51 @@ export function randomToken(prefix: string): string {
   return `${prefix}_${secretToken(32)}`;
 }
 
+/**
+ * How stale the cached OAuth document may get. Short, because a token revoked on
+ * another instance (sign-out, account deletion) stays valid here until the reload.
+ */
+const AUTH_MAX_AGE_MS = 5_000;
+
 export class AuthStore {
-  private persistence: AuthPersistence;
-  private data: Data | null = null;
-  private mutex = new KeyedMutex();
+  private data: SharedDocument<Data>;
   now: () => number;
 
   /** `where` is a data directory (file persistence) or an AuthPersistence (e.g. Postgres). */
   constructor(where: string | AuthPersistence, now: () => number = Date.now) {
-    this.persistence = typeof where === 'string' ? fileAuthPersistence(where) : where;
     this.now = now;
-  }
-
-  private async load(): Promise<Data> {
-    if (this.data) return this.data;
-    const parsed = await readDocument<Data>(this.persistence, 'OAuth');
-    this.data = { clients: parsed.clients ?? {}, tokens: parsed.tokens ?? {} };
-    return this.data;
-  }
-
-  /** Mutate + persist under a lock. Expired records are pruned on every write. */
-  private write<T>(mutate: (data: Data) => T): Promise<T> {
-    return this.mutex.run('auth', async () => {
-      const data = await this.load();
-      const result = mutate(data);
-      const now = this.now();
-      for (const [hash, record] of Object.entries(data.tokens)) if (record.expiresAt <= now) delete data.tokens[hash];
-      const clients = Object.values(data.clients);
-      if (clients.length > CLIENT_LIMITS.clients) {
-        clients.sort((a, b) => a.last_used_at - b.last_used_at);
-        for (const c of clients.slice(0, clients.length - CLIENT_LIMITS.clients)) delete data.clients[c.client_id];
-      }
-      await this.persistence.write(JSON.stringify(data));
-      return result;
+    this.data = new SharedDocument<Data>(typeof where === 'string' ? fileAuthPersistence(where) : where, 'OAuth', (d) => ({ clients: d.clients ?? {}, tokens: d.tokens ?? {} }), {
+      maxAgeMs: AUTH_MAX_AGE_MS,
+      now: () => this.now(),
+      beforeWrite: (data) => {
+        const now = this.now();
+        for (const [hash, record] of Object.entries(data.tokens)) if (record.expiresAt <= now) delete data.tokens[hash];
+        const clients = Object.values(data.clients);
+        if (clients.length > CLIENT_LIMITS.clients) {
+          clients.sort((a, b) => a.last_used_at - b.last_used_at);
+          for (const c of clients.slice(0, clients.length - CLIENT_LIMITS.clients)) delete data.clients[c.client_id];
+        }
+      },
     });
+  }
+
+  /** The OAuth document, from the cache unless it's older than `maxAgeMs`. */
+  private load(maxAgeMs?: number): Promise<Data> {
+    return this.data.get(maxAgeMs);
+  }
+
+  /** Mutate + persist atomically. Expired records are pruned on every write. */
+  private write<T>(mutate: (data: Data) => T): Promise<T> {
+    return this.data.update(mutate);
+  }
+
+  /**
+   * A record from the cache, or, if it isn't there, from a reload: another instance may
+   * have issued it a moment ago. Overlapping reloads share one read, so a burst of
+   * unknown tokens costs one read, not one each.
+   */
+  private async lookup<V>(pick: (data: Data) => V | undefined): Promise<V | undefined> {
+    return pick(await this.load()) ?? pick(await this.load(0));
   }
 
   async registerClient(input: { client_name?: string | undefined; redirect_uris: string[] }): Promise<ClientRecord> {
@@ -123,7 +134,7 @@ export class AuthStore {
   }
 
   async getClient(clientId: string): Promise<ClientRecord | undefined> {
-    return (await this.load()).clients[clientId];
+    return this.lookup((d) => d.clients[clientId]);
   }
 
   async touchClient(clientId: string): Promise<void> {
@@ -150,7 +161,7 @@ export class AuthStore {
 
   /** Valid, unexpired access token issued for this resource. */
   async verifyAccess(token: string, resource: string): Promise<TokenRecord | undefined> {
-    const record = (await this.load()).tokens[hashToken(token)];
+    const record = await this.lookup((d) => d.tokens[hashToken(token)]);
     if (!record || record.kind !== 'access' || record.expiresAt <= this.now() || record.resource !== resource) return undefined;
     return record;
   }

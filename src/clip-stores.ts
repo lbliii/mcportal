@@ -6,7 +6,7 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { CLIP_LIMITS, ClipError, clampLimit, normalizeTags, patchClip, queryWords, searchTextOf, summaryOf, type Clip, type ClipPatch, type ClipQuery, type ClipSummary } from './clips.ts';
-import { atomicWrite, defaultDataDir, KeyedMutex, safeFileId } from './store.ts';
+import { atomicWrite, defaultDataDir, KeyedMutex, safeFileId } from './lib/files.ts';
 
 export interface ClipStore {
   /** Throws ClipError when the user is at a limit. */

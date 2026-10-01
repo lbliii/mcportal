@@ -3,7 +3,7 @@ import { readFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { AppError } from './lib/errors.ts';
 import { sha256Hex } from './lib/ids.ts';
-import { atomicWrite, defaultDataDir, KeyedMutex } from './store.ts';
+import { atomicWrite, defaultDataDir, KeyedMutex } from './lib/files.ts';
 
 const invalid = (message: string) => new AppError('invalid_argument', message);
 

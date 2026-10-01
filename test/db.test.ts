@@ -74,6 +74,26 @@ test('pg profiles: concurrent updates from two instances all land (per-user lock
   assert.equal(await a.rev('racy'), urls.length);
 });
 
+test('pg documents: two instances share OAuth and accounts without losing or missing changes', { skip }, async () => {
+  const { Accounts, makeBootstrap } = await import('../src/accounts.ts');
+  let now = Date.parse('2026-10-01T00:00:00Z');
+  const clock = () => now;
+  const [a, b] = [new AuthStore(pgAuthPersistence(db, 'auth-multi'), clock), new AuthStore(pgAuthPersistence(db, 'auth-multi'), clock)];
+  const client = await a.registerClient({ redirect_uris: ['https://app.example/cb'] });
+  assert.ok(await b.getClient(client.client_id), 'a client registered on one instance is found on the other at once');
+  const who = { userId: 'multi', login: 'multi' };
+  const issued = await a.issueTokens(who as never, client.client_id, 'https://mcp.example/mcp', 'mcportal');
+  assert.ok(await b.verifyAccess(issued.access_token, 'https://mcp.example/mcp'), 'so is a token');
+  await a.revokeUser('multi');
+  now += 5_000;
+  assert.equal(await b.verifyAccess(issued.access_token, 'https://mcp.example/mcp'), undefined, 'a revocation reaches the other instance within its cache age');
+
+  const [x, y] = [new Accounts(pgAuthPersistence(db, 'accounts-multi'), makeBootstrap([], [])), new Accounts(pgAuthPersistence(db, 'accounts-multi'), makeBootstrap([], []))];
+  await Promise.all(['ann', 'ben', 'cat', 'dan'].map((login, i) => (i % 2 ? x : y).invite(login, 'test')));
+  await x.load(true);
+  assert.deepEqual((await x.list()).invites.map((i) => i.login).sort(), ['ann', 'ben', 'cat', 'dan'], 'concurrent invites from two instances all land');
+});
+
 test('pg profiles: an unreadable row is kept aside and the user gets the default plus a notice', { skip }, async () => {
   await db.query(`INSERT INTO mcportal_profiles (user_id, data) VALUES ('broken', $1)`, [JSON.stringify({ columns: 'nope' })]);
   const store = new PgProfileStore(db);
