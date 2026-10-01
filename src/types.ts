@@ -1,3 +1,5 @@
+import type { ErrorCode } from './lib/errors.ts';
+
 /**
  * 'saved' is the user's own bookmarks and 'pinned' is data the agent brought from
  * another tool (Jira, Slack, …): both live in the profile and are never fetched.
@@ -49,6 +51,8 @@ export interface PortalResult {
   items: Item[];
   provenance: Provenance;
   error?: string;
+  /** Why it failed, when it did (see src/lib/errors.ts). */
+  errorCode?: ErrorCode;
   /** Pinned portals: where the items came from and how the agent fetches them again. */
   pin?: { from: string; recipe: string };
 }

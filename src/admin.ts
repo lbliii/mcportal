@@ -16,57 +16,45 @@ import { DESIGN_CSS, PRIMITIVES_CSS } from './design/generated.ts';
  * SameSite=Lax cookie. Every change needs the session, a same-origin request and
  * the CSRF token, and re-checks that the admin is still an active admin.
  */
-import { createHash, randomBytes } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { fileURLToPath } from 'node:url';
 import type { Accounts } from './accounts.ts';
 import type { PublicProfiles } from './public-profiles.ts';
 import type { Social } from './social.ts';
-import { cookies, escapeHtml, page, redirect, safeEqual, sendHtml, sendJson, type OAuthServer } from './auth/oauth.ts';
+import type { OAuthServer } from './auth/oauth.ts';
+import { httpStatus, isAppError, type ErrorCode } from './lib/errors.ts';
+import { escapeHtml, readJson, redirect, sameOrigin, sendHtml, sendJson, sendJsonError } from './lib/web.ts';
+import { page } from './page.ts';
+import { PageSessions, type PageSession } from './page-sessions.ts';
 
 const SESSION_MS = 8 * 3600 * 1000;
 const MAX_SESSIONS = 200;
 const MAX_BODY = 4096;
+/** An API error: { error: code, error_description: message }, with the code's HTTP status. */
+function fail(res: ServerResponse, code: ErrorCode, message: string): void {
+  sendJsonError(res, httpStatus(code), code, message);
+}
+
 const ADMIN_HTML = fileURLToPath(new URL('./ui/admin.html', import.meta.url));
 
-interface Session {
-  accountId: string;
-  login: string;
-  csrf: string;
-  expiresAt: number;
-}
-
-const hash = (v: string) => createHash('sha256').update(v).digest('hex');
-
-async function readJson(req: IncomingMessage): Promise<Record<string, unknown>> {
-  let size = 0;
-  const chunks: Buffer[] = [];
-  for await (const chunk of req) {
-    size += (chunk as Buffer).length;
-    if (size > MAX_BODY) throw new Error('Request too large');
-    chunks.push(chunk as Buffer);
-  }
-  const parsed = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}') as unknown;
-  return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {};
-}
 
 export class AdminPanel {
-  private sessions = new Map<string, Session>();
+  private sessions: PageSessions;
   private accounts: Accounts;
   private oauth: OAuthServer;
   private publicUrl: string;
-  private now: () => number;
-  private social?: Social;
-  private profiles?: PublicProfiles;
+  private social: Social | undefined;
+  private profiles: PublicProfiles | undefined;
 
-  constructor(accounts: Accounts, oauth: OAuthServer, publicUrl: string, now: () => number = Date.now, moderation: { social?: Social; profiles?: PublicProfiles } = {}) {
+  constructor(accounts: Accounts, oauth: OAuthServer, publicUrl: string, now: () => number = Date.now, moderation: { social?: Social | undefined; profiles?: PublicProfiles | undefined } = {}) {
     this.accounts = accounts;
     this.oauth = oauth;
     this.publicUrl = publicUrl;
-    this.now = now;
     this.social = moderation.social;
     this.profiles = moderation.profiles;
+    this.sessions = new PageSessions('admin', { publicUrl, ttlMs: SESSION_MS, max: MAX_SESSIONS, now });
   }
 
   /** Open reports and the last few resolved ones, with what they're about. */
@@ -91,40 +79,23 @@ export class AdminPanel {
     }));
   }
 
-  private get secure(): boolean {
-    return this.publicUrl.startsWith('https://');
-  }
-
-  private get cookieName(): string {
-    return this.secure ? '__Host-mcportal_admin' : 'mcportal_admin';
-  }
-
-  private cookie(value: string, maxAgeSeconds: number): string {
-    return `${this.cookieName}=${value}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSeconds}${this.secure ? '; Secure' : ''}`;
-  }
-
   /** The current admin, re-checked against accounts on every request. */
-  private session(req: IncomingMessage): { key: string; session: Session } | undefined {
-    const raw = cookies(req)[this.cookieName];
-    if (!raw) return undefined;
-    const key = hash(raw);
-    const session = this.sessions.get(key);
-    if (!session || session.expiresAt <= this.now()) {
-      this.sessions.delete(key);
-      return undefined;
-    }
-    const actor = this.accounts.actor(session.accountId);
+  private session(req: IncomingMessage): { key: string; session: PageSession } | undefined {
+    const current = this.sessions.current(req);
+    if (!current) return undefined;
+    const actor = this.accounts.actor(current.session.accountId);
     if (actor.role !== 'admin' || actor.status !== 'active') {
-      this.sessions.delete(key);
+      this.sessions.end(current.key);
       return undefined;
     }
-    return { key, session };
+    return current;
   }
 
-  private sameOrigin(req: IncomingMessage): boolean {
-    const origin = req.headers.origin;
-    if (origin) return origin === new URL(this.publicUrl).origin;
-    return req.headers['sec-fetch-site'] === 'same-origin';
+  /** A change needs a same-origin request and the session's CSRF token: why not, if it's refused. */
+  private refusal(req: IncomingMessage, session: PageSession): string | undefined {
+    if (!sameOrigin(req, this.publicUrl)) return 'Cross-site request refused';
+    if (!this.sessions.csrfMatches(session, String(req.headers['x-csrf'] ?? ''))) return 'Missing or stale CSRF token; reload the page';
+    return undefined;
   }
 
   /** The /join/<code> page: who invited them and the steps to connect. */
@@ -170,12 +141,7 @@ export class AdminPanel {
         if (!admission.ok || !actor || actor.role !== 'admin' || actor.status !== 'active') {
           return sendHtml(out, 403, page('Admins only', `<p>@${escapeHtml(who.login)} isn't an admin of this MCPortal server.</p>`), clearCookie);
         }
-        for (const [k, v] of this.sessions) if (v.expiresAt <= this.now()) this.sessions.delete(k);
-        if (this.sessions.size >= MAX_SESSIONS) this.sessions.delete(this.sessions.keys().next().value!);
-        const token = randomBytes(32).toString('base64url');
-        this.sessions.set(hash(token), { accountId: admission.account.id, login: who.login, csrf: randomBytes(24).toString('base64url'), expiresAt: this.now() + SESSION_MS });
-        out.writeHead(302, { location: '/admin', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'set-cookie': [clearCookie['set-cookie']!, this.cookie(token, SESSION_MS / 1000)] });
-        out.end();
+        redirect(out, '/admin', { 'set-cookie': [clearCookie['set-cookie']!, this.sessions.start(admission.account.id, who.login)] });
       });
       return true;
     }
@@ -196,14 +162,14 @@ export class AdminPanel {
     }
 
     if (!current) {
-      sendJson(res, 401, { error: 'Sign in at /admin' });
+      fail(res, 'unauthenticated', 'Sign in at /admin');
       return true;
     }
 
     if (route === '/admin/logout' && req.method === 'POST') {
-      if (!this.sameOrigin(req)) return sendJson(res, 403, { error: 'Cross-site request refused' }), true;
-      this.sessions.delete(current.key);
-      redirect(res, '/admin', { 'set-cookie': this.cookie('', 0) });
+      if (!sameOrigin(req, this.publicUrl)) return fail(res, 'forbidden', 'Cross-site request refused'), true;
+      this.sessions.end(current.key);
+      redirect(res, '/admin', { 'set-cookie': this.sessions.cookie('', 0) });
       return true;
     }
 
@@ -216,32 +182,31 @@ export class AdminPanel {
 
     const moderation = route.match(/^\/admin\/api\/(report|unhide)$/)?.[1];
     if (moderation && req.method === 'POST') {
-      if (!this.sameOrigin(req)) return sendJson(res, 403, { error: 'Cross-site request refused' }), true;
-      const csrf = String(req.headers['x-csrf'] ?? '');
-      if (!csrf || !safeEqual(csrf, current.session.csrf)) return sendJson(res, 403, { error: 'Missing or stale CSRF token; reload the page' }), true;
-      if (!this.social) return sendJson(res, 404, { error: 'Sharing is not enabled on this server' }), true;
+      const refused = this.refusal(req, current.session);
+      if (refused) return fail(res, 'forbidden', refused), true;
+      if (!this.social) return fail(res, 'not_found', 'Sharing is not enabled on this server'), true;
       let body: Record<string, unknown>;
       try {
-        body = await readJson(req);
+        body = await readJson(req, MAX_BODY);
       } catch {
-        return sendJson(res, 400, { error: 'Send a small JSON body' }), true;
+        return fail(res, 'invalid_argument', 'Send a small JSON body'), true;
       }
       const id = String(body.id ?? '');
       const by = `admin:${current.session.login}`;
       if (moderation === 'unhide') {
-        if (!(await this.social.hideShare(id, false))) return sendJson(res, 404, { error: 'No such share' }), true;
+        if (!(await this.social.hideShare(id, false))) return fail(res, 'not_found', 'No such share'), true;
         await this.accounts.record(by, 'share.unhidden', id);
       } else {
         const report = (await this.social.reports()).find((r) => r.id === id);
-        if (!report) return sendJson(res, 404, { error: 'No such report' }), true;
+        if (!report) return fail(res, 'not_found', 'No such report'), true;
         if (body.action === 'hide') {
-          if (report.targetKind !== 'share' || !(await this.social.hideShare(report.targetId, true))) return sendJson(res, 400, { error: 'That report is not about a share that still exists' }), true;
+          if (report.targetKind !== 'share' || !(await this.social.hideShare(report.targetId, true))) return fail(res, 'invalid_argument', 'That report is not about a share that still exists'), true;
           await this.social.resolveReport(id, by, 'share hidden');
           await this.accounts.record(by, 'share.hidden', report.targetId, `report ${id}`);
         } else if (body.action === 'dismiss') {
           await this.social.resolveReport(id, by, 'dismissed');
           await this.accounts.record(by, 'report.dismissed', id);
-        } else return sendJson(res, 400, { error: 'action must be hide or dismiss' }), true;
+        } else return fail(res, 'invalid_argument', 'action must be hide or dismiss'), true;
       }
       const { accounts, invites } = await this.accounts.list();
       sendJson(res, 200, { ok: true, accounts, invites, audit: await this.accounts.auditLog(100), reports: await this.reportsView() });
@@ -250,35 +215,35 @@ export class AdminPanel {
 
     const action = route.match(/^\/admin\/api\/(invite|uninvite|suspend|reinstate)$/)?.[1];
     if (action && req.method === 'POST') {
-      if (!this.sameOrigin(req)) return sendJson(res, 403, { error: 'Cross-site request refused' }), true;
-      const csrf = String(req.headers['x-csrf'] ?? '');
-      if (!csrf || !safeEqual(csrf, current.session.csrf)) return sendJson(res, 403, { error: 'Missing or stale CSRF token; reload the page' }), true;
+      const refused = this.refusal(req, current.session);
+      if (refused) return fail(res, 'forbidden', refused), true;
       let body: Record<string, unknown>;
       try {
-        body = await readJson(req);
+        body = await readJson(req, MAX_BODY);
       } catch {
-        return sendJson(res, 400, { error: 'Send a small JSON body' }), true;
+        return fail(res, 'invalid_argument', 'Send a small JSON body'), true;
       }
       const who = String(body.who ?? '').trim();
-      if (!who) return sendJson(res, 400, { error: 'Say who' }), true;
+      if (!who) return fail(res, 'invalid_argument', 'Say who'), true;
       const by = `admin:${current.session.login}`;
       try {
         if (action === 'invite') await this.accounts.invite(who, by);
         else if (action === 'uninvite') await this.accounts.uninvite(who, by);
         else {
           const self = [current.session.accountId, current.session.login.toLowerCase()].includes(who.toLowerCase().replace(/^@/, ''));
-          if (self && action === 'suspend') return sendJson(res, 400, { error: "You can't suspend yourself" }), true;
+          if (self && action === 'suspend') return fail(res, 'invalid_argument', "You can't suspend yourself"), true;
           await this.accounts.setStatus(who, action === 'suspend' ? 'suspended' : 'active', by, String(body.reason ?? ''));
         }
       } catch (error) {
-        return sendJson(res, 400, { error: (error as Error).message }), true;
+        if (!isAppError(error) || error.code === 'internal') throw error;
+        return fail(res, error.code, error.message), true;
       }
       const { accounts, invites } = await this.accounts.list();
       sendJson(res, 200, { ok: true, accounts, invites, audit: await this.accounts.auditLog(100), reports: await this.reportsView() });
       return true;
     }
 
-    sendJson(res, 404, { error: 'Not found' });
+    fail(res, 'not_found', 'Not found');
     return true;
   }
 }

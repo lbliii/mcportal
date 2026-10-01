@@ -4,6 +4,8 @@ import { fetchHn, hnEndpoint, type HnConfig } from './adapters/hn.ts';
 import { fetchArticle } from './adapters/reader.ts';
 import { fetchRss, type RssConfig } from './adapters/rss.ts';
 import type { TtlCache } from './lib/cache.ts';
+import { AppError, errorCode, errorStack, userMessage, type ErrorCode } from './lib/errors.ts';
+import type { Logger, LogFields } from './lib/log.ts';
 import { clean } from './lib/text.ts';
 import type { ClipSummary } from './clips.ts';
 import type { SharedItem } from './social.ts';
@@ -26,6 +28,15 @@ export const FRESHNESS: Record<SourceKind | 'reader', number> = {
 export interface SourceDeps {
   fetcher: Fetcher;
   cache: TtlCache;
+  log?: Logger | undefined;
+}
+
+/** A source that failed to load becomes a portal error; a bug in our code is also logged with its stack. */
+function loadFailure(error: unknown, deps: SourceDeps, fields: LogFields): { error: string; errorCode: ErrorCode } {
+  const code = errorCode(error);
+  if (code === 'internal') deps.log?.error('source.failed', { ...fields, error: errorStack(error) });
+  else deps.log?.debug('source.failed', { ...fields, code });
+  return { error: clean(userMessage(error, 'Unexpected error loading this source'), 200), errorCode: code };
 }
 
 const DEFAULT_TITLES: Record<SourceKind, string> = { hn: 'Hacker News', rss: 'Feed', github: 'GitHub', docs: 'Docs', saved: 'Saved', pinned: 'Pinned', clips: 'Clips', following: 'Following' };
@@ -36,7 +47,7 @@ export function savedPortal(portal: PortalSpec, saved: SavedItem[]): PortalResul
   const items: Item[] = saved.slice(0, limit).map((s) => {
     let host = '';
     try { host = new URL(s.url).hostname.replace(/^www\./, ''); } catch { /* validated on save */ }
-    return { id: s.url, title: s.title, url: s.url, summary: s.note, meta: host ? [host] : [], publishedAt: s.savedAt };
+    return { id: s.url, title: s.title, url: s.url, ...(s.note !== undefined ? { summary: s.note } : {}), meta: host ? [host] : [], publishedAt: s.savedAt };
   });
   return {
     portalId: portal.id,
@@ -69,16 +80,19 @@ export function clipsQuery(portal: PortalSpec): ClipsConfig {
 /** Clips come from the clip store: the caller runs clipsQuery and passes the result. */
 export function clipsPortal(portal: PortalSpec, clips: ClipSummary[]): PortalResult {
   const { kind, tag } = clipsQuery(portal);
-  const items: Item[] = clips.map((c) => ({
-    id: c.id,
-    title: c.title,
+  const items: Item[] = clips.map((c) => {
     // A title taken from the first line would otherwise repeat at the start of the preview.
-    summary: c.note ? clean(c.note, 280) : c.preview.startsWith(c.title) ? c.preview.slice(c.title.length).trim() || undefined : c.preview,
-    meta: [c.kind, ...c.tags.slice(0, 3).map((t) => `#${t}`)],
-    publishedAt: c.createdAt,
-    ...(c.source.url ? { url: c.source.url } : {}),
-    clip: { id: c.id, kind: c.kind },
-  }));
+    const summary = c.note ? clean(c.note, 280) : c.preview.startsWith(c.title) ? c.preview.slice(c.title.length).trim() || undefined : c.preview;
+    return {
+      id: c.id,
+      title: c.title,
+      ...(summary !== undefined ? { summary } : {}),
+      meta: [c.kind, ...c.tags.slice(0, 3).map((t) => `#${t}`)],
+      publishedAt: c.createdAt,
+      ...(c.source.url ? { url: c.source.url } : {}),
+      clip: { id: c.id, kind: c.kind },
+    };
+  });
   return {
     portalId: portal.id,
     source: 'clips',
@@ -140,7 +154,7 @@ export async function findDocs(query: string, deps: SourceDeps): Promise<{ confi
     await deps.cache.get(`docs:${site.toc.url}`, FRESHNESS.docs, async () => site);
     return { config: { url: docsInputUrl(input), toc: site.toc, limit: 30 }, title: site.title };
   } catch (error) {
-    return { error: clean((error as Error).message, 200) };
+    return { error: loadFailure(error, deps, { source: 'docs' }).error };
   }
 }
 
@@ -149,7 +163,7 @@ export function docsItems(site: DocSite, config: DocsConfig): Item[] {
   if (config.section) {
     const wanted = config.section.toLowerCase();
     const section = site.sections.find((s) => s.title.toLowerCase() === wanted);
-    if (!section) throw new Error(`${site.title} has no section "${config.section}"`);
+    if (!section) throw new AppError('not_found', `${site.title} has no section "${config.section}"`);
     return section.pages.slice(0, config.limit).map((p) => ({
       id: p.url,
       title: p.title,
@@ -171,7 +185,7 @@ export function docsItems(site: DocSite, config: DocsConfig): Item[] {
 }
 
 export async function loadPortal(portal: PortalSpec, deps: SourceDeps, force = false): Promise<PortalResult> {
-  if (portal.source === 'saved' || portal.source === 'pinned' || portal.source === 'clips' || portal.source === 'following') throw new Error(`${portal.source} portals are built from the profile, not fetched`);
+  if (portal.source === 'saved' || portal.source === 'pinned' || portal.source === 'clips' || portal.source === 'following') throw new AppError('invalid_argument', `${portal.source} portals are built from the profile, not fetched`);
   const config = normalizeSourceConfig(portal.source, portal.config, portal.id);
   let endpoint = '';
   let title = portal.title ?? DEFAULT_TITLES[portal.source];
@@ -219,7 +233,7 @@ export async function loadPortal(portal: PortalSpec, deps: SourceDeps, force = f
       source: portal.source,
       title,
       items: [],
-      error: clean((error as Error).message, 200) || 'Unknown error',
+      ...loadFailure(error, deps, { source: portal.source }),
       provenance: { source: portal.source, endpoint, fetchedAt: new Date().toISOString(), cached: false, ttlSeconds: FRESHNESS[portal.source] },
     };
   }

@@ -8,7 +8,6 @@
  *     alone can't stop it because an attacker controls both headers);
  *   - never lets a malformed request crash the process.
  */
-import { timingSafeEqual } from 'node:crypto';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { OAuthServer } from './auth/oauth.ts';
 import { AuthStore, fileAuthPersistence, type AuthPersistence } from './auth/store.ts';
@@ -22,11 +21,15 @@ import { DEFAULT_SUPPORT_URL, serveSite, type SiteConfig } from './site.ts';
 import { limitsFromEnv, UsageBudget, type BudgetLimits } from './lib/budget.ts';
 import type { TtlCache } from './lib/cache.ts';
 import { isLoopbackHost } from './lib/ip.ts';
-import { handleMessage, RPC, rpcError, SERVER_INFO, roomHtml, type JsonRpcResponse, type Log } from './mcp.ts';
+import { errorCode, errorStack } from './lib/errors.ts';
+import { safeEqual } from './lib/ids.ts';
+import { createLogger, requestId, type Logger } from './lib/log.ts';
+import { readBody } from './lib/web.ts';
+import { handleMessage, RPC, rpcError, SERVER_INFO, roomHtml, type JsonRpcResponse } from './mcp.ts';
 import { FileClipStore, type ClipStore } from './clips.ts';
 import { FileReadingStore, type ReadingStore } from './reading.ts';
 import type { ProfileStore } from './store.ts';
-import type { ToolContext } from './tools.ts';
+import type { ToolContext } from './tools/kit.ts';
 import type { Fetcher } from './types.ts';
 
 export const MAX_BODY_BYTES = 1_000_000;
@@ -36,9 +39,9 @@ export interface AppConfig {
   host: string;
   port: number;
   publicUrl: string;
-  staticToken?: string;
+  staticToken?: string | undefined;
   staticUser: string;
-  github?: { clientId: string; clientSecret: string };
+  github?: { clientId: string; clientSecret: string } | undefined;
   allowedGithubUsers: string[];
   allowedHosts: string[];
   allowedOrigins: string[];
@@ -47,31 +50,31 @@ export interface AppConfig {
   trustProxy: boolean;
   dataDir: string;
   /** Per-user tool budget (MCPORTAL_LIMIT_PER_MINUTE / _PER_DAY / _GLOBAL_PER_DAY). */
-  limits?: Partial<BudgetLimits>;
+  limits?: Partial<BudgetLimits> | undefined;
   /** The public pages: support link (MCPORTAL_SUPPORT_URL) and operator name (MCPORTAL_OPERATOR). */
-  site?: Pick<SiteConfig, 'supportUrl' | 'operator'>;
+  site?: Pick<SiteConfig, 'supportUrl' | 'operator'> | undefined;
 }
 
 export interface AppDeps {
   store: ProfileStore;
-  reading?: ReadingStore;
+  reading?: ReadingStore | undefined;
   /** Clips; defaults to files under the data directory. */
-  clips?: ClipStore;
+  clips?: ClipStore | undefined;
   /** Handles and public profiles (only with GitHub sign-in: a single-token server has no social layer). */
-  publicProfiles?: PublicProfiles;
+  publicProfiles?: PublicProfiles | undefined;
   /** Shares and follows (also only with GitHub sign-in). */
-  social?: Social;
+  social?: Social | undefined;
   fetcher: Fetcher;
   cache: TtlCache;
-  log?: Log;
-  now?: () => number;
-  budget?: UsageBudget;
+  log?: Logger | undefined;
+  now?: (() => number) | undefined;
+  budget?: UsageBudget | undefined;
   /** Where OAuth state persists; defaults to auth.json in the data directory. */
-  authPersistence?: AuthPersistence;
+  authPersistence?: AuthPersistence | undefined;
   /** Accounts, invites and roles; defaults to accounts.json in the data directory with bootstrap from the env. */
-  accounts?: Accounts;
+  accounts?: Accounts | undefined;
   /** Reported by /health. */
-  storage?: 'files' | 'postgres';
+  storage?: 'files' | 'postgres' | undefined;
 }
 
 function list(value: string | undefined): string[] {
@@ -102,7 +105,7 @@ export function configFromEnv(env: NodeJS.ProcessEnv, dataDir: string): AppConfi
     trustProxy: env.MCPORTAL_TRUST_PROXY === '1' || Boolean(env.RAILWAY_ENVIRONMENT),
     dataDir,
     limits: limitsFromEnv(env),
-    site: { supportUrl: env.MCPORTAL_SUPPORT_URL || DEFAULT_SUPPORT_URL, operator: env.MCPORTAL_OPERATOR || undefined },
+    site: { supportUrl: env.MCPORTAL_SUPPORT_URL || DEFAULT_SUPPORT_URL, ...(env.MCPORTAL_OPERATOR ? { operator: env.MCPORTAL_OPERATOR } : {}) },
   };
   if (!hasAuth && !isLoopbackHost(host) && env.MCPORTAL_ALLOW_UNAUTHENTICATED !== '1') {
     throw new Error(
@@ -112,27 +115,23 @@ export function configFromEnv(env: NodeJS.ProcessEnv, dataDir: string): AppConfi
   return config;
 }
 
-function tokenMatches(given: string, expected: string): boolean {
-  const a = Buffer.from(given);
-  const b = Buffer.from(expected);
-  return a.length === b.length && timingSafeEqual(a, b);
-}
-
 function send(res: ServerResponse, status: number, body: string, type = 'application/json', extra: Record<string, string> = {}): void {
   if (res.headersSent) return;
   res.writeHead(status, { 'content-type': type, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', ...extra });
   res.end(body);
 }
 
-async function readBody(req: IncomingMessage): Promise<string> {
-  let size = 0;
-  const chunks: Buffer[] = [];
-  for await (const chunk of req) {
-    size += (chunk as Buffer).length;
-    if (size > MAX_BODY_BYTES) throw Object.assign(new Error('Body too large'), { status: 413 });
-    chunks.push(chunk as Buffer);
-  }
-  return Buffer.concat(chunks).toString('utf8');
+/**
+ * A plain-HTTP error (not JSON-RPC, not an HTML page), in the same shape as the OAuth
+ * endpoints: { error: code, error_description: message }.
+ */
+function sendError(res: ServerResponse, status: number, code: string, message: string): void {
+  send(res, status, JSON.stringify({ error: code, error_description: message }));
+}
+
+/** A path for logs: one-time tokens and other long opaque segments are masked. */
+function loggablePath(pathname: string): string {
+  return pathname.split('/').map((seg) => (seg.length >= 16 ? ':token' : seg)).join('/').slice(0, 120);
 }
 
 function hostnameOf(hostHeader: string | undefined): string | undefined {
@@ -145,7 +144,7 @@ function hostnameOf(hostHeader: string | undefined): string | undefined {
 }
 
 export function createApp(config: AppConfig, deps: AppDeps): Server {
-  const log = deps.log ?? ((m: string) => process.stderr.write(`[mcportal] ${m}\n`));
+  const log = deps.log ?? createLogger();
   // Normally passed in by server.ts; otherwise accounts.json next to the other data, bootstrapped from the env.
   const accounts = deps.accounts ?? new Accounts(fileAuthPersistence(config.dataDir, 'accounts.json'), bootstrapFromEnv(process.env, config.allowedGithubUsers), deps.now);
   const oauth = config.github
@@ -168,7 +167,8 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
   const social = oauth && publicProfiles ? deps.social : undefined;
   // The account page needs GitHub sign-in; without it, exports are written to the data directory.
   const account = oauth ? new AccountPage({ accounts, oauth, store: deps.store, reading, clips, publicProfiles, social, publicUrl: config.publicUrl, log, now: deps.now }) : undefined;
-  const context = (userId: string): ToolContext => ({
+  const context = (userId: string, reqLog: Logger): ToolContext => ({
+    log: reqLog,
     store: deps.store, reading, clips, publicProfiles, social, fetcher: deps.fetcher, cache: deps.cache, userId, budget, actor: accounts.actor(userId),
     accountUrl: account?.url,
     uploadLink: account ? () => account.uploadLink(userId) : undefined,
@@ -186,7 +186,7 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
     const header = req.headers.authorization ?? '';
     const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
     if (token) {
-      if (config.staticToken && tokenMatches(token, config.staticToken)) return config.staticUser;
+      if (config.staticToken && safeEqual(token, config.staticToken)) return config.staticUser;
       if (oauth) return oauth.authenticate(token);
       return undefined;
     }
@@ -201,24 +201,18 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
   async function handlePayload(payload: unknown, ctx: ToolContext): Promise<JsonRpcResponse | JsonRpcResponse[] | null> {
     if (Array.isArray(payload)) {
       if (payload.length === 0 || payload.length > MAX_BATCH) return rpcError(null, RPC.invalidRequest, `Batch must have 1-${MAX_BATCH} messages`);
-      const results = (await Promise.all(payload.map((m) => handleMessage(m, ctx, log)))).filter((r): r is JsonRpcResponse => r !== null);
+      const results = (await Promise.all(payload.map((m) => handleMessage(m, ctx)))).filter((r): r is JsonRpcResponse => r !== null);
       return results.length ? results : null;
     }
-    return handleMessage(payload, ctx, log);
+    return handleMessage(payload, ctx);
   }
 
-  async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  async function route(req: IncomingMessage, res: ServerResponse, url: URL, reqLog: Logger): Promise<void> {
     const hostname = hostnameOf(req.headers.host);
-    let url: URL;
-    try {
-      url = new URL(req.url ?? '/', 'http://placeholder');
-    } catch {
-      return send(res, 400, JSON.stringify({ error: 'bad request' }));
-    }
     // Health checks come from the platform with its own Host header.
     if (url.pathname === '/health') return send(res, 200, JSON.stringify({ ok: true, ...SERVER_INFO, storage: deps.storage ?? 'files' }));
     if (!hostname || !config.allowedHosts.includes(hostname)) {
-      return send(res, 421, JSON.stringify({ error: 'unknown host; set MCPORTAL_PUBLIC_URL or MCPORTAL_ALLOWED_HOSTS' }));
+      return sendError(res, 421, 'unknown_host', 'Unknown host; set MCPORTAL_PUBLIC_URL or MCPORTAL_ALLOWED_HOSTS');
     }
     const origin = req.headers.origin;
     if (origin && url.pathname === '/mcp') {
@@ -247,7 +241,7 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
       });
     }
 
-    if (url.pathname !== '/mcp') return send(res, 404, JSON.stringify({ error: 'not found' }));
+    if (url.pathname !== '/mcp') return sendError(res, 404, 'not_found', 'Not found');
     const userId = await authenticate(req);
     if (!userId) return unauthorized(res);
     if (req.method !== 'POST') {
@@ -256,12 +250,12 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
     }
     let payload: unknown;
     try {
-      payload = JSON.parse(await readBody(req));
+      payload = JSON.parse((await readBody(req, MAX_BODY_BYTES)).toString('utf8'));
     } catch (error) {
-      const status = (error as { status?: number }).status ?? 400;
-      return send(res, status, JSON.stringify(rpcError(null, RPC.parseError, status === 413 ? 'Body too large' : 'Parse error')));
+      const tooLarge = errorCode(error) === 'limit_exceeded';
+      return send(res, tooLarge ? 413 : 400, JSON.stringify(rpcError(null, RPC.parseError, tooLarge ? 'Body too large' : 'Parse error')));
     }
-    const response = await handlePayload(payload, context(userId));
+    const response = await handlePayload(payload, context(userId, reqLog));
     if (response === null) {
       res.writeHead(202);
       res.end();
@@ -271,9 +265,20 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
   }
 
   const server = createServer((req, res) => {
-    route(req, res).catch((error) => {
-      log(`http error: ${(error as Error).stack ?? error}`);
-      send(res, 500, JSON.stringify(rpcError(null, RPC.internal, 'Internal error')));
+    const id = requestId();
+    const reqLog = log.child({ req: id });
+    const started = Date.now();
+    res.setHeader('x-request-id', id);
+    let url: URL;
+    try {
+      url = new URL(req.url ?? '/', 'http://placeholder');
+    } catch {
+      return sendError(res, 400, 'bad_request', 'Bad request');
+    }
+    res.on('finish', () => reqLog.debug('http.request', { method: req.method, path: loggablePath(url.pathname), status: res.statusCode, ms: Date.now() - started }));
+    route(req, res, url, reqLog).catch((error) => {
+      reqLog.error('http.crashed', { method: req.method, path: loggablePath(url.pathname), error: errorStack(error) });
+      send(res, 500, JSON.stringify(rpcError(null, RPC.internal, `Internal error (reference ${id})`)));
     });
   });
   server.on('clientError', (_error, socket) => {

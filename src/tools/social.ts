@@ -4,18 +4,13 @@
  * clips) reaches the model fenced as untrusted: another user's note is exactly
  * where someone would try to plant instructions.
  */
-import { clipText } from './clip-tools.ts';
-import { clean } from './lib/text.ts';
-import { httpUrl } from './profile.ts';
-import type { ClipData } from './clips.ts';
-import { AUDIENCES, SocialError, type SharedItem } from './social.ts';
-import { ensurePortal, toolError, untrusted, ROOM_URI, type CallToolResult, type ToolContext, type ToolDef } from './tools.ts';
-
-function ok(text: string, structuredContent: Record<string, unknown>): CallToolResult {
-  return { content: [{ type: 'text', text }], structuredContent };
-}
-
-const HOSTED_ONLY = 'Sharing is part of the hosted MCPortal. This one runs on your machine, so there is nobody to share with.';
+import { clean } from '../lib/text.ts';
+import { httpUrl } from '../profile.ts';
+import { clipText, type ClipData } from '../clips.ts';
+import { AUDIENCES, type SharedItem } from '../social.ts';
+import { isAppError } from '../lib/errors.ts';
+import { ensurePortal } from '../layout.ts';
+import { HOSTED_ONLY, ok, toolError, untrusted, ROOM_URI, type CallToolResult, type ToolContext, type ToolDef } from './kit.ts';
 
 export function shareLine(s: SharedItem): string {
   const who = s.mine ? 'you' : `@${s.author.handle}`;
@@ -23,9 +18,10 @@ export function shareLine(s: SharedItem): string {
   return `- [${s.id}] ${who} shared ${s.kind === 'clip' ? `a ${s.clip?.kind ?? 'clip'}` : 'a link'}: ${s.title}${s.url ? ` <${s.url}>` : ''} · to ${to} · ${s.createdAt.slice(0, 10)}${s.hiddenAt ? ' · hidden by an admin' : ''}${s.note ? `\n  note: ${clean(s.note, 300)}` : ''}`;
 }
 
+/** A refused request as a sentence (the rules' messages have no final stop). */
 function fail(error: unknown): CallToolResult {
-  if (error instanceof SocialError) return toolError(`${error.message}.`);
-  throw error;
+  if (!isAppError(error)) throw error;
+  return toolError(`${error.message.replace(/\.$/, '')}.`, error.code, error.details);
 }
 
 const handleProp = { type: 'string', description: 'e.g. "@someone"' };
@@ -53,6 +49,7 @@ export const SOCIAL_TOOLS: ToolDef[] = [
   {
     name: 'open_space',
     title: 'Open a space',
+    access: 'read',
     description: [
       "Open someone's MCPortal Space by handle, or the user's own Space without one: their name, bio and Space title, their posts (what they shared, as a grid), and the sources they recommend, which the user can add to their own room.",
       'Use it when the user asks to see someone\'s space, page or profile, or their own ("what does my space look like").',
@@ -61,11 +58,11 @@ export const SOCIAL_TOOLS: ToolDef[] = [
     annotations: { readOnlyHint: true },
     _meta: { ui: { resourceUri: ROOM_URI } },
     async handler(args, ctx) {
-      if (!ctx.social || !ctx.publicProfiles) return toolError(HOSTED_ONLY);
+      if (!ctx.social || !ctx.publicProfiles) return toolError(HOSTED_ONLY.sharing, 'unavailable');
       try {
         const handle = typeof args.handle === 'string' && args.handle.trim() ? args.handle : undefined;
         const profile = handle ? await ctx.social.resolve(ctx.userId, handle) : await ctx.publicProfiles.get(ctx.userId);
-        if (!profile) return toolError('You have no space yet: it starts with a public profile. Create one with set_public_profile (a handle, and optionally a space title and featured sources), then share things into it.');
+        if (!profile) return toolError('You have no space yet: it starts with a public profile. Create one with set_public_profile (a handle, and optionally a space title and featured sources), then share things into it.', 'failed_precondition');
         const mine = profile.accountId === ctx.userId;
         const posts = await ctx.social.sharesOf(ctx.userId, profile.accountId, { limit: GRID_POSTS });
         const stats = await ctx.social.stats(ctx.userId, profile.accountId);
@@ -89,6 +86,7 @@ export const SOCIAL_TOOLS: ToolDef[] = [
   {
     name: 'share',
     title: 'Share with followers',
+    access: 'write',
     description: [
       'Share one of the user\'s saved links (savedUrl) or clips (clipId) with a note, to their followers (default) or everyone on MCPortal (audience "mcportal").',
       'Only when the user asks to share. If you write the note, show it to them and share only after they approve those exact words.',
@@ -106,12 +104,12 @@ export const SOCIAL_TOOLS: ToolDef[] = [
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
     async handler(args, ctx) {
-      if (!ctx.social) return toolError(HOSTED_ONLY);
+      if (!ctx.social) return toolError(HOSTED_ONLY.sharing, 'unavailable');
       try {
         let input: Parameters<NonNullable<ToolContext['social']>['share']>[1];
         if (typeof args.clipId === 'string' && args.clipId) {
           const clip = await ctx.clips?.get(ctx.userId, args.clipId);
-          if (!clip) return toolError(`No clip with id "${clean(args.clipId, 40)}". Use search_clips to find it.`);
+          if (!clip) return toolError(`No clip with id "${clean(args.clipId, 40)}". Use search_clips to find it.`, 'not_found');
           input = { kind: 'clip', title: clip.title, url: clip.source.url, clip, note: args.note, audience: args.audience };
         } else {
           const url = httpUrl(args.savedUrl);
@@ -129,11 +127,12 @@ export const SOCIAL_TOOLS: ToolDef[] = [
   {
     name: 'unshare',
     title: 'Remove a share',
+    access: 'write',
     description: "Remove one of the user's shares. Only when they ask.",
     inputSchema: { type: 'object', required: ['id'], additionalProperties: false, properties: { id: { type: 'string' } } },
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
     async handler(args, ctx) {
-      if (!ctx.social) return toolError(HOSTED_ONLY);
+      if (!ctx.social) return toolError(HOSTED_ONLY.sharing, 'unavailable');
       const removed = await ctx.social.unshare(ctx.userId, String(args.id ?? ''));
       return ok(removed ? 'Removed the share.' : 'No share of yours with that id; nothing changed.', { removed });
     },
@@ -141,14 +140,15 @@ export const SOCIAL_TOOLS: ToolDef[] = [
   {
     name: 'get_share',
     title: 'Show a share',
+    access: 'read',
     description: 'Show one share in full (the note and the shared link or clip), as a card in the conversation. Ids come from the Following portal or list_shares.',
     inputSchema: { type: 'object', required: ['id'], additionalProperties: false, properties: { id: { type: 'string' } } },
     annotations: { readOnlyHint: true },
     _meta: { ui: { resourceUri: ROOM_URI } },
     async handler(args, ctx) {
-      if (!ctx.social) return toolError(HOSTED_ONLY);
+      if (!ctx.social) return toolError(HOSTED_ONLY.sharing, 'unavailable');
       const share = await ctx.social.get(ctx.userId, String(args.id ?? ''));
-      if (!share) return toolError('That share isn\'t available.');
+      if (!share) return toolError('That share isn\'t available.', 'not_found');
       const body = share.clip ? `\n\n${clipText(share.clip.data)}` : '';
       return ok(`Showing share ${share.id} in a card.\n${untrusted(share.mine ? 'your share' : `a share by @${share.author.handle}`, `${shareLine(share)}${body}`)}`, { share });
     },
@@ -156,6 +156,7 @@ export const SOCIAL_TOOLS: ToolDef[] = [
   {
     name: 'list_shares',
     title: 'List shares',
+    access: 'read',
     description: 'Without handle: the user\'s own shares. With handle: what that person shared that the user may see. Newest first.',
     inputSchema: {
       type: 'object',
@@ -164,7 +165,7 @@ export const SOCIAL_TOOLS: ToolDef[] = [
     },
     annotations: { readOnlyHint: true },
     async handler(args, ctx) {
-      if (!ctx.social || !ctx.publicProfiles) return toolError(HOSTED_ONLY);
+      if (!ctx.social || !ctx.publicProfiles) return toolError(HOSTED_ONLY.sharing, 'unavailable');
       try {
         const query = { limit: Number(args.limit) || 20, before: typeof args.before === 'string' ? args.before : undefined };
         const owner = typeof args.handle === 'string' && args.handle.trim() ? (await ctx.social.resolve(ctx.userId, args.handle)).accountId : ctx.userId;
@@ -180,6 +181,7 @@ export const SOCIAL_TOOLS: ToolDef[] = [
   {
     name: 'relationship',
     title: 'Follow, mute or block someone',
+    access: 'write',
     description: [
       'follow / unfollow a person by handle (their shares then appear in the user\'s Following portal; the first follow adds that portal);',
       'mute / unmute (hide their shares from the user\'s Following portal);',
@@ -194,14 +196,16 @@ export const SOCIAL_TOOLS: ToolDef[] = [
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
     async handler(args, ctx) {
-      if (!ctx.social) return toolError(HOSTED_ONLY);
+      if (!ctx.social) return toolError(HOSTED_ONLY.sharing, 'unavailable');
       const handle = String(args.handle ?? '');
       try {
         switch (args.action) {
           case 'follow': {
             const target = await ctx.social.follow(ctx.userId, handle);
-            const { profile, added } = ensurePortal(await ctx.store.get(ctx.userId), 'following', 'Following');
-            if (added) await ctx.store.put(ctx.userId, profile);
+            const { profile, added } = await ctx.store.update(ctx.userId, (before) => {
+              const placed = ensurePortal(before, 'following', 'Following');
+              return placed.added ? { profile: placed.profile, result: placed } : { result: placed };
+            });
             return ok(`Following @${target.handle}.${added ? ' Added a "Following" portal to the room.' : ''}`, { handle: target.handle, layoutChanged: added, profile });
           }
           case 'unfollow':
@@ -225,11 +229,12 @@ export const SOCIAL_TOOLS: ToolDef[] = [
   {
     name: 'list_connections',
     title: 'Who you follow, mute and block',
+    access: 'read',
     description: 'The handles the user follows, mutes and blocks, and how many people follow them.',
     inputSchema: { type: 'object', additionalProperties: false, properties: {} },
     annotations: { readOnlyHint: true },
     async handler(_args, ctx) {
-      if (!ctx.social) return toolError(HOSTED_ONLY);
+      if (!ctx.social) return toolError(HOSTED_ONLY.sharing, 'unavailable');
       const c = await ctx.social.connections(ctx.userId);
       const list = (xs: string[]) => (xs.length ? xs.map((h) => `@${h}`).join(', ') : 'nobody');
       return ok(`Following: ${list(c.following)}.\nMuted: ${list(c.muted)}.\nBlocked: ${list(c.blocked)}.\nFollowers: ${c.followers}.`, c);
@@ -238,6 +243,7 @@ export const SOCIAL_TOOLS: ToolDef[] = [
   {
     name: 'report',
     title: 'Report a share or person',
+    access: 'write',
     description: 'Report a share (shareId) or a person (handle) to the MCPortal admins, with a short reason. Only when the user asks. Suggest blocking too if they don\'t want to see them.',
     inputSchema: {
       type: 'object',
@@ -247,7 +253,7 @@ export const SOCIAL_TOOLS: ToolDef[] = [
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
     async handler(args, ctx) {
-      if (!ctx.social) return toolError(HOSTED_ONLY);
+      if (!ctx.social) return toolError(HOSTED_ONLY.sharing, 'unavailable');
       try {
         const report = await ctx.social.report(ctx.userId, {
           shareId: typeof args.shareId === 'string' && args.shareId ? args.shareId : undefined,

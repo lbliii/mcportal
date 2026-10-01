@@ -20,12 +20,21 @@ import { isIP } from 'node:net';
 import { pipeline, type Readable } from 'node:stream';
 import zlib from 'node:zlib';
 import type { FetchOptions, FetchResponse, Fetcher } from '../types.ts';
+import { AppError, UpstreamError, upstreamStatus, type AppErrorOptions } from './errors.ts';
 import { isPublicAddress } from './ip.ts';
 
 export const USER_AGENT = 'MCPortal/0.3 (+https://github.com/lbliii/mcportal)';
 
-export class BoundaryError extends Error {
+/**
+ * The fetch boundary refused or gave up. `code` says why: fetch_blocked (not a
+ * public http(s) URL, or a redirect to one), fetch_timeout, or fetch_too_large.
+ */
+export class BoundaryError extends AppError {
   override name = 'BoundaryError';
+
+  constructor(message: string, code: 'fetch_blocked' | 'fetch_timeout' | 'fetch_too_large' = 'fetch_blocked', options?: AppErrorOptions) {
+    super(code, message, options);
+  }
 }
 
 /** Backwards-compatible name used by tests and callers. */
@@ -102,7 +111,7 @@ async function readCapped(stream: Readable, maxBytes: number, truncate: boolean,
     const buf = chunk as Buffer;
     if (total + buf.length > maxBytes) {
       stream.destroy();
-      if (!truncate) throw new BoundaryError(`Response exceeded ${maxBytes} bytes`);
+      if (!truncate) throw new BoundaryError(`Response exceeded ${maxBytes} bytes`, 'fetch_too_large', { details: { maxBytes } });
       chunks.push(buf.subarray(0, maxBytes - total));
       return { text: Buffer.concat(chunks).toString(encoding), truncated: true };
     }
@@ -139,8 +148,8 @@ export const safeFetch: Fetcher = async (target: string, options: FetchOptions =
       res = await request(url, method, headers, body, signal);
     } catch (error) {
       if (error instanceof BoundaryError) throw error;
-      if ((error as Error).name === 'AbortError' || (error as Error).name === 'TimeoutError') throw new BoundaryError(`Timed out fetching ${url.host}`);
-      throw new Error(`Could not reach ${url.host}: ${(error as NodeJS.ErrnoException).code ?? (error as Error).message}`);
+      if ((error as Error).name === 'AbortError' || (error as Error).name === 'TimeoutError') throw new BoundaryError(`Timed out fetching ${url.host}`, 'fetch_timeout', { cause: error });
+      throw new UpstreamError('upstream_unreachable', `Could not reach ${url.host}: ${(error as NodeJS.ErrnoException).code ?? (error as Error).message}`, { cause: error });
     }
     const status = res.statusCode ?? 0;
     if (status >= 300 && status < 400 && res.headers.location) {
@@ -169,10 +178,10 @@ export const safeFetch: Fetcher = async (target: string, options: FetchOptions =
 export async function fetchJson<T>(fetcher: Fetcher, url: string, options?: FetchOptions): Promise<T> {
   const res = await fetcher(url, options);
   const host = new URL(url).host;
-  if (res.status < 200 || res.status >= 300) throw new Error(`${host} responded ${res.status}`);
+  if (res.status < 200 || res.status >= 300) throw upstreamStatus(host, res.status);
   try {
     return JSON.parse(res.text) as T;
-  } catch {
-    throw new Error(`${host} returned invalid JSON`);
+  } catch (error) {
+    throw new UpstreamError('upstream_error', `${host} returned invalid JSON`, { cause: error });
   }
 }

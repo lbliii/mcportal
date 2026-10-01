@@ -10,16 +10,17 @@ import { createFixtureFetcher } from '../src/lib/fixture-fetch.ts';
 import { isPublicAddress, parseV6 } from '../src/lib/ip.ts';
 import { assertPublicUrl, BoundaryError, guardedLookup } from '../src/lib/safe-fetch.ts';
 import { clean } from '../src/lib/text.ts';
-import { handleMessage, MCP_APP_MIME, scriptJson, SERVER_INFO } from '../src/mcp.ts';
+import { handleMessage, MCP_APP_MIME, roomHtml, scriptJson, SERVER_INFO, UI_INCLUDES } from '../src/mcp.ts';
 import { buildBrand } from '../scripts/brand.ts';
 import { defaultProfile, ProfileError, validateProfile } from '../src/profile.ts';
 import { FileProfileStore, MemoryProfileStore } from '../src/store.ts';
-import { ROOM_URI, type ToolContext } from '../src/tools.ts';
+import { ROOM_URI, type ToolContext } from '../src/tools/kit.ts';
 import { pageFeeds, recipesFor } from '../src/discover.ts';
 import { parseFeed } from '../src/adapters/rss.ts';
 import { STARTER_PACKS } from '../src/packs.ts';
 import { buildOpml, parseOpml } from '../src/opml.ts';
-import { toolCost, UsageBudget } from '../src/lib/budget.ts';
+import { UsageBudget } from '../src/lib/budget.ts';
+import { toolCost } from '../src/tools/index.ts';
 import type { Fetcher } from '../src/types.ts';
 
 /** A user who has already set up their portal (the sample layout). Use newUser() for onboarding. */
@@ -73,7 +74,7 @@ test('notifications get no response; unknown methods get -32601', async () => {
 test('tools/list links open_room to the UI and hides app-only tools from the model', async () => {
   const res = await rpc(ctx(), 'tools/list');
   const tools = (res.result as any).tools as any[];
-  assert.deepEqual(tools.map((t) => t.name), ['open_room', 'build_room', 'get_profile', 'update_profile', 'read_source', 'refresh_portal', 'read_article', 'get_thumbnails', 'import_opml', 'export_opml', 'find_source', 'add_portal', 'pin_portal', 'save_item', 'remove_saved', 'list_sources', 'open_docs', 'read_doc_page', 'search_docs', 'clip', 'search_clips', 'get_clip', 'update_clip', 'delete_clip', 'get_public_profile', 'set_public_profile', 'remove_public_profile', 'export_data', 'import_portal', 'account_settings', 'open_space', 'share', 'unshare', 'get_share', 'list_shares', 'relationship', 'list_connections', 'report', 'record_reading', 'get_reading', 'list_reading']);
+  assert.deepEqual(tools.map((t) => t.name), ['open_room', 'build_room', 'get_profile', 'update_profile', 'refresh_portal', 'read_source', 'find_source', 'add_portal', 'list_sources', 'import_opml', 'export_opml', 'read_article', 'get_thumbnails', 'save_item', 'remove_saved', 'pin_portal', 'open_docs', 'read_doc_page', 'search_docs', 'clip', 'search_clips', 'get_clip', 'update_clip', 'delete_clip', 'get_public_profile', 'set_public_profile', 'remove_public_profile', 'export_data', 'import_portal', 'account_settings', 'open_space', 'share', 'unshare', 'get_share', 'list_shares', 'relationship', 'list_connections', 'report', 'record_reading', 'get_reading', 'list_reading']);
   assert.equal(tools.find((t) => t.name === 'open_room')._meta.ui.resourceUri, ROOM_URI);
   assert.deepEqual(tools.find((t) => t.name === 'refresh_portal')._meta.ui.visibility, ['app']);
   assert.equal(tools.find((t) => t.name === 'read_article')._meta.ui.resourceUri, ROOM_URI, 'reader renders as its own card');
@@ -92,6 +93,23 @@ test('resources/read serves the self-contained room app', async () => {
   for (const [, script] of content.text.matchAll(/<script>([\s\S]*?)<\/script>/g)) new vm.Script(script); // throws on a syntax error
   const missing = await rpc(ctx(), 'resources/read', { uri: 'ui://nope' });
   assert.equal(missing.error?.code, -32602);
+});
+
+test('room fragments: every src/ui/room file is included, in order, and no include marker is left', async () => {
+  const fragments = (await readdir(new URL('../src/ui/room/', import.meta.url))).map((f) => `room/${f}`);
+  assert.ok(fragments.length >= 10, `found the room fragments (${fragments.length})`);
+  const page = await readFile(new URL('../src/ui/room.html', import.meta.url), 'utf8');
+  const html = await roomHtml();
+  assert.ok(!/include:/.test(html), 'no leftover include markers');
+  for (const name of fragments) {
+    assert.ok(UI_INCLUDES.includes(name), `${name} is listed in UI_INCLUDES`);
+    assert.ok(page.includes(`include:${name}*/`) || page.includes(`include:${name}-->`), `room.html includes ${name}`);
+    const text = (await readFile(new URL(`../src/ui/${name}`, import.meta.url), 'utf8')).trim();
+    assert.ok(html.includes(text), `${name} appears in the assembled page`);
+  }
+  // The script fragments share one closure; their order is evaluation order.
+  const order = [...page.matchAll(/\/\*include:(room\/[\w.]+\.js)\*\//g)].map((m) => m[1]);
+  assert.deepEqual(order, ['bridge', 'dom', 'room', 'reader', 'docs', 'social', 'add', 'toolbar', 'boot'].map((n) => `room/${n}.js`));
 });
 
 // ---------------------------------------------------------------- tools
@@ -368,10 +386,10 @@ test('get_thumbnails: oversized WordPress uploads go through Photon; timeouts ar
   const fetcher: Fetcher = async (target, options = {}) => {
     calls.push(target);
     const u = new URL(target);
-    if (u.hostname === 'www.thisiscolossal.com') throw new BoundaryError(`Response exceeded ${options.maxBytes} bytes`);   // ignores ?w=
+    if (u.hostname === 'www.thisiscolossal.com') throw new BoundaryError(`Response exceeded ${options.maxBytes} bytes`, 'fetch_too_large');   // ignores ?w=
     if (u.hostname === 'i0.wp.com') return { status: 200, url: target, contentType: 'image/png', text: png.toString('base64'), truncated: false };
     if (u.hostname === 'slow.example.org') {
-      if (down) throw new BoundaryError('Timed out fetching slow.example.org');
+      if (down) throw new BoundaryError('Timed out fetching slow.example.org', 'fetch_timeout');
       return { status: 200, url: target, contentType: 'image/png', text: png.toString('base64'), truncated: false };
     }
     return { status: 404, url: target, contentType: 'text/plain', text: '', truncated: false };
@@ -450,9 +468,9 @@ test('brand: every icon the room asks for is in the generated set, drawn on the 
   const { ICONS, ICON_STROKE } = vm.runInNewContext(`${text['src/ui/brand/icons.js']}; ({ ICONS, ICON_STROKE })`);
   assert.equal(ICON_STROKE, 1.75);
   assert.match(text['brand/mark-line.svg']!, /stroke-width="1\.75"/, 'the Line mark shares the icon stroke');
-  const page = await readFile(new URL('../src/ui/room.html', import.meta.url), 'utf8');
+  const page = await roomHtml();
   const used = new Set([...page.matchAll(/(?:icon|iconButton)\('(\w+)'|data-icon="(\w+)"|icon\(full \? '(\w+)' : '(\w+)'\)/g)].flatMap((m) => m.slice(1).filter(Boolean)));
-  assert.ok(used.size >= 19, `found the icon names in room.html (${used.size})`);
+  assert.ok(used.size >= 19, `found the icon names in the assembled room (${used.size})`);
   for (const name of used) assert.ok(Object.hasOwn(ICONS, name), `icon "${name}" is missing from scripts/brand.ts`);
   for (const [name, { d, dot }] of Object.entries(ICONS) as [string, { d: string; dot?: number[] }][]) {
     const numbers = d.match(/-?\d*\.?\d+/g)!.map(Number);

@@ -7,9 +7,9 @@ import { pkce, raw, startApp, type Running } from './helpers.ts';
 const CLIENT_REDIRECT = 'https://claude.ai/api/mcp/auth_callback';
 
 /** Fixture fetcher plus a fake GitHub and a fake client metadata document. */
-function fakeUpstreams(users: Record<string, { id: number; login: string }>): { fetcher: Fetcher; calls: Array<{ url: string; options?: FetchOptions }> } {
+function fakeUpstreams(users: Record<string, { id: number; login: string }>): { fetcher: Fetcher; calls: Array<{ url: string; options?: FetchOptions | undefined }> } {
   const fixtures = createFixtureFetcher();
-  const calls: Array<{ url: string; options?: FetchOptions }> = [];
+  const calls: Array<{ url: string; options?: FetchOptions | undefined }> = [];
   const fetcher: Fetcher = async (url, options) => {
     calls.push({ url, options });
     const reply = (status: number, body: unknown) => ({ status, url, contentType: 'application/json', text: JSON.stringify(body), truncated: false });
@@ -406,7 +406,7 @@ test('admin page: browser-bound GitHub sign-in, admins only, CSRF and same-origi
     assert.equal(cookieOf(mallory, 'mcportal_admin'), undefined);
     assert.match((await raw(app.port, { path: `/join/${code}` })).body, /@mallory is already in/, 'the link reflects that the invite was used');
     const reinvite = await post('/admin/api/invite', { who: 'mallory' }, { ...sameOrigin(app.port), 'x-csrf': state.csrf });
-    assert.match(JSON.parse(reinvite.body).error, /already has an account/);
+    assert.match(JSON.parse(reinvite.body).error_description, /already has an account/);
 
     const self = await post('/admin/api/suspend', { who: 'lawrence' }, { ...sameOrigin(app.port), 'x-csrf': state.csrf });
     assert.equal(self.status, 400, "can't suspend yourself");

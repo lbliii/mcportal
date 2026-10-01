@@ -3,6 +3,7 @@
  * indexOf that starts at the current cursor, so unclosed tags can't cause
  * quadratic scans. Every value comes out as plain, single-line text.
  */
+import { upstreamStatus } from '../lib/errors.ts';
 import { parseAttrs } from '../lib/html.ts';
 import { clean, decodeEntities, hostOf, htmlToText, safeHttpUrl, stripCdata, truncate } from '../lib/text.ts';
 import { MAX_THUMB_BYTES, type Fetcher, type Item } from '../types.ts';
@@ -172,10 +173,10 @@ export function parseFeed(xml: string, limit = 20, baseUrl?: string): ParsedFeed
       ...(video ? { video: true } : {}),
       id: clean(htmlToText(tagText(block, bl, isAtom ? 'id' : 'guid') ?? ''), 300) || url || `${index}`,
       title: itemTitle,
-      url,
-      summary,
+      ...(url !== undefined ? { url } : {}),
+      ...(summary !== undefined ? { summary } : {}),
       meta,
-      publishedAt,
+      ...(publishedAt !== undefined ? { publishedAt } : {}),
     };
   });
 
@@ -187,6 +188,6 @@ export async function fetchRss(config: RssConfig, fetcher: Fetcher): Promise<Par
     headers: { accept: 'application/atom+xml, application/rss+xml, application/xml;q=0.9, text/xml;q=0.8, */*;q=0.5' },
     maxBytes: 3_000_000,
   });
-  if (res.status < 200 || res.status >= 300) throw new Error(`Feed responded ${res.status}`);
+  if (res.status < 200 || res.status >= 300) throw upstreamStatus('Feed', res.status);
   return parseFeed(res.text, config.limit, res.url);
 }

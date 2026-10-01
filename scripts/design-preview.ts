@@ -4,12 +4,12 @@
  */
 import {createServer} from 'node:http';
 import {readFile} from 'node:fs/promises';
-import {roomHtml,handleMessage,scriptJson} from '../src/mcp.ts';
+import {roomHtml,handleMessage} from '../src/mcp.ts';
 import {MemoryProfileStore} from '../src/store.ts';
 import {defaultProfile} from '../src/profile.ts';
 import {createFixtureFetcher} from '../src/lib/fixture-fetch.ts';
 import {TtlCache} from '../src/lib/cache.ts';
-import {page} from '../src/auth/oauth.ts';
+import {page} from '../src/page.ts';
 import {serveSite,DEFAULT_SUPPORT_URL} from '../src/site.ts';
 const ctx={store:new MemoryProfileStore({room:{...defaultProfile(),onboarded:true}}),fetcher:createFixtureFetcher(),cache:new TtlCache(),userId:'room'};
 const now='2026-09-30T12:00:00Z',url='https://example.com/guide';

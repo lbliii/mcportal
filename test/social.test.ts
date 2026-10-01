@@ -9,7 +9,7 @@ import { defaultProfile, validateProfile } from '../src/profile.ts';
 import { PublicProfiles } from '../src/public-profiles.ts';
 import { DocumentSocialStore, Social, type SocialStore } from '../src/social.ts';
 import { MemoryProfileStore } from '../src/store.ts';
-import type { ToolContext } from '../src/tools.ts';
+import type { ToolContext } from '../src/tools/kit.ts';
 
 /** Four people on one server: alice, bob, carol, and dave (no public profile). */
 export async function world(store: SocialStore = new DocumentSocialStore()) {

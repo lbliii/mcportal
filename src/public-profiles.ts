@@ -12,6 +12,8 @@
  * it moves to tables when sharing needs joins. One server instance.
  */
 import type { AuthPersistence } from './auth/store.ts';
+import { readDocument } from './lib/document.ts';
+import { AppError, type AppErrorOptions, type ErrorCode } from './lib/errors.ts';
 import { clean } from './lib/text.ts';
 import { normalizeSourceConfig, ProfileError } from './profile.ts';
 import { KeyedMutex } from './store.ts';
@@ -52,13 +54,13 @@ export interface PublicProfile {
 }
 
 export interface PublicProfileInput {
-  handle?: string;
-  displayName?: string;
-  bio?: string;
-  spaceTitle?: string;
-  accent?: string;
+  handle?: string | undefined;
+  displayName?: string | undefined;
+  bio?: string | undefined;
+  spaceTitle?: string | undefined;
+  accent?: string | undefined;
   /** Replaces the featured list; [] clears it. */
-  sources?: Array<{ title?: string; source: string; config: unknown }>;
+  sources?: Array<{ title?: string; source: string; config: unknown }> | undefined;
 }
 
 /** Only sources MCPortal fetches itself can be featured; configs are re-validated. */
@@ -88,8 +90,13 @@ interface Doc {
   held: Record<string, { accountId: string; until: number }>;  // released handle -> previous owner
 }
 
-export class HandleError extends Error {
+/** A handle that is invalid, reserved or taken. Defaults to invalid_argument; pass a code when it's something else. */
+export class HandleError extends AppError {
   override name = 'HandleError';
+
+  constructor(message: string, code: ErrorCode = 'invalid_argument', options?: AppErrorOptions) {
+    super(code, message, options);
+  }
 }
 
 /** The handle as stored, or an error message saying what's wrong with it. */
@@ -122,14 +129,8 @@ export class PublicProfiles {
 
   private async load(): Promise<Doc> {
     if (this.doc) return this.doc;
-    try {
-      const raw = await this.persistence.read();
-      const parsed = (raw ? JSON.parse(raw) : {}) as Partial<Doc>;
-      this.doc = { profiles: parsed.profiles ?? {}, held: parsed.held ?? {} };
-    } catch (error) {
-      process.stderr.write(`[mcportal] public profiles unreadable, starting empty: ${(error as Error).message}\n`);
-      this.doc = { profiles: {}, held: {} };
-    }
+    const parsed = await readDocument<Doc>(this.persistence, 'public profiles');
+    this.doc = { profiles: parsed.profiles ?? {}, held: parsed.held ?? {} };
     return this.doc;
   }
 
@@ -187,9 +188,9 @@ export class PublicProfiles {
         if ('error' in checked) throw new HandleError(checked.error);
         if (checked.handle !== current?.handle) {
           const owner = this.owner(doc, checked.handle);
-          if (owner && owner !== accountId) throw new HandleError(`@${checked.handle} is taken`);
+          if (owner && owner !== accountId) throw new HandleError(`@${checked.handle} is taken`, 'conflict');
           const hold = doc.held[checked.handle];
-          if (hold && hold.until > this.now() && hold.accountId !== accountId) throw new HandleError(`@${checked.handle} was in use recently; try another`);
+          if (hold && hold.until > this.now() && hold.accountId !== accountId) throw new HandleError(`@${checked.handle} was in use recently; try another`, 'conflict');
           delete doc.held[checked.handle];
           if (current) {
             released = current.handle;

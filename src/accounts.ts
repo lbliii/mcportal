@@ -19,8 +19,11 @@
  * memory; it's reloaded periodically so changes made by the admin CLI (another
  * process) take effect. One server instance.
  */
-import { randomBytes } from 'node:crypto';
 import type { AuthPersistence } from './auth/store.ts';
+import { memoryPersistence, readDocument } from './lib/document.ts';
+import { AppError, errorMessage } from './lib/errors.ts';
+import { secretToken } from './lib/ids.ts';
+import { processLogger } from './lib/log.ts';
 import { clean } from './lib/text.ts';
 
 export type AccountStatus = 'active' | 'suspended';
@@ -103,10 +106,7 @@ export function bootstrapFromEnv(env: NodeJS.ProcessEnv, allowOverride?: string[
 }
 
 /** In-memory persistence, for tests and for OAuth setups without an accounts store. */
-export function memoryPersistence(): AuthPersistence {
-  let value: string | undefined;
-  return { read: async () => value, write: async (json) => { value = json; } };
-}
+export { memoryPersistence };
 
 export function accountIdFor(githubId: number): string {
   return `github-${githubId}`;
@@ -129,12 +129,17 @@ export class Accounts {
   /** Load (or reload, if stale) from persistence. Call before the sync checks are trusted. */
   async load(force = false): Promise<void> {
     if (!force && this.doc && this.now() - this.loadedAt < RELOAD_MS) return;
-    const raw = await this.persistence.read().catch(() => undefined);
-    let parsed: Partial<Doc> = {};
+    let parsed: Partial<Doc>;
     try {
-      parsed = raw ? (JSON.parse(raw) as Partial<Doc>) : {};
-    } catch {
-      process.stderr.write('[mcportal] accounts document unreadable; starting from bootstrap config only\n');
+      parsed = await readDocument<Doc>(this.persistence, 'accounts');
+    } catch (error) {
+      // A periodic reload keeps what it had; a write (force) must see the stored document or not happen.
+      if (!force && this.doc) {
+        processLogger().warn('accounts.reload_failed', { error: errorMessage(error) });
+        this.loadedAt = this.now();
+        return;
+      }
+      throw error;
     }
     this.doc = { accounts: parsed.accounts ?? {}, identities: parsed.identities ?? {}, invites: parsed.invites ?? {}, audit: parsed.audit ?? [] };
     this.loadedAt = this.now();
@@ -249,7 +254,7 @@ export class Accounts {
       delete doc.accounts[accountId];
       for (const [key, id] of Object.entries(doc.identities)) if (id === accountId) delete doc.identities[key];
       for (const [login, invite] of Object.entries(doc.invites)) if (invite.accountId === accountId) delete doc.invites[login];
-      doc.audit.push({ at: this.now(), actor: by, action: 'account.deleted', target: accountId, detail: account.login ? `@${account.login}` : undefined });
+      doc.audit.push({ at: this.now(), actor: by, action: 'account.deleted', target: accountId, ...(account.login ? { detail: `@${account.login}` } : {}) });
       return true;
     });
   }
@@ -263,12 +268,12 @@ export class Accounts {
 
   invite(login: string, by: string): Promise<Invite> {
     const l = login.trim().toLowerCase().replace(/^@/, '');
-    if (!LOGIN.test(l)) return Promise.reject(new Error(`"${login}" isn't a valid GitHub login`));
+    if (!LOGIN.test(l)) return Promise.reject(new AppError('invalid_argument', `"${login}" isn't a valid GitHub login`));
     return this.write((doc) => {
       const existing = doc.invites[l];
       if (existing && !existing.acceptedAt && existing.code) return existing;   // inviting again keeps the same link
-      if (Object.values(doc.accounts).some((a) => a.login === l)) throw new Error(`@${l} already has an account`);
-      const invite: Invite = { login: l, invitedBy: by, createdAt: this.now(), code: randomBytes(18).toString('base64url') };
+      if (Object.values(doc.accounts).some((a) => a.login === l)) throw new AppError('conflict', `@${l} already has an account`);
+      const invite: Invite = { login: l, invitedBy: by, createdAt: this.now(), code: secretToken(18) };
       doc.invites[l] = invite;
       doc.audit.push({ at: invite.createdAt, actor: by, action: 'invite.created', target: l });
       return invite;
@@ -288,10 +293,11 @@ export class Accounts {
   setStatus(who: string, status: AccountStatus, by: string, reason?: string): Promise<Account> {
     return this.write((doc) => {
       const account = this.find(doc, who);
-      if (!account) throw new Error(`No account for "${who}"`);
+      if (!account) throw new AppError('not_found', `No account for "${who}"`);
       account.status = status;
       account.updatedAt = this.now();
-      doc.audit.push({ at: account.updatedAt, actor: by, action: status === 'suspended' ? 'account.suspended' : 'account.reinstated', target: account.id, detail: clean(reason, 200) || undefined });
+      const detail = clean(reason, 200);
+      doc.audit.push({ at: account.updatedAt, actor: by, action: status === 'suspended' ? 'account.suspended' : 'account.reinstated', target: account.id, ...(detail ? { detail } : {}) });
       return account;
     });
   }
@@ -314,7 +320,8 @@ export class Accounts {
   /** Record an admin action taken elsewhere (moderation) in the audit log. */
   record(actor: string, action: string, target: string, detail?: string): Promise<void> {
     return this.write((doc) => {
-      doc.audit.push({ at: this.now(), actor, action, target, detail: clean(detail, 200) || undefined });
+      const cleaned = clean(detail, 200);
+      doc.audit.push({ at: this.now(), actor, action, target, ...(cleaned ? { detail: cleaned } : {}) });
     });
   }
 

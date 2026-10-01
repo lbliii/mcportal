@@ -98,7 +98,7 @@
       : { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json', 'x-csrf': csrf }, body: JSON.stringify(body) });
     const data = await res.json().catch(() => ({}));
     if (res.status === 401) { location.href = '/admin'; throw new Error('Signed out'); }
-    if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+    if (!res.ok) throw new Error(data.error_description || data.error || `Request failed (${res.status})`);
     return data;
   }
 

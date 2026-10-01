@@ -21,7 +21,7 @@ async function inventory(name = 'python-objects.txt'): Promise<Buffer> {
 interface Route { status?: number; type?: string; body: string | Buffer; when?: (o: FetchOptions) => boolean }
 
 /** Answers from a table of URL → response (first matching `when` wins); everything else 404s. Records calls. */
-function mapFetcher(routes: Record<string, Route | Route[]>, calls: Array<{ url: string; accept?: string }> = []): Fetcher {
+function mapFetcher(routes: Record<string, Route | Route[]>, calls: Array<{ url: string; accept?: string | undefined }> = []): Fetcher {
   return async (url, options = {}) => {
     calls.push({ url, accept: options.headers?.accept });
     const all = routes[url];
@@ -199,7 +199,7 @@ test('resolve: falls back to Sphinx, then to a sitemap index, then explains', as
 });
 
 test('pages: a .md link is read as markdown; front matter and the repeated H1 are dropped', async () => {
-  const calls: Array<{ url: string; accept?: string }> = [];
+  const calls: Array<{ url: string; accept?: string | undefined }> = [];
   const md = '---\ntitle: "Testing"\n---\n# Testing\n\nSimulate payments.\n\n## Cards\n\n- Use `4242`';
   const page = await fetchDocPage('https://docs.stripe.com/testing.md', mapFetcher({ 'https://docs.stripe.com/testing.md': { body: md, type: 'text/markdown' } }, calls));
   assert.equal(page.title, 'Testing');
@@ -219,7 +219,7 @@ test('pages: content negotiation, then the .md sibling, then the HTML reader, an
   }));
   assert.equal(hono.route, 'markdown');
 
-  const calls: Array<{ url: string; accept?: string }> = [];
+  const calls: Array<{ url: string; accept?: string | undefined }> = [];
   const next = mapFetcher({
     'https://nextjs.org/docs/app/caching': { body: '<!DOCTYPE html><html><main><p>html</p></main></html>', type: 'text/html' },
     'https://nextjs.org/docs/app/caching.md': { body: '# Caching\n\nFrom markdown.', type: 'text/markdown' },
@@ -238,7 +238,7 @@ test('pages: content negotiation, then the .md sibling, then the HTML reader, an
   assert.deepEqual(calls.map((c) => c.url), ['https://nextjs.org/docs/app/fetching.md'], 'learned route goes first; trailing slash dropped');
 
   const sphinxHtml = '<!DOCTYPE html><html><head><title>os — Python</title></head><body><nav>menu</nav><main><h1>os</h1><p>Portable OS functions.</p></main></body></html>';
-  const calls2: Array<{ url: string; accept?: string }> = [];
+  const calls2: Array<{ url: string; accept?: string | undefined }> = [];
   const py = await fetchDocPage('https://docs.python.org/3/library/os.html', mapFetcher({ 'https://docs.python.org/3/library/os.html': { body: sphinxHtml, type: 'text/html' } }, calls2), { title: 'os' });
   assert.equal(py.route, 'html');
   assert.deepEqual(py.blocks.map((b) => b.text), ['Portable OS functions.'], 'the H1 repeating the title is dropped');

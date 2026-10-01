@@ -13,7 +13,7 @@ import { buildExport, importExport, parseExport, type PortalExport } from '../sr
 import { defaultProfile, validateProfile } from '../src/profile.ts';
 import { HANDLE_HOLD_MS, normalizeHandle, PublicProfiles, suggestHandle } from '../src/public-profiles.ts';
 import { MemoryProfileStore } from '../src/store.ts';
-import type { ToolContext } from '../src/tools.ts';
+import type { ToolContext } from '../src/tools/kit.ts';
 
 const PNG_1PX = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
 

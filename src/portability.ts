@@ -11,15 +11,15 @@
  * that aren't already kept. Everything in an import is untrusted and re-validated.
  */
 import { gzipSync } from 'node:zlib';
-import { buildClip, ClipError, CLIP_KINDS, type Clip, type ClipStore } from './clips.ts';
-import { clipText } from './clip-tools.ts';
+import { buildClip, ClipError, CLIP_KINDS, clipText, type Clip, type ClipStore } from './clips.ts';
 import { buildOpml } from './opml.ts';
 import { LIMITS, normalizePinnedItems, normalizeSaved, ProfileError, validateProfile, type PortalSpec, type Profile } from './profile.ts';
 import type { PublicProfile } from './public-profiles.ts';
 import type { SharedItem, Social } from './social.ts';
 import type { ReadingStore, ReadingState } from './reading.ts';
 import type { ProfileStore } from './store.ts';
-import { addPortalTo } from './tools.ts';
+import { addPortalTo } from './layout.ts';
+import { escapeHtml } from './lib/web.ts';
 import type { ArticleBlock } from './types.ts';
 
 export const EXPORT_FORMATS = ['mcportal', 'bookmarks', 'clips', 'opml'] as const;
@@ -49,10 +49,10 @@ export interface PortalExport {
 
 export interface ExportSources {
   store: ProfileStore;
-  reading?: ReadingStore;
-  clips?: ClipStore;
-  publicProfile?: PublicProfile;
-  social?: Social;
+  reading?: ReadingStore | undefined;
+  clips?: ClipStore | undefined;
+  publicProfile?: PublicProfile | undefined;
+  social?: Social | undefined;
 }
 
 async function allClips(clips: ClipStore | undefined, userId: string): Promise<Clip[]> {
@@ -102,12 +102,11 @@ export async function buildExport(format: ExportFormat, userId: string, from: Ex
 
 // ---- bookmarks ----------------------------------------------------------------
 
-const html = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
 export function bookmarksHtml(profile: Profile): string {
   const items = profile.saved.map((s) => {
     const added = Math.floor(Date.parse(s.savedAt) / 1000);
-    return `        <DT><A HREF="${html(s.url)}" ADD_DATE="${added}">${html(s.title)}</A>${s.note ? `\n        <DD>${html(s.note)}` : ''}`;
+    return `        <DT><A HREF="${escapeHtml(s.url)}" ADD_DATE="${added}">${escapeHtml(s.title)}</A>${s.note ? `\n        <DD>${escapeHtml(s.note)}` : ''}`;
   });
   return [
     '<!DOCTYPE NETSCAPE-Bookmark-file-1>',
@@ -254,10 +253,40 @@ export function parseExport(text: string): PortalExport {
   return data as unknown as PortalExport;
 }
 
+/** `before` with an export's portals and saved items added (or its layout, for a room not set up yet). */
+function mergeProfile(before: Profile, incoming: Profile, counts: Pick<ImportResult, 'portalsAdded' | 'portalsSkipped' | 'layoutAdopted' | 'savedAdded'>): Profile {
+  let profile = before;
+  if (!before.onboarded) {
+    // A brand-new room takes the exported layout as it is.
+    profile = { ...incoming, saved: before.saved, onboarded: true };
+    counts.layoutAdopted = true;
+    counts.portalsAdded = incoming.columns.reduce((n, c) => n + c.panels.length, 0);
+  } else {
+    const have = new Set(before.columns.flatMap((c) => c.panels).map(portalKey));
+    for (const spec of incoming.columns.flatMap((c) => c.panels)) {
+      if (have.has(portalKey(spec))) continue;
+      const added = addPortalTo(profile, { ...spec, id: spec.id });
+      if ('error' in added) {
+        counts.portalsSkipped.push(`${spec.title ?? spec.id} (${added.error})`);
+        continue;
+      }
+      profile = added.profile;
+      const pinned = spec.source === 'pinned' ? incoming.pins[spec.id] : undefined;
+      if (pinned) profile = { ...profile, pins: { ...profile.pins, [added.portalId]: { items: normalizePinnedItems(pinned.items), pinnedAt: pinned.pinnedAt } } };
+      have.add(portalKey(spec));
+      counts.portalsAdded++;
+    }
+  }
+  const urls = new Set(profile.saved.map((s) => s.url));
+  const fresh = incoming.saved.filter((s) => !urls.has(s.url));
+  const merged = normalizeSaved([...profile.saved, ...fresh].sort((a, b) => (a.savedAt < b.savedAt ? 1 : -1)));
+  counts.savedAdded = merged.filter((s) => !urls.has(s.url)).length;
+  return { ...profile, saved: merged.slice(0, LIMITS.saved) };
+}
+
 /** Add an export to a room. Never removes or rearranges anything. */
-export async function importExport(data: PortalExport, userId: string, to: { store: ProfileStore; reading?: ReadingStore; clips?: ClipStore }): Promise<ImportResult> {
+export async function importExport(data: PortalExport, userId: string, to: { store: ProfileStore; reading?: ReadingStore | undefined; clips?: ClipStore | undefined }): Promise<ImportResult> {
   const result: ImportResult = { portalsAdded: 0, portalsSkipped: [], layoutAdopted: false, savedAdded: 0, clipsAdded: 0, clipsSkipped: 0, clipErrors: [] };
-  const before = await to.store.get(userId);
   let incoming: Profile | undefined;
   try {
     incoming = isRecord(data.profile) ? validateProfile(data.profile) : undefined;
@@ -265,37 +294,18 @@ export async function importExport(data: PortalExport, userId: string, to: { sto
     if (!(error instanceof ProfileError)) throw error;
     result.portalsSkipped.push(`the layout (${error.message})`);
   }
-  let profile = before;
-  if (incoming && !before.onboarded) {
-    // A brand-new room takes the exported layout as it is.
-    profile = { ...incoming, saved: before.saved, onboarded: true };
-    result.layoutAdopted = true;
-    result.portalsAdded = incoming.columns.reduce((n, c) => n + c.panels.length, 0);
-  } else if (incoming) {
-    const have = new Set(before.columns.flatMap((c) => c.panels).map(portalKey));
-    for (const spec of incoming.columns.flatMap((c) => c.panels)) {
-      if (have.has(portalKey(spec))) continue;
-      const added = addPortalTo(profile, { ...spec, id: spec.id });
-      if ('error' in added) {
-        result.portalsSkipped.push(`${spec.title ?? spec.id} (${added.error})`);
-        continue;
-      }
-      profile = added.profile;
-      if (spec.source === 'pinned' && incoming.pins[spec.id]) {
-        profile = { ...profile, pins: { ...profile.pins, [added.portalId]: { items: normalizePinnedItems(incoming.pins[spec.id]!.items), pinnedAt: incoming.pins[spec.id]!.pinnedAt } } };
-      }
-      have.add(portalKey(spec));
-      result.portalsAdded++;
-    }
-  }
   if (incoming) {
-    const urls = new Set(profile.saved.map((s) => s.url));
-    const fresh = incoming.saved.filter((s) => !urls.has(s.url));
-    const merged = normalizeSaved([...profile.saved, ...fresh].sort((a, b) => (a.savedAt < b.savedAt ? 1 : -1)));
-    result.savedAdded = merged.filter((s) => !urls.has(s.url)).length;
-    profile = { ...profile, saved: merged.slice(0, LIMITS.saved) };
+    const from = incoming;
+    const merged = await to.store.update(userId, (before) => {
+      const counts = { portalsAdded: 0, portalsSkipped: [] as string[], layoutAdopted: false, savedAdded: 0 };
+      const profile = mergeProfile(before, from, counts);
+      return profile === before ? { result: counts } : { profile, result: counts };
+    });
+    result.portalsAdded = merged.portalsAdded;
+    result.portalsSkipped.push(...merged.portalsSkipped);
+    result.layoutAdopted = merged.layoutAdopted;
+    result.savedAdded = merged.savedAdded;
   }
-  if (profile !== before) await to.store.put(userId, profile);
 
   if (to.clips && Array.isArray(data.clips)) {
     const existing = await to.clips.list(userId, { limit: 100_000 });
@@ -315,7 +325,7 @@ export async function importExport(data: PortalExport, userId: string, to: { sto
       } catch (error) {
         if (!(error instanceof ClipError)) throw error;
         result.clipErrors.push(`${String(raw.title ?? raw.kind).slice(0, 60)}: ${error.message}`);
-        if (/clips, the most|MB allowed/.test(error.message)) break;
+        if (error.code === 'limit_exceeded') break;
       }
     }
   }

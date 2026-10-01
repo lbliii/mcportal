@@ -6,12 +6,12 @@ import {
   candidateBases, githubTocUrl, inDocsScope, loadGithubDocs, originalUrl, parseGithubDocs, resolveDocs, searchDocs, type DocSite,
 } from '../src/adapters/docs.ts';
 import { TtlCache } from '../src/lib/cache.ts';
-import { toolCost } from '../src/lib/budget.ts';
+import { toolCost } from '../src/tools/index.ts';
 import { handleMessage } from '../src/mcp.ts';
 import { defaultProfile } from '../src/profile.ts';
 import { docsQuery } from '../src/sources.ts';
 import { MemoryProfileStore } from '../src/store.ts';
-import type { ToolContext } from '../src/tools.ts';
+import type { ToolContext } from '../src/tools/kit.ts';
 import type { Fetcher } from '../src/types.ts';
 
 const fixture = (name: string) => readFile(new URL(`./fixtures/docs/${name}`, import.meta.url), 'utf8');

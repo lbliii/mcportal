@@ -1,8 +1,11 @@
 /** Durable activity, deliberately separate from layout/preferences. */
-import { createHash } from 'node:crypto';
 import { readFile, rm } from 'node:fs/promises';
 import path from 'node:path';
+import { AppError } from './lib/errors.ts';
+import { sha256Hex } from './lib/ids.ts';
 import { atomicWrite, defaultDataDir, KeyedMutex } from './store.ts';
+
+const invalid = (message: string) => new AppError('invalid_argument', message);
 
 export interface ReadingState {
   url: string;
@@ -30,24 +33,24 @@ export interface ReadingStore {
 }
 export const READING_LIMIT = 1000;
 export function canonicalReadingUrl(value: unknown): string {
-  if (typeof value !== 'string' || value.length > 4096) throw new Error('Reading URL must be an HTTP(S) URL of at most 4096 characters.');
+  if (typeof value !== 'string' || value.length > 4096) throw invalid('Reading URL must be an HTTP(S) URL of at most 4096 characters.');
   const url = new URL(value);
-  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) throw new Error('Reading URL must be HTTP(S), without credentials.');
+  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) throw invalid('Reading URL must be HTTP(S), without credentials.');
   url.hash = '';
   return url.href;
 }
 export function validateReadingUpdate(raw: ReadingUpdate): ReadingUpdate {
   const url = canonicalReadingUrl(raw.url);
-  if (!['seen', 'opened', 'read'].includes(raw.status)) throw new Error('status must be seen, opened or read');
-  if (raw.progress !== undefined && (!Number.isFinite(raw.progress) || raw.progress < 0 || raw.progress > 1)) throw new Error('progress must be between 0 and 1');
-  if (raw.status === 'seen' && (raw.anchor !== undefined || raw.progress !== undefined)) throw new Error('seen does not change reading position');
+  if (!['seen', 'opened', 'read'].includes(raw.status)) throw invalid('status must be seen, opened or read');
+  if (raw.progress !== undefined && (!Number.isFinite(raw.progress) || raw.progress < 0 || raw.progress > 1)) throw invalid('progress must be between 0 and 1');
+  if (raw.status === 'seen' && (raw.anchor !== undefined || raw.progress !== undefined)) throw invalid('seen does not change reading position');
   let anchor = raw.anchor;
   if (anchor != null) {
-    if (typeof anchor !== 'object' || Array.isArray(anchor) || (anchor.block !== undefined && (!Number.isSafeInteger(anchor.block) || anchor.block < 0))) throw new Error('anchor.block must be a nonnegative integer');
-    if (anchor.heading !== undefined && (typeof anchor.heading !== 'string' || anchor.heading.length > 300)) throw new Error('anchor.heading must be at most 300 characters');
+    if (typeof anchor !== 'object' || Array.isArray(anchor) || (anchor.block !== undefined && (!Number.isSafeInteger(anchor.block) || anchor.block < 0))) throw invalid('anchor.block must be a nonnegative integer');
+    if (anchor.heading !== undefined && (typeof anchor.heading !== 'string' || anchor.heading.length > 300)) throw invalid('anchor.heading must be at most 300 characters');
     anchor = { ...(anchor.heading !== undefined ? { heading: anchor.heading } : {}), ...(anchor.block !== undefined ? { block: anchor.block } : {}) };
   }
-  if (raw.title !== undefined && (typeof raw.title !== 'string' || raw.title.length > 300)) throw new Error('title must be at most 300 characters');
+  if (raw.title !== undefined && (typeof raw.title !== 'string' || raw.title.length > 300)) throw invalid('title must be at most 300 characters');
   return { url, status: raw.status, ...(raw.title !== undefined ? { title: raw.title } : {}), ...(anchor !== undefined ? { anchor } : {}), ...(raw.progress !== undefined ? { progress: raw.progress } : {}) };
 }
 export function nextReading(previous: ReadingState | undefined, input: ReadingUpdate, now = new Date().toISOString()): ReadingState {
@@ -66,7 +69,7 @@ export function readingList(states: ReadingState[], options: { unfinished?: bool
   return states.filter(s => !options.unfinished || s.status === 'opened').sort((a,b) => (b.lastOpenedAt ?? b.lastSeenAt).localeCompare(a.lastOpenedAt ?? a.lastSeenAt) || a.url.localeCompare(b.url)).slice(0, limit);
 }
 export function importedReading(raw: unknown): ReadingState {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Invalid reading record');
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw invalid('Invalid reading record');
   const value = raw as ReadingState;
   const validated = validateReadingUpdate(value);
   const result: ReadingState = { url: validated.url, status: validated.status, lastSeenAt: timestamp(value.lastSeenAt) };
@@ -75,19 +78,19 @@ export function importedReading(raw: unknown): ReadingState {
   if (validated.progress !== undefined) result.progress = validated.progress;
   if (value.lastOpenedAt !== undefined) result.lastOpenedAt = timestamp(value.lastOpenedAt);
   if (value.readAt !== undefined) result.readAt = timestamp(value.readAt);
-  if (result.status !== 'seen' && !result.lastOpenedAt) throw new Error('Opened/read record requires lastOpenedAt');
-  if (result.status === 'read') { if (!result.readAt) throw new Error('Read record requires readAt'); result.progress = 1; }
+  if (result.status !== 'seen' && !result.lastOpenedAt) throw invalid('Opened/read record requires lastOpenedAt');
+  if (result.status === 'read') { if (!result.readAt) throw invalid('Read record requires readAt'); result.progress = 1; }
   return result;
 }
 function timestamp(value: unknown): string {
-  if (typeof value !== 'string' || !Number.isFinite(Date.parse(value))) throw new Error('Invalid reading timestamp');
+  if (typeof value !== 'string' || !Number.isFinite(Date.parse(value))) throw invalid('Invalid reading timestamp');
   return new Date(value).toISOString();
 }
 export class FileReadingStore implements ReadingStore {
   private mutex = new KeyedMutex();
   private dir: string;
   constructor(dir = defaultDataDir()) { this.dir = dir; }
-  private file(userId: string) { return path.join(this.dir, 'reading', createHash('sha256').update(userId).digest('hex') + '.json'); }
+  private file(userId: string) { return path.join(this.dir, 'reading', sha256Hex(userId) + '.json'); }
   private async load(userId: string): Promise<ReadingState[]> {
     try { const raw = JSON.parse(await readFile(this.file(userId), 'utf8')); if (!Array.isArray(raw) || raw.length > READING_LIMIT) throw new Error('Invalid reading document'); return raw.map(importedReading); }
     catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []; throw error; }
@@ -101,7 +104,7 @@ export class FileReadingStore implements ReadingStore {
     await atomicWrite(this.file(userId), JSON.stringify(all)); return next;
   }); }
   import(userId: string, raw: unknown[]) { return this.mutex.run(userId, async () => {
-    if (raw.length > READING_LIMIT) throw new Error('Too many reading records');
+    if (raw.length > READING_LIMIT) throw new AppError('limit_exceeded', 'Too many reading records');
     const incoming = raw.map(importedReading); const states = await this.load(userId); const urls = new Set(states.map(s => s.url));
     const fresh = incoming.filter(s => { if (urls.has(s.url)) return false; urls.add(s.url); return true; }).slice(0, READING_LIMIT - states.length);
     await atomicWrite(this.file(userId), JSON.stringify([...states, ...fresh])); return fresh.length;

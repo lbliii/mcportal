@@ -14,13 +14,18 @@
  *
  * Visibility is decided here, in one place (canSee), and every cross-user read
  * goes through Social. Stores only store.
+ *
+ * The store interface and the in-process store live in social-store.ts and are
+ * re-exported from here.
  */
 import { randomBytes } from 'node:crypto';
-import type { AuthPersistence } from './auth/store.ts';
-import { cleanText, type Clip } from './clips.ts';
+import { ClipError, cleanText, type Clip } from './clips.ts';
+import { AppError, type AppErrorOptions, type ErrorCode } from './lib/errors.ts';
 import { clean } from './lib/text.ts';
 import type { PublicProfile, PublicProfiles } from './public-profiles.ts';
-import { KeyedMutex } from './store.ts';
+import { limitOf, type SocialStore } from './social-store.ts';
+
+export { DocumentSocialStore, type SocialStore } from './social-store.ts';
 
 export const AUDIENCES = ['followers', 'mcportal'] as const;
 export type Audience = (typeof AUDIENCES)[number];
@@ -58,167 +63,20 @@ export interface Report {
 export type Relation = 'follows' | 'mutes' | 'blocks';
 
 export interface PageQuery {
-  limit?: number;
-  before?: string;
+  limit?: number | undefined;
+  before?: string | undefined;
 }
 
-export class SocialError extends Error {
+/** A sharing or relationship request the rules refuse. Defaults to invalid_argument; pass a code when it's something else. */
+export class SocialError extends AppError {
   override name = 'SocialError';
-}
 
-/** Storage only; no rules. */
-export interface SocialStore {
-  addShare(share: Share): Promise<void>;
-  getShare(id: string): Promise<Share | undefined>;
-  deleteShare(accountId: string, id: string): Promise<boolean>;
-  setHidden(id: string, hiddenAt: string | null): Promise<boolean>;
-  /** Newest first. */
-  sharesBy(accountIds: string[], query: PageQuery & { includeHidden?: boolean }): Promise<Share[]>;
-  countShares(accountId: string): Promise<number>;
-  /** a follows/mutes/blocks b. */
-  relate(relation: Relation, a: string, b: string): Promise<boolean>;
-  unrelate(relation: Relation, a: string, b: string): Promise<boolean>;
-  /** Everyone a follows/mutes/blocks. */
-  outgoing(relation: Relation, a: string): Promise<string[]>;
-  /** Everyone who follows/mutes/blocks b. */
-  incoming(relation: Relation, b: string): Promise<string[]>;
-  addReport(report: Report): Promise<void>;
-  reports(status?: Report['status'], limit?: number): Promise<Report[]>;
-  resolveReport(id: string, by: string, resolution: string, at: string): Promise<Report | undefined>;
-  /** Account deletion: their shares and relations go; reports they filed stay, anonymized. */
-  forget(accountId: string): Promise<void>;
+  constructor(message: string, code: ErrorCode = 'invalid_argument', options?: AppErrorOptions) {
+    super(code, message, options);
+  }
 }
 
 const newId = (prefix: string) => `${prefix}${randomBytes(6).toString('hex')}`;
-const limitOf = (q: PageQuery, fallback = 30, max = 100) => Math.min(max, Math.max(1, Math.round(Number(q.limit) || fallback)));
-
-// ---- in-process store ---------------------------------------------------------
-
-interface Doc {
-  shares: Share[];
-  relations: Record<Relation, Array<[string, string, string]>>;   // [a, b, at]
-  reports: Report[];
-}
-
-/** One document (memory, or a file / Postgres row via persistence). For tests and local servers. */
-export class DocumentSocialStore implements SocialStore {
-  private persistence?: AuthPersistence;
-  private doc: Doc | null = null;
-  private mutex = new KeyedMutex();
-
-  constructor(persistence?: AuthPersistence) {
-    this.persistence = persistence;
-  }
-
-  private async load(): Promise<Doc> {
-    if (this.doc) return this.doc;
-    let parsed: Partial<Doc> = {};
-    try {
-      const raw = await this.persistence?.read();
-      parsed = raw ? (JSON.parse(raw) as Partial<Doc>) : {};
-    } catch (error) {
-      process.stderr.write(`[mcportal] social document unreadable, starting empty: ${(error as Error).message}\n`);
-    }
-    this.doc = { shares: parsed.shares ?? [], relations: { follows: [], mutes: [], blocks: [], ...parsed.relations }, reports: parsed.reports ?? [] };
-    return this.doc;
-  }
-
-  private write<T>(change: (doc: Doc) => T): Promise<T> {
-    return this.mutex.run('social', async () => {
-      const doc = await this.load();
-      const result = change(doc);
-      await this.persistence?.write(JSON.stringify(doc));
-      return result;
-    });
-  }
-
-  async addShare(share: Share): Promise<void> {
-    await this.write((d) => { d.shares.unshift(structuredClone(share)); });
-  }
-
-  async getShare(id: string): Promise<Share | undefined> {
-    return structuredClone((await this.load()).shares.find((s) => s.id === id));
-  }
-
-  deleteShare(accountId: string, id: string): Promise<boolean> {
-    return this.write((d) => {
-      const before = d.shares.length;
-      d.shares = d.shares.filter((s) => !(s.id === id && s.accountId === accountId));
-      return d.shares.length < before;
-    });
-  }
-
-  setHidden(id: string, hiddenAt: string | null): Promise<boolean> {
-    return this.write((d) => {
-      const share = d.shares.find((s) => s.id === id);
-      if (!share) return false;
-      if (hiddenAt) share.hiddenAt = hiddenAt;
-      else delete share.hiddenAt;
-      return true;
-    });
-  }
-
-  async sharesBy(accountIds: string[], query: PageQuery & { includeHidden?: boolean }): Promise<Share[]> {
-    const ids = new Set(accountIds);
-    return structuredClone((await this.load()).shares
-      .filter((s) => ids.has(s.accountId) && (query.includeHidden || !s.hiddenAt) && (!query.before || s.createdAt < query.before))
-      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0))
-      .slice(0, limitOf(query)));
-  }
-
-  async countShares(accountId: string): Promise<number> {
-    return (await this.load()).shares.filter((s) => s.accountId === accountId).length;
-  }
-
-  relate(relation: Relation, a: string, b: string): Promise<boolean> {
-    return this.write((d) => {
-      if (d.relations[relation].some(([x, y]) => x === a && y === b)) return false;
-      d.relations[relation].push([a, b, new Date().toISOString()]);
-      return true;
-    });
-  }
-
-  unrelate(relation: Relation, a: string, b: string): Promise<boolean> {
-    return this.write((d) => {
-      const before = d.relations[relation].length;
-      d.relations[relation] = d.relations[relation].filter(([x, y]) => !(x === a && y === b));
-      return d.relations[relation].length < before;
-    });
-  }
-
-  async outgoing(relation: Relation, a: string): Promise<string[]> {
-    return (await this.load()).relations[relation].filter(([x]) => x === a).map(([, y]) => y);
-  }
-
-  async incoming(relation: Relation, b: string): Promise<string[]> {
-    return (await this.load()).relations[relation].filter(([, y]) => y === b).map(([x]) => x);
-  }
-
-  async addReport(report: Report): Promise<void> {
-    await this.write((d) => { d.reports.unshift(structuredClone(report)); });
-  }
-
-  async reports(status?: Report['status'], limit = 100): Promise<Report[]> {
-    return structuredClone((await this.load()).reports.filter((r) => !status || r.status === status).slice(0, limit));
-  }
-
-  resolveReport(id: string, by: string, resolution: string, at: string): Promise<Report | undefined> {
-    return this.write((d) => {
-      const report = d.reports.find((r) => r.id === id);
-      if (!report) return undefined;
-      Object.assign(report, { status: 'resolved', resolvedAt: at, resolvedBy: by, resolution });
-      return structuredClone(report);
-    });
-  }
-
-  async forget(accountId: string): Promise<void> {
-    await this.write((d) => {
-      d.shares = d.shares.filter((s) => s.accountId !== accountId);
-      for (const r of Object.keys(d.relations) as Relation[]) d.relations[r] = d.relations[r].filter(([a, b]) => a !== accountId && b !== accountId);
-      for (const report of d.reports) if (report.reporterId === accountId) report.reporterId = 'deleted';
-    });
-  }
-}
 
 // ---- the rules ----------------------------------------------------------------
 
@@ -256,9 +114,9 @@ export class Social {
   /** The account behind a handle that `viewer` may deal with (visible, not blocked either way). */
   async resolve(viewer: string, handle: string): Promise<PublicProfile> {
     const found = await this.profiles.byHandle(handle);
-    if (!found) throw new SocialError(`No MCPortal profile for @${clean(handle, 40).replace(/^@/, '')}`);
+    if (!found) throw new SocialError(`No MCPortal profile for @${clean(handle, 40).replace(/^@/, '')}`, 'not_found');
     if (found.profile.accountId !== viewer && (await this.blockedEitherWay(viewer, found.profile.accountId))) {
-      throw new SocialError(`No MCPortal profile for @${found.profile.handle}`);   // a block hides both ways, silently
+      throw new SocialError(`No MCPortal profile for @${found.profile.handle}`, 'not_found');   // a block hides both ways, silently
     }
     return found.profile;
   }
@@ -287,15 +145,16 @@ export class Social {
     return out;
   }
 
-  async share(author: string, input: { kind: 'link' | 'clip'; title: string; url?: string; clip?: Clip; note?: unknown; audience?: unknown }): Promise<SharedItem> {
-    if (!(await this.profiles.get(author))) throw new SocialError('Sharing needs a public profile, so people know who shared it. Create one with set_public_profile first');
-    if ((await this.store.countShares(author)) >= SOCIAL_LIMITS.sharesPerUser) throw new SocialError(`You have ${SOCIAL_LIMITS.sharesPerUser} shares, the most MCPortal keeps. Remove some with unshare`);
+  async share(author: string, input: { kind: 'link' | 'clip'; title: string; url?: string | undefined; clip?: Clip | undefined; note?: unknown; audience?: unknown }): Promise<SharedItem> {
+    if (!(await this.profiles.get(author))) throw new SocialError('Sharing needs a public profile, so people know who shared it. Create one with set_public_profile first', 'failed_precondition');
+    if ((await this.store.countShares(author)) >= SOCIAL_LIMITS.sharesPerUser) throw new SocialError(`You have ${SOCIAL_LIMITS.sharesPerUser} shares, the most MCPortal keeps. Remove some with unshare`, 'limit_exceeded');
     const audience: Audience = input.audience === 'mcportal' ? 'mcportal' : 'followers';
     let note: string;
     try {
       note = cleanText(input.note, SOCIAL_LIMITS.note, 'note');
     } catch (error) {
-      throw new SocialError((error as Error).message.replace(/\.$/, ''));
+      if (!(error instanceof ClipError)) throw error;
+      throw new SocialError(error.message.replace(/\.$/, ''), error.code);
     }
     const share: Share = {
       id: newId('s'),
@@ -351,7 +210,7 @@ export class Social {
   async follow(viewer: string, handle: string): Promise<PublicProfile> {
     const target = await this.resolve(viewer, handle);
     if (target.accountId === viewer) throw new SocialError("You can't follow yourself");
-    if ((await this.store.outgoing('follows', viewer)).length >= SOCIAL_LIMITS.follows) throw new SocialError(`You follow ${SOCIAL_LIMITS.follows} people, the most MCPortal allows`);
+    if ((await this.store.outgoing('follows', viewer)).length >= SOCIAL_LIMITS.follows) throw new SocialError(`You follow ${SOCIAL_LIMITS.follows} people, the most MCPortal allows`, 'limit_exceeded');
     await this.store.relate('follows', viewer, target.accountId);
     return target;
   }
@@ -372,7 +231,7 @@ export class Social {
   /** Blocking also removes follows both ways. Unblocking doesn't restore them. */
   async block(viewer: string, handle: string, on: boolean): Promise<PublicProfile> {
     const found = await this.profiles.byHandle(handle);
-    if (!found) throw new SocialError(`No MCPortal profile for @${clean(handle, 40).replace(/^@/, '')}`);
+    if (!found) throw new SocialError(`No MCPortal profile for @${clean(handle, 40).replace(/^@/, '')}`, 'not_found');
     const target = found.profile;
     if (target.accountId === viewer) throw new SocialError("You can't block yourself");
     if (on) {
@@ -400,16 +259,16 @@ export class Social {
     return { followers: (await this.store.incoming('follows', accountId)).length, following: (await this.store.outgoing('follows', viewer)).includes(accountId), shares: visible.length };
   }
 
-  async report(reporter: string, target: { shareId?: string; handle?: string }, reason: unknown): Promise<Report> {
+  async report(reporter: string, target: { shareId?: string | undefined; handle?: string | undefined }, reason: unknown): Promise<Report> {
     const why = clean(reason, SOCIAL_LIMITS.reason);
     if (!why) throw new SocialError('Say briefly what is wrong');
     const open = (await this.store.reports('open', 10_000)).filter((r) => r.reporterId === reporter).length;
-    if (open >= SOCIAL_LIMITS.openReportsPerUser) throw new SocialError('You have many open reports; an admin will get to them');
+    if (open >= SOCIAL_LIMITS.openReportsPerUser) throw new SocialError('You have many open reports; an admin will get to them', 'limit_exceeded');
     let targetKind: Report['targetKind'];
     let targetId: string;
     if (target.shareId) {
       const share = await this.store.getShare(target.shareId);
-      if (!share || !(await this.canSee(reporter, share))) throw new SocialError('No such share');
+      if (!share || !(await this.canSee(reporter, share))) throw new SocialError('No such share', 'not_found');
       if (share.accountId === reporter) throw new SocialError("That's your own share; remove it with unshare");
       targetKind = 'share';
       targetId = share.id;

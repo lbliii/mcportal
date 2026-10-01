@@ -1,3 +1,4 @@
+import { isAppError, UpstreamError } from '../lib/errors.ts';
 import { fetchJson } from '../lib/safe-fetch.ts';
 import { clean, hostOf, safeHttpUrl } from '../lib/text.ts';
 import type { Fetcher, Item } from '../types.ts';
@@ -42,18 +43,18 @@ function toItem(s: HnStory): Item | null {
     discussionUrl,
     score: Number(s.score) || 0,
     meta,
-    publishedAt: typeof s.time === 'number' ? new Date(s.time * 1000).toISOString() : undefined,
+    ...(typeof s.time === 'number' ? { publishedAt: new Date(s.time * 1000).toISOString() } : {}),
   };
 }
 
 export async function fetchHn(config: HnConfig, fetcher: Fetcher): Promise<Item[]> {
   const ids = await fetchJson<unknown>(fetcher, hnEndpoint(config));
-  if (!Array.isArray(ids)) throw new Error('Hacker News returned an unexpected response');
+  if (!Array.isArray(ids)) throw new UpstreamError('upstream_error', 'Hacker News returned an unexpected response');
   const stories = await Promise.all(
     ids
       .filter((id): id is number => Number.isInteger(id))
       .slice(0, config.limit)
-      .map((id) => fetchJson<HnStory>(fetcher, `${HN_API}/item/${id}.json`).catch(() => null)),
+      .map((id) => fetchJson<HnStory>(fetcher, `${HN_API}/item/${id}.json`).catch((error: unknown) => { if (!isAppError(error)) throw error; return null; })),
   );
   // One malformed story must never take down the portal.
   return stories.flatMap((s) => {

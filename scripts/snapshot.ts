@@ -18,7 +18,7 @@ import { safeFetch } from '../src/lib/safe-fetch.ts';
 import { handleMessage, roomHtml } from '../src/mcp.ts';
 import { MemoryClipStore } from '../src/clips.ts';
 import { MemoryProfileStore } from '../src/store.ts';
-import type { ToolContext } from '../src/tools.ts';
+import type { ToolContext } from '../src/tools/kit.ts';
 
 const out = process.argv.slice(2).find((a) => !a.startsWith('--')) ?? 'snapshot.html';
 const openReader = process.argv.includes('--reader');

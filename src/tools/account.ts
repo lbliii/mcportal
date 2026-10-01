@@ -7,17 +7,10 @@
  */
 import { readFile, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { clean } from './lib/text.ts';
-import { describeImport, EXPORT_FORMATS, importExport, parseExport, type ExportFormat } from './portability.ts';
-import { ACCENTS, HandleError, MAX_FEATURED, suggestHandle, type PublicProfile } from './public-profiles.ts';
-import { ProfileError } from './profile.ts';
-import { toolError, untrusted, type CallToolResult, type ToolDef } from './tools.ts';
-
-function ok(text: string, structuredContent: Record<string, unknown>): CallToolResult {
-  return { content: [{ type: 'text', text }], structuredContent };
-}
-
-const HOSTED_ONLY = 'Public profiles are part of the hosted MCPortal. This one runs on your machine, so it has no handle to claim.';
+import { clean } from '../lib/text.ts';
+import { describeImport, EXPORT_FORMATS, importExport, parseExport, type ExportFormat } from '../portability.ts';
+import { ACCENTS, MAX_FEATURED, suggestHandle, type PublicProfile } from '../public-profiles.ts';
+import { HOSTED_ONLY, ok, toolError, toolFailure, untrusted, type ToolDef } from './kit.ts';
 
 function describeProfile(p: PublicProfile): string {
   return [
@@ -40,6 +33,7 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
   {
     name: 'get_public_profile',
     title: 'Get a public profile',
+    access: 'read',
     description: [
       "Without handle: the user's own public profile, if they have one (they don't until they claim a handle), and a suggested handle.",
       'With handle: another MCPortal user\'s public profile (handle, name, bio).',
@@ -47,10 +41,10 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
     inputSchema: { type: 'object', additionalProperties: false, properties: { handle: { type: 'string', description: 'e.g. "@someone"' } } },
     annotations: { readOnlyHint: true },
     async handler(args, ctx) {
-      if (!ctx.publicProfiles) return toolError(HOSTED_ONLY);
+      if (!ctx.publicProfiles) return toolError(HOSTED_ONLY.profiles, 'unavailable');
       if (typeof args.handle === 'string' && args.handle.trim()) {
         const found = await ctx.publicProfiles.byHandle(args.handle);
-        if (!found) return toolError(`No MCPortal profile for @${clean(args.handle, 40).replace(/^@/, '')}.`);
+        if (!found) return toolError(`No MCPortal profile for @${clean(args.handle, 40).replace(/^@/, '')}.`, 'not_found');
         const { accountId: _id, ...profile } = found.profile;
         const moved = found.movedFrom ? `@${found.movedFrom} is now @${profile.handle}.\n` : '';
         const stats = ctx.social && found.profile.accountId !== ctx.userId ? await ctx.social.stats(ctx.userId, found.profile.accountId) : undefined;
@@ -66,6 +60,7 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
   {
     name: 'set_public_profile',
     title: 'Set your public profile and space',
+    access: 'write',
     description: [
       "Create or change the user's public profile and space: a handle (2-30 letters, digits or underscores), a display name, a short bio,",
       `the Space's title (e.g. "late-night reading"), an accent colour (${ACCENTS.join(', ')}), and featuredPortalIds: up to ${MAX_FEATURED} portals from their room (portal ids from get_profile) to recommend as "Sources I read" (feeds, Hacker News, GitHub; [] clears).`,
@@ -86,14 +81,14 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
     async handler(args, ctx) {
-      if (!ctx.publicProfiles) return toolError(HOSTED_ONLY);
+      if (!ctx.publicProfiles) return toolError(HOSTED_ONLY.profiles, 'unavailable');
       try {
         let sources: Array<{ title?: string; source: string; config: unknown }> | undefined;
         if (Array.isArray(args.featuredPortalIds)) {
           const portals = (await ctx.store.get(ctx.userId)).columns.flatMap((c) => c.panels);
           const ids = args.featuredPortalIds.map(String);
           const unknown = ids.filter((id) => !portals.some((p) => p.id === id));
-          if (unknown.length) return toolError(`Not saved: no portal with id ${unknown.map((u) => clean(u, 40)).join(', ')} (see get_profile).`);
+          if (unknown.length) return toolError(`Not saved: no portal with id ${unknown.map((u) => clean(u, 40)).join(', ')} (see get_profile).`, 'not_found');
           sources = ids.map((id) => portals.find((p) => p.id === id)!).map((p) => ({ title: p.title ?? p.id, source: p.source, config: p.config }));
         }
         const { profile, created, released } = await ctx.publicProfiles.set(ctx.userId, {
@@ -108,19 +103,19 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
         const head = created ? `Created your public profile as @${profile.handle}.` : released ? `Changed your handle from @${released} to @${profile.handle}. @${released} points to you for 30 days.` : 'Updated your public profile.';
         return ok(`${head}\n${describeProfile(profile)}${skipped > 0 ? `\n${skipped} portal(s) weren't featured: only feeds, Hacker News and GitHub can be.` : ''}`, { profile });
       } catch (error) {
-        if (error instanceof HandleError) return toolError(`Not saved: ${error.message}.`);
-        throw error;
+        return toolFailure(error, 'Not saved: ', '.');
       }
     },
   },
   {
     name: 'remove_public_profile',
     title: 'Remove your public profile',
+    access: 'write',
     description: "Make the user private again: removes their handle, name and bio. Only when they ask. Their handle stays reserved for them for 30 days.",
     inputSchema: { type: 'object', additionalProperties: false, properties: {} },
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
     async handler(_args, ctx) {
-      if (!ctx.publicProfiles) return toolError(HOSTED_ONLY);
+      if (!ctx.publicProfiles) return toolError(HOSTED_ONLY.profiles, 'unavailable');
       const removed = await ctx.publicProfiles.remove(ctx.userId);
       return ok(removed ? `Removed your public profile. @${removed.handle} is held for you for 30 days.` : 'You had no public profile; nothing changed.', { removed: Boolean(removed) });
     },
@@ -128,6 +123,8 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
   {
     name: 'export_data',
     title: 'Export your data',
+    access: 'read',
+    cost: 5,
     description: [
       "Give the user a copy of their MCPortal data. Formats: ",
       EXPORT_FORMATS.map((f) => `${f}: ${FORMAT_DOCS[f]}`).join('; '),
@@ -138,7 +135,7 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
     async handler(args, ctx) {
       const format = args.format as ExportFormat;
       if (!EXPORT_FORMATS.includes(format)) return toolError(`format must be one of ${EXPORT_FORMATS.join(', ')}`);
-      if (!ctx.deliver) return toolError('Exports are not available on this server.');
+      if (!ctx.deliver) return toolError('Exports are not available on this server.', 'unavailable');
       const got = await ctx.deliver(format);
       const text = got.kind === 'link'
         ? `Your export (${got.summary}) is ready. Download link (works once, for 15 minutes): ${got.where}`
@@ -149,6 +146,8 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
   {
     name: 'import_portal',
     title: 'Import an MCPortal export',
+    access: 'write',
+    cost: 20,
     description: [
       'Add an MCPortal export file (format "mcportal-export") to the user\'s room: portals they don\'t have, saved items and clips. Only adds; nothing is removed or moved. A brand-new room takes the exported layout as is.',
       'Usually call it with no arguments: on the hosted MCPortal that returns a one-time upload link for the user to pick the file, so it never has to pass through the conversation. Show them the link as is.',
@@ -172,7 +171,7 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
         const file = args.path.trim().replace(/^~(?=\/|$)/, homedir());
         if (!/\.json$/i.test(file)) return toolError('path must be a .json MCPortal export file.');
         const info = await stat(file).catch(() => undefined);
-        if (!info?.isFile()) return toolError(`No file at ${clean(file, 200)}.`);
+        if (!info?.isFile()) return toolError(`No file at ${clean(file, 200)}.`, 'not_found');
         if (info.size > 60 * 1024 * 1024) return toolError('That file is over 60 MB; it isn\'t an MCPortal export.');
         text = await readFile(file, 'utf8');
       } else if (ctx.uploadLink) {
@@ -183,14 +182,14 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
         const result = await importExport(parseExport(text), ctx.userId, ctx);
         return ok(`${describeImport(result)}\nCall open_room to show it.`, { result, profile: await ctx.store.get(ctx.userId) });
       } catch (error) {
-        if (error instanceof ProfileError) return toolError(`Not imported: ${error.message}`);
-        throw error;
+        return toolFailure(error, 'Not imported: ');
       }
     },
   },
   {
     name: 'account_settings',
     title: 'Account page',
+    access: 'read',
     description: "Link to the user's MCPortal account page, where they sign in with GitHub to download everything or delete their account. Use it when they ask to delete their account: deletion only happens there, never through a tool.",
     inputSchema: { type: 'object', additionalProperties: false, properties: {} },
     annotations: { readOnlyHint: true },

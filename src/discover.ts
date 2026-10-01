@@ -7,6 +7,7 @@
  * feed paths. Callers test-load every candidate before offering it, so nothing
  * that doesn't load gets added. All fetches go through the caller's guarded fetcher.
  */
+import { isAppError } from './lib/errors.ts';
 import { REPO_PATTERN } from './adapters/github.ts';
 import { HN_FEEDS } from './adapters/hn.ts';
 import { parseFeed } from './adapters/rss.ts';
@@ -150,7 +151,8 @@ async function probe(fetcher: Fetcher, url: string): Promise<{ title: string } |
     if (res.status < 200 || res.status >= 300 || !looksLikeFeed(res.text)) return null;
     const feed = parseFeed(res.text, 1, res.url);
     return feed.items.length ? { title: feed.title } : null;
-  } catch {
+  } catch (error) {
+    if (!isAppError(error)) throw error;   // a failed fetch means no feed there; a bug isn't that
     return null;
   }
 }

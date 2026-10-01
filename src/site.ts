@@ -11,7 +11,7 @@ import { DESIGN_CSS, PRIMITIVES_CSS } from './design/generated.ts';
 import { readFile } from 'node:fs/promises';
 import type { ServerResponse } from 'node:http';
 import { fileURLToPath } from 'node:url';
-import { escapeHtml } from './auth/oauth.ts';
+import { escapeHtml } from './lib/web.ts';
 
 export const DEFAULT_SUPPORT_URL = 'https://github.com/lbliii/mcportal/issues';
 const POLICY_UPDATED = '2026-09-30';   // bump when what's stored changes
