@@ -1,14 +1,15 @@
 /**
- * The room tools: open_room, build_room, get_profile, update_profile, refresh_portal.
- * They show the room and change its layout; adding single portals lives in sources.ts.
+ * The room tools: open_room, build_room, arrange_room, remove_portal, refresh_portal.
+ * They show the room and change its layout (src/layout.ts arrange: only what a call
+ * names can change); adding single portals lives in sources.ts.
  */
 import { clean } from '../lib/text.ts';
-import { spreadColumns, withLayout } from '../layout.ts';
+import { arrange, spreadColumns, withLayout, type Arrangement } from '../layout.ts';
 import { MAX_PACKS, packSummaries, STARTER_PACKS } from '../packs.ts';
-import { describeDiff, describeLayout, diffProfiles, findPortal, normalizePins, normalizeSourceConfig, SOURCES, validateProfile, type PortalInput, type Profile } from '../profile.ts';
+import { describeDiff, describeLayout, diffProfiles, findPortal, normalizeSourceConfig, type PortalInput, type Profile, type ProfileDiff } from '../profile.ts';
 import { clipsPortal, clipsQuery, followingPortal, loadPortal, pinnedPortal, savedPortal } from '../sources.ts';
 import type { PortalResult } from '../types.ts';
-import { ok, toolError, toolFailure, untrusted, ROOM_URI, type ToolContext, type ToolDef } from './kit.ts';
+import { ok, toolError, toolFailure, untrusted, ROOM_URI, type CallToolResult, type ToolContext, type ToolDef } from './kit.ts';
 import type { ToolResults } from './results.ts';
 
 /** Any portal's current items: profile-backed ones from the profile and stores, the rest fetched (cached unless `force`). */
@@ -47,16 +48,19 @@ function summarizePortals(profile: Profile, portals: PortalResult[], notice?: st
   return lines.join('\n');
 }
 
-const portalSchema = {
-  type: 'object',
-  required: ['source', 'config'],
-  properties: {
-    id: { type: 'string', description: 'Stable id. Keep existing ids when editing.' },
-    source: { type: 'string', enum: SOURCES },
-    title: { type: 'string' },
-    config: { type: 'object', description: 'Source-specific settings; see list_sources.' },
-  },
-};
+/** Apply an arrangement atomically and say what changed (arrange_room, remove_portal). */
+async function rearrange(change: Arrangement, ctx: ToolContext): Promise<CallToolResult> {
+  let saved: { profile: Profile; changes: ProfileDiff };
+  try {
+    saved = await ctx.store.update(ctx.userId, (before) => {
+      const profile = arrange(before, change);
+      return { profile, result: { profile, changes: diffProfiles(before, profile) } };
+    });
+  } catch (error) {
+    return toolFailure(error, 'Nothing changed: ');
+  }
+  return ok(`Saved. Changes: ${describeDiff(saved.changes)}.\nLayout now: ${describeLayout(saved.profile)}`, { profile: saved.profile, changes: saved.changes } satisfies ToolResults['arrange_room']);
+}
 
 export const ROOM_TOOLS: ToolDef[] = [
   {
@@ -129,88 +133,39 @@ export const ROOM_TOOLS: ToolDef[] = [
     },
   },
   {
-    name: 'get_profile',
-    title: 'Get room preferences',
-    access: 'read',
-    description: "Return the user's saved MCPortal profile: the layout, and each portal with its source settings (each column stores its portals as panels). Always call this before update_profile.",
-    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
-    annotations: { readOnlyHint: true },
-    async handler(_args, ctx) {
-      const profile = await ctx.store.get(ctx.userId);
-      const notice = ctx.store.takeNotice?.(ctx.userId);
-      // Pinned items stay out of the text: update_profile carries them over, and they can be long.
-      const pins = Object.fromEntries(Object.entries(profile.pins).map(([id, p]) => [id, `${p.items.length} items, pinned ${p.pinnedAt}`]));
-      return ok(`${notice ? `Notice for the user: ${notice}\n\n` : ''}${describeLayout(profile)}\n\n${JSON.stringify({ ...profile, pins }, null, 2)}`, { profile });
-    },
-  },
-  {
-    name: 'update_profile',
-    title: 'Update room preferences',
+    name: 'arrange_room',
+    title: 'Arrange the room',
     access: 'write',
-    description: [
-      "Save the user's layout: send the COMPLETE profile from get_profile with only the changes they asked for.",
-      'Columns go left to right; the portals in a column ("panels") stack top to bottom.',
-      'Never move, retitle or remove portals the user didn\'t mention. A removal is refused unless the portal\'s id is in removePortalIds, only when the user asked to remove it.',
-      'Saved items and pinned portals\' items are kept as they are (save_item, pin_portal change them).',
-      'Then tell the user what changed (the result lists it) and call open_room.',
-    ].join(' '),
+    description: "Change the room's layout: move portals (to a column, 1 = left; one past the last makes a new column), set column widths, retitle portals or change their settings, rename the room, or switch layout or how stories open. Name portals by id or title (open_room lists them); only what you name changes. Removing is remove_portal.",
     inputSchema: {
       type: 'object',
-      required: ['profile'],
       additionalProperties: false,
       properties: {
-        profile: {
-          type: 'object',
-          required: ['columns'],
-          properties: {
-            name: { type: 'string' },
-            layout: { type: 'string', enum: ['columns', 'shelves'], description: 'columns side by side, or shelves: one sideways-scrolling row per portal' },
-            openIn: { type: 'string', enum: ['card', 'chat'], description: 'stories open in a reader in the room, or as their own card in the chat' },
-            columns: {
-              type: 'array',
-              minItems: 1,
-              maxItems: 8,
-              items: {
-                type: 'object',
-                required: ['panels'],
-                properties: { width: { type: 'integer', minimum: 1, maximum: 4, description: 'relative' }, panels: { type: 'array', minItems: 1, maxItems: 4, items: portalSchema } },
-              },
-            },
-          },
-        },
-        removePortalIds: {
-          type: 'array',
-          items: { type: 'string' },
-          description: 'Ids of portals the user explicitly asked to remove. Required for any removal.',
-        },
+        move: { type: 'array', items: { type: 'object', required: ['portal', 'column'], additionalProperties: false, properties: { portal: { type: 'string' }, column: { type: 'integer', minimum: 1 }, position: { type: 'integer', minimum: 1, description: 'top = 1; default last' } } } },
+        width: { type: 'array', items: { type: 'object', required: ['column', 'width'], additionalProperties: false, properties: { column: { type: 'integer', minimum: 1 }, width: { type: 'integer', minimum: 1, maximum: 4 } } } },
+        retitle: { type: 'array', items: { type: 'object', required: ['portal', 'title'], additionalProperties: false, properties: { portal: { type: 'string' }, title: { type: 'string' } } } },
+        configure: { type: 'array', items: { type: 'object', required: ['portal', 'config'], additionalProperties: false, properties: { portal: { type: 'string' }, config: { type: 'object', description: 'Settings to change (list_sources)' } } } },
+        name: { type: 'string' },
+        layout: { type: 'string', enum: ['columns', 'shelves'], description: 'columns side by side, or one sideways row per portal' },
+        openIn: { type: 'string', enum: ['card', 'chat'], description: 'stories open in the room, or as their own card in the chat' },
       },
     },
-    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
-    async handler(args, ctx) {
-      let next: Profile;
-      try {
-        next = validateProfile(args.profile);
-      } catch (error) {
-        return toolFailure(error, 'Profile not saved: ');
-      }
-      const asked = next;
-      const allowed = new Set(Array.isArray(args.removePortalIds) ? args.removePortalIds.map(String) : []);
-      ctx.store.takeNotice?.(ctx.userId);
-      const saved = await ctx.store.update<{ unapproved: string[] } | { profile: Profile; diff: ReturnType<typeof diffProfiles> }>(ctx.userId, (before) => {
-        // Bookmarks and pinned items are never edited through the layout.
-        const pinnedIds = asked.columns.flatMap((c) => c.panels).filter((p) => p.source === 'pinned').map((p) => p.id);
-        const profile = { ...asked, saved: before.saved, pins: normalizePins(before.pins, pinnedIds) };
-        const diff = diffProfiles(before, profile);
-        const unapproved = diff.removed.filter((id) => !allowed.has(id));
-        return unapproved.length ? { result: { unapproved } } : { profile, result: { profile, diff } };
-      });
-      if ('unapproved' in saved) {
-        return toolError(
-          `Profile not saved: it would remove ${saved.unapproved.join(', ')}. Keep those portals, or, only if the user explicitly asked to remove them, list them in removePortalIds.`,
-        );
-      }
-      return ok(`Saved. Changes: ${describeDiff(saved.diff)}.\nLayout now: ${describeLayout(saved.profile)}`, { profile: saved.profile, changes: saved.diff } satisfies ToolResults['update_profile']);
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
+    handler: (args, ctx) => rearrange(args as Arrangement, ctx),
+  },
+  {
+    name: 'remove_portal',
+    title: 'Remove portals from the room',
+    access: 'write',
+    description: "Remove portals from the user's room, only ones they asked to remove (by id or title; open_room lists them). Nothing else moves. Their saved items and clips stay.",
+    inputSchema: {
+      type: 'object',
+      required: ['portals'],
+      additionalProperties: false,
+      properties: { portals: { type: 'array', minItems: 1, items: { type: 'string' } } },
     },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
+    handler: (args, ctx) => rearrange({ remove: (args.portals as unknown[]).map(String) }, ctx),
   },
   {
     name: 'refresh_portal',

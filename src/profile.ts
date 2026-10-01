@@ -104,9 +104,9 @@ export interface Profile {
   layout: Layout;
   openIn: OpenIn;
   columns: ColumnSpec[];
-  /** Newest first. Only save_item / remove_saved change it; update_profile carries it over. */
+  /** Newest first. Only save_item / remove_saved change it; arrange_room carries it over. */
   saved: SavedItem[];
-  /** Items of pinned portals, by portal id. Only pin_portal changes them; update_profile carries them over. */
+  /** Items of pinned portals, by portal id. Only pin_portal changes them; arrange_room drops a removed portal's. */
   pins: Record<string, PinnedData>;
   /** False only for a brand-new user who hasn't set up their room yet (shows the welcome). */
   onboarded: boolean;
@@ -407,6 +407,11 @@ export function diffProfiles(before: Profile, after: Profile): ProfileDiff {
   const diff: ProfileDiff = { settings: [], added: [], removed: [], moved: [], retitled: [], reconfigured: [] };
   if (before.layout !== after.layout) diff.settings.push(`layout ${before.layout} → ${after.layout}`);
   if (before.openIn !== after.openIn) diff.settings.push(`openIn ${before.openIn} → ${after.openIn}`);
+  if (before.name !== after.name) diff.settings.push(`name "${before.name}" → "${after.name}"`);
+  after.columns.forEach((c, i) => {
+    const was = before.columns[i];
+    if (was && was.width !== c.width) diff.settings.push(`column ${i + 1} width ${was.width} → ${c.width}`);
+  });
   for (const [id, was] of a) {
     const now = b.get(id);
     if (!now) {

@@ -119,13 +119,11 @@ test('full flow: register → consent → GitHub → code → token → per-user
 
     const mcp = (token: string, body: unknown) =>
       raw(app.port, { method: 'POST', path: '/mcp', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: JSON.stringify(body) });
-    const getProfile = { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'get_profile', arguments: {} } };
+    const getProfile = { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'open_room', arguments: {} } };
     const first = await mcp(tokens.access_token, getProfile);
     assert.equal(first.status, 200);
-    // Save a custom layout for this user.
-    const profile = JSON.parse(first.body).result.structuredContent.profile;
-    profile.name = 'lawrence-room';
-    await mcp(tokens.access_token, { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'update_profile', arguments: { profile } } });
+    // Rename this user's room.
+    await mcp(tokens.access_token, { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'arrange_room', arguments: { name: 'lawrence-room' } } });
 
     // A different GitHub user gets their own profile.
     const other = await authorize(app, clientId, challenge, 'gh-code-mallory');
@@ -229,7 +227,7 @@ test('removing a user from the allowlist revokes their access and refresh; refre
   const dataDir = await mkdtemp(`${tmpdir()}/mcportal-allow-`);
   const users = { 'gh-code-lawrence': { id: 42, login: 'Lawrence' }, 'gh-code-mallory': { id: 666, login: 'mallory' } };
   const github = { clientId: 'gh-client', clientSecret: 'gh-secret' };
-  const getProfile = JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'get_profile', arguments: {} } });
+  const getProfile = JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'open_room', arguments: {} } });
   const mcp = (app: Running, token: string) => raw(app.port, { method: 'POST', path: '/mcp', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: getProfile });
   const exchange = async (app: Running, clientId: string, code: string, verifier: string) =>
     JSON.parse((await raw(app.port, { method: 'POST', path: '/oauth/token', ...form({ grant_type: 'authorization_code', code, client_id: clientId, redirect_uri: CLIENT_REDIRECT, code_verifier: verifier }) })).body);
@@ -306,7 +304,7 @@ test('invite-only: admins and invited logins get in and get accounts; others are
   const accounts = new Accounts(memoryPersistence(), makeBootstrap(['lawrence'], []));
   await accounts.invite('Mallory', 'test');
   const app = await startApp({ github: { clientId: 'gh-client', clientSecret: 'gh-secret' } }, fakeUpstreams(users).fetcher, { accounts });
-  const getProfile = JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'get_profile', arguments: {} } });
+  const getProfile = JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'open_room', arguments: {} } });
   const call = (token: string) => raw(app.port, { method: 'POST', path: '/mcp', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: getProfile });
   try {
     const clientId = await register(app);

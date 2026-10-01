@@ -15,4 +15,8 @@ export interface Rename {
   args?: Record<string, string | null>;
 }
 
-export const RENAMES: Rename[] = [];
+export const RENAMES: Rename[] = [
+  // Edit by patch: the room and its ids come from open_room; each change is named.
+  { version: '0.5.0', from: 'get_profile', to: ['open_room', 'arrange_room', 'remove_portal'] },
+  { version: '0.5.0', from: 'update_profile', to: ['arrange_room', 'remove_portal'], args: { removePortalIds: 'portals' } },
+];

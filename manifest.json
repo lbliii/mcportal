@@ -37,12 +37,12 @@
       "description": "Set up the user's room from up to 4 starter packs (ids from open_room's setup)."
     },
     {
-      "name": "get_profile",
-      "description": "Return the user's saved MCPortal profile: the layout, and each portal with its source settings (each column stores its portals as panels)."
+      "name": "arrange_room",
+      "description": "Change the room's layout: move portals (to a column, 1 = left; one past the last makes a new column), set column widths, retitle portals or change their settings, rename the room, or switch layout or how stories open."
     },
     {
-      "name": "update_profile",
-      "description": "Save the user's layout: send the COMPLETE profile from get_profile with only the changes they asked for."
+      "name": "remove_portal",
+      "description": "Remove portals from the user's room, only ones they asked to remove (by id or title; open_room lists them)."
     },
     {
       "name": "read_source",

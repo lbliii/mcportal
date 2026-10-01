@@ -54,7 +54,8 @@ export type SpaceResult = {
 export type ToolResults = {
   open_room: RoomResult;
   build_room: { profile: Profile };
-  update_profile: { profile: Profile; changes: ProfileDiff };
+  arrange_room: { profile: Profile; changes: ProfileDiff };
+  remove_portal: { profile: Profile; changes: ProfileDiff };
   refresh_portal: { portal: PortalResult };
   find_source: { candidates: Array<SourceSettings<FetchedSource> & Omit<SourceCandidate, 'source' | 'config'> & { preview: Item[] }>; hint?: string | undefined };
   add_portal: { profile: Profile; portal: PortalResult; portalId: string };

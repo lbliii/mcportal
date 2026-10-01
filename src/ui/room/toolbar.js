@@ -5,14 +5,15 @@
     root.classList.toggle('show-sources', on); $('btnSources').setAttribute('aria-pressed', String(on));
   });
   // Layout and open-in are saved to the profile, so the next open_room keeps them.
-  /** @param {Partial<Profile>} change */
+  /** @param {Pick<Partial<Profile>, 'layout' | 'openIn'>} change */
   async function saveSettings(change) {
     if (!state.profile) return;
     const before = state.profile;
     state.profile = { ...before, ...change };
     drawLayout();
     try {
-      const result = await callTool('update_profile', { profile: state.profile });
+      // Only the setting that changed: arrange_room can't touch anything it isn't given.
+      const result = await callTool('arrange_room', change);
       state.profile = result.structuredContent.profile;
     } catch (error) {
       state.profile = before; drawLayout();

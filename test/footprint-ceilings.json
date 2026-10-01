@@ -1,19 +1,19 @@
 {
   "totals": {
-    "local": 3952,
-    "hosted-new": 4500,
-    "hosted-active": 4975
+    "local": 3923,
+    "hosted-new": 4471,
+    "hosted-active": 4946
   },
   "tools": {
     "account_settings": 64,
     "add_portal": 128,
+    "arrange_room": 394,
     "build_room": 148,
     "clip": 470,
     "delete_clip": 49,
     "export_data": 97,
     "find_source": 139,
     "get_clip": 64,
-    "get_profile": 64,
     "get_public_profile": 62,
     "get_reading": 51,
     "get_share": 65,
@@ -32,6 +32,7 @@
     "read_source": 93,
     "record_reading": 174,
     "relationship": 119,
+    "remove_portal": 83,
     "remove_public_profile": 56,
     "remove_saved": 55,
     "report": 88,
@@ -41,7 +42,6 @@
     "set_public_profile": 223,
     "share": 119,
     "unshare": 41,
-    "update_clip": 102,
-    "update_profile": 442
+    "update_clip": 102
   }
 }
