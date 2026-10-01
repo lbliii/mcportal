@@ -28,6 +28,9 @@ export function itemLine(item: PortalResult['items'][number]): string {
   return `- ${item.title}${item.meta.length ? ` (${item.meta.join(', ')})` : ''}${item.url ? ` <${item.url}>` : ''}`;
 }
 
+/** Items per portal in open_room's text: enough to say what's new; the room card shows the rest. */
+const ROOM_ITEMS = 3;
+
 function summarizePortals(profile: Profile, portals: PortalResult[], notice?: string): string {
   const lines = [`MCPortal room "${profile.name}": ${describeLayout(profile)}.`];
   if (notice) lines.push(`Notice for the user: ${notice}`);
@@ -39,7 +42,7 @@ function summarizePortals(profile: Profile, portals: PortalResult[], notice?: st
     if (portal.pin) {
       lines.push(`\n[${portal.portalId}] ${portal.items.length} items pinned from ${portal.pin.from}, updated ${portal.provenance.fetchedAt}. To refresh: ${portal.pin.recipe}; then pin_portal with portalId ${portal.portalId}.`);
     } else lines.push(`\n[${portal.portalId}] ${portal.items.length} items`);
-    lines.push(untrusted(portal.provenance.endpoint, [`portal title: ${portal.title}`, ...portal.items.slice(0, 5).map(itemLine)].join('\n')));
+    lines.push(untrusted(portal.provenance.endpoint, [`portal title: ${portal.title}`, ...portal.items.slice(0, ROOM_ITEMS).map(itemLine)].join('\n')));
   }
   return lines.join('\n');
 }

@@ -9,7 +9,7 @@ import {
   DocsError, docsInputUrl, fetchDocPage, inDocsScope, loadDocs, originalUrl, parseGithubDocs, searchDocs, githubRawUrl,
   type DocPage, type DocPageRef, type DocsConfig, type DocSection, type DocSite,
 } from '../adapters/docs.ts';
-import { blocksToText } from '../lib/markdown.ts';
+import { textParts } from '../lib/markdown.ts';
 import { clean } from '../lib/text.ts';
 import { findPortal, LIMITS } from '../profile.ts';
 import { FRESHNESS, loadDocSite } from '../sources.ts';
@@ -18,7 +18,8 @@ import type { ToolResults } from './results.ts';
 import type { ArticleBlock, Provenance } from '../types.ts';
 
 /** How much of a page the model gets as text; the app gets every block. */
-const MODEL_CHARS = 30_000;
+/** How much of a page the model gets per call, in characters; it asks for the next part when it needs it. */
+const PART_CHARS = 10_000;
 const OUTLINE_LINES = 250;
 
 const siteArgs = {
@@ -129,7 +130,7 @@ export const DOCS_TOOLS: ToolDef[] = [
       type: 'object',
       required: ['url'],
       additionalProperties: false,
-      properties: { url: { type: 'string' }, ...siteArgs },
+      properties: { url: { type: 'string' }, ...siteArgs, part: { type: 'integer', minimum: 1, description: 'A long page comes in parts; ask for the next one' } },
     },
     annotations: { readOnlyHint: true, openWorldHint: true },
     async handler(args, ctx) {
@@ -142,8 +143,10 @@ export const DOCS_TOOLS: ToolDef[] = [
         const result = await ctx.cache.get(`docpage:${url}`, FRESHNESS.reader, load);
         const page = result.value;
         const provenance: Provenance = { source: 'docs', endpoint: page.sourceUrl, fetchedAt: result.fetchedAt, cached: result.cached, ttlSeconds: FRESHNESS.reader };
-        let text = blocksToText(page.blocks);
-        if (text.length > MODEL_CHARS) text = `${text.slice(0, MODEL_CHARS)}\n\n… (the page continues; the reader shows all of it)`;
+        const parts = textParts(page.blocks, PART_CHARS);
+        const part = Math.min(parts.length, typeof args.part === 'number' ? args.part : 1);
+        const more = part < parts.length ? `\n\n… (part ${part} of ${parts.length}: call read_doc_page with part: ${part + 1} for more)` : '';
+        const text = `${part > 1 ? `(part ${part} of ${parts.length})\n\n` : ''}${parts[part - 1]}${more}`;
         const head = [`title: ${page.title}`, where.section ? `section: ${where.section.title}` : '', `site: ${site.title}`].filter(Boolean).join('\n');
         const nav = [where.prev ? `previous: ${where.prev.title} <${where.prev.url}>` : '', where.next ? `next: ${where.next.title} <${where.next.url}>` : ''].filter(Boolean).join('\n');
         return ok(untrusted(page.sourceUrl, `${head}\n\n${text}${nav ? `\n\n${nav}` : ''}`), {

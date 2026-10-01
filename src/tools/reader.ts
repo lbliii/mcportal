@@ -4,13 +4,16 @@
  */
 import { mapLimit } from '../lib/async.ts';
 import { isAppError } from '../lib/errors.ts';
-import { blocksToText } from '../lib/markdown.ts';
+import { textParts } from '../lib/markdown.ts';
 import { clean } from '../lib/text.ts';
 import { httpUrl } from '../profile.ts';
 import { loadArticle } from '../sources.ts';
 import { thumbnail } from '../thumbnails.ts';
 import type { Article } from '../types.ts';
 import { ok, toolError, untrusted, ROOM_URI, type ToolDef } from './kit.ts';
+
+/** How much of an article the model gets as text, in characters. */
+const ARTICLE_CHARS = 12_000;
 import type { ToolResults } from './results.ts';
 
 export const READER_TOOLS: ToolDef[] = [
@@ -32,7 +35,9 @@ export const READER_TOOLS: ToolDef[] = [
         if (!isAppError(error)) throw error;
         return toolError(`Could not open ${clean(url, 200)}: ${clean(error.message, 200)}`, error.code, error.details);
       }
-      const text = blocksToText(article.blocks.slice(0, 60));
+      // Its first part (the card shows the whole article; another call would open another card).
+      const parts = textParts(article.blocks, ARTICLE_CHARS);
+      const text = `${parts[0]}${parts.length > 1 ? '\n\n… (the article continues in the reader card)' : ''}`;
       const head = [`title: ${article.title}`, article.byline ? `byline: ${article.byline}` : ''].filter(Boolean).join('\n');
       const { saved } = await ctx.store.get(ctx.userId);
       return ok(untrusted(article.url, `${head}\n\n${text}`), { article, saved: saved.some((s) => s.url === article.url) } satisfies ToolResults['read_article']);

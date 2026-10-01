@@ -307,3 +307,25 @@ export function blocksToText(blocks: ArticleBlock[]): string {
     }
   }).join('\n\n');
 }
+
+/**
+ * A page's text in parts of at most about `maxChars`, split between blocks (a block
+ * longer than that is a part of its own). What a tool hands the model one part at a time.
+ */
+export function textParts(blocks: ArticleBlock[], maxChars: number): string[] {
+  const parts: string[] = [];
+  let current: ArticleBlock[] = [];
+  let size = 0;
+  for (const block of blocks) {
+    const length = blocksToText([block]).length + 2;
+    if (current.length && size + length > maxChars) {
+      parts.push(blocksToText(current));
+      current = [];
+      size = 0;
+    }
+    current.push(block);
+    size += length;
+  }
+  if (current.length) parts.push(blocksToText(current));
+  return parts.length ? parts : [''];
+}
