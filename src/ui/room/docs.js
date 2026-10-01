@@ -72,15 +72,15 @@
     const first = site.sections.flatMap((s) => s.pages).find((p) => !p.index);
     const start = options.url || data.page || (first && first.url);
     if (start) loadDocsPage(start);
-    else reader.querySelector('.docs-page').replaceChildren(readerTop('', !options.card), docsMessage('Pick a section on the left.'));
+    else $first('.docs-page', reader).replaceChildren(readerTop('', !options.card), docsMessage('Pick a section on the left.'));
   }
 
   function markCurrentPage() {
     if (!docsState) return;
-    const toc = $('reader').querySelector('.docs-toc');
+    const toc = $first('.docs-toc', $('reader'));
     if (!toc) return;
-    for (const a of toc.querySelectorAll('a.current')) a.classList.remove('current');
-    const current = [...toc.querySelectorAll('a[data-url]')].find((a) => a.dataset.url === docsState.url);
+    for (const a of $$('a.current', toc)) a.classList.remove('current');
+    const current = [...$$('a[data-url]', toc)].find((a) => a.dataset.url === docsState.url);
     if (!current) return;
     current.classList.add('current');
     const details = current.closest('details');
@@ -90,7 +90,7 @@
   }
 
   function scrollToAnchor(id) {
-    const target = $('reader').querySelector(`.docs-page [data-anchor="${CSS.escape(id)}"]`);
+    const target = $first(`.docs-page [data-anchor="${CSS.escape(id)}"]`, $('reader'));
     if (target) target.scrollIntoView({ block: 'start', behavior: scrollBehavior() });
     return !!target;
   }
@@ -101,8 +101,8 @@
     const generation = ++readerGeneration;
     const [url, hash] = String(target).split('#');
     const reader = $('reader');
-    const column = reader.querySelector('.docs-page');
-    const otp = reader.querySelector('.docs-otp');
+    const column = $first('.docs-page', reader);
+    const otp = $first('.docs-otp', reader);
     reader.classList.remove('toc-open');
     if (docsState.url === url && hash) { scrollToAnchor(hash); return; }
     column.replaceChildren(docsMessage('Loading…'));
@@ -176,7 +176,7 @@
   function rememberRoomNavigation() {
     if ($('grid').hidden || roomNavigation) return;
     roomNavigation = { x: window.scrollX, y: window.scrollY, focus: document.activeElement,
-      positions: [$('grid'), ...$('grid').querySelectorAll('.items, .shelf-row')].map((node) => ({ node, left: node.scrollLeft, top: node.scrollTop })) };
+      positions: [$('grid'), ...$$('.items, .shelf-row', $('grid'))].map((node) => ({ node, left: node.scrollLeft, top: node.scrollTop })) };
   }
   async function closeReader() {
     readerGeneration++;

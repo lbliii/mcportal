@@ -58,7 +58,12 @@
   const theme = MCPortalTheme.create(root);
   const scrollBehavior = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
   if (DEV) root.classList.add('framed');
-  const $ = (id) => document.getElementById(id);
+  /** @type {ById<RoomElements>} */
+  const $ = (id) => /** @type {any} */ (document.getElementById(id));
+  /** Elements matching a selector (the room only queries HTML elements). @param {string} selector */
+  const $$ = (selector, /** @type {ParentNode} */ from = document) => /** @type {NodeListOf<HTMLElement>} */ (from.querySelectorAll(selector));
+  /** The first element matching a selector, or null. @param {string} selector */
+  const $first = (selector, /** @type {ParentNode} */ from = document) => /** @type {HTMLElement | null} */ (from.querySelector(selector));
   /*include:art.js*/
 
   // MCPortal icon set: 24px grid, 1.75px round strokes, 1.5px corner radius, drawn in currentColor.
@@ -83,7 +88,7 @@
   function iconButton(name, label, onclick, cls = 'ib sm') {
     return el('button', { class: cls, title: label, 'aria-label': label, onclick }, icon(name));
   }
-  for (const node of document.querySelectorAll('[data-icon]')) node.replaceChildren(icon(node.dataset.icon));
+  for (const node of $$('[data-icon]')) node.replaceChildren(icon(node.dataset.icon));
 
   /*include:room/bridge.js*/
   /*include:room/dom.js*/

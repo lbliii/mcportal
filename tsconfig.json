@@ -18,5 +18,6 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["src", "test", "scripts"]
+  "include": ["src", "test", "scripts"],
+  "exclude": ["src/ui"]
 }

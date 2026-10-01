@@ -39,7 +39,7 @@
       drawLayout();
       toggleAdd(false); $('addInput').value = ''; $('addResults').replaceChildren();
       toast(`It's alive! ${data.portal.title} has joined your room.`);
-      const node = document.querySelector(`[data-portal="${CSS.escape(data.portalId)}"]`);
+      const node = $first(`[data-portal="${CSS.escape(data.portalId)}"]`);
       if (node) node.scrollIntoView({ behavior: scrollBehavior(), block: 'nearest', inline: 'start' });
     } catch (error) {
       button.disabled = false; button.textContent = 'Add';

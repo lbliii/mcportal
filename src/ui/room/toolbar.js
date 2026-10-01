@@ -1,8 +1,8 @@
   // room/toolbar.js: toolbar controls
   // ------------------------------------------------------------ toolbar
-  $('btnSources').addEventListener('click', (e) => {
+  $('btnSources').addEventListener('click', () => {
     const on = !root.classList.contains('show-sources');
-    root.classList.toggle('show-sources', on); e.currentTarget.setAttribute('aria-pressed', String(on));
+    root.classList.toggle('show-sources', on); $('btnSources').setAttribute('aria-pressed', String(on));
   });
   // Layout and open-in are saved to the profile, so the next open_room keeps them.
   async function saveSettings(change) {
@@ -18,7 +18,7 @@
       toast(`Couldn't save: ${error.message}`);
     }
   }
-  for (const b of document.querySelectorAll('[data-layout]')) {
+  for (const b of $$('[data-layout]')) {
     b.addEventListener('click', () => { if (state.profile && state.profile.layout !== b.dataset.layout) saveSettings({ layout: b.dataset.layout }); });
   }
   $('btnOpenIn').addEventListener('click', () => {

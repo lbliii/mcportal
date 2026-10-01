@@ -94,7 +94,7 @@
     grid.replaceChildren(...(shelves
       ? p.columns.flatMap((col) => col.panels).map((spec) => renderShelf(spec.id))
       : p.columns.map((col) => el('div', { class: 'col', style: `--mp-column-weight:${col.width}` }, col.panels.map((spec) => renderPortal(spec.id))))));
-    for (const b of document.querySelectorAll('[data-layout]')) b.setAttribute('aria-pressed', String(b.dataset.layout === p.layout));
+    for (const b of $$('[data-layout]')) b.setAttribute('aria-pressed', String(b.dataset.layout === p.layout));
     $('btnOpenIn').setAttribute('aria-pressed', String(p.openIn === 'chat'));
   }
 
@@ -175,7 +175,7 @@
     const url = node.dataset.img;
     if (!pictures.has(url)) return false;
     const data = pictures.get(url);
-    const img = node.tagName === 'IMG' ? node : node.querySelector('img');
+    const img = node.tagName === 'IMG' ? node : $first('img', node);
     if (data && img) { img.src = data; img.classList.add('on'); }
     else if (!data && node.classList.contains('avatar')) node.classList.add('gone');
     return true;
@@ -183,8 +183,9 @@
   const seen = new IntersectionObserver((entries) => {
     for (const e of entries) {
       if (!e.isIntersecting) continue;
-      seen.unobserve(e.target);
-      if (!showPicture(e.target)) { wanted.add(e.target.dataset.img); clearTimeout(pictureTimer); pictureTimer = setTimeout(loadPictures, 60); }
+      const node = /** @type {HTMLElement} */ (e.target);   // only picture elements are observed
+      seen.unobserve(node);
+      if (!showPicture(node)) { wanted.add(node.dataset.img); clearTimeout(pictureTimer); pictureTimer = setTimeout(loadPictures, 60); }
     }
   }, { rootMargin: '200px' });
 
@@ -199,7 +200,7 @@
     } catch {
       for (const u of batch) pictures.set(u, null);
     }
-    for (const node of document.querySelectorAll('[data-img]')) if (batch.includes(node.dataset.img)) showPicture(node);
+    for (const node of $$('[data-img]')) if (batch.includes(node.dataset.img)) showPicture(node);
     pictureBusy = false;
     if (wanted.size) loadPictures();
   }
@@ -207,7 +208,7 @@
   // The first few pictures in each portal are what's on screen: ask for them now,
   // without waiting on visibility (which never fires in a hidden or background frame).
   function primePictures(portalNode, count = 6) {
-    const urls = [...new Set([...portalNode.querySelectorAll('[data-img]')].map((n) => n.dataset.img))].slice(0, count);
+    const urls = [...new Set([...$$('[data-img]', portalNode)].map((n) => n.dataset.img))].slice(0, count);
     for (const u of urls) if (!pictures.has(u)) wanted.add(u);
     if (wanted.size) { clearTimeout(pictureTimer); pictureTimer = setTimeout(loadPictures, 30); }
   }
@@ -270,7 +271,7 @@
   }
 
   function markSaved() {
-    for (const b of document.querySelectorAll('[data-save-url]')) {
+    for (const b of $$('[data-save-url]')) {
       const on = state.saved.has(b.dataset.saveUrl);
       b.setAttribute('aria-pressed', String(on));
       b.title = on ? 'Saved (click to remove)' : 'Save to your room';
@@ -293,7 +294,7 @@
         if (data.portal) state.portals.set(data.portal.portalId, data.portal);
         if (data.layoutChanged) { drawLayout(); toast('Saved! A Saved portal has materialized in your room.'); }
         else if (data.portal) {
-          const node = document.querySelector(`[data-portal="${CSS.escape(data.portal.portalId)}"]`);
+          const node = $first(`[data-portal="${CSS.escape(data.portal.portalId)}"]`);
           if (node) node.replaceWith(renderPortal(data.portal.portalId));
         }
       }
@@ -359,7 +360,7 @@
   }
 
   async function refreshPortal(portalId) {
-    const node = document.querySelector(`[data-portal="${CSS.escape(portalId)}"]`);
+    const node = $first(`[data-portal="${CSS.escape(portalId)}"]`);
     if (node) node.style.opacity = '0.55';
     try {
       const result = await callTool('refresh_portal', { portalId });
@@ -368,7 +369,7 @@
       toast(error.message);
     }
     const fresh = renderPortal(portalId);
-    const current = document.querySelector(`[data-portal="${CSS.escape(portalId)}"]`);
+    const current = $first(`[data-portal="${CSS.escape(portalId)}"]`);
     if (current) current.replaceWith(fresh);
   }
 

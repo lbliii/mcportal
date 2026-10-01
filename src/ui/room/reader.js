@@ -1,7 +1,7 @@
   // room/reader.js: reader view: article cards and reader blocks
   // ------------------------------------------------------------ reader view
   function openItem(item, portal) {
-    if (item.clip) return openClip(item, portal);
+    if (item.clip) return openClip(item);
     if (item.share && item.share.kind === 'clip') return openShare(item);
     if (portal.source === 'docs' && item.url) return openDocs({ portalId: portal.portalId }, { url: item.url });
     // Videos play at the source; pinned items are often internal pages reader view can't reach.
