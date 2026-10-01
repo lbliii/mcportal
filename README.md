@@ -157,6 +157,8 @@ Limits: 8 columns, 4 portals per column, 30 items per portal, 200 saved items, 3
 
 ## Next
 
+The [delivery roadmap](docs/plans/delivery-roadmap.md) sequences the next product releases: compatibility, reading continuity, useful knowledge, proactive updates, and personal presentation.
+
 MCPortal is a **reading platform with light social**, driven by your agent. Anything people share lives natively in MCPortal, not as public feeds. Your room is yours: it works without an account, and it exports in standard formats. Detailed plans live in [`docs/plans/`](docs/plans/).
 
 **M1.5: public beta.** Done when someone who isn't the author can connect, onboard, and come back the next day to a room that still works.
