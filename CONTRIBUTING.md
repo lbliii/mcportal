@@ -68,4 +68,5 @@ Install the repo as a local plugin, which includes the `/portal` command and ski
   ```
 - `npm run smoke` passes if you touched an adapter or `safe-fetch` (needs network).
 - If you touched the brand (`scripts/brand.ts`), run `npm run brand` and commit what it writes. Brand files are generated, not edited; see [brand/README.md](brand/README.md).
+- If you touched design tokens or shared controls, run `npm run design`, commit its outputs, and run `npm run design:check`. Use the [design-system guide](docs/design-system.md) for theme contracts and the fixture browser workflow.
 - Changes to the fetch or OAuth boundaries stay consistent with the security model in the [README](README.md#security-model).

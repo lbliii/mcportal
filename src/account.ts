@@ -234,7 +234,7 @@ ${uploadForm('/account/import', s.csrf)}
 <form method="post" action="/account/delete">
   <input type="hidden" name="csrf" value="${escapeHtml(s.csrf)}">
   <p><label>Type <code>delete @${login}</code> to confirm:<br><input name="confirm" autocomplete="off" style="font:inherit;padding:6px 8px;width:100%;box-sizing:border-box;margin-top:6px"></label></p>
-  <p><button class="primary" style="background:#c62828;border-color:#c62828">Delete my account</button></p>
+  <p><button class="danger">Delete my account</button></p>
 </form>
 <form method="post" action="/account/logout"><input type="hidden" name="csrf" value="${escapeHtml(s.csrf)}"><button>Sign out</button></form>`));
   }
