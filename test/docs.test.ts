@@ -13,8 +13,8 @@ import type { Fetcher, FetchOptions } from '../src/types.ts';
 const fixture = (name: string) => readFile(new URL(`./fixtures/docs/${name}`, import.meta.url), 'utf8');
 
 /** A real objects.inv: the four header lines, then the entries zlib-compressed. */
-async function inventory(): Promise<Buffer> {
-  const lines = (await fixture('python-objects.txt')).split('\n');
+async function inventory(name = 'python-objects.txt'): Promise<Buffer> {
+  const lines = (await fixture(name)).split('\n');
   return Buffer.concat([Buffer.from(lines.slice(0, 4).join('\n') + '\n'), deflateSync(lines.slice(4).join('\n'))]);
 }
 
@@ -132,17 +132,55 @@ test('resolve: candidate directories, nearest first, with docs.<domain> guesses 
   assert.throws(() => candidateBases('javascript:alert(1)'));
 });
 
-test('resolve: llms.txt beats objects.inv; a 200 HTML page is not an llms.txt', async () => {
-  const llms = await fixture('stripe-llms.txt');
-  const fetcher = mapFetcher({
-    'https://docs.example.dev/guide/llms.txt': { body: '<!DOCTYPE html><html>soft 404</html>', type: 'text/html' },
-    'https://docs.example.dev/llms.txt': { body: llms },
-    'https://docs.example.dev/objects.inv': { body: await inventory(), type: 'application/octet-stream' },
-  });
+test('resolve: a scoped parent llms.txt can serve a path request after local formats fail', async () => {
   const calls: Array<{ url: string }> = [];
-  const site = await resolveDocs('https://docs.example.dev/guide/', (url, o) => { calls.push({ url }); return fetcher(url, o); });
+  const site = await resolveDocs('https://docs.example.dev/guide/', mapFetcher({
+    'https://docs.example.dev/guide/llms.txt': { body: '<!DOCTYPE html><html>soft 404</html>', type: 'text/html' },
+    'https://docs.example.dev/llms.txt': { body: '# Guide\n- [a](/guide/a)\n- [b](/guide/b)\n- [c](/guide/c)' },
+  }, calls));
   assert.deepEqual(site.toc, { kind: 'llms', url: 'https://docs.example.dev/llms.txt' });
-  assert.deepEqual(calls.map((c) => c.url), ['https://docs.example.dev/guide/llms.txt', 'https://docs.example.dev/llms.txt'], 'one at a time, stopping at the first that works');
+  assert.deepEqual(calls.map((c) => c.url), [
+    'https://docs.example.dev/guide/llms.txt', 'https://docs.example.dev/guide/objects.inv',
+    'https://docs.example.dev/guide/sitemap.xml', 'https://docs.example.dev/guide/sitemap_index.xml',
+    'https://docs.example.dev/llms.txt',
+  ]);
+});
+
+test('resolve: local llms.txt keeps precedence over a local inventory', async () => {
+  const calls: Array<{ url: string }> = [];
+  const site = await resolveDocs('https://docs.example.dev/guide/', mapFetcher({
+    'https://docs.example.dev/guide/llms.txt': { body: '# Guide\n- [a](a)\n- [b](b)\n- [c](c)' },
+    'https://docs.example.dev/guide/objects.inv': { body: await inventory() },
+  }, calls));
+  assert.equal(site.toc.kind, 'llms');
+  assert.equal(calls.length, 1);
+});
+
+test('resolve: Sphinx local inventory wins over a broad ancestor llms.txt', async () => {
+  const calls: Array<{ url: string }> = [];
+  const site = await resolveDocs('https://www.sphinx-doc.org/en/master/', mapFetcher({
+    'https://www.sphinx-doc.org/llms.txt': { body: await fixture('parent-llms.txt') },
+    'https://www.sphinx-doc.org/en/master/objects.inv': { body: await inventory('sphinx-objects.txt') },
+  }, calls));
+  assert.deepEqual(site.toc, { kind: 'sphinx', url: 'https://www.sphinx-doc.org/en/master/objects.inv' });
+  assert.equal(site.title, 'Sphinx');
+  assert.equal(calls.length, 2);
+});
+
+test('resolve: NemoClaw ancestor catalog cannot replace its documentation', async () => {
+  const site = await resolveDocs('https://docs.nvidia.com/nemoclaw/latest/', mapFetcher({
+    'https://docs.nvidia.com/llms.txt': { body: await fixture('parent-llms.txt') },
+    'https://docs.nvidia.com/nemoclaw/objects.inv': { body: await inventory('nemoclaw-objects.txt') },
+  }));
+  assert.deepEqual(site.toc, { kind: 'sphinx', url: 'https://docs.nvidia.com/nemoclaw/objects.inv' });
+  assert.equal(site.title, 'NemoClaw');
+  assert.ok(site.sections.flatMap((section) => section.pages).every((page) => page.url.startsWith('https://docs.nvidia.com/nemoclaw/')));
+});
+
+test('resolve: unrelated ancestor llms.txt is rejected, even with one matching project link', async () => {
+  await assert.rejects(resolveDocs('https://docs.nvidia.com/nemoclaw/latest/', mapFetcher({
+    'https://docs.nvidia.com/llms.txt': { body: await fixture('parent-llms.txt') },
+  })), /No docs index found/);
 });
 
 test('resolve: falls back to Sphinx, then to a sitemap index, then explains', async () => {

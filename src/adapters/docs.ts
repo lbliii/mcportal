@@ -625,8 +625,8 @@ export async function loadDocs(toc: DocsToc, fetcher: Fetcher): Promise<DocSite>
 }
 
 /**
- * Find a docs site's table of contents: llms.txt, then objects.inv, then a sitemap, nearest
- * directory first. One request at a time: some docs hosts rate-limit bursts (Django answers 429).
+ * Find a docs site's table of contents, nearest directory first, trying llms.txt,
+ * objects.inv and a sitemap at each directory. One request at a time: some docs hosts rate-limit bursts (Django answers 429).
  */
 export async function resolveDocs(input: string, fetcher: Fetcher): Promise<DocSite> {
   const github = parseGithubDocs(input);
@@ -637,11 +637,27 @@ export async function resolveDocs(input: string, fetcher: Fetcher): Promise<DocS
     throw new DocsError('That GitHub address isn\'t a repository or folder: use owner/repo, or a link to a folder or file in the repo');
   }
   const bases = candidateBases(input);
-  for (const kind of ['llms', 'sphinx', 'sitemap'] as const) {
-    const { file, load } = LOADERS[kind];
-    for (const url of bases.flatMap((base) => file.map((f) => base + f))) {
-      const site = await load(url, fetcher);
-      if (site) return site;
+  const requested = new URL(bases[0]!);
+  for (const base of bases) {
+    for (const kind of ['llms', 'sphinx', 'sitemap'] as const) {
+      const { file, load } = LOADERS[kind];
+      for (const name of file) {
+        const site = await load(base + name, fetcher);
+        if (!site) continue;
+        // A broad parent llms.txt can describe many unrelated products. Only use it
+        // for a path request when its entire index belongs to that subtree. Merely
+        // finding one matching link is not enough: reloading its stored toc must
+        // still open the requested documentation, rather than the parent catalog.
+        if (kind === 'llms' && base !== bases[0] && requested.pathname !== '/') {
+          const pages = site.sections.flatMap((section) => section.pages);
+          if (!pages.every((page) => {
+            const url = new URL(page.url);
+            return url.origin === requested.origin &&
+              (url.pathname === requested.pathname.slice(0, -1) || url.pathname.startsWith(requested.pathname));
+          })) continue;
+        }
+        return site;
+      }
     }
   }
   throw new DocsError(`No docs index found for ${docsUrl(input).href}: tried llms.txt, a Sphinx objects.inv and a sitemap`);
