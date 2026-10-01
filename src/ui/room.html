@@ -26,6 +26,11 @@
   .brand-line { width: 17px; height: 17px; flex: none; }
   .brand-dot { fill: var(--mp-brand-brick); }
   .brand-word { height: 10px; width: auto; display: block; }
+  /* the wordmark only when there's room for it: inline in a chat the mark carries the brand alone */
+  :root:not(.fullscreen) .brand-word { display: none; }
+  @container (min-width: 1100px) { .brand-word { display: block !important; } }
+  :root.fullscreen .room-name::before { content: "· "; }
+  @container (min-width: 1100px) { .room-name::before { content: "· "; } }
   .brand-mc { fill: currentColor; }
   .brand-portal { fill: var(--mp-brand-teal); }
   .room-name { color: var(--mp-text-secondary); font-size: var(--mp-type-12); }
@@ -37,12 +42,16 @@
   /* icon controls: every control is a 26px square icon with a tooltip, so text keeps the room */
   .ib { display: inline-flex; align-items: center; justify-content: center; flex: none; width: var(--mp-control-height); height: var(--mp-control-height); padding: 0; border: 0; border-radius: var(--mp-radius-sm); background: none; color: var(--mp-text-secondary); cursor: pointer; }
   .ib:hover, .ib:focus-visible { background: var(--mp-surface-hover); color: var(--mp-text-primary); outline: none; }
-  .ib[aria-pressed="true"] { color: var(--mp-action-primary); background: var(--mp-surface-hover); }
+  .ib[aria-pressed="true"] { color: var(--mp-action-primary); background: var(--mp-surface-selected); }
   .ib svg, .mi svg { width: var(--mp-icon-normal); height: var(--mp-icon-normal); fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; }
   .ib.sm { width: var(--mp-control-minimum); height: var(--mp-control-minimum); }
   .ib.sm svg { width: var(--mp-icon-small); height: var(--mp-icon-small); }
-  .seg { display: inline-flex; gap: 1px; padding: 1px; border: 1px solid var(--mp-border-control); border-radius: var(--mp-radius-control); }
-  .seg .ib { width: var(--mp-control-minimum); height: var(--mp-control-minimum); border-radius: 5px; }
+  /* a two-way switch: a pill track whose chosen half fills in */
+  .seg { display: inline-flex; padding: 2px; border-radius: 999px; box-shadow: inset 0 0 0 1px var(--mp-border-control); }
+  .seg .ib { width: 28px; height: var(--mp-control-minimum); border-radius: 999px; }
+  .seg .ib svg { width: var(--mp-icon-small); height: var(--mp-icon-small); }
+  .seg .ib:hover:not([aria-pressed="true"]) { background: none; color: var(--mp-text-primary); }
+  .seg .ib[aria-pressed="true"] { background: var(--mp-action-primary); color: var(--mp-action-on-primary); }
   .sep { width: 1px; height: 16px; background: var(--mp-border-divider); margin: 0 3px; }
   :root.article-view .room-only, :root.welcome-view .room-only { display: none !important; }
 
@@ -279,7 +288,6 @@
 
   .pack, .btn, .docs-pager button, .composer textarea, .docs-search, .add-row input { border-color: var(--mp-border-control); }
   .pack[aria-pressed="true"] { background: var(--mp-surface-selected); }
-  .ib[aria-pressed="true"] { box-shadow: inset 0 -2px var(--mp-border-selected); }
   .item, .card, .post { position: relative; }
   .item-main, .card-main, .post-main { display: block; width: 100%; border: 0; background: none; text-align: left; padding: 0; font: inherit; color: inherit; cursor: pointer; }
   .card-main { flex: 1; min-height: 0; }
@@ -308,7 +316,7 @@
 <body>
 <template id="brandBadge"><!--include:brand/badge.svg--></template>
 <header class="bar">
-  <div class="brand"><!--include:brand/mark-line.svg--><!--include:brand/wordmark.svg--></div>
+  <div class="brand" title="MCPortal"><!--include:brand/mark-line.svg--><!--include:brand/wordmark.svg--></div>
   <div class="room-name" id="roomName"></div>
   <div class="spacer"></div>
   <span class="status" id="status">Warming up the portal…</span>
@@ -601,7 +609,7 @@
     state.profile = { layout: 'columns', openIn: 'card', saved: [], ...data.profile };
     root.classList.add('welcome-view');
     $('grid').hidden = true; $('reader').hidden = true;
-    $('roomName').textContent = rebuilding ? '· start over' : '· welcome';
+    $('roomName').textContent = rebuilding ? 'start over' : 'welcome';
     setStatus('');
     const chosen = new Set();
     const build = el('button', { class: 'btn primary', disabled: true, onclick: () => buildRoom([...chosen]) }, 'Summon my portals!');
@@ -675,7 +683,7 @@
     state.profile = { layout: 'columns', openIn: 'card', saved: [], ...data.profile };
     state.saved = new Set(state.profile.saved.map((s) => s.url));
     state.portals = new Map(data.portals.map((p) => [p.portalId, p]));
-    $('roomName').textContent = `· ${data.profile.name}`;
+    $('roomName').textContent = data.profile.name;
     drawLayout();
     setUpdated(data.generatedAt);
     if (data.notice) toast(data.notice);
@@ -1101,7 +1109,7 @@
   function showArticleCard(a, saved) {
     if (saved) state.saved.add(a.url);
     root.classList.add('article-view');
-    $('roomName').textContent = '· reader';
+    $('roomName').textContent = 'reader';
     $('grid').hidden = true;
     const reader = $('reader');
     reader.hidden = false; reader.scrollTop = 0;
@@ -1312,7 +1320,7 @@
   // This view belongs to an open_docs call: a docs card, not the room.
   function showDocsCard(data) {
     root.classList.add('article-view');
-    $('roomName').textContent = '· docs';
+    $('roomName').textContent = 'docs';
     $('welcome').hidden = true;
     root.classList.remove('welcome-view');
     $('grid').hidden = true;
@@ -1342,7 +1350,7 @@
     $('reader').hidden = true;
     $('grid').hidden = false;
     if (!state.profile) { await loadRoom(); return; }
-    $('roomName').textContent = `· ${state.profile.name}`;
+    $('roomName').textContent = state.profile.name;
     if (roomNavigation) {
       const previous = roomNavigation; roomNavigation = null;
       for (const { node, left, top } of previous.positions) { node.scrollLeft = left; node.scrollTop = top; }
@@ -1389,7 +1397,7 @@
   // This view belongs to a get_clip call: it is a clip card, not a room.
   function showClipCard(clip) {
     root.classList.add('article-view');
-    $('roomName').textContent = '· clip';
+    $('roomName').textContent = 'clip';
     $('grid').hidden = true;
     const reader = $('reader');
     reader.hidden = false; reader.scrollTop = 0;
@@ -1534,7 +1542,7 @@
   // This view belongs to an open_space call: it is a space card.
   function showSpaceCard(space) {
     root.classList.add('article-view');
-    $('roomName').textContent = `· @${space.handle}`;
+    $('roomName').textContent = `@${space.handle}`;
     showSpace(space, false);
   }
 
@@ -1568,7 +1576,7 @@
 
   function showShareCard(share) {
     root.classList.add('article-view');
-    $('roomName').textContent = '· shared';
+    $('roomName').textContent = 'shared';
     $('grid').hidden = true;
     const reader = $('reader');
     reader.hidden = false; reader.scrollTop = 0;
