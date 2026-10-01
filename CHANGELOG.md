@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### For hosts and agents (interface changes)
+- **Arguments are checked:** every tool call is checked against the tool's `inputSchema` before it runs. A wrong type (`column: "2"`), an unknown argument or a missing required one is refused with `invalid_argument` and a sentence naming the problem, where some were silently ignored before. `pin_portal` still trims extra items and tags rather than refusing them.
+- **Error codes:** a failed call carries `structuredContent.error = { code, message, retryable }` (codes such as `not_found`, `conflict`, `limit_exceeded`, `rate_limited`, `unavailable`, `upstream_error`). A server bug reports `internal` with a reference, never its message.
+- **Fewer tools where they can't work:** a local MCPortal no longer lists the sharing, space and public-profile tools (they're hosted only), which cuts what it costs every conversation from about 8,000 to 6,400 tokens. `tools/list` is grouped by area.
+- **Admin API errors** are `{ error: code, error_description }`, like the OAuth endpoints.
+- **`find_source` candidates** carry validated settings, exactly as `add_portal` will store them.
+
+### Health, reliability and distribution
+- **No lost changes:** two tool calls at once can't overwrite each other's change to the room (also across server instances on Postgres), and a failed read of shared data can't replace it with an empty document.
+- **`/health` checks storage** and answers 503 when it can't reach it; the admin page shows today's usage and per-tool counters.
+- **Listing files:** `server.json` (MCP Registry) and `manifest.json` (an MCPB bundle for Claude desktop) are generated from the code by `node scripts/distribution.ts`, so their tools and version always match.
+
 ### Design system
 - **Shared tokens:** versioned, typed authoring source generates CSS, browser palettes and TypeScript exports for the room, reading/social cards, public site, account, OAuth and admin.
 - **Validated themes:** an exact host adapter repairs unreadable colour pairs, clears stale colours on theme changes, supports partial/reset inputs and follows system preferences until the host selects a scheme. Functional contrast no longer depends on native `contrast-color()`.
