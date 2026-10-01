@@ -383,7 +383,8 @@
   const pending = new Map();
   let nextId = 1;
   let displayMode = 'inline';
-  let canFullscreen = !DEV;
+  let canFullscreen = false;
+  let hostCapabilities = {};
   let gotInitialResult = false;
   let toolRunning = false;
   // /preview with a static token: the user pastes it once; it lives only in this tab.
@@ -395,6 +396,9 @@
   let clipId = null;       // set when this view belongs to a get_clip or get_share call (a card); share ids start with "s"
 
   function hostRequest(method, params, timeoutMs = 30000) {
+    const capability = { 'tools/call': 'serverTools', 'ui/open-link': 'openLinks', 'ui/message': 'message', 'ui/update-model-context': 'updateModelContext' }[method];
+    if (capability && !hostCapabilities[capability]) return Promise.reject(new Error(`This host does not support ${method}. Ask your agent to perform this action.`));
+    if (method === 'ui/request-display-mode' && !canFullscreen) return Promise.reject(new Error('Fullscreen is not available here'));
     const id = nextId++;
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => { pending.delete(id); reject(new Error(`${method} timed out`)); }, timeoutMs);
@@ -505,7 +509,17 @@
   async function openLink(url) {
     if (!isHttpUrl(url)) { toast("That link isn't a web address"); return; }
     if (DEV) { window.open(url, '_blank', 'noopener,noreferrer'); return; }
-    try { await hostRequest('ui/open-link', { url }); } catch { toast("The host didn't open the link"); }
+    try {
+      const result = await hostRequest('ui/open-link', { url });
+      if (result && result.isError) throw new Error('Link opening declined');
+    } catch { showLinkFallback(url); }
+  }
+
+  function showLinkFallback(url) {
+    const fallback = el('div', { class: 'error', role: 'status', style: 'position:fixed;bottom:16px;left:16px;right:16px;z-index:100;padding:12px;background:var(--mp-surface-canvas);border:1px solid var(--mp-border-control);border-radius:var(--mp-radius-card)' }, 'Open this address in your browser: ',
+      el('input', { value: url, readonly: true, 'aria-label': 'Original web address', onclick: (e) => e.target.select() }),
+      el('button', { class: 'btn', onclick: () => fallback.remove() }, 'Dismiss'));
+    document.body.append(fallback);
   }
 
   function applyHostContext(ctx) {
@@ -654,9 +668,10 @@
 
   function renderRoom(data) {
     if (data.onboarding) return renderWelcome(data);
-    root.classList.remove('welcome-view');
+    root.classList.remove('welcome-view', 'article-view');
     $('welcome').hidden = true;
-    if (articleUrl === null) { $('grid').hidden = false; }
+    $('reader').hidden = true;
+    $('grid').hidden = false;
     state.profile = { layout: 'columns', openIn: 'card', saved: [], ...data.profile };
     state.saved = new Set(state.profile.saved.map((s) => s.url));
     state.portals = new Map(data.portals.map((p) => [p.portalId, p]));
@@ -1001,7 +1016,7 @@
   // which renders as its own reader card below this one. Only the URL goes into the
   // message: titles are third-party text and must never be spoken in the user's voice.
   async function openInChat(item, portal) {
-    if (!isHttpUrl(item.url) || item.url.length > 2000) return openReader(item, portal);
+    if (!hostCapabilities.message || !isHttpUrl(item.url) || item.url.length > 2000) return openReader(item, portal);
     try {
       await hostRequest('ui/message', { role: 'user', content: [{ type: 'text', text: `Open this in MCPortal's reader view: ${item.url}` }] }, 10000);
       toast('Opening in the conversation…');
@@ -1108,11 +1123,14 @@
   }
 
   async function openReader(item, portal) {
+    const generation = ++readerGeneration;
     const reader = $('reader');
+    rememberRoomNavigation();
     $('grid').hidden = true; reader.hidden = false; reader.scrollTop = 0; window.scrollTo(0, 0);
     reader.replaceChildren(readerTop(item.url, true), el('h1', null, item.title), el('div', { class: 'byline' }, 'Unrolling the scroll…'));
     try {
       const result = await callTool('read_article', { url: item.url });
+      if (generation !== readerGeneration) return;
       const a = result.structuredContent.article;
       reader.replaceChildren(...articleNodes(a, portal.title, true));
       if (!DEV) {
@@ -1123,6 +1141,7 @@
         }, 5000).catch(() => {});
       }
     } catch (error) {
+      if (generation !== readerGeneration) return;
       reader.replaceChildren(readerTop(item.url, true), el('h1', null, item.title),
         el('div', { class: 'error' }, `Reader view isn't available for this page (${error.message}).`),
         el('button', { class: 'btn', onclick: () => openLink(item.url) }, 'Open the original'));
@@ -1145,13 +1164,17 @@
   function docsMessage(text) { return el('div', { class: 'byline' }, text); }
 
   async function openDocs(key, options = {}) {
+    const generation = ++readerGeneration;
     const reader = $('reader');
+    rememberRoomNavigation();
     $('grid').hidden = true; reader.hidden = false; reader.classList.add('docs'); reader.scrollTop = 0; window.scrollTo(0, 0);
-    reader.replaceChildren(docsMessage('Opening the docs…'));
+    reader.replaceChildren(readerTop('', !options.card), docsMessage('Opening the docs…'));
     try {
       const data = (await callTool('open_docs', key)).structuredContent;
+      if (generation !== readerGeneration) return;
       showDocs(data, key, options);
     } catch (error) {
+      if (generation !== readerGeneration) return;
       console.error('[mcportal] open_docs failed', key, error);
       reader.replaceChildren(readerTop('', !options.card), el('div', { class: 'error' }, `These docs couldn't be opened (${error.message}).`));
     }
@@ -1205,7 +1228,7 @@
     const first = site.sections.flatMap((s) => s.pages).find((p) => !p.index);
     const start = options.url || data.page || (first && first.url);
     if (start) loadDocsPage(start);
-    else reader.querySelector('.docs-page').replaceChildren(docsMessage('Pick a section on the left.'));
+    else reader.querySelector('.docs-page').replaceChildren(readerTop('', !options.card), docsMessage('Pick a section on the left.'));
   }
 
   function markCurrentPage() {
@@ -1230,6 +1253,8 @@
 
   async function loadDocsPage(target) {
     if (!docsState) return;
+    const requestState = docsState;
+    const generation = ++readerGeneration;
     const [url, hash] = String(target).split('#');
     const reader = $('reader');
     const column = reader.querySelector('.docs-page');
@@ -1239,6 +1264,7 @@
     column.replaceChildren(docsMessage('Loading…'));
     try {
       const data = (await callTool('read_doc_page', { url, ...docsState.key })).structuredContent;
+      if (generation !== readerGeneration || docsState !== requestState) return;
       const { page, section, prev, next, provenance } = data;
       docsState.url = url;
       const here = new URL(page.url);
@@ -1276,6 +1302,7 @@
         }, 5000).catch(() => {});
       }
     } catch (error) {
+      if (generation !== readerGeneration || docsState !== requestState) return;
       console.error('[mcportal] read_doc_page failed', { url, ...docsState.key }, error);
       column.replaceChildren(readerTop(url, !docsState.card), el('div', { class: 'error' }, `This page couldn't be read (${error.message}).`),
         el('button', { class: 'btn', onclick: () => openLink(url) }, 'Open the original'));
@@ -1296,11 +1323,33 @@
 
   function readerTop(url, withBack, title) {
     return el('div', { class: 'reader-top' },
-      withBack ? iconButton('back', 'Back to your room', closeReader, 'ib') : null,
+      iconButton('back', withBack ? 'Back to your room' : 'Open your room', closeReader, 'ib'),
       url ? iconButton('external', 'Open the original', () => openLink(url), 'ib') : null,
       title ? saveButton({ url, title }, 'reader', 'ib save') : null);
   }
-  function closeReader() { if (articleUrl || clipId || docsArgs) return; docsState = null; $('reader').classList.remove('space', 'docs', 'toc-open'); $('reader').hidden = true; $('grid').hidden = false; }
+  let readerGeneration = 0;
+  let roomNavigation = null;
+  function rememberRoomNavigation() {
+    if ($('grid').hidden || roomNavigation) return;
+    roomNavigation = { x: window.scrollX, y: window.scrollY, focus: document.activeElement,
+      positions: [$('grid'), ...$('grid').querySelectorAll('.items, .shelf-row')].map((node) => ({ node, left: node.scrollLeft, top: node.scrollTop })) };
+  }
+  async function closeReader() {
+    readerGeneration++;
+    articleUrl = null; clipId = null; docsArgs = null; spaceHandle = null; docsState = null;
+    root.classList.remove('article-view');
+    $('reader').classList.remove('space', 'docs', 'toc-open');
+    $('reader').hidden = true;
+    $('grid').hidden = false;
+    if (!state.profile) { await loadRoom(); return; }
+    $('roomName').textContent = `· ${state.profile.name}`;
+    if (roomNavigation) {
+      const previous = roomNavigation; roomNavigation = null;
+      for (const { node, left, top } of previous.positions) { node.scrollLeft = left; node.scrollTop = top; }
+      previous.focus?.focus({ preventScroll: true });
+      window.scrollTo(previous.x, previous.y);
+    }
+  }
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('reader').hidden) closeReader(); });
 
   // ------------------------------------------------------------ clips
@@ -1326,7 +1375,7 @@
     const src = clip.source || {};
     const from = src.url ? (src.title || new URL(src.url).hostname) : src.kind === 'conversation' ? 'a conversation' : (src.title || '');
     const top = el('div', { class: 'reader-top' },
-      withBack ? iconButton('back', 'Back to your room', closeReader, 'ib') : null,
+      iconButton('back', withBack ? 'Back to your room' : 'Open your room', closeReader, 'ib'),
       src.url && isHttpUrl(src.url) ? iconButton('external', 'Open where it came from', () => openLink(src.url), 'ib') : null);
     return [top, el('h1', null, clip.title),
       el('div', { class: 'byline' }, [`${clip.kind[0].toUpperCase()}${clip.kind.slice(1)}`, from ? `from ${from}` : '', `clipped ${ago(clip.createdAt)}`].filter(Boolean).join(' · ')),
@@ -1362,6 +1411,7 @@
 
   async function openClip(item) {
     const reader = $('reader');
+    rememberRoomNavigation();
     $('grid').hidden = true; reader.hidden = false; reader.scrollTop = 0; window.scrollTo(0, 0);
     reader.replaceChildren(el('div', { class: 'reader-top' }, iconButton('back', 'Back to your room', closeReader, 'ib')), el('h1', null, item.title), el('div', { class: 'byline' }, 'Stand by…'));
     try {
@@ -1402,6 +1452,7 @@
 
   function openComposer(item) {
     const reader = $('reader');
+    rememberRoomNavigation();
     $('grid').hidden = true; reader.hidden = false; reader.scrollTop = 0; window.scrollTo(0, 0);
     reader.replaceChildren(el('div', { class: 'reader-top' }, iconButton('back', 'Back to your room', closeReader, 'ib')),
       el('h1', null, item.title), el('div', { class: 'byline' }, item.url), composer({ savedUrl: item.url }, item.title));
@@ -1504,7 +1555,7 @@
     const who = share.mine ? 'You' : `@${share.author.handle}`;
     const to = share.audience === 'mcportal' ? 'everyone on MCPortal' : 'followers';
     const top = el('div', { class: 'reader-top' },
-      withBack ? iconButton('back', 'Back to your room', closeReader, 'ib') : null,
+      iconButton('back', withBack ? 'Back to your room' : 'Open your room', closeReader, 'ib'),
       share.url && isHttpUrl(share.url) ? iconButton('external', 'Open the original', () => openLink(share.url), 'ib') : null);
     const body = share.clip ? clipBody(share.clip.data)
       : share.url && isHttpUrl(share.url) ? [el('p', null, el('button', { class: 'btn', onclick: () => openLink(share.url) }, share.url))] : [];
@@ -1541,6 +1592,7 @@
     const reader = $('reader');
     const scroll = reader.scrollTop;
     reader.classList.remove('space');
+    rememberRoomNavigation();
     $('grid').hidden = true; reader.hidden = false; reader.scrollTop = 0; window.scrollTo(0, 0);
     reader.replaceChildren(el('div', { class: 'reader-top' }, iconButton('back', 'Back', back || closeReader, 'ib')), el('h1', null, item.title), el('div', { class: 'byline' }, 'Stand by…'));
     try {
@@ -1692,11 +1744,13 @@
         appCapabilities: { availableDisplayModes: ['inline', 'fullscreen'] },
         capabilities: {},
       }, 10000);
+      hostCapabilities = (init && init.hostCapabilities) || {};
       applyHostContext(init && init.hostContext);
     } catch (error) {
       console.warn('[mcportal] ui/initialize failed', error);
     }
-    $('btnOpenIn').hidden = false;
+    $('btnOpenIn').hidden = !hostCapabilities.message;
+    $('btnExpand').hidden = !canFullscreen;
     hostNotify('ui/notifications/initialized', {});
     // If the host opened us without running the tool (e.g. a restored view), fetch the
     // room ourselves. If it IS running the tool, wait for that result instead.
