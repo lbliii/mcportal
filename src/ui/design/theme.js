@@ -1,5 +1,10 @@
 /* Plain script: inlined into the room; Node tests evaluate this complete file. */
+/** @typedef {Record<string, string>} ThemePalette A role (`surface-canvas`, `text-link`, …) to its CSS value. */
+/** @typedef {(value: string) => string | null} ColorResolver Resolves a CSS colour to #RRGGBB, or null if it can't. */
+/** @typedef {{ theme?: unknown, styles?: { variables?: Record<string, unknown> } }} ThemeHostContext The host context's theme fields: host JSON, so values are unchecked. */
 const MCPortalTheme = (() => {
+  // Typed as a string map: it's only ever indexed by host variable names read at runtime.
+  /** @type {Readonly<Record<string, string>>} */
   const HOST = Object.freeze({
     '--color-background-primary': 'surface-canvas',
     '--color-background-secondary': 'surface-inset',
@@ -11,6 +16,7 @@ const MCPortalTheme = (() => {
     '--border-radius-lg': 'radius-card',
   });
   const COLOR_KEYS = Object.keys(HOST).filter(k => k.startsWith('--color-'));
+  /** An opaque sRGB colour's channels, or null. @param {unknown} value @returns {number[] | null} */
   function rgb(value) {
     if (typeof value !== 'string') return null;
     const s = value.trim();
@@ -27,27 +33,42 @@ const MCPortalTheme = (() => {
     }
     return null;
   }
-  const hex = channels => '#' + channels.map(c => Math.round(c).toString(16).padStart(2, '0')).join('').toUpperCase();
+  const hex = (/** @type {number[]} */ channels) => '#' + channels.map(c => Math.round(c).toString(16).padStart(2, '0')).join('').toUpperCase();
+  /** @param {string} value */
   function luminance(value) {
     const channels = rgb(value);
     if (!channels) throw new Error('Expected resolved opaque sRGB colour');
     const linear = channels.map(c => { const v = c / 255; return v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; });
     return linear[0] * .2126 + linear[1] * .7152 + linear[2] * .0722;
   }
+  /** WCAG contrast ratio of two opaque colours. @param {string} a @param {string} b */
   function contrast(a, b) { const x = luminance(a), y = luminance(b); return (Math.max(x, y) + .05) / (Math.min(x, y) + .05); }
-  function mix(a, b, weight) { const x = rgb(a), y = rgb(b); return hex(x.map((v, i) => v * weight + y[i] * (1 - weight))); }
+  /** @param {string} a @param {string} b @param {number} weight */
+  function mix(a, b, weight) {
+    // Callers only mix resolved #RRGGBB colours (the foreground and canvas), so both parse.
+    const x = /** @type {number[]} */ (rgb(a)), y = /** @type {number[]} */ (rgb(b)); return hex(x.map((v, i) => v * weight + y[i] * (1 - weight))); }
+  /** @param {unknown} value @param {ColorResolver | null | undefined} resolveColor @returns {string | null} */
   function normalize(value, resolveColor) {
     const direct = rgb(value);
     if (direct) return hex(direct);
     if (typeof value !== 'string' || /[;{}<>]|url\(|var\(/i.test(value)) return null;
     const resolved = resolveColor ? resolveColor(value) : null;
-    return rgb(resolved) ? hex(rgb(resolved)) : null;
+    const channels = rgb(resolved);
+    return channels ? hex(channels) : null;
   }
+  /**
+   * The palette for a scheme, with the host's colour variables folded in where they stay readable.
+   * @param {string} scheme @param {Record<string, unknown>} [variables] host variables (unchecked host data)
+   * @param {ColorResolver | null} [resolveColor] @returns {ThemePalette}
+   */
   function resolve(scheme, variables = {}, resolveColor) {
-    const house = MP_PALETTES[scheme === 'dark' ? 'dark' : 'light'];
+    // The generated palettes are flat role-to-colour maps; roles are looked up by computed name.
+    const house = /** @type {ThemePalette} */ (MP_PALETTES[scheme === 'dark' ? 'dark' : 'light']);
     const palette = { ...house };
+    /** @type {ThemePalette} */
     const incoming = {};
     // Only references to known colour inputs are allowed; cycles and external names fail closed.
+    /** @param {string} key @param {Set<string>} [seen] @returns {string | null} */
     function color(key, seen = new Set()) {
       if (!COLOR_KEYS.includes(key) || seen.has(key)) return null;
       const value = variables[key];
@@ -72,6 +93,7 @@ const MCPortalTheme = (() => {
       palette[name] = contrast(foreground, candidate) >= 4.5 ? candidate : canvas;
       surfaces.push(palette[name]);
     }
+    /** @param {string | undefined} candidate @param {string | undefined} fallback */
     function safe(candidate, fallback, minimum = 4.5) {
       for (const c of [candidate, fallback, foreground]) if (c && surfaces.every(bg => contrast(c, bg) >= minimum)) return c;
       return foreground;
@@ -100,6 +122,7 @@ const MCPortalTheme = (() => {
     if (typeof radius === 'string' && /^\d+(?:\.\d+)?px$/.test(radius.trim()) && parseFloat(radius) <= 24) palette['radius-card'] = radius.trim();
     return palette;
   }
+  /** @param {HTMLElement} root @returns {ColorResolver} */
   function browserColorResolver(root) {
     const doc = root.ownerDocument;
     const context = doc && doc.createElement('canvas').getContext('2d', { willReadFrequently: true, colorSpace: 'srgb' });
@@ -115,12 +138,17 @@ const MCPortalTheme = (() => {
       return pixel[3] === 255 ? hex([...pixel].slice(0, 3)) : null;
     };
   }
+  /**
+   * Paints the palette onto root and keeps it current with the system and host.
+   * @param {HTMLElement} root
+   * @param {{ matchMedia?: (query: string) => MediaQueryList, resolveColor?: ColorResolver }} [options]
+   */
   function create(root, options = {}) {
-    const media = options.matchMedia || (query => window.matchMedia(query));
+    const media = options.matchMedia || ((/** @type {string} */ query) => window.matchMedia(query));
     const system = media('(prefers-color-scheme: dark)');
     const resolveColor = options.resolveColor || browserColorResolver(root);
-    let scheme = system.matches ? 'dark' : 'light', hostScheme = null;
-    const variables = {}, applied = new Set();
+    let scheme = system.matches ? 'dark' : 'light', hostScheme = /** @type {string | null} */ (null);
+    const variables = /** @type {Record<string, string>} */ ({}), applied = /** @type {Set<string>} */ (new Set());
     function paint() {
       const palette = resolve(scheme, variables, resolveColor);
       for (const prop of applied) root.style.removeProperty(prop);
@@ -133,6 +161,7 @@ const MCPortalTheme = (() => {
       root.dataset.theme = scheme;
       return palette;
     }
+    /** @param {ThemeHostContext | null | undefined} ctx */
     function update(ctx) {
       if (!ctx || typeof ctx !== 'object') return paint();
       const requested = ctx.theme === 'dark' || ctx.theme === 'light' ? ctx.theme : null;

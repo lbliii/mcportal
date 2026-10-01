@@ -90,7 +90,47 @@ declare global {
   type DocHit = Docs.DocHit;
 
   /** The room's state: the profile, the portals as last loaded, saved URLs, and each portal's fallback art style. */
-  type RoomState = { profile: Profile | null; portals: Map<string, PortalResult>; saved: Set<string>; art: Map<string, string> };
+  type RoomState = { profile: Profile | null; portals: Map<string, PortalResult>; saved: Set<string>; art: Map<string, number> };
+
+  // ---- Admin page data (src/admin.ts: /admin/api/state and the POST actions).
+  // admin.ts builds reports and usage as `unknown`, so their shapes are spelled out here
+  // from reportsView() and usageView(); the rest are the server's own types.
+
+  type Account = import('../accounts.ts').Account;
+  type Invite = import('../accounts.ts').Invite;
+  type AuditEntry = import('../accounts.ts').AuditEntry;
+
+  /** Who a report is from or about (admin.ts reportsView `who`). */
+  type AdminPerson = { accountId: string; login: string | null; handle: string | null };
+
+  /** A report with its people and target resolved (admin.ts reportsView). */
+  type AdminReport = Social.Report & {
+    reporter: AdminPerson;
+    target: {
+      kind: Social.Report['targetKind'];
+      id: string;
+      exists: boolean;
+      account: AdminPerson | null;
+      /** Only when the share still exists. */
+      title?: string;
+      note?: string;
+      url?: string;
+      hidden?: boolean;
+      shareKind?: Social.Share['kind'];
+    };
+  };
+
+  /** Usage on this instance (admin.ts usageView); each half is missing when that feature is off. */
+  type AdminUsage = {
+    budget?: Omit<import('../lib/budget.ts').BudgetSnapshot, 'today'> & { today: Array<import('../lib/budget.ts').BudgetSnapshot['today'][number] & { login: string | null }> };
+    tools?: ReturnType<import('../lib/metrics.ts').ToolMetrics['snapshot']>;
+  };
+
+  /** What every admin API call returns: the POST actions send this (with ok: true). */
+  type AdminUpdate = { accounts: Account[]; invites: Invite[]; audit: AuditEntry[]; reports: AdminReport[]; usage?: AdminUsage };
+
+  /** GET /admin/api/state: the update plus who's signed in, the CSRF token and usage. */
+  type AdminState = AdminUpdate & { me: { login: string; accountId: string }; csrf: string; usage: AdminUsage };
 }
 
 export {};

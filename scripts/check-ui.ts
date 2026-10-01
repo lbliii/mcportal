@@ -8,7 +8,8 @@
  * assembles the script the way roomHtml() does, remembers which file and line every
  * assembled line came from, and type-checks the result with checkJs against the DOM.
  * Errors are reported against the original files. JSDoc in the fragments supplies
- * the types, including the server's own (`import('../../types.ts')`).
+ * the types; src/ui/ui.d.ts brings in the server's own (data shapes, and the tool
+ * results contract in src/tools/results.ts). Strict, like the server.
  */
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -66,23 +67,10 @@ export const UI_COMPILER_OPTIONS: ts.CompilerOptions = {
   // Browser globals only: Node's would hide mistakes (its setTimeout, Buffer). Server modules
   // imported for their data types may not check without them; their errors are skipped below.
   types: [],
-  strict: false,
+  // Strict, like the server.
+  strict: true,
   skipLibCheck: true,
 };
-
-/**
- * Files that must also pass strict mode (strictNullChecks, noImplicitAny, …), as the
- * server does. Every file starts outside this list and moves in once it's typed; the
- * goal is all of them. A file on the list can't regress.
- */
-export const STRICT_UI_FILES: readonly string[] = [
-  'src/ui/room.html',
-  'src/ui/room/bridge.js',
-  'src/ui/room/dom.js',
-  'src/ui/room/boot.js',
-  'src/ui/room/add.js',
-  'src/ui/room/toolbar.js',
-];
 
 export interface UiProblem {
   file: string;
@@ -90,15 +78,9 @@ export interface UiProblem {
   message: string;
 }
 
-/**
- * Every type error in the room's and the admin page's scripts, against their source
- * files: all of them in non-strict mode, plus strict errors in STRICT_UI_FILES.
- */
-export async function checkUi(strictFiles: readonly string[] = STRICT_UI_FILES): Promise<UiProblem[]> {
-  const loose = await diagnose(UI_COMPILER_OPTIONS);
-  const strict = (await diagnose({ ...UI_COMPILER_OPTIONS, strict: true })).filter((p) => strictFiles.includes(p.file));
-  const seen = new Set(loose.map((p) => `${p.file}:${p.line}:${p.message}`));
-  return [...loose, ...strict.filter((p) => !seen.has(`${p.file}:${p.line}:${p.message}`))];
+/** Every type error in the room's and the admin page's scripts, in strict mode, against their source files. */
+export async function checkUi(): Promise<UiProblem[]> {
+  return diagnose(UI_COMPILER_OPTIONS);
 }
 
 /** Type errors under `options`, mapped back to the files they came from. */

@@ -88,7 +88,7 @@ export class AdminPanel {
           id: r.targetId,
           exists: r.targetKind === 'profile' || Boolean(share),
           account: targetAccount ? await who(targetAccount) : null,
-          ...(share ? { title: share.title, note: share.note ?? '', url: share.url ?? '', hidden: Boolean(share.hiddenAt), kind: share.kind } : {}),
+          ...(share ? { title: share.title, note: share.note ?? '', url: share.url ?? '', hidden: Boolean(share.hiddenAt), shareKind: share.kind } : {}),
         },
       };
     }));

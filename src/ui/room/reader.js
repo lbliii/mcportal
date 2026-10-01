@@ -1,19 +1,25 @@
   // room/reader.js: reader view: article cards and reader blocks
   // ------------------------------------------------------------ reader view
+  /** @typedef {Item & { url: string }} ReadableItem  an item with a link reader view can try */
+  /** @typedef {(href: string) => unknown} LinkHandler  opens an http(s) link from reader text */
+  /** @param {Item} item @param {PortalResult} portal */
   function openItem(item, portal) {
     if (item.clip) return openClip(item);
     if (item.share && item.share.kind === 'clip') return openShare(item);
     if (portal.source === 'docs' && item.url) return openDocs({ portalId: portal.portalId }, { url: item.url });
     // Videos play at the source; pinned items are often internal pages reader view can't reach.
     const readable = item.url && portal.source !== 'github' && portal.source !== 'pinned' && !item.video;
-    if (!readable) return openLink(item.url);
-    if (!DEV && state.profile && state.profile.openIn === 'chat') return openInChat(item, portal);
-    return openReader(item, portal);
+    // openLink turns away anything that isn't a web address, a missing url included.
+    if (!readable) return openLink(/** @type {string} */ (item.url));
+    const link = /** @type {ReadableItem} */ (item);   // readable: it has a url
+    if (!DEV && state.profile && state.profile.openIn === 'chat') return openInChat(link, portal);
+    return openReader(link, portal);
   }
 
   // Ask the host to post a message so the model opens the story with read_article,
   // which renders as its own reader card below this one. Only the URL goes into the
   // message: titles are third-party text and must never be spoken in the user's voice.
+  /** @param {ReadableItem} item @param {PortalResult} portal */
   async function openInChat(item, portal) {
     if (!hostCapabilities.message || !isHttpUrl(item.url) || item.url.length > 2000) return openReader(item, portal);
     try {
@@ -27,19 +33,21 @@
 
   // Reader blocks (articles, docs pages, note clips) as DOM. Everything is built as text;
   // links are only http(s), opened through the host, or #anchors within the same view.
+  /** @param {ArticleBlock} b @param {() => ParentNode} scope @param {LinkHandler} [onLink] */
   function spanNodes(b, scope, onLink = openLink) {
     if (!Array.isArray(b.spans)) return [b.text];
     return b.spans.map((s) => {
       const text = s.code ? el('code', null, s.text) : s.strong ? el('strong', null, s.text) : s.text;
-      if (typeof s.href !== 'string') return text;
+      if (typeof s.href !== 'string') return text;   // so s.href is a string in the click handlers below (casts restate it)
       if (/^#[\w\-.:%~]{1,200}$/.test(s.href)) {
-        return el('a', { href: s.href, onclick: (e) => { e.preventDefault(); scope().querySelector(`[data-anchor="${CSS.escape(s.href.slice(1))}"]`)?.scrollIntoView({ block: 'start', behavior: scrollBehavior() }); } }, text);
+        return el('a', { href: s.href, onclick: (/** @type {MouseEvent} */ e) => { e.preventDefault(); scope().querySelector(`[data-anchor="${CSS.escape(/** @type {string} */ (s.href).slice(1))}"]`)?.scrollIntoView({ block: 'start', behavior: scrollBehavior() }); } }, text);
       }
       if (!isHttpUrl(s.href)) return text;
-      return el('a', { href: s.href, title: s.href, onclick: (e) => { e.preventDefault(); onLink(s.href); } }, text);
+      return el('a', { href: s.href, title: s.href, onclick: (/** @type {MouseEvent} */ e) => { e.preventDefault(); onLink(/** @type {string} */ (s.href)); } }, text);
     });
   }
 
+  /** @param {string} text */
   function copyButton(text) {
     const button = el('button', { class: 'copy', type: 'button' }, 'Copy');
     button.addEventListener('click', async () => {
@@ -50,9 +58,11 @@
     return button;
   }
 
+  /** @param {ArticleBlock[]} blocks @param {LinkHandler} [onLink] */
   function blockNodes(blocks, onLink) {
+    /** @type {HTMLElement | null} */
     let body = null;
-    const scope = () => body;
+    const scope = () => /** @type {HTMLElement} */ (body);   // links are clicked only after body is built below
     const counters = [0, 0, 0, 0];
     const nodes = blocks.map((b, i) => {
       if (b.type !== 'li') counters.fill(0);
@@ -77,7 +87,7 @@
           el('thead', null, el('tr', null, b.columns.map((c) => el('th', null, c)))),
           el('tbody', null, b.rows.map((r) => el('tr', null, r.map((c) => el('td', null, c))))))) : el('p', null, b.text);
         case 'callout': {
-          const tone = ['note', 'tip', 'warning', 'danger'].includes(b.tone) ? b.tone : 'note';
+          const tone = /** @type {Array<string | undefined>} */ (['note', 'tip', 'warning', 'danger']).includes(b.tone) ? b.tone : 'note';
           return el('div', { class: `callout ${tone}`, role: 'note' }, b.label ? el('span', { class: 'callout-label' }, b.label) : null, spanNodes(b, scope, onLink));
         }
         default: return el('p', null, spanNodes(b, scope, onLink));
@@ -87,6 +97,7 @@
     return body;
   }
 
+  /** @param {Article} a @param {string | null} via @param {boolean} withBack @param {LinkHandler} [onLink] */
   function articleNodes(a, via, withBack, onLink) {
     const body = blockNodes(a.blocks, onLink);
     const site = a.siteName && a.siteName !== a.byline ? a.siteName : null;
@@ -97,6 +108,7 @@
   }
 
   // This view belongs to a read_article call: it is a reader card, not a room.
+  /** @param {Article} a @param {boolean} saved */
   function showArticleCard(a, saved) {
     if (saved) state.saved.add(a.url);
     root.classList.add('article-view');
@@ -108,6 +120,7 @@
     setStatus('');
   }
 
+  /** @param {string} url */
   async function loadArticleCard(url) {
     setStatus('Stand by…');
     try {
@@ -117,10 +130,11 @@
       setStatus('');
       $('grid').hidden = true;
       $('reader').hidden = false;
-      $('reader').replaceChildren(readerTop(url, false), el('div', { class: 'error' }, `Reader view isn't available for this page (${error.message}).`));
+      $('reader').replaceChildren(readerTop(url, false), el('div', { class: 'error' }, `Reader view isn't available for this page (${errorText(error)}).`));
     }
   }
 
+  /** @param {ReadableItem} item @param {PortalResult} portal */
   async function openReader(item, portal) {
     const generation = ++readerGeneration;
     const reader = $('reader');
@@ -142,11 +156,12 @@
     } catch (error) {
       if (generation !== readerGeneration) return;
       reader.replaceChildren(readerTop(item.url, true), el('h1', null, item.title),
-        el('div', { class: 'error' }, `Reader view isn't available for this page (${error.message}).`),
+        el('div', { class: 'error' }, `Reader view isn't available for this page (${errorText(error)}).`),
         el('button', { class: 'btn', onclick: () => openLink(item.url) }, 'Open the original'));
     }
   }
   // "Docs · docs.stripe.com" or "Docs · GitHub owner/repo", for source lists.
+  /** @param {{ url?: unknown } | null | undefined} config */
   function docsSourceLabel(config) {
     const url = config && typeof config.url === 'string' ? config.url : '';
     const gh = url.match(/^https:\/\/github\.com\/([^/]+\/[^/]+)/);

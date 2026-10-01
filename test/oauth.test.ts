@@ -591,6 +591,8 @@ test('admin moderation: reports show on the admin page; hide, unhide and dismiss
     const state = JSON.parse((await raw(app.port, { path: '/admin/api/state', headers: { cookie: session } })).body);
     assert.equal(state.reports.length, 1);
     assert.equal(state.reports[0].target.title, 'Buy now');
+    assert.equal(state.reports[0].target.kind, 'share', 'a live share is still reported as a share (the page offers Hide on it)');
+    assert.equal(state.reports[0].target.shareKind, 'link');
     assert.equal(state.reports[0].target.account.handle, 'spammer');
     assert.equal(state.reports[0].reporter.handle, 'reader');
     const post = (path: string, body: unknown, headers: Record<string, string> = { ...sameOrigin(app.port), 'x-csrf': state.csrf }) =>
