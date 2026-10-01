@@ -1,15 +1,15 @@
 {
   "totals": {
-    "local": 3923,
-    "hosted-new": 4471,
-    "hosted-active": 4946
+    "local": 3814,
+    "hosted-new": 4362,
+    "hosted-active": 4837
   },
   "tools": {
     "account_settings": 64,
     "add_portal": 128,
     "arrange_room": 394,
     "build_room": 148,
-    "clip": 470,
+    "clip": 361,
     "delete_clip": 49,
     "export_data": 97,
     "find_source": 139,

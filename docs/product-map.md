@@ -265,7 +265,7 @@ Some views need new data (a `docs` source, stored read state for `deck` and `wat
 
 | Vertical | Tools |
 |---|---|
-| Reading | `open_room` · `get_profile` · `update_profile` · `find_source` · `add_portal` · `read_source` · `refresh_portal` (app) · `read_article` · `get_thumbnails` (app) · `list_sources` |
+| Reading | `open_room` · `arrange_room` · `remove_portal` · `find_source` · `add_portal` · `read_source` · `refresh_portal` (app) · `read_article` · `get_thumbnails` (app) · `list_sources` |
 | Collecting | `save_item` · `remove_saved` · `pin_portal` · `clip` · `search_clips` · `get_clip` · `update_clip` · `delete_clip` |
 | Social | `get_public_profile` · `set_public_profile` · `remove_public_profile` · `open_space` · `share` · `unshare` · `get_share` · `list_shares` · `relationship` · `list_connections` · `report` |
 | Onboarding & portability | `build_room` · `import_opml` · `export_data` · `import_portal` · `account_settings` |
@@ -315,4 +315,4 @@ Renaming is cheapest now, while the beta is invite-only and before the connector
 2. ✅ **Model-facing text:** server instructions and tool descriptions use the new words and say that "my portal" means the room.
 3. ✅ **Tool names, once, before the directory submission:** `open_workspace` → `open_room`, `add_panel` → `add_portal`, `pin_panel` → `pin_portal`, `refresh_panel` → `refresh_portal`, `build_portal` → `build_room`. The rest already fit. Hosts will ask people to approve the renamed tools again, which is acceptable in a beta. Parameters and results changed with them: `panelId` → `portalId`, `removePanelIds` → `removePortalIds`, `featuredPanelIds` → `featuredPortalIds`, and results carry `portals`, `portal` and `portalId`. There are no aliases for the old names.
 4. ✅ **Code:** `PanelSpec` → `PortalSpec`, `PanelResult` → `PortalResult`, `workspace.html` → `room.html`, `WORKSPACE_URI` → `ROOM_URI` (`ui://mcportal/room.html`), CSS `.panel` → `.portal` and `data-panel` → `data-portal`. Done ahead of the view work, so views start in the new words.
-5. **Stored data:** keep the profile's JSON keys (`columns[].panels`) and read them as portals. Change them only with a versioned migration, if ever. `update_profile` takes the stored shape too, and `test/compat.test.ts` checks that a profile file and an export from before the rename still load.
+5. **Stored data:** keep the profile's JSON keys (`columns[].panels`) and read them as portals. Change them only with a versioned migration, if ever. `export_data` and `import_portal` carry the stored shape too, and `test/compat.test.ts` checks that a profile file and an export from before the rename still load.

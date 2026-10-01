@@ -443,7 +443,7 @@ test('account page: download everything, one-time links, and delete the account 
       const res = await raw(app.port, { method: 'POST', path: '/mcp', headers: { 'content-type': 'application/json', authorization: `Bearer ${tokens.access_token}` }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }) });
       return { status: res.status, result: res.status === 200 ? JSON.parse(res.body).result : undefined };
     };
-    assert.equal((await tool('clip', { kind: 'quote', text: 'keep me' })).status, 200);
+    assert.equal((await tool('clip', { kind: 'quote', content: 'keep me' })).status, 200);
     assert.equal((await tool('set_public_profile', { handle: 'lawrence' })).result.structuredContent.profile.handle, 'lawrence');
     assert.match((await tool('account_settings')).result.content[0].text, /http:\/\/localhost\/account/);
 
