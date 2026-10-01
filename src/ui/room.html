@@ -69,12 +69,13 @@
   // MCPortal icon set: 24px grid, 1.75px round strokes, 1.5px corner radius, drawn in currentColor.
   // The icon set and its stroke come from scripts/brand.ts, so they match the Line mark.
   /*include:brand/icons.js*/
+  /** An icon from the generated set, drawn in currentColor. @param {string} name */
   function icon(name) {
     const NS = 'http://www.w3.org/2000/svg';
     const svg = document.createElementNS(NS, 'svg');
     svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('aria-hidden', 'true');
     svg.setAttribute('stroke-width', String(ICON_STROKE));
-    const { d, dot } = ICONS[name];
+    const { d, dot } = /** @type {Record<string, { d: string, dot?: number[] }>} */ (ICONS)[name] ?? { d: '' };
     const path = document.createElementNS(NS, 'path'); path.setAttribute('d', d);
     svg.append(path);
     if (dot) {
@@ -85,10 +86,11 @@
     }
     return svg;
   }
+  /** @param {string} name @param {string} label @param {(e: MouseEvent) => void} onclick */
   function iconButton(name, label, onclick, cls = 'ib sm') {
     return el('button', { class: cls, title: label, 'aria-label': label, onclick }, icon(name));
   }
-  for (const node of $$('[data-icon]')) node.replaceChildren(icon(node.dataset.icon));
+  for (const node of $$('[data-icon]')) node.replaceChildren(icon(node.dataset.icon ?? ''));
 
   /*include:room/bridge.js*/
   /*include:room/dom.js*/

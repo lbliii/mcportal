@@ -5,6 +5,7 @@
     root.classList.toggle('show-sources', on); $('btnSources').setAttribute('aria-pressed', String(on));
   });
   // Layout and open-in are saved to the profile, so the next open_room keeps them.
+  /** @param {Partial<Profile>} change */
   async function saveSettings(change) {
     if (!state.profile) return;
     const before = state.profile;
@@ -15,11 +16,14 @@
       state.profile = result.structuredContent.profile;
     } catch (error) {
       state.profile = before; drawLayout();
-      toast(`Couldn't save: ${error.message}`);
+      toast(`Couldn't save: ${errorText(error)}`);
     }
   }
   for (const b of $$('[data-layout]')) {
-    b.addEventListener('click', () => { if (state.profile && state.profile.layout !== b.dataset.layout) saveSettings({ layout: b.dataset.layout }); });
+    b.addEventListener('click', () => {
+      const layout = b.dataset.layout;
+      if ((layout === 'columns' || layout === 'shelves') && state.profile && state.profile.layout !== layout) saveSettings({ layout });
+    });
   }
   $('btnOpenIn').addEventListener('click', () => {
     if (state.profile) saveSettings({ openIn: state.profile.openIn === 'chat' ? 'card' : 'chat' });

@@ -15,7 +15,7 @@
    */
 
   function el(tag, attrs, ...children) {
-    if (tag === 'a' && attrs && attrs.onclick && !attrs.href) attrs = { ...attrs, role: 'button', tabindex: '0', onkeydown: e => {
+    if (tag === 'a' && attrs && attrs.onclick && !attrs.href) attrs = { ...attrs, role: 'button', tabindex: '0', onkeydown: (/** @type {KeyboardEvent} */ e) => {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); /** @type {HTMLElement} */ (e.currentTarget).click(); }
     } };
     const node = document.createElement(tag);
@@ -33,6 +33,7 @@
     return node;
   }
 
+  /** "5m ago", "3d ago", or a date. @param {string | undefined} iso */
   function ago(iso) {
     if (!iso) return '';
     const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
@@ -42,14 +43,23 @@
     if (s < 86400 * 30) return `${Math.floor(s / 86400)}d ago`;
     return new Date(iso).toLocaleDateString();
   }
+  /** @param {string} text */
   function setStatus(text) { $('status').textContent = text; $('status').title = ''; }
+  /** @param {string} [iso] */
   function setUpdated(iso) {
     const t = new Date(iso || Date.now());
     setStatus(t.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }));
     $('status').title = `Updated ${t.toLocaleString()}`;
   }
-  let toastTimer = 0;
+  /** @type {ReturnType<typeof setTimeout> | undefined} */
+  let toastTimer;
+  /** A short message at the bottom of the room. @param {string} text */
   function toast(text) {
     const t = $('toast'); t.textContent = text; t.classList.add('show');
     clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
+  }
+
+  /** A thrown value's message, for the user. @param {unknown} error */
+  function errorText(error) {
+    return error instanceof Error ? error.message : String(error);
   }

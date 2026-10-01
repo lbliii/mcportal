@@ -70,14 +70,39 @@ export const UI_COMPILER_OPTIONS: ts.CompilerOptions = {
   skipLibCheck: true,
 };
 
+/**
+ * Files that must also pass strict mode (strictNullChecks, noImplicitAny, …), as the
+ * server does. Every file starts outside this list and moves in once it's typed; the
+ * goal is all of them. A file on the list can't regress.
+ */
+export const STRICT_UI_FILES: readonly string[] = [
+  'src/ui/room.html',
+  'src/ui/room/bridge.js',
+  'src/ui/room/dom.js',
+  'src/ui/room/boot.js',
+  'src/ui/room/add.js',
+  'src/ui/room/toolbar.js',
+];
+
 export interface UiProblem {
   file: string;
   line: number;
   message: string;
 }
 
-/** Every type error in the room's and the admin page's scripts, against their source files. */
-export async function checkUi(options: ts.CompilerOptions = UI_COMPILER_OPTIONS): Promise<UiProblem[]> {
+/**
+ * Every type error in the room's and the admin page's scripts, against their source
+ * files: all of them in non-strict mode, plus strict errors in STRICT_UI_FILES.
+ */
+export async function checkUi(strictFiles: readonly string[] = STRICT_UI_FILES): Promise<UiProblem[]> {
+  const loose = await diagnose(UI_COMPILER_OPTIONS);
+  const strict = (await diagnose({ ...UI_COMPILER_OPTIONS, strict: true })).filter((p) => strictFiles.includes(p.file));
+  const seen = new Set(loose.map((p) => `${p.file}:${p.line}:${p.message}`));
+  return [...loose, ...strict.filter((p) => !seen.has(`${p.file}:${p.line}:${p.message}`))];
+}
+
+/** Type errors under `options`, mapped back to the files they came from. */
+export async function diagnose(options: ts.CompilerOptions): Promise<UiProblem[]> {
   const pages = [await assemble('room.html', 'room.assembled.js'), await assemble('admin.html', 'admin.assembled.js')];
   const virtual = new Map<string, string>(pages.map((p) => [p.name, p.text]));
   const host = ts.createCompilerHost(options);

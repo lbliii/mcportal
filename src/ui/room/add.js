@@ -6,6 +6,7 @@
     if (open) $('addInput').focus();
   }
 
+  /** @param {string} query */
   async function findSources(query) {
     const hint = $('addHint'), list = $('addResults');
     hint.textContent = 'Looking…'; list.replaceChildren();
@@ -26,10 +27,14 @@
           add);
       }));
     } catch (error) {
-      hint.textContent = `Curses! Couldn't look that up: ${error.message}`;
+      hint.textContent = `Curses! Couldn't look that up: ${errorText(error)}`;
     }
   }
 
+  /**
+   * @param {ToolResults['find_source']['candidates'][number]} c
+   * @param {HTMLButtonElement} button
+   */
   async function addCandidate(c, button) {
     button.disabled = true; button.textContent = 'Adding…';
     try {
@@ -43,7 +48,7 @@
       if (node) node.scrollIntoView({ behavior: scrollBehavior(), block: 'nearest', inline: 'start' });
     } catch (error) {
       button.disabled = false; button.textContent = 'Add';
-      toast(error.message.replace(/^Not added: /, ''));
+      toast(errorText(error).replace(/^Not added: /, ''));
     }
   }
 
@@ -54,12 +59,12 @@
     catch { toast('Attach the OPML file in the chat and ask your agent to import it'); }
   }
   $('opmlFile').addEventListener('change', async () => {
-    const file = $('opmlFile').files && $('opmlFile').files[0];
+    const file = $('opmlFile').files?.[0];
     if (!file) return;
     if (file.size > 1_000_000) { toast('That file is over 1 MB'); return; }
     const status = root.classList.contains('welcome-view') ? el('div', { class: 'building' }) : null;
     if (status) $('welcome').append(status);
-    const say = (t) => (status ? (status.textContent = t) : setStatus(t));
+    const say = (/** @type {string} */ t) => (status ? (status.textContent = t) : setStatus(t));
     say('Smuggling your subscriptions through the portal…');
     try {
       const text = await file.text();
@@ -72,7 +77,7 @@
       toast(summary);
     } catch (error) {
       say('');
-      toast(`Curses! The import failed: ${error.message}`);
+      toast(`Curses! The import failed: ${errorText(error)}`);
     }
   });
   $('btnImportOpml').addEventListener('click', () => pickOpml());

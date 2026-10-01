@@ -3,6 +3,7 @@
   // Contents (with search) | the page | on this page. The site is named by a docs portal id or by
   // its address; the server reads only that site's pages. Everything is built as text.
   let docsState = null;    // { key, site, parent, url, card }
+  /** @type {{ docs: string } | { portalId: string } | null} */
   let docsArgs = null;     // set when this view belongs to an open_docs call (a docs card)
 
   function docsMessage(text) { return el('div', { class: 'byline' }, text); }
