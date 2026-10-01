@@ -107,8 +107,8 @@ export const DOCS_TOOLS: ToolDef[] = [
     async handler(args, ctx) {
       try {
         const input = clean(args.docs, 500);
-        const { site, config } = /\/llms\.txt$/i.test(input) && !parseGithubDocs(input)
-          ? { site: await loadDocs({ kind: 'llms', url: docsInputUrl(input) }, ctx.fetcher), config: { url: docsInputUrl(input), limit: LIMITS.items } }
+        const { site, config, cached, fetchedAt } = /\/llms\.txt$/i.test(input) && !parseGithubDocs(input)
+          ? { site: await loadDocs({ kind: 'llms', url: docsInputUrl(input) }, ctx.fetcher), config: { url: docsInputUrl(input), limit: LIMITS.items }, cached: false, fetchedAt: new Date().toISOString() }
           : await siteFor(args, ctx);
         const github = parseGithubDocs(input);
         const page = github?.file ? githubRawUrl(github, github.file) : undefined;
@@ -117,6 +117,7 @@ export const DOCS_TOOLS: ToolDef[] = [
         return ok(`${head}\n${untrusted(site.toc.url, outlineText(site))}`, {
           site: { title: site.title, summary: site.summary, toc: site.toc, sections: site.sections, symbols: site.symbols?.length ?? 0 },
           docs: config.url,
+          provenance: { source: 'docs', endpoint: site.toc.url, fetchedAt, cached, ttlSeconds: FRESHNESS.docs },
           ...(page ? { page } : {}),
         });
       } catch (error) {

@@ -441,7 +441,11 @@
         : { jsonrpc: '2.0', id: msg.id, error: { code: -32601, message: 'Method not found' } }, '*');
       return;
     }
-    onHostNotification(msg.method, msg.params || {});
+    try {
+      onHostNotification(msg.method, msg.params || {});
+    } catch (error) {
+      showAppError('Could not display the tool result', error);
+    }
   });
 
   function onHostNotification(method, params) {
@@ -456,18 +460,37 @@
     } else if (method === 'ui/notifications/tool-result') {
       toolRunning = false;
       const data = params.structuredContent;
-      if (data && data.site && Array.isArray(data.site.sections)) { gotInitialResult = true; showDocsCard(data); }
+      if (params.isError) {
+        gotInitialResult = true;
+        const message = (params.content || []).filter((c) => c.type === 'text').map((c) => c.text).join(' ');
+        showAppError('The tool could not open this view', new Error(message || 'No error details returned'));
+      } else if (data && data.site && Array.isArray(data.site.sections)) { gotInitialResult = true; showDocsCard(data); }
       else if (data && data.space && data.space.handle) { gotInitialResult = true; showSpaceCard(data.space); }
       else if (data && data.share && data.share.id) { gotInitialResult = true; showShareCard(data.share); }
       else if (data && data.clip && data.clip.data) { gotInitialResult = true; showClipCard(data.clip); }
       else if (data && data.article) { gotInitialResult = true; showArticleCard(data.article, data.saved); }
       else if (data && data.profile && data.portals) { gotInitialResult = true; renderRoom(data); }
-      else if (params.isError) setStatus("Your room didn't open. Try again, or ask your agent to open it.");
+      else {
+        gotInitialResult = true;
+        showAppError('Could not display the tool result', new Error('The result has no supported view data'));
+      }
     } else if (method === 'ui/notifications/host-context-changed') {
       applyHostContext(params);
     } else if (method === 'ui/notifications/tool-cancelled') {
       setStatus('Cancelled');
     }
+  }
+
+  function showAppError(context, error) {
+    gotInitialResult = true;
+    toolRunning = false;
+    console.error(`[mcportal] ${context}`, error);
+    $('grid').hidden = true;
+    $('welcome').hidden = true;
+    const reader = $('reader');
+    reader.hidden = false;
+    reader.replaceChildren(el('div', { class: 'error', role: 'alert' }, `${context}: ${error.message || String(error)}. Ask your agent to open it again.`));
+    setStatus('View failed');
   }
 
   async function callTool(name, args = {}) {
@@ -1163,6 +1186,7 @@
       const data = (await callTool('open_docs', key)).structuredContent;
       showDocs(data, key, options);
     } catch (error) {
+      console.error('[mcportal] open_docs failed', key, error);
       reader.replaceChildren(readerTop('', !options.card), el('div', { class: 'error' }, `These docs couldn't be opened (${error.message}).`));
     }
   }
@@ -1178,7 +1202,11 @@
   }
 
   function showDocs(data, key, options = {}) {
-    const site = data.site;
+    const site = data && data.site;
+    if (!site || !Array.isArray(site.sections) || typeof data.docs !== 'string' ||
+        site.sections.some((s) => !s || !Array.isArray(s.pages))) {
+      throw new Error('Invalid docs viewer data: expected a docs address and sections with pages');
+    }
     // A docs card has no portal: later calls name the site by its address.
     docsState = { key: key && key.portalId ? { portalId: key.portalId } : { docs: data.docs }, site, parent: options.parent || null, url: null, card: !!options.card };
     const reader = $('reader');
@@ -1198,7 +1226,10 @@
             ? el('ul', { class: 'docs-hits' }, hits.map((h) => el('li', null, el('a', { onclick: () => loadDocsPage(h.url) }, h.title,
               el('span', { class: 'sub' }, h.kind === 'symbol' ? h.role : h.section || '')))))
             : el('div', { class: 'docs-hits' }, el('div', { class: 'empty' }, 'No titles match.')));
-        } catch (error) { list.replaceChildren(el('div', { class: 'error' }, error.message)); }
+        } catch (error) {
+          console.error('[mcportal] search_docs failed', error);
+          list.replaceChildren(el('div', { class: 'error', role: 'alert' }, error.message));
+        }
       }, 250);
     });
     const toc = el('aside', { class: 'docs-toc', 'aria-label': 'Contents' },
@@ -1279,6 +1310,7 @@
         }, 5000).catch(() => {});
       }
     } catch (error) {
+      console.error('[mcportal] read_doc_page failed', { url, ...docsState.key }, error);
       column.replaceChildren(readerTop(url, !docsState.card), el('div', { class: 'error' }, `This page couldn't be read (${error.message}).`),
         el('button', { class: 'btn', onclick: () => openLink(url) }, 'Open the original'));
     }
@@ -1287,7 +1319,9 @@
   // This view belongs to an open_docs call: a docs card, not the room.
   function showDocsCard(data) {
     root.classList.add('article-view');
-    $('wsName').textContent = '· docs';
+    $('roomName').textContent = '· docs';
+    $('welcome').hidden = true;
+    root.classList.remove('welcome-view');
     $('grid').hidden = true;
     $('reader').hidden = false;
     showDocs(data, docsArgs, { card: true });
@@ -1708,7 +1742,7 @@
     };
     setTimeout(check, 3000);
   }
-  boot();
+  boot().catch((error) => showAppError('Could not initialize the viewer', error));
 })();
 </script>
 </body>
