@@ -132,7 +132,7 @@ function layout(title: string, head: string, body: string, site: SiteConfig, her
 ${head}${hero ? '\n<img class="art" src="/site/hero.svg" alt="" width="1500" height="640">' : ''}
 </header>
 <main class="wrap">${body}</main>
-<footer><div class="wrap"><span class="tag jost">${TAGLINE}</span>${by}<a href="/privacy">Privacy</a><a href="/support">Support</a><a href="https://github.com/lbliii/mcportal">Source</a></div></footer>
+<footer><div class="wrap"><span class="tag jost">${TAGLINE}</span>${by}<a href="/privacy">Privacy</a><a href="/security">Security</a><a href="/support">Support</a><a href="https://github.com/lbliii/mcportal">Source</a></div></footer>
 </body></html>`;
 }
 
@@ -259,9 +259,33 @@ function support(site: SiteConfig): string {
 <p>Sign in on your <a href="/account">account page</a> and delete it there. It happens at once. See the <a href="/privacy">privacy policy</a> for what's deleted.</p>`, site);
 }
 
-/** Serves /, /privacy, /support and the files in FILES. Returns true if it handled the request. */
+function security(site: SiteConfig): string {
+  const url = escapeHtml(site.supportUrl);
+  return layout('MCPortal security', titleBand('Security'), `
+<p class="lede" style="margin-top:40px">MCPortal reads the open web for you and puts what it finds in front of your agent. Both are places someone could try something, so here is what MCPortal does about it.</p>
+
+<h2>Text from the web can't give your agent orders</h2>
+<p>Feeds, articles, docs pages, other people's notes: anything MCPortal didn't write reaches your agent marked as third-party text, inside a fence with a random id that the text itself can't close or fake. Your agent is told to report on it and never follow instructions inside it, including text addressed to AI agents. MCPortal's own tests try exactly that with poisoned content.</p>
+
+<h2>Your agent can't quietly rearrange or delete things</h2>
+<p>Changing your layout can't remove a portal unless that portal is named as one you asked to remove, and every change is reported back. Deleting your account isn't something your agent can do at all: it happens only on your account page, after you sign in again.</p>
+
+<h2>MCPortal only fetches from the public web</h2>
+<p>Every request MCPortal makes is checked when it connects, so a feed or a link can't point it at a private network, the server itself or a cloud provider's internal addresses, even through redirects or tricks with DNS. Requests have time and size limits, and pages are read with parsers built to stay fast on hostile input.</p>
+
+<h2>Sign-in</h2>
+<p>You sign in with GitHub, and MCPortal only learns your GitHub user ID and login. Apps like Claude connect through standard OAuth with PKCE, after MCPortal's own consent screen, which is tied to your browser so it can't be approved from another site. Tokens are short-lived, stored only as hashes, and bound to this server. A suspended account is cut off within seconds.</p>
+
+<h2>Your data</h2>
+<p>There are no ads, trackers or analytics. You can export everything in open formats or delete your account yourself. See the <a href="/privacy">privacy policy</a> for what's stored and for how long.</p>
+
+<h2>Report a problem</h2>
+<p>If you find a security issue, please tell us privately at <a href="${url}">${url}</a> before sharing it anywhere else, and don't include tokens or other secrets.</p>`, site);
+}
+
+/** Serves /, /privacy, /support, /security and the files in FILES. Returns true if it handled the request. */
 export async function serveSite(res: ServerResponse, pathname: string, site: SiteConfig): Promise<boolean> {
-  const pages: Record<string, (s: SiteConfig) => string> = { '/': landing, '/privacy': privacy, '/support': support };
+  const pages: Record<string, (s: SiteConfig) => string> = { '/': landing, '/privacy': privacy, '/support': support, '/security': security };
   const render = pages[pathname];
   if (render) {
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'public, max-age=300', ...HEADERS });

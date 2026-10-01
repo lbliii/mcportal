@@ -138,7 +138,7 @@ test('config: loopback by default; refuses a public bind without auth', () => {
 test('public pages: landing, privacy and support render without scripts; images and brand files only from the allowlist', async () => {
   const app = await startApp({ staticToken: 't', site: { supportUrl: 'mailto:help@example.com', operator: 'A <b>Person</b>' } });
   try {
-    for (const path of ['/', '/privacy', '/support']) {
+    for (const path of ['/', '/privacy', '/support', '/security']) {
       const page = await raw(app.port, { path });
       assert.equal(page.status, 200, path);
       assert.match(page.headers['content-type'] as string, /text\/html/);
@@ -157,7 +157,7 @@ test('public pages: landing, privacy and support render without scripts; images 
     assert.match(landing, /src:url\(\/site\/jost-bold\.ttf\)/);
     assert.match(landing, /<meta property="og:image" content="http:\/\/localhost\/site\/og\.png">/, 'link previews get an absolute image URL');
     assert.match(landing, /<link rel="icon" href="\/favicon\.svg" type="image\/svg\+xml">/);
-    for (const path of ['/', '/privacy', '/support']) {
+    for (const path of ['/', '/privacy', '/support', '/security']) {
       assert.doesNotMatch((await raw(app.port, { path })).body, /inside Claude|[Aa]sk Claude|tell Claude/, `${path} talks about "your agent", not one host`);
     }
     const types: Record<string, RegExp> = {
