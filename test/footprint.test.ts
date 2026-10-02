@@ -19,7 +19,9 @@ for (const profile of PROFILES) {
 }
 
 test('footprint: every tool has a ceiling and stays within it', async () => {
-  const f = await footprint('hosted-active');
+  const seen = new Map<string, { name: string; tokens: number }>();
+  for (const profile of PROFILES) for (const t of (await footprint(profile)).tools) seen.set(t.name, t);
+  const f = { tools: [...seen.values()] };
   const over = f.tools.filter((t) => t.tokens > (ceilings.tools[t.name] ?? 0)).map((t) => `${t.name}: ${t.tokens} tokens, ceiling ${ceilings.tools[t.name] ?? 'none'}`);
   assert.deepEqual(over, [], 'shrink it, or raise its ceiling in test/footprint-ceilings.json on purpose');
 });

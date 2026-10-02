@@ -12,28 +12,30 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { OAuthServer } from './auth/oauth.ts';
 import { AuthStore, fileAuthPersistence, type AuthPersistence } from './auth/store.ts';
 import { Accounts, bootstrapFromEnv } from './accounts.ts';
-import { AccountPage } from './account.ts';
+import { AccountPage, MAX_UPLOAD } from './account.ts';
 import { AdminPanel } from './admin.ts';
-import { deliverToFile } from './portability.ts';
+import { buildExport, deliverToFile, describeImport, EXPORT_FORMATS, importExport, parseExport, type ExportFormat } from './portability.ts';
 import type { PublicProfiles } from './public-profiles.ts';
 import type { Social } from './social.ts';
 import { DEFAULT_SUPPORT_URL, serveSite, type SiteConfig } from './site.ts';
-import { limitsFromEnv, UsageBudget, type BudgetLimits } from './lib/budget.ts';
+import { budgetMessage, limitsFromEnv, UsageBudget, type BudgetLimits } from './lib/budget.ts';
+import { authorize, localActor } from './access.ts';
 import type { TtlCache } from './lib/cache.ts';
 import { isLoopbackHost } from './lib/ip.ts';
-import { errorCode, errorMessage, errorStack } from './lib/errors.ts';
+import { errorCode, errorMessage, errorStack, isAppError } from './lib/errors.ts';
 import { safeEqual } from './lib/ids.ts';
 import { createLogger, requestId, type Logger } from './lib/log.ts';
 import { ToolMetrics } from './lib/metrics.ts';
 import { readBody } from './lib/web.ts';
 import { handleMessage, RPC, rpcError, SERVER_INFO, roomHtml, type JsonRpcResponse } from './mcp.ts';
-import { API_PATH, CLIENT_HEADER, handleCalls, MIN_CLIENT_VERSION, versionAtLeast } from './api/calls.ts';
+import { API_EXPORT_PATH, API_IMPORT_PATH, API_PATH, CLIENT_HEADER, handleCalls, MIN_CLIENT_VERSION, versionAtLeast } from './api/calls.ts';
 import { API_METHODS } from './api/methods.ts';
 import { FileClipStore, type ClipStore } from './clips.ts';
 import { FileHandoffStore, type HandoffStore } from './handoffs.ts';
 import { FileReadingStore, type ReadingStore } from './reading.ts';
 import { FileSeenStore, type SeenStore } from './seen.ts';
 import type { ProfileStore } from './store.ts';
+import type { LocalSession } from './link/session.ts';
 import type { ToolContext } from './tools/kit.ts';
 import type { Fetcher } from './types.ts';
 
@@ -86,6 +88,12 @@ export interface AppDeps {
   storage?: 'files' | 'postgres' | undefined;
   /** Throws when storage can't be reached; /health then answers 503. */
   checkStorage?: (() => Promise<void>) | undefined;
+  /**
+   * A local MCPortal served over HTTP (npm start, /preview): no auth, loopback only. Its
+   * requests take their context from the session, so it can sign in to a hosted one
+   * like the stdio server does.
+   */
+  session?: LocalSession | undefined;
 }
 
 function list(value: string | undefined): string[] {
@@ -126,7 +134,7 @@ export function configFromEnv(env: NodeJS.ProcessEnv, dataDir: string): AppConfi
   return config;
 }
 
-function send(res: ServerResponse, status: number, body: string, type = 'application/json', extra: Record<string, string> = {}): void {
+function send(res: ServerResponse, status: number, body: string | Buffer, type = 'application/json', extra: Record<string, string> = {}): void {
   if (res.headersSent) return;
   res.writeHead(status, { 'content-type': type, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', ...extra });
   res.end(body);
@@ -246,31 +254,67 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
   }
 
   /**
-   * The state API a linked local MCPortal uses (src/api/calls.ts): same tokens, Host
-   * and Origin rules as /mcp; the client names its version and old ones are told to update.
+   * The state API a linked local MCPortal uses (src/api/calls.ts), with the same tokens,
+   * Host and Origin rules as /mcp. The client names its version; old ones are told to update.
+   *
+   *   POST /api/v1/call     a batch of method calls
+   *   GET  /api/v1/export   an export, any format (?format=), as the export_data tool builds it
+   *   POST /api/v1/import   add an MCPortal export (JSON body), as the account page's import does
    */
-  async function stateApi(req: IncomingMessage, res: ServerResponse, reqLog: Logger): Promise<void> {
+  async function stateApi(req: IncomingMessage, res: ServerResponse, url: URL, reqLog: Logger): Promise<void> {
     const server = { 'mcportal-server': SERVER_INFO.version };
-    if (req.method !== 'POST') return send(res, 405, JSON.stringify({ error: 'method_not_allowed', error_description: 'Use POST' }), 'application/json', { allow: 'POST', ...server });
+    const json = (status: number, body: unknown, extra: Record<string, string> = {}) => send(res, status, JSON.stringify(body), 'application/json', { ...server, ...extra });
+    const want = url.pathname === API_EXPORT_PATH ? 'GET' : 'POST';
+    if (req.method !== want) return json(405, { error: 'method_not_allowed', error_description: `Use ${want}` }, { allow: want });
     const userId = await authenticate(req);
     if (!userId) {
       const challenge = oauth ? `Bearer resource_metadata="${oauth.resourceMetadataUrl}", scope="mcportal"` : 'Bearer';
-      return send(res, 401, JSON.stringify({ error: 'unauthorized', error_description: 'Sign in again: this device is not linked, or its link was revoked.' }), 'application/json', { 'www-authenticate': challenge, ...server });
+      return json(401, { error: 'unauthorized', error_description: 'Sign in again: this device is not linked, or its link was revoked.' }, { 'www-authenticate': challenge });
     }
-    const client = String(req.headers[CLIENT_HEADER] ?? '');
-    if (!versionAtLeast(client, MIN_CLIENT_VERSION)) {
-      return send(res, 426, JSON.stringify({ error: 'upgrade_required', error_description: `Update MCPortal to ${MIN_CLIENT_VERSION} or later to keep using your linked portal.`, minClientVersion: MIN_CLIENT_VERSION }), 'application/json', server);
+    if (!versionAtLeast(String(req.headers[CLIENT_HEADER] ?? ''), MIN_CLIENT_VERSION)) {
+      return json(426, { error: 'upgrade_required', error_description: `Update MCPortal to ${MIN_CLIENT_VERSION} or later to keep using your linked portal.`, minClientVersion: MIN_CLIENT_VERSION });
     }
+    const ctx = context(userId, reqLog);
+
+    if (url.pathname !== API_PATH) {
+      // Whole exports and imports: one gate decision and one charge each, like export_data and import_portal.
+      const action = url.pathname === API_EXPORT_PATH ? 'read' : 'write';
+      const decision = authorize(ctx.actor ?? localActor(userId), action, { ownerId: userId });
+      if (!decision.ok) return json(403, { error: 'forbidden', error_description: decision.reason });
+      const verdict = budget.take(userId, action === 'read' ? 5 : 20);
+      if (!verdict.ok) return json(429, { error: 'rate_limited', error_description: budgetMessage(verdict) }, { 'retry-after': String(verdict.retryAfterSeconds) });
+      if (url.pathname === API_EXPORT_PATH) {
+        const format = url.searchParams.get('format') ?? 'mcportal';
+        if (!EXPORT_FORMATS.includes(format as ExportFormat)) return json(400, { error: 'bad_request', error_description: `format must be one of ${EXPORT_FORMATS.join(', ')}` });
+        const file = await buildExport(format as ExportFormat, userId, { store: deps.store, reading, clips, publicProfile: await publicProfiles?.get(userId), social });
+        return send(res, 200, file.body, file.contentType, { ...server, 'content-disposition': `attachment; filename="${file.filename}"`, 'x-mcportal-summary': file.summary });
+      }
+      let text: string;
+      try {
+        text = (await readBody(req, MAX_UPLOAD)).toString('utf8');
+      } catch (error) {
+        const tooLarge = errorCode(error) === 'limit_exceeded';
+        return json(tooLarge ? 413 : 400, { error: tooLarge ? 'too_large' : 'bad_request', error_description: tooLarge ? 'Over 60 MB' : 'Unreadable body' }, tooLarge ? { connection: 'close' } : {});
+      }
+      try {
+        const result = await importExport(parseExport(text), userId, { store: deps.store, reading, clips });
+        return json(200, { result, summary: describeImport(result) });
+      } catch (error) {
+        if (!isAppError(error) || error.code === 'internal') throw error;
+        return json(400, { error: error.code, error_description: error.message });
+      }
+    }
+
     let body: unknown;
     try {
       body = JSON.parse((await readBody(req, MAX_API_BODY_BYTES)).toString('utf8'));
     } catch (error) {
       const tooLarge = errorCode(error) === 'limit_exceeded';
-      return send(res, tooLarge ? 413 : 400, JSON.stringify({ error: tooLarge ? 'too_large' : 'bad_request', error_description: tooLarge ? 'Body too large' : 'Body must be JSON' }), 'application/json', { ...server, ...(tooLarge ? { connection: 'close' } : {}) });
+      return json(tooLarge ? 413 : 400, { error: tooLarge ? 'too_large' : 'bad_request', error_description: tooLarge ? 'Body too large' : 'Body must be JSON' }, tooLarge ? { connection: 'close' } : {});
     }
-    const results = await handleCalls(body, context(userId, reqLog), API_METHODS);
-    if (!results) return send(res, 400, JSON.stringify({ error: 'bad_request', error_description: 'Send { calls: [{ id, method, params }] } with 1-20 calls' }), 'application/json', server);
-    return send(res, 200, JSON.stringify({ results }), 'application/json', server);
+    const results = await handleCalls(body, ctx, API_METHODS);
+    if (!results) return json(400, { error: 'bad_request', error_description: 'Send { calls: [{ id, method, params }] } with 1-20 calls' });
+    return json(200, { results });
   }
 
   async function route(req: IncomingMessage, res: ServerResponse, url: URL, reqLog: Logger): Promise<void> {
@@ -284,7 +328,7 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
       return sendError(res, 421, 'unknown_host', 'Unknown host; set MCPORTAL_PUBLIC_URL or MCPORTAL_ALLOWED_HOSTS');
     }
     const origin = req.headers.origin;
-    if (origin && (url.pathname === '/mcp' || url.pathname === API_PATH)) {
+    if (origin && (url.pathname === '/mcp' || url.pathname.startsWith('/api/'))) {
       const originHost = hostnameOf(origin.replace(/^[a-z]+:\/\//i, ''));
       if (!config.allowedOrigins.includes(origin) && !(originHost && config.allowedHosts.includes(originHost))) {
         return send(res, 403, JSON.stringify(rpcError(null, RPC.invalidRequest, 'Origin not allowed')));
@@ -310,7 +354,7 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
       });
     }
 
-    if (url.pathname === API_PATH) return stateApi(req, res, reqLog);
+    if (url.pathname === API_PATH || url.pathname === API_EXPORT_PATH || url.pathname === API_IMPORT_PATH) return stateApi(req, res, url, reqLog);
     if (url.pathname !== '/mcp') return sendError(res, 404, 'not_found', 'Not found');
     const userId = await authenticate(req);
     if (!userId) return unauthorized(res);
@@ -326,7 +370,8 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
       // An unread body stays on the socket: close it, so a reused connection can't read it as the next request.
       return send(res, tooLarge ? 413 : 400, JSON.stringify(rpcError(null, RPC.parseError, tooLarge ? 'Body too large' : 'Parse error')), 'application/json', tooLarge ? { connection: 'close' } : {});
     }
-    const response = await handlePayload(payload, context(userId, reqLog));
+    const local = deps.session && !oauth && !config.staticToken && config.allowUnauthenticated && isLoopbackHost(config.host);
+    const response = await handlePayload(payload, local ? { ...(await deps.session!.context()), log: reqLog } : context(userId, reqLog));
     if (response === null) {
       res.writeHead(202);
       res.end();

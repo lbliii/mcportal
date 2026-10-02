@@ -7,7 +7,8 @@
  * caller with, the same way the tool does. So clips are rebuilt here (buildClip, with
  * an id the server picks), shares name a clip or saved item the server looks up, seen
  * marks are limited to portals in the room, and featured sources must be portals in
- * the room. Where a tool's inputSchema already describes a method's params, it's reused.
+ * the room. Other people's account ids never leave: they're "@handle" here (publicRef).
+ * Where a tool's inputSchema already describes a method's params, it's reused.
  *
  * Left out on purpose: anything that deletes everything or imports (deleteAll,
  * import), moderation and admin, and account deletion. Those stay on their pages.
@@ -51,6 +52,22 @@ const socialOf = (ctx: ToolContext) => need(ctx.social, 'Sharing is not availabl
 const profilesOf = (ctx: ToolContext) => need(ctx.publicProfiles, 'Public profiles are not available on this server.');
 
 const portalsOf = (profile: Profile) => profile.columns.flatMap((c) => c.panels);
+
+/**
+ * Account ids never leave the server: other people are referred to by "@handle"
+ * where a public profile would carry their id (the caller's own id stays, so tools
+ * can tell "me" from "them").
+ */
+function publicRef<P extends { accountId: string; handle: string }>(profile: P, ctx: ToolContext): P {
+  return profile.accountId === ctx.userId ? profile : { ...profile, accountId: `@${profile.handle}` };
+}
+
+/** An "@handle" from publicRef back to the account, as the caller may see it; or the caller's own id. */
+async function accountOf(ref: string, ctx: ToolContext): Promise<string> {
+  if (ref === ctx.userId) return ref;
+  if (!ref.startsWith('@')) throw new AppError('invalid_argument', 'Name other people by @handle.');
+  return (await socialOf(ctx).resolve(ctx.userId, ref)).accountId;
+}
 
 export const API_METHODS: Record<string, ApiMethod> = {
   /** Who the token belongs to, and the versions, for link_status and update nudges. */
@@ -145,7 +162,10 @@ export const API_METHODS: Record<string, ApiMethod> = {
   // ---- public profiles: anyone's by handle, only your own otherwise
   'profiles.mine': params(NO_PARAMS, async (_p, ctx) => (await profilesOf(ctx).get(ctx.userId)) ?? null),
   'profiles.byHandle': params<{ handle: string }>({ type: 'object', required: ['handle'], additionalProperties: false, properties: { handle } },
-    async (p, ctx) => (await profilesOf(ctx).byHandle(p.handle)) ?? null),
+    async (p, ctx) => {
+      const found = await profilesOf(ctx).byHandle(p.handle);
+      return found ? { ...found, profile: publicRef(found.profile, ctx) } : null;
+    }),
   /** Featured sources must be portals in the room, as set_public_profile picks them. */
   'profiles.set': params<{ handle?: string; displayName?: string; bio?: string; spaceTitle?: string; accent?: string; sources?: Array<{ title?: string; source: string; config: unknown }> }>(
     { type: 'object', additionalProperties: false, properties: {
@@ -164,7 +184,7 @@ export const API_METHODS: Record<string, ApiMethod> = {
 
   // ---- social, always as the token's account
   'social.resolve': params<{ handle: string }>({ type: 'object', required: ['handle'], additionalProperties: false, properties: { handle } },
-    (p, ctx) => socialOf(ctx).resolve(ctx.userId, p.handle)),
+    async (p, ctx) => publicRef(await socialOf(ctx).resolve(ctx.userId, p.handle), ctx)),
   /** A clip or saved item the server looks up itself, as the share tool does; never content from the request. */
   'social.share': params<{ clipId?: string; savedUrl?: string; note?: string; audience?: string }>(
     { type: 'object', additionalProperties: false, properties: { clipId: id, savedUrl: { type: 'string', maxLength: 2000 }, note: { type: 'string', maxLength: 500 }, audience: { type: 'string', enum: AUDIENCES } } },
@@ -188,19 +208,19 @@ export const API_METHODS: Record<string, ApiMethod> = {
     (p, ctx) => socialOf(ctx).feed(ctx.userId, p.query)),
   'social.sharesOf': params<{ accountId: string; query?: { limit?: number; before?: string } }>(
     { type: 'object', required: ['accountId'], additionalProperties: false, properties: { accountId: id, query: pageQuery } },
-    (p, ctx) => socialOf(ctx).sharesOf(ctx.userId, p.accountId, p.query)),
+    async (p, ctx) => socialOf(ctx).sharesOf(ctx.userId, await accountOf(p.accountId, ctx), p.query)),
   'social.follow': params<{ handle: string }>({ type: 'object', required: ['handle'], additionalProperties: false, properties: { handle } },
-    (p, ctx) => socialOf(ctx).follow(ctx.userId, p.handle), 'write'),
+    async (p, ctx) => publicRef(await socialOf(ctx).follow(ctx.userId, p.handle), ctx), 'write'),
   'social.unfollow': params<{ handle: string }>({ type: 'object', required: ['handle'], additionalProperties: false, properties: { handle } },
     (p, ctx) => socialOf(ctx).unfollow(ctx.userId, p.handle), 'write'),
   'social.mute': params<{ handle: string; on: boolean }>({ type: 'object', required: ['handle', 'on'], additionalProperties: false, properties: { handle, on: { type: 'boolean' } } },
-    (p, ctx) => socialOf(ctx).mute(ctx.userId, p.handle, p.on), 'write'),
+    async (p, ctx) => publicRef(await socialOf(ctx).mute(ctx.userId, p.handle, p.on), ctx), 'write'),
   'social.block': params<{ handle: string; on: boolean }>({ type: 'object', required: ['handle', 'on'], additionalProperties: false, properties: { handle, on: { type: 'boolean' } } },
-    (p, ctx) => socialOf(ctx).block(ctx.userId, p.handle, p.on), 'write'),
+    async (p, ctx) => publicRef(await socialOf(ctx).block(ctx.userId, p.handle, p.on), ctx), 'write'),
   'social.uses': params(NO_PARAMS, (_p, ctx) => socialOf(ctx).uses(ctx.userId)),
   'social.connections': params(NO_PARAMS, (_p, ctx) => socialOf(ctx).connections(ctx.userId)),
   'social.stats': params<{ accountId: string }>({ type: 'object', required: ['accountId'], additionalProperties: false, properties: { accountId: id } },
-    (p, ctx) => socialOf(ctx).stats(ctx.userId, p.accountId)),
+    async (p, ctx) => socialOf(ctx).stats(ctx.userId, await accountOf(p.accountId, ctx))),
   'social.report': params<{ target: { shareId?: string; handle?: string }; reason: string }>(
     { type: 'object', required: ['target', 'reason'], additionalProperties: false, properties: {
       target: { type: 'object', additionalProperties: false, properties: { shareId: id, handle } }, reason: { type: 'string', maxLength: 500 },

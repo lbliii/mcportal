@@ -21,6 +21,9 @@ import { clean } from '../lib/text.ts';
 import type { ToolContext, ToolErrorInfo } from '../tools/kit.ts';
 
 export const API_PATH = '/api/v1/call';
+/** Whole exports (GET, ?format=) and imports (POST, an MCPortal export as the body). */
+export const API_EXPORT_PATH = '/api/v1/export';
+export const API_IMPORT_PATH = '/api/v1/import';
 /** Calls per request. */
 export const API_MAX_CALLS = 20;
 /** The header a client names its version in, and the oldest version this server still serves. */

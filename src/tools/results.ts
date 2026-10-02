@@ -85,6 +85,8 @@ export type ToolResults = {
   share: { share: SharedItem };
   relationship: { handle?: string; layoutChanged?: boolean; profile?: Profile };
   record_reading: { reading: ReadingState };
+  link_account: { url: string };
+  unlink_account: { identity: Identity };
   get_reading: { reading: ReadingState | null };
   list_reading: { reading: ReadingState[] };
 };

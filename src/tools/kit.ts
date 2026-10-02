@@ -14,7 +14,8 @@ import { AppError, ERROR_CODES, isAppError, type ErrorCode } from '../lib/errors
 import type { Logger } from '../lib/log.ts';
 import type { ToolMetrics } from '../lib/metrics.ts';
 import { clean } from '../lib/text.ts';
-import type { ExportFormat } from '../portability.ts';
+import type { ExportFormat, ImportResult, PortalExport } from '../portability.ts';
+import type { LinkControl } from '../link/session.ts';
 import type { ProfileDirectory } from '../public-profiles.ts';
 import type { HandoffStore } from '../handoffs.ts';
 import type { SeenStore } from '../seen.ts';
@@ -46,6 +47,10 @@ export interface ToolContext extends SourceDeps {
   uploadLink?: (() => string) | undefined;
   /** Local MCPortal: imports may read an export file from this machine. */
   localFiles?: boolean | undefined;
+  /** Imports go here instead of into the stores one by one (a linked MCPortal: one request to the hosted account). */
+  importer?: ((data: PortalExport) => Promise<ImportResult>) | undefined;
+  /** A local MCPortal: whether it's signed in to a hosted one, and signing in and out. Absent on a hosted server. */
+  link?: LinkControl | undefined;
   userId: string;
   /** Hosted server only: charged per tool call. Local stdio has none (unlimited). */
   budget?: UsageBudget | undefined;
@@ -123,15 +128,18 @@ export function need<T>(value: T | undefined, why: string): T {
  */
 export interface Reach {
   social: 'none' | 'new' | 'active';
+  /** 'none' on a hosted server; a local MCPortal is 'unlinked' (ghost mode) or 'linked'. */
+  link: 'none' | 'unlinked' | 'linked';
 }
 
 export const hasSocial = (ctx: ToolContext): boolean => Boolean(ctx.social && ctx.publicProfiles);
 
 /** The caller's reach (one profile read and, for an account without a handle, one relations read). */
 export async function reachOf(ctx: ToolContext): Promise<Reach> {
-  if (!ctx.social || !ctx.publicProfiles) return { social: 'none' };
-  if (await ctx.publicProfiles.get(ctx.userId)) return { social: 'active' };
-  return { social: (await ctx.social.uses(ctx.userId)) ? 'active' : 'new' };
+  const link = !ctx.link ? 'none' : ctx.link.linked ? 'linked' : 'unlinked';
+  if (!ctx.social || !ctx.publicProfiles) return { social: 'none', link };
+  if (await ctx.publicProfiles.get(ctx.userId)) return { social: 'active', link };
+  return { social: (await ctx.social.uses(ctx.userId)) ? 'active' : 'new', link };
 }
 
 /**
@@ -139,19 +147,31 @@ export async function reachOf(ctx: ToolContext): Promise<Reach> {
  * account, so the portal stays where the server runs and nothing is shared. Hosted:
  * signed in to an MCPortal with accounts, by GitHub login and (once claimed) handle.
  */
-export type Identity = { mode: 'ghost' } | { mode: 'hosted'; login?: string | undefined; handle?: string | undefined };
+export type Identity =
+  /** canSignIn: a local MCPortal that can link to a hosted account (link_account). */
+  | { mode: 'ghost'; canSignIn?: boolean }
+  | { mode: 'hosted'; login?: string | undefined; handle?: string | undefined; accountUrl?: string | undefined }
+  /** A local MCPortal signed in to a hosted one: it runs here, the portal lives in the account. */
+  | { mode: 'linked'; server: string; login?: string | undefined; handle?: string | undefined; accountUrl?: string | undefined; offline?: boolean; syncedAt?: string | undefined };
 
 /** The caller's identity (one public-profile read on a hosted server). */
 export async function identityOf(ctx: ToolContext): Promise<Identity> {
-  if (!ctx.accountUrl) return { mode: 'ghost' };
-  const handle = (await ctx.publicProfiles?.get(ctx.userId))?.handle;
-  return { mode: 'hosted', ...(ctx.actor?.login ? { login: ctx.actor.login } : {}), ...(handle ? { handle } : {}) };
+  if (ctx.link && !ctx.link.linked) return { mode: 'ghost', canSignIn: true };
+  if (!ctx.link && !ctx.accountUrl) return { mode: 'ghost' };
+  // A signed-out link still answers (the handle can't be read): the mode is what matters here.
+  const handle = (await ctx.publicProfiles?.get(ctx.userId).catch(() => undefined))?.handle;
+  const login = ctx.link?.login ?? ctx.actor?.login;
+  const who = { ...(login ? { login } : {}), ...(handle ? { handle } : {}), ...(ctx.accountUrl ? { accountUrl: ctx.accountUrl } : {}) };
+  if (!ctx.link) return { mode: 'hosted', ...who };
+  const health = ctx.link.health?.();
+  return { mode: 'linked', server: ctx.link.server, ...who, ...(health?.offline ? { offline: true } : {}), ...(health?.syncedAt ? { syncedAt: new Date(health.syncedAt).toISOString() } : {}) };
 }
 
 /** How the identity reads in a sentence, for the model to pass on. */
 export function describeIdentity(identity: Identity): string {
   if (identity.mode === 'ghost') return 'Ghost mode: not signed in. This MCPortal has no account, keeps the portal where it runs (~/.mcportal unless MCPORTAL_DATA_DIR is set) and shares nothing.';
   const who = identity.handle ? `@${identity.handle}` : identity.login ? `${identity.login} on GitHub (no handle claimed yet)` : 'their GitHub account';
+  if (identity.mode === 'linked') return `Signed in as ${who}: MCPortal runs on this computer and keeps the portal in the hosted account at ${new URL(identity.server).host}, so it's the same portal everywhere they sign in.`;
   return `Signed in to the hosted MCPortal as ${who}.`;
 }
 

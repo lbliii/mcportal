@@ -81,7 +81,9 @@ export const ROOM_TOOLS: ToolDef[] = [
     annotations: { readOnlyHint: true, openWorldHint: true },
     _meta: { ui: { resourceUri: ROOM_URI } },
     async handler(args, ctx) {
-      const [profile, identity] = await Promise.all([ctx.store.get(ctx.userId), identityOf(ctx)]);
+      // The room first: on a linked MCPortal, reading it is what finds out whether the hosted server is reachable.
+      const profile = await ctx.store.get(ctx.userId);
+      const identity = await identityOf(ctx);
       const notice = ctx.store.takeNotice?.(ctx.userId);
       if (!profile.onboarded || args.setup === true) {
         const packs = packSummaries();
@@ -92,7 +94,7 @@ export const ROOM_TOOLS: ToolDef[] = [
           `Starter packs (pick up to ${MAX_PACKS} with build_room): ${packs.map((p) => `${p.id} (${p.label}: ${p.sources.join(', ')})`).join('; ')}.`,
           'For interests no pack covers, build from the closest packs (or none), then use find_source and add_portal for specific sites, channels or feeds.',
         ].join('\n');
-        return ok(text, { profile, portals: [], onboarding: { packs, maxPacks: MAX_PACKS, rebuilding: profile.onboarded }, identity, generatedAt: new Date().toISOString() } satisfies ToolResults['open_room']);
+        return ok(notice ? `${notice}\n${text}` : text, { profile, portals: [], notice, onboarding: { packs, maxPacks: MAX_PACKS, rebuilding: profile.onboarded }, identity, generatedAt: new Date().toISOString() } satisfies ToolResults['open_room']);
       }
       const specs = profile.columns.flatMap((c) => c.panels);
       await ctx.seen?.keepOnly(ctx.userId, specs.map((p) => p.id));

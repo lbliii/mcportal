@@ -191,6 +191,13 @@ test('api social: shares name a clip or saved item the server looks up; always a
   assert.equal(await code(call(alice, 'profiles.set', { sources: [{ title: 'Elsewhere', source: 'rss', config: { url: 'https://evil.example/feed' } }] })), 'invalid_argument');
   assert.equal((await call(alice, 'profiles.mine')).handle, 'alice');
   assert.equal((await call(bob, 'profiles.byHandle', { handle: 'alice' })).profile.bio, 'hi');
+
+  // Other people's account ids never leave the server: they're @handles, resolved again on the way in.
+  assert.equal((await call(bob, 'social.resolve', { handle: 'alice' })).accountId, '@alice');
+  assert.equal((await call(bob, 'profiles.byHandle', { handle: 'alice' })).profile.accountId, '@alice');
+  assert.equal((await call(alice, 'profiles.byHandle', { handle: 'alice' })).profile.accountId, 'alice', 'your own stays, so tools can tell you apart');
+  assert.equal((await call(bob, 'social.stats', { accountId: '@alice' })).following, true);
+  assert.equal(await code(call(bob, 'social.sharesOf', { accountId: 'alice' })), 'invalid_argument', 'raw ids of others are refused');
 });
 
 test('api access: suspended accounts are refused, budgets apply, and bugs are reported by reference', async () => {
