@@ -1,8 +1,8 @@
 {
   "totals": {
-    "local": 3678,
-    "hosted-new": 4226,
-    "hosted-active": 4701
+    "local": 3954,
+    "hosted-new": 4502,
+    "hosted-active": 4977
   },
   "tools": {
     "account_settings": 64,
@@ -19,6 +19,7 @@
     "import_opml": 105,
     "import_portal": 145,
     "list_connections": 40,
+    "list_new_items": 105,
     "list_reading": 70,
     "list_shares": 92,
     "list_sources": 41,
@@ -40,6 +41,7 @@
     "search_docs": 133,
     "set_public_profile": 223,
     "share": 119,
+    "show_highlights": 141,
     "unshare": 41,
     "update_clip": 102
   }

@@ -45,6 +45,14 @@
       "description": "Remove portals from the user's room, only ones they asked to remove (by id or title; open_room lists them)."
     },
     {
+      "name": "list_new_items",
+      "description": "What the user hasn't seen yet across their room (or the portals named), each with a ref, plus what MCPortal knows of their taste."
+    },
+    {
+      "name": "show_highlights",
+      "description": "Show your picks from list_new_items as a highlights card: each item's ref and a one-line reason it's worth the user's time."
+    },
+    {
       "name": "read_source",
       "description": "Fetch the latest items from one source (Hacker News, a feed, GitHub) without changing the room: for 'what's new on…' or previewing a feed before adding it."
     },

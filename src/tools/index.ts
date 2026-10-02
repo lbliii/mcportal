@@ -7,6 +7,7 @@ import { ACCOUNT_TOOLS } from './account.ts';
 import { CLIP_TOOLS } from './clips.ts';
 import { DOCS_TOOLS } from './docs.ts';
 import { HANDOFF_TOOLS } from './handoffs.ts';
+import { HIGHLIGHT_TOOLS } from './highlights.ts';
 import type { ToolDef } from './kit.ts';
 import { READER_TOOLS } from './reader.ts';
 import { READING_TOOLS } from './reading.ts';
@@ -17,6 +18,7 @@ import { SOURCE_TOOLS } from './sources.ts';
 
 export const TOOLS: readonly ToolDef[] = [
   ...ROOM_TOOLS,
+  ...HIGHLIGHT_TOOLS,
   ...SOURCE_TOOLS,
   ...READER_TOOLS,
   ...SAVED_TOOLS,

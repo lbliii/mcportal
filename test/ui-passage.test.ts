@@ -159,3 +159,22 @@ test('handoff: the new chat\'s card opens with the sent passage, and a way to it
   assert.ok((await ctx.handoffs!.get('reader', sent.code))?.openedAt, 'marked opened');
   assert.deepEqual(page.problems, []);
 });
+
+test('highlights: the card shows each pick as the source\'s item with the agent\'s reason; "Not for me" marks it seen', { skip }, async () => {
+  const listed = await handleMessage({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'list_new_items', arguments: {} } }, ctx) as { result: { structuredContent: { items: Array<{ ref: string; portalId: string; item: { id: string; title: string } }> } } };
+  const [a, b] = listed.result.structuredContent.items;
+  const args = { title: 'Worth your morning', intro: 'Two picks.', picks: [{ ref: a!.ref, why: 'Because you asked about MCP.' }, { ref: b!.ref, why: 'A follow-up to yesterday.' }] };
+  page.problems.length = 0;
+  await page.goto(`${base}/?caps=serverTools,updateModelContext,message&tool=show_highlights&args=${encodeURIComponent(JSON.stringify(args))}`);
+  await page.waitFor(`${IN_FRAME}.document.querySelectorAll('.highlight').length === 2`, 'the highlights card');
+  const shown = await page.eval<{ h1: string; titles: string[]; whys: string[] }>(`(() => { const d = ${IN_FRAME}.document; return { h1: d.querySelector('#reader h1').textContent, titles: [...d.querySelectorAll('.highlight .item-title')].map((n) => n.textContent), whys: [...d.querySelectorAll('.highlight-why')].map((n) => n.lastChild.textContent) }; })()`);
+  assert.equal(shown.h1, 'Worth your morning');
+  assert.deepEqual(shown.titles, [a!.item.title, b!.item.title], "the sources' own titles");
+  assert.deepEqual(shown.whys, ['Because you asked about MCP.', 'A follow-up to yesterday.']);
+  await page.eval(`${IN_FRAME}.document.querySelector('.highlight .not-for-me').click()`);
+  await page.waitFor(`window.log.some((m) => m.method === 'tools/call' && m.params.name === 'mark_seen')`, 'mark_seen');
+  const marked = await page.eval<any>(`window.log.find((m) => m.method === 'tools/call' && m.params.name === 'mark_seen').params.arguments`);
+  assert.deepEqual(marked, { portals: [{ portalId: a!.portalId, itemIds: [a!.item.id] }] });
+  assert.equal(await page.eval(`${IN_FRAME}.document.querySelectorAll('.highlight').length`), 1, 'it leaves the card');
+  assert.deepEqual(page.problems, []);
+});
