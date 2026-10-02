@@ -25,7 +25,7 @@ Get MCPortal listed in Claude's directory first and OpenAI's (ChatGPT and Codex)
 | # | Decision | Options | Leaning |
 |---|---|---|---|
 | D1 | Who can sign up | **Decided:** open to anyone with a GitHub account. Invites stay, as a way to bring friends in, not a gate. | — |
-| D2 | Code license | MIT, Apache-2.0, source-available (e.g. FSL), proprietary with a public repo | Undecided. The plugin listing needs a public repo, but not necessarily an open-source license. |
+| D2 | Code license | MIT, Apache-2.0, source-available (e.g. FSL), proprietary with a public repo | Undecided, leaning AGPL-3.0 ([open-source.md](open-source.md)). The plugin listing needs a public repo, but not necessarily an open-source license. |
 | D3 | How reviewers sign in | A reviewer-only sign-in on our authorization server; a dedicated GitHub account we hand over | Reviewer-only sign-in, used for both directories. A shared GitHub account breaks GitHub's terms (one login per person, and a review team is several people), and GitHub can ask for an emailed device code, which OpenAI rejects. Reviewer accounts aren't users, so the GitHub-only rule for users stands. |
 | D4 | Paid tier shape | Free plus ~$5/mo "Patron" with higher limits and more storage; free only at launch | Launch free. Add billing after the Claude listing is stable (Phase 8). |
 | D5 | Domain | Keep `*.up.railway.app`, or a custom domain | A custom domain before submitting. The listing, OAuth metadata, OpenAI domain verification and the MCP Apps `_meta.ui.domain` all tie to it, and moving later means a new OpenAI submission. |
