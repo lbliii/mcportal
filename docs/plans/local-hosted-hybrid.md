@@ -1,6 +1,6 @@
 # Plan: one portal, run locally or hosted
 
-**Status:** revised 2026-10-02 (replaces the 2026-09-30 proposal, which predated Postgres, the 0.5 tool names, clips and the social layer). Phases 1 (modes in the open), 2 (contracts) and 3 (hosted state API) built 2026-10-02. **Milestone:** finishes M1.5 ("come back tomorrow on any device") and opens M2's social layer, reblogging first, to people who run MCPortal locally.
+**Status:** revised 2026-10-02 (replaces the 2026-09-30 proposal, which predated Postgres, the 0.5 tool names, clips and the social layer). Phases 1 (modes in the open), 2 (contracts), 3 (hosted state API) and 4 (remote stores) built 2026-10-02. **Milestone:** finishes M1.5 ("come back tomorrow on any device") and opens M2's social layer, reblogging first, to people who run MCPortal locally.
 
 ## The problem
 
@@ -47,6 +47,7 @@ One endpoint, **`POST /api/v1/call`**, taking a batch of typed calls:
 ```
 
 - **Methods mirror the interfaces**, one allowlisted entry each, with a param schema and an `access` class (read / write), all in one table (`src/api/methods.ts`). The dispatcher validates params, charges the budget, calls the same store or service the hosted tools use, and returns `{ id, result }` or `{ id, error: { code, message, retryable } }` using the existing error codes.
+- **Other people's account ids never leave.** Where a profile would carry someone else's id, the API gives `@handle` instead and resolves it again when it comes back (`social.sharesOf`, `social.stats`); raw ids other than the caller's own are refused.
 - **The account is never a parameter.** Every method acts as the token's account; the remote client drops the `userId`/`viewer` argument (and asserts it matches the linked account, so a mix-up is a bug, not a leak). This is the same rule as MCP tools.
 - **A strict subset.** No `deleteAll`, no `import`, no admin or report-resolution methods, no account deletion. Those stay on the account page, the upload page and the admin page. `Social.forget`, `hideShare` and friends are never callable.
 - **Batching** keeps `open_room` to one round trip: the room, seen sets and the Following feed in one request. Calls in a batch run concurrently and are independent; there are no cross-call transactions.
@@ -116,7 +117,7 @@ A hosted relay (`POST /api/v1/fetch`) used only on network-level failures (DNS, 
 | 1 | Modes in the open | `account_settings` names the mode; the room's account chip (local: "Local · not signed in", hosted: avatar) | "Am I signed in?" gets a correct answer in every mode |
 | 2 | Contracts | Tools see social and public profiles through `SocialService` and `ProfileDirectory` (moderation left out); every profile store has `versioned()` and `replaceIf()` with revisions (files keep `rev` beside the profile); the contract suite covers revisions on files, memory and Postgres | No behavior change; existing tests pass |
 | 3 | Hosted state API | `/api/v1/call` with batching, the method table, version header and 426, `room.get`/`room.put` with revisions, `POST /oauth/revoke`, linked devices on the account page | In-process: two clients, concurrent edits, conflicts retried, a stale schema refused, revocation, budget, no account id accepted |
-| 4 | Remote stores | `Remote*` implementations and the API client; the contract suite run against them through an in-process hosted app | The same contract tests pass on file, Postgres and remote |
+| 4 | Remote stores | `src/link/client.ts` (batched per tick, one refresh on 401, coded errors) and `src/link/stores.ts` (every interface the tools use; the room cached 30 s with revisions and conflict retry; a newer room is read-only) | `test/linked.test.ts`: the real tools on a linked context against an in-process hosted app over HTTP: rooms, clips, reading, handoffs, two devices editing at once, sharing and following, batching, offline, signed out, newer schema. The store-level contract suite stays for files and Postgres, since remote stores deliberately don't offer `deleteAll` or imports |
 | 5 | Linking | Loopback OAuth client, `link.json` with locking, `link_account`/`unlink_account`, first-link merge, unlink copy-back, the room's chip and sign-in flow | End-to-end against an in-process hosted app with fixture GitHub; a refresh race between two processes doesn't revoke |
 | 6 | Offline and polish | Cache and offline notice, best-effort background writes, update nudge | Offline read and write behavior; old client gets a clear upgrade message |
 | 7 | Ship | README, CONTRIBUTING, privacy page, onboarding copy; deploy; the author links their Mac | The author's Mac and the hosted connector show the same portal, and sharing works from the Mac |
