@@ -62,6 +62,8 @@ To develop against Claude desktop (the room renders inline in chat, no deploymen
 
 **Cowork:** add `~/Developer/mcportal` as a plugin marketplace from Cowork's plugin settings and install `mcportal`.
 
+**Updates:** a plugin marketplace you add yourself doesn't update automatically. Turn it on in `/plugin` → **Marketplaces** → `mcportal` → **Enable auto-update**, or update by hand with `claude plugin update mcportal@mcportal`. New releases arrive in your next session.
+
 Then `/portal`, or ask "open my room" ("open my portal" works too). Your profile is stored in `~/.mcportal/default.json`.
 
 **Ghost mode, or signed in.** A local MCPortal starts in ghost mode: no account, everything in `~/.mcportal`, nothing shared. To keep the same portal on every device and to share and follow, say "sign in to MCPortal" or click **Ghost mode → Sign in** in the room. You sign in with GitHub in your browser; this computer's portal is added to your hosted account (nothing is removed), and from then on MCPortal still runs and fetches on this computer while your room, clips and shares live in the account. **Sign out** copies the portal back to this computer first. `MCPORTAL_HOSTED_URL` picks the hosted MCPortal (default: the public one). See [the plan](docs/plans/local-hosted-hybrid.md) for how it works.

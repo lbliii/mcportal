@@ -138,13 +138,14 @@ An audit on 2026-10-02 found the foundations solid (sign-in tokens stored only a
 
 ## Phase 5: release discipline
 
-- [ ] **Release script:** one command bumps the version everywhere it lives (`package.json`, `.claude-plugin/plugin.json`, `manifest.json`, `server.json`, `SERVER_INFO`), moves "Unreleased" in the CHANGELOG under a version, tags, and pushes. Plugin users only get updates when the version changes.
+- [x] **Release script** (`scripts/release.ts`, `npm run release`): `prepare` sets the version everywhere it's stated (package.json and its lockfile, the plugin, `SERVER_INFO`, then the generated `server.json` and `manifest.json`), moves "Unreleased" under it, runs the checks and opens a release PR; `publish`, after the merge, tags it and creates the GitHub release. Steps in CONTRIBUTING.md. Plugin users only get updates when the version changes.
 - [ ] **Catch up:** cut v0.5.0 (or v0.6.0) with the current "Unreleased" changelog, and update the README's "latest" line.
-- [ ] **Compatibility policy**, written down:
+- [x] **Compatibility policy**, written down (CONTRIBUTING.md, "Versions and the tool interface"):
   - `MIN_CLIENT_VERSION` only rises with a release note
   - a tool rename keeps the old name for one release, as a hidden alias that says it's moving
   - Claude listing name changes go through a listing edit
-- [ ] **README:** how to turn on auto-update for the plugin marketplace (it's off by default for third-party marketplaces).
+  - [ ] Build the alias mechanism before the first rename after listing (none is planned yet).
+- [x] **README:** how to turn on auto-update for the plugin marketplace (it's off by default for third-party marketplaces).
 
 ## Phase 6: certify the hosts
 
