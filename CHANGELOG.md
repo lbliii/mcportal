@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## v0.6.0 — 2026-10-02
+
+MCPortal becomes one portal, local or hosted: run it on your computer in ghost mode or sign in to keep it in your account, with sharing, a Space and a handle. The room gains layouts led by your agent's picks, the tool surface is reworked for the long run (breaking; see "A tool surface for the long run" and "For hosts and agents"), and the service gets ready for directory review. 0.5.0 was never released on its own; its changes are here.
+
 ### Releases
 - **One command per release step:** `npm run release -- prepare <x.y.z | patch | minor | major>` sets the version everywhere it's stated (package.json and its lockfile, the plugin, `SERVER_INFO`, then the generated `server.json` and `manifest.json`), moves "Unreleased" under it, runs `npm run check` and opens a release PR. After the merge, `npm run release -- publish` tags it and creates the GitHub release from that version's notes. `--dry-run` previews either step. See CONTRIBUTING.md.
 
@@ -47,7 +51,7 @@
 - **Highlights:** ask "what's worth reading today?" and your agent calls `list_new_items` (what you haven't seen across the room, in turn by portal, at most 60, with what MCPortal knows of your taste: recent saves and finished reads, clip tags, the sites you read most), picks with the conversation and what it knows of you, and calls `show_highlights`: a card of the sources' own items, each with the agent's reason. Picks must name items the room really has. **Not for me** marks one seen. Nothing about the picks is stored.
 - **Send to a new chat:** from the reader's top bar (the whole page) or the passage bar (a selection), MCPortal keeps a pointer to the page, where you were and what you selected under a short code, and shows what to say in a new chat: "Open MCPortal handoff k7q2xm". There `open_handoff` opens the page as a card at that place, with the passage, and gives the agent its text. Send two pages to two chats and keep driving this one. Codes work only in your account, last 7 days (50 at most), aren't exported, and are deleted with your account. Postgres gains `mcportal_handoffs` (schema version 5).
 
-### Version 0.5.0: a tool surface for the long run (breaking)
+### A tool surface for the long run (breaking)
 See [the plan](docs/plans/tool-surface.md).
 - **Edit by patch (breaking):** `arrange_room` replaces `update_profile`. It takes only the changes you name (`move`, `width`, `retitle`, `configure`, `name`, `layout`, `openIn`), applies them all or none, and can't touch anything it isn't given, so "never drop a portal you weren't asked to" is a guarantee rather than a rule for the model. `remove_portal` is its own call, marked destructive, so hosts can ask before it runs. Portals are named by id or exact title. `get_profile` is gone: the room and its ids come from `open_room`. The room app's layout switch uses `arrange_room` too.
 - **One `content` for clips (breaking):** `clip` takes the clip as `content` text for every kind but an exchange: a quote, a note in markdown, a markdown table, a link's url, or an image as SVG markup or a data: URI. Exchanges keep `turns` and quotes keep `attribution`. `text`, `markdown`, `table`, `columns`, `rows`, `svg`, `image` and `url` are gone.
