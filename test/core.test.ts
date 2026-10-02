@@ -61,6 +61,11 @@ test('initialize negotiates version and advertises the MCP Apps extension', asyn
   assert.equal(svg!.mimeType, 'image/svg+xml');
   assert.doesNotMatch(Buffer.from(svg!.src.split(',')[1]!, 'base64').toString(), /<script|href=/i);
   assert.equal('icons' in SERVER_INFO, false, '/health reports SERVER_INFO and stays small');
+
+  // Tool-list changes are announced only where the transport can send them (stdio).
+  assert.equal(result.capabilities.tools.listChanged, false);
+  const stdio = await rpc({ ...ctx(), toolsChanged: () => {} }, 'initialize', { protocolVersion: '2025-06-18' });
+  assert.equal((stdio.result as any).capabilities.tools.listChanged, true);
 });
 
 test('notifications get no response; unknown methods get -32601', async () => {

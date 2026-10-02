@@ -92,7 +92,7 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
         });
         const skipped = sources ? sources.length - (profile.sources?.length ?? 0) : 0;
         const head = created ? `Created your public profile as @${profile.handle}. ${UNLOCKS}` : released ? `Changed your handle from @${released} to @${profile.handle}. @${released} points to you for 30 days.` : 'Updated your public profile.';
-        return ok(`${head}\n${describeProfile(profile)}${skipped > 0 ? `\n${skipped} portal(s) weren't featured: only feeds, Hacker News and GitHub can be.` : ''}`, { profile });
+        return ok(`${head}\n${describeProfile(profile)}${skipped > 0 ? `\n${skipped} portal(s) weren't featured: only feeds, Hacker News and GitHub can be.` : ''}`, { profile } satisfies ToolResults['set_public_profile']);
       } catch (error) {
         return toolFailure(error, 'Not saved: ', '.');
       }
@@ -181,9 +181,9 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
       const identity = await identityOf(ctx);
       if (!ctx.accountUrl) {
         const signIn = ctx.link ? ' To keep this portal in a hosted account (the same portal on every device, plus sharing), link_account signs in.' : '';
-        return ok(`${describeIdentity(identity)} To remove everything, delete that folder.${signIn}`, { identity, url: null });
+        return ok(`${describeIdentity(identity)} To remove everything, delete that folder.${signIn}`, { identity, url: null } satisfies ToolResults['account_settings']);
       }
-      return ok(`${describeIdentity(identity)} The account page is ${ctx.accountUrl}: the user signs in with GitHub there to download everything or delete their account.`, { identity, url: ctx.accountUrl });
+      return ok(`${describeIdentity(identity)} The account page is ${ctx.accountUrl}: the user signs in with GitHub there to download everything or delete their account.`, { identity, url: ctx.accountUrl } satisfies ToolResults['account_settings']);
     },
   },
   {

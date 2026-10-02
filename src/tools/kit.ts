@@ -54,6 +54,8 @@ export interface ToolContext extends SourceDeps {
   importer?: ((data: PortalExport) => Promise<ImportResult>) | undefined;
   /** A local MCPortal: whether it's signed in to a hosted one, and signing in and out. Absent on a hosted server. */
   link?: LinkControl | undefined;
+  /** stdio: tell the client its tool list changed (signed in or out, a handle claimed or removed). */
+  toolsChanged?: (() => void) | undefined;
   userId: string;
   /** Hosted server only: charged per tool call. Local stdio has none (unlimited). */
   budget?: UsageBudget | undefined;
