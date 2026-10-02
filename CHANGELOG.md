@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Deleting an account leaves nothing behind ([plan](docs/plans/directory-launch.md))
+- **Nothing names you after you delete your account:** the sign-in records of apps only you used (which can carry your computer's name) go with it, the audit log no longer says whose entries were yours, reports you made or that were about you stop naming you (open reports about you are closed), and your handles stay reserved for 30 days without saying whose. In file mode, unreadable copies of your room and an empty clips file go too. A test creates every kind of data, deletes the account, and searches what's left.
+- **Admins can delete an account for you** if you can't sign in any more: `mcportal admin delete <login> --confirm`, recorded in the audit log.
+- **Retention on a schedule:** expired highlights and handoffs, reports resolved more than 180 days ago, invites unused for 90 days, audit entries older than a year and app registrations unused for 180 days are removed every 6 hours, so the privacy policy's "how long" holds on a quiet server too. The policy now states each.
+- Under the hood, the server and the admin CLI open storage the same way (`src/storage.ts`).
+
 ### Shipping device linking ([plan](docs/plans/local-hosted-hybrid.md))
 - **Sign in from the welcome screen:** a local MCPortal's first-run screen offers **Already have a portal? Sign in to bring it here**, which starts the same sign-in as the account chip.
 - **Privacy policy:** a section on MCPortal on your own computer: ghost mode sends nothing to the service; signed in, your room is stored by the service while feeds are still fetched from your computer, tokens stay in a file only you can read, and you can revoke a computer from the account page.

@@ -17,4 +17,5 @@ export class PgEditionStore implements EditionStore {
       [userId, JSON.stringify(edition), edition.createdAt, edition.expiresAt]);
   }
   async deleteAll(userId: string) { await this.db.query('DELETE FROM mcportal_editions WHERE user_id = $1', [userId]); }
+  async purgeExpired() { return (await this.db.query('DELETE FROM mcportal_editions WHERE expires_at <= $1', [this.now().toISOString()])).rowCount ?? 0; }
 }

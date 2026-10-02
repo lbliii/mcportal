@@ -27,9 +27,20 @@ export interface SocialStore {
   addReport(report: Report): Promise<void>;
   reports(status?: Report['status'], limit?: number): Promise<Report[]>;
   resolveReport(id: string, by: string, resolution: string, at: string): Promise<Report | undefined>;
-  /** Account deletion: their shares and relations go; reports they filed stay, anonymized. */
-  forget(accountId: string): Promise<void>;
+  /**
+   * Account deletion: their shares and relations go. Reports they filed stay, without
+   * their name (and, once resolved, without the reason they gave: admins still need it
+   * to act on an open one). Reports about them or their shares no longer name them, and
+   * open ones are resolved: there's nothing left to act on.
+   */
+  forget(accountId: string, at: string): Promise<void>;
+  /** Retention: resolved reports go once they were resolved before `resolvedBefore`. */
+  purgeReports(resolvedBefore: string): Promise<number>;
 }
+
+/** What a deleted account is called in the reports that outlast it. */
+export const DELETED_ID = 'deleted';
+export const DELETED_RESOLUTION = 'The account was deleted';
 
 /** A page size from a query: its limit, clamped. */
 export const limitOf = (q: PageQuery, fallback = 30, max = 100) => Math.min(max, Math.max(1, Math.round(Number(q.limit) || fallback)));
@@ -140,11 +151,29 @@ export class DocumentSocialStore implements SocialStore {
     });
   }
 
-  async forget(accountId: string): Promise<void> {
+  async forget(accountId: string, at: string): Promise<void> {
     await this.write((d) => {
+      const theirShares = new Set(d.shares.filter((s) => s.accountId === accountId).map((s) => s.id));
       d.shares = d.shares.filter((s) => s.accountId !== accountId);
       for (const r of Object.keys(d.relations) as Relation[]) d.relations[r] = d.relations[r].filter(([a, b]) => a !== accountId && b !== accountId);
-      for (const report of d.reports) if (report.reporterId === accountId) report.reporterId = 'deleted';
+      for (const report of d.reports) {
+        if (report.reporterId === accountId) {
+          report.reporterId = DELETED_ID;
+          if (report.status === 'resolved') report.reason = '';
+        }
+        const about = report.targetKind === 'profile' ? report.targetId === accountId : theirShares.has(report.targetId);
+        if (!about) continue;
+        report.targetId = DELETED_ID;
+        if (report.status === 'open') Object.assign(report, { status: 'resolved', resolvedAt: at, resolvedBy: 'system', resolution: DELETED_RESOLUTION });
+      }
+    });
+  }
+
+  purgeReports(resolvedBefore: string): Promise<number> {
+    return this.write((d) => {
+      const before = d.reports.length;
+      d.reports = d.reports.filter((r) => !(r.status === 'resolved' && r.resolvedAt && r.resolvedAt < resolvedBefore));
+      return before - d.reports.length;
     });
   }
 }

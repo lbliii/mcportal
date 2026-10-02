@@ -4,7 +4,7 @@
  * (unique temp file + rename). A corrupt or hand-broken file is moved aside and
  * replaced by the default profile so the user is never locked out.
  */
-import { readFile, rename, rm } from 'node:fs/promises';
+import { readdir, readFile, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { AppError, errorMessage } from './lib/errors.ts';
 import { atomicWrite, defaultDataDir, KeyedMutex, safeFileId } from './lib/files.ts';
@@ -126,8 +126,14 @@ export class FileProfileStore implements ProfileStore {
     return this.mutex.run(userId, async () => this.write(userId, profile, (await this.read(userId)).rev + 1));
   }
 
+  /** The room, and any unreadable copies set aside for it (`<id>.corrupt-<time>.json`). */
   delete(userId: string): Promise<void> {
-    return this.mutex.run(userId, () => rm(this.file(userId), { force: true }));
+    return this.mutex.run(userId, async () => {
+      await rm(this.file(userId), { force: true });
+      const prefix = `${safeFileId(userId)}.corrupt-`;
+      const names = await readdir(this.dir).catch(() => [] as string[]);
+      for (const name of names) if (name.startsWith(prefix) && name.endsWith('.json')) await rm(path.join(this.dir, name), { force: true });
+    });
   }
 
   takeNotice(userId: string): string | undefined {

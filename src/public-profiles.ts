@@ -117,6 +117,9 @@ export function suggestHandle(login: string | undefined): string | undefined {
  * tools pass the signed-in account). PublicProfiles implements it on the hosted
  * server; a linked local MCPortal implements it over the hosted API.
  */
+/** Who holds a deleted account's handles while they're held. */
+const DELETED_HOLDER = 'deleted';
+
 export type ProfileDirectory = Pick<PublicProfiles, 'get' | 'byHandle' | 'set' | 'remove'>;
 
 export class PublicProfiles {
@@ -216,6 +219,19 @@ export class PublicProfiles {
       if (sources?.length) profile.sources = sources;
       doc.profiles[accountId] = profile;
       return { profile: { ...profile }, created: !current, ...(released ? { released } : {}) };
+    });
+  }
+
+  /**
+   * Account deletion: the profile goes, and its handles (current and recently given up)
+   * stay held for their 30 days, so nobody can pose as them, but no longer say whose.
+   */
+  forget(accountId: string): Promise<void> {
+    return this.write((doc) => {
+      const profile = doc.profiles[accountId];
+      delete doc.profiles[accountId];
+      if (profile) doc.held[profile.handle] = { accountId: DELETED_HOLDER, until: this.now() + HANDLE_HOLD_MS };
+      for (const hold of Object.values(doc.held)) if (hold.accountId === accountId) hold.accountId = DELETED_HOLDER;
     });
   }
 

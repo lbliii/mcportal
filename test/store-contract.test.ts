@@ -53,6 +53,8 @@ interface Backend {
   handoffs: () => Promise<HandoffStore>;
   seen: () => Promise<SeenStore>;
   editions: () => Promise<EditionStore>;
+  /** Stores on a clock the test moves, for retention (file stores purge by file age instead: test/retention.test.ts). */
+  expiring?: (now: () => Date) => Promise<{ handoffs: HandoffStore; editions: EditionStore }>;
 }
 
 const tmp = (what: string) => mkdtemp(path.join(tmpdir(), `mcportal-contract-${what}-`));
@@ -80,6 +82,7 @@ const BACKENDS: Backend[] = [
     handoffs: async () => new MemoryHandoffStore(),
     seen: async () => new FileSeenStore(null),
     editions: async () => new MemoryEditionStore(),
+    expiring: async (now) => ({ handoffs: new MemoryHandoffStore(now), editions: new MemoryEditionStore(now) }),
   },
   {
     name: 'postgres',
@@ -91,6 +94,7 @@ const BACKENDS: Backend[] = [
     handoffs: async () => new (await pg()).PgHandoffStore(db!),
     seen: async () => new (await pg()).PgSeenStore(db!),
     editions: async () => new (await pg()).PgEditionStore(db!),
+    expiring: async (now) => ({ handoffs: new (await pg()).PgHandoffStore(db!, now), editions: new (await pg()).PgEditionStore(db!, now) }),
   },
 ];
 
@@ -99,6 +103,24 @@ let n = 0;
 const user = (label: string) => `${label}-${process.pid}-${++n}`;
 
 for (const b of BACKENDS) {
+  test(`contract (${b.name}): expired handoffs and editions are purged`, { skip: b.skip || (!b.expiring && 'file stores purge by file age (test/retention.test.ts)') }, async () => {
+    let now = new Date(Date.UTC(2026, 0, 1));
+    const { handoffs, editions } = await b.expiring!(() => now);
+    const [gone, kept] = [user('purge-gone'), user('purge-kept')];
+    const page = { url: 'https://example.com/p', title: 'P', place: { kind: 'article' as const } };
+    await handoffs.create(gone, page);
+    await editions.put(gone, buildEdition({ title: 'Old', picks: [] }, now));
+    now = new Date(now.getTime() + 8 * 86_400_000);
+    await handoffs.create(kept, page);
+    await editions.put(kept, buildEdition({ title: 'New', picks: [] }, now));
+    assert.ok((await handoffs.purgeExpired!()) >= 1);
+    assert.ok((await editions.purgeExpired!()) >= 1);
+    assert.equal((await handoffs.list(kept)).length, 1, 'live ones stay');
+    assert.equal((await editions.get(kept))?.title, 'New');
+    await handoffs.deleteAll(kept);
+    await editions.deleteAll(kept);
+  });
+
   test(`contract (${b.name}): profiles`, { skip: b.skip }, async () => {
     const store = await b.profiles();
     const u = user('p');
@@ -200,10 +222,30 @@ for (const b of BACKENDS) {
     assert.ok((await store.reports('resolved')).some((r) => r.id === report.id));
 
     await store.relate('follows', alice, bob);
-    await store.forget(bob);
+    // Reports about bob (his profile, one of his shares) and an open one he filed.
+    await store.addShare({ ...share(500), id: `${bob}-s1`, accountId: bob });
+    const aboutHim = { id: `${alice}-r2`, reporterId: alice, targetKind: 'profile' as const, targetId: bob, reason: 'rude', status: 'open' as const, createdAt: at(302) };
+    const aboutHisShare = { ...aboutHim, id: `${alice}-r3`, targetKind: 'share' as const, targetId: `${bob}-s1` };
+    const openByHim = { ...report, id: `${bob}-r4`, reason: 'also spam', createdAt: at(303) };
+    for (const r of [aboutHim, aboutHisShare, openByHim]) await store.addReport(r);
+    await store.forget(bob, at(400));
     assert.deepEqual(await store.incoming('follows', bob), [], "a forgotten account's relations go");
-    const kept = (await store.reports()).find((r) => r.id === report.id);
-    assert.ok(kept && kept.reporterId !== bob, 'reports it filed stay, anonymized');
+    assert.equal(await store.getShare(`${bob}-s1`), undefined, 'and its shares');
+    const byId = new Map((await store.reports()).map((r) => [r.id, r]));
+    const resolvedByHim = byId.get(report.id)!;
+    assert.ok(resolvedByHim.reporterId !== bob && resolvedByHim.reason === '', 'a resolved report it filed stays, without its name or reason');
+    assert.ok(byId.get(openByHim.id)!.reporterId !== bob && byId.get(openByHim.id)!.reason === 'also spam', 'an open one keeps the reason admins need');
+    for (const id of [aboutHim.id, aboutHisShare.id]) {
+      const r = byId.get(id)!;
+      assert.ok(r.targetId !== bob && r.targetId !== `${bob}-s1`, 'reports about it no longer name it');
+      assert.equal(r.status, 'resolved', 'and are resolved: nothing is left to act on');
+      assert.equal(r.resolvedAt, at(400));
+    }
+
+    // Retention: resolved reports go once they're old enough; open ones stay.
+    assert.equal(await store.purgeReports(at(400)), 1, 'only the one resolved before the cutoff');
+    assert.equal(await store.purgeReports(at(401)), 2);
+    assert.deepEqual((await store.reports()).map((r) => r.id), [openByHim.id]);
   });
 
   test(`contract (${b.name}): reading`, { skip: b.skip }, async () => {
