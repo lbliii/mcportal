@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Shipping device linking ([plan](docs/plans/local-hosted-hybrid.md))
+- **Sign in from the welcome screen:** a local MCPortal's first-run screen offers **Already have a portal? Sign in to bring it here**, which starts the same sign-in as the account chip.
+- **Privacy policy:** a section on MCPortal on your own computer: ghost mode sends nothing to the service; signed in, your room is stored by the service while feeds are still fetched from your computer, tokens stay in a file only you can read, and you can revoke a computer from the account page.
+- **Support and README:** organizations that block custom connectors can install MCPortal locally and sign in.
+- **CONTRIBUTING:** how linked mode fits together and how to try signing in without touching your own link.
+
 ## v0.6.0 — 2026-10-02
 
 MCPortal becomes one portal, local or hosted: run it on your computer in ghost mode or sign in to keep it in your account, with sharing, a Space and a handle. The room gains layouts led by your agent's picks, the tool surface is reworked for the long run (breaking; see "A tool surface for the long run" and "For hosts and agents"), and the service gets ready for directory review. 0.5.0 was never released on its own; its changes are here.

@@ -206,6 +206,10 @@ function privacy(site: SiteConfig): string {
 <p>When your room loads, MCPortal's server fetches the feeds, articles and thumbnails you asked for. Those sites see the server's address, not yours. For some large pictures on WordPress sites, the server asks WordPress.com's image service (run by Automattic) for a smaller copy, so that service sees the picture's address too. Fetched content is cached in the server's memory for between two minutes and one day, and is shared across users because it's the same public content. It isn't written to the database. When you choose to open an original story or its discussion, your browser goes to that site directly, and that site's own privacy policy applies.</p>
 <p>What you see in your room is also available to the agent you use it in, and that agent's privacy policy covers your conversations (in Claude, Anthropic's).</p>
 
+<h2>MCPortal on your own computer</h2>
+<p>You can also run MCPortal on your own computer (the Claude Code plugin, the desktop bundle, or from source). Until you sign in, it's in ghost mode: everything stays in <code>~/.mcportal</code> on that computer, it fetches feeds and pages itself, and it sends nothing to this service.</p>
+<p>If you sign in from it, your room, saved items, clips, reading history, seen marks, public profile, shares and follows are stored by this service exactly as the table above says, and the first sign-in adds that computer's portal to your account. MCPortal on your computer still fetches feeds, articles and pictures itself, so those sites see your computer's address rather than the server's. Its sign-in tokens are kept in a file on your computer that only your user can read. Signing out copies your portal back to the computer, ends that sign-in, and deletes the file. Your <a href="/account">account page</a> lists each signed-in computer by name, and you can revoke one from there, for example if you lose it.</p>
+
 <h2>What other people see</h2>
 <p>Nothing, unless you choose. With a public profile, you have a space: signed-in MCPortal users can open it to see your handle, name, bio, space title, the sources you chose to feature, your follower count, and the shares you made for them (your followers, or everyone). Shares are never published to the open web. Admins can see reported shares and profiles, and can hide a share or suspend an account.</p>
 
@@ -224,7 +228,7 @@ function privacy(site: SiteConfig): string {
   <li><b>Take it with you:</b> ask your agent to export your data, or download it from your <a href="/account">account page</a>: everything as one file another MCPortal can import, saved items as a bookmarks file, clips as Markdown, and sources as OPML.</li>
   <li><b>Delete clips, shares or your public profile, or block someone:</b> ask your agent at any time. Removing your public profile hides your shares from everyone.</li>
   <li><b>Delete your account:</b> sign in on your <a href="/account">account page</a> and delete it. Your account, room, saved items, clips, public profile, shares and follows are deleted at once, and you're signed out everywhere. A few records outlast it, as the table above says: reports about your account, the audit log entry, and app registrations.</li>
-  <li><b>Disconnect:</b> remove MCPortal from your agent's connectors. You can also revoke it on GitHub under Settings → Applications.</li>
+  <li><b>Disconnect:</b> remove MCPortal from your agent's connectors, sign out from MCPortal on your computer, or revoke a computer or app on your <a href="/account">account page</a>. You can also revoke it on GitHub under Settings → Applications.</li>
 </ul>
 
 <h2>Children</h2>
@@ -250,7 +254,7 @@ function support(site: SiteConfig): string {
 <h3>A portal says it couldn't load.</h3>
 <p>Some sites block requests from cloud servers or stop publishing their feed. Try refreshing the portal. If it keeps failing, ask your agent to find another feed for that site.</p>
 <h3>Claude says my organization doesn't allow custom connectors.</h3>
-<p>Some work and school accounts block connectors that aren't in Claude's directory. Until MCPortal is listed there, use a personal Claude account, or ask your admin.</p>
+<p>Some work and school accounts block connectors that aren't in Claude's directory. You can run MCPortal on your own computer instead (see the <a href="https://github.com/lbliii/mcportal#readme">README</a>) and sign in from its room, so it's the same portal as everywhere else. Or use a personal Claude account, or ask your admin.</p>
 <h3>I got “sign-in isn't allowed for this account”.</h3>
 <p>MCPortal is invite-only right now. The invite is tied to one GitHub account, so sign in as the account that was invited.</p>
 <h3>How do I bring my subscriptions from another reader?</h3>
