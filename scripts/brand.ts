@@ -102,7 +102,8 @@ const ICON_STROKE = 1.75;
 /** The house corner for rounded rectangles in icons. */
 const R = 3;
 
-interface Icon { d: string; dot?: [number, number, number] }
+/** `state`: the dot marks a state, drawn only while the icon's button is pressed. */
+interface Icon { d: string; dot?: [number, number, number]; state?: true }
 
 /**
  * An arc of a tilted orbit from `from` to `to` degrees (clockwise on screen), ending in an
@@ -124,10 +125,21 @@ function box(x: number, y: number, w: number, h: number, r = R): string {
 }
 
 /**
+ * The repost loop drawn as a doorway: one arrow runs along the sill and up the left jamb,
+ * the other comes over the arch and down the right jamb.
+ */
+function doorLoop(cx: number, sill: number, w: number, top: number, head: number): string {
+  const a = w / 2, start = (122 * Math.PI) / 180;   // the arch starts clear of the jamb's arrowhead
+  const left = cx - a, right = cx + a, jamb = top - 1;
+  return `M${cx + 1.5} ${sill}H${left + R}a${R} ${R} 0 0 1 ${-R} ${-R}V${jamb}M${left - head} ${jamb + head}l${head} ${-head} ${head} ${head}`
+    + `M${r2(cx + a * Math.cos(start))} ${r2(top - a * Math.sin(start))}A${a} ${a} 0 0 1 ${right} ${top}V${sill}M${right - head} ${sill - head}l${head} ${head} ${head} ${-head}`;
+}
+
+/**
  * The room's icons, on the Line mark's 24-unit grid and stroke. Where an icon has a frame,
  * it borrows the mark: columns are two doorways, the front page is a lead block over its lines, the bookmark and the "open original" frame are
  * arch-topped, a space is someone's doorway, refresh runs around a tilted orbit, and the feed
- * icon's dot is the moon's size, and ghost mode is a doorway with a wavy hem. Everything else keeps the familiar shape with the house corner.
+ * icon's dot is the moon's size, ghost mode is a doorway with a wavy hem, and reblog is the repost loop drawn as a doorway, the moon in it once reblogged. Everything else keeps the familiar shape with the house corner.
  */
 function icons(): Record<string, Icon> {
   // A shelf row: one picture, then the next running off the edge.
@@ -161,6 +173,7 @@ function icons(): Record<string, Icon> {
     share: { d: 'M12 14.5V4.5M8 8.5l4-4 4 4M5.5 12.5v4.5a3 3 0 0 0 3 3h7a3 3 0 0 0 3-3v-4.5' },
     space: { d: `${arch(12, 20, 14, 16)}M8.75 20a3.25 3.25 0 0 1 6.5 0`, dot: [12, 12.25, 2.1] },
     ghost: { d: `M5 19.5V11a7 7 0 0 1 14 0v8.5${hem(14, 3)}zM9.75 10v1.75M14.25 10v1.75` },
+    reblog: { d: doorLoop(12, 19.5, 13, 11.5, 2.5), dot: [12, 12.5, 1.8], state: true },
   };
 }
 

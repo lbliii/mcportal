@@ -79,13 +79,14 @@
     const svg = document.createElementNS(NS, 'svg');
     svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('aria-hidden', 'true');
     svg.setAttribute('stroke-width', String(ICON_STROKE));
-    const { d, dot } = /** @type {Record<string, { d: string, dot?: number[] }>} */ (ICONS)[name] ?? { d: '' };
+    const { d, dot, state } = /** @type {Record<string, { d: string, dot?: number[], state?: true }>} */ (ICONS)[name] ?? { d: '' };
     const path = document.createElementNS(NS, 'path'); path.setAttribute('d', d);
     svg.append(path);
     if (dot) {
       const circle = document.createElementNS(NS, 'circle');
       circle.setAttribute('cx', String(dot[0])); circle.setAttribute('cy', String(dot[1])); circle.setAttribute('r', String(dot[2]));
       circle.setAttribute('fill', 'currentColor'); circle.setAttribute('stroke', 'none');
+      if (state) circle.setAttribute('class', 'icon-state');   // shown only while its button is pressed
       svg.append(circle);
     }
     return svg;

@@ -251,7 +251,7 @@ There's no per-portal choice. The ideas from the brainstorm all fit once we add 
 | `cards` | Today's shelf cards | Anything |
 | `gallery` | Pictures first, mosaic | YouTube, art, design feeds |
 | `frontpage` | Lead story, secondaries, headlines | News, a Space |
-| `river` | Several sources merged into one timeline | A column you scan once |
+| `river` | Now a room layout: every portal merged into one stream ([plan](plans/river.md)) | Wandering, and reblogs later |
 | `deck` | One at a time: read, archive, snooze | Saved items |
 | `quotes` | Pull quotes | Clips |
 | `changelog` | Versions grouped by project | GitHub releases, changelog feeds |
