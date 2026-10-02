@@ -134,6 +134,27 @@ export async function reachOf(ctx: ToolContext): Promise<Reach> {
   return { social: (await ctx.social.uses(ctx.userId)) ? 'active' : 'new' };
 }
 
+/**
+ * Who the room belongs to, as the toolbar and account_settings show it. Ghost: no
+ * account, so the portal stays where the server runs and nothing is shared. Hosted:
+ * signed in to an MCPortal with accounts, by GitHub login and (once claimed) handle.
+ */
+export type Identity = { mode: 'ghost' } | { mode: 'hosted'; login?: string | undefined; handle?: string | undefined };
+
+/** The caller's identity (one public-profile read on a hosted server). */
+export async function identityOf(ctx: ToolContext): Promise<Identity> {
+  if (!ctx.accountUrl) return { mode: 'ghost' };
+  const handle = (await ctx.publicProfiles?.get(ctx.userId))?.handle;
+  return { mode: 'hosted', ...(ctx.actor?.login ? { login: ctx.actor.login } : {}), ...(handle ? { handle } : {}) };
+}
+
+/** How the identity reads in a sentence, for the model to pass on. */
+export function describeIdentity(identity: Identity): string {
+  if (identity.mode === 'ghost') return 'Ghost mode: not signed in. This MCPortal has no account, keeps the portal where it runs (~/.mcportal unless MCPORTAL_DATA_DIR is set) and shares nothing.';
+  const who = identity.handle ? `@${identity.handle}` : identity.login ? `${identity.login} on GitHub (no handle claimed yet)` : 'their GitHub account';
+  return `Signed in to the hosted MCPortal as ${who}.`;
+}
+
 /** Listed on servers with the social layer: the ways in (open a space, follow, claim a handle, report). */
 export const socialEntry = (reach: Reach): boolean => reach.social !== 'none';
 /** Listed once the account takes part in the social layer. */
@@ -141,8 +162,8 @@ export const socialActive = (reach: Reach): boolean => reach.social === 'active'
 
 /** Why the social and public-profile tools refuse on a local server. */
 export const HOSTED_ONLY = {
-  sharing: 'Sharing is part of the hosted MCPortal. This one runs on your machine, so there is nobody to share with.',
-  profiles: 'Public profiles are part of the hosted MCPortal. This one runs on your machine, so it has no handle to claim.',
+  sharing: 'Sharing is part of the hosted MCPortal. This one is in ghost mode (no account), so there is nobody to share with.',
+  profiles: 'Public profiles are part of the hosted MCPortal. This one is in ghost mode (no account), so it has no handle to claim.',
 } as const;
 
 /**

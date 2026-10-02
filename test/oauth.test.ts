@@ -445,7 +445,11 @@ test('account page: download everything, one-time links, and delete the account 
     };
     assert.equal((await tool('clip', { kind: 'quote', content: 'keep me' })).status, 200);
     assert.equal((await tool('set_public_profile', { handle: 'lawrence' })).result.structuredContent.profile.handle, 'lawrence');
-    assert.match((await tool('account_settings')).result.content[0].text, /http:\/\/localhost\/account/);
+    const settings = (await tool('account_settings')).result;
+    assert.match(settings.content[0].text, /^Signed in to the hosted MCPortal as @lawrence\. The account page is http:\/\/localhost\/account/);
+    assert.equal(settings.structuredContent.identity.mode, 'hosted');
+    assert.equal(settings.structuredContent.identity.handle, 'lawrence');
+    assert.equal((await tool('open_room')).result.structuredContent.identity.handle, 'lawrence', 'the toolbar shows the handle');
 
     // export_data hands out a link that works once.
     const link = new URL((await tool('export_data', { format: 'mcportal' })).result.structuredContent.where);

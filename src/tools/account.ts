@@ -10,7 +10,7 @@ import { homedir } from 'node:os';
 import { clean } from '../lib/text.ts';
 import { describeImport, EXPORT_FORMATS, importExport, parseExport, type ExportFormat } from '../portability.ts';
 import { ACCENTS, MAX_FEATURED, suggestHandle, type PublicProfile } from '../public-profiles.ts';
-import { HOSTED_ONLY, socialActive, socialEntry, ok, toolError, toolFailure, untrusted, type ToolDef } from './kit.ts';
+import { describeIdentity, HOSTED_ONLY, identityOf, socialActive, socialEntry, ok, toolError, toolFailure, untrusted, type ToolDef } from './kit.ts';
 
 function describeProfile(p: PublicProfile): string {
   return [
@@ -170,14 +170,15 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
   },
   {
     name: 'account_settings',
-    title: 'Account page',
+    title: 'Account and sign-in',
     access: 'read',
-    description: "Link to the user's account page, where they sign in with GitHub to download everything or delete their account. Deleting an account only happens there, never through a tool.",
+    description: "Whether the user is signed in (as whom) or in ghost mode, and the account page, where they download everything or delete their account (only there, never a tool).",
     inputSchema: { type: 'object', additionalProperties: false, properties: {} },
     annotations: { readOnlyHint: true },
     async handler(_args, ctx) {
-      if (!ctx.accountUrl) return ok('This MCPortal runs on your machine: there is no account. Your data is in the MCPortal data folder (~/.mcportal unless MCPORTAL_DATA_DIR is set); delete that folder to remove everything.', { url: null });
-      return ok(`The account page is ${ctx.accountUrl}. The user signs in with GitHub there to download everything or delete their account.`, { url: ctx.accountUrl });
+      const identity = await identityOf(ctx);
+      if (!ctx.accountUrl) return ok(`${describeIdentity(identity)} To remove everything, delete that folder.`, { identity, url: null });
+      return ok(`${describeIdentity(identity)} The account page is ${ctx.accountUrl}: the user signs in with GitHub there to download everything or delete their account.`, { identity, url: ctx.accountUrl });
     },
   },
 ];

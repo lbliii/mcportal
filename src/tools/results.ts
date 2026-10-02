@@ -15,6 +15,7 @@ import type { Handoff } from '../handoffs.ts';
 import type { Candidate } from '../highlights.ts';
 import type { ReadingState } from '../reading.ts';
 import type { Article, Item, PortalResult, Provenance } from '../types.ts';
+import type { Identity } from './kit.ts';
 
 /** A starter pack as the welcome screen lists it. */
 export type PackSummary = { id: string; label: string; blurb: string; sources: string[] };
@@ -25,6 +26,8 @@ export type RoomResult = {
   portals: PortalResult[];
   notice?: string | undefined;
   generatedAt: string;
+  /** Signed in (and as whom) or ghost mode, for the toolbar. */
+  identity: Identity;
   onboarding?: { packs: PackSummary[]; maxPacks: number; rebuilding: boolean };
 };
 

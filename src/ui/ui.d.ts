@@ -34,7 +34,7 @@ declare global {
     btnOpenIn: HTMLButtonElement;
     btnRefresh: HTMLButtonElement;
     btnSources: HTMLButtonElement;
-    btnSpace: HTMLButtonElement;
+    btnWho: HTMLButtonElement;
     grid: HTMLElement;
     opmlFile: HTMLInputElement;
     reader: HTMLElement;
@@ -89,9 +89,10 @@ declare global {
   type DocPageRef = Docs.DocPageRef;
   type DocHit = Docs.DocHit;
   type Handoff = import('../handoffs.ts').Handoff;
+  type Identity = import('../tools/kit.ts').Identity;
 
-  /** The room's state: the profile, the portals as last loaded, saved URLs, and each portal's fallback art style. */
-  type RoomState = { profile: Profile | null; portals: Map<string, PortalResult>; saved: Set<string>; art: Map<string, number> };
+  /** The room's state: the profile, who it belongs to, the portals as last loaded, saved URLs, and each portal's fallback art style. */
+  type RoomState = { profile: Profile | null; identity: Identity | null; portals: Map<string, PortalResult>; saved: Set<string>; art: Map<string, number> };
 
   // ---- Admin page data (src/admin.ts: /admin/api/state and the POST actions).
   // admin.ts builds reports and usage as `unknown`, so their shapes are spelled out here

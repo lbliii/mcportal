@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### One portal, local or hosted ([plan](docs/plans/local-hosted-hybrid.md))
+- **Who you are, at a glance:** the room's toolbar ends with an identity chip. Signed in, it shows your handle (or your GitHub login before you claim one) and opens your space. Running without an account, it shows **Ghost mode** with a ghost icon and a dashed outline: your portal stays where MCPortal runs and nothing is shared. The old space button is folded into it.
+- **"Am I signed in?" has an answer:** `account_settings` starts with the mode ("Ghost mode: not signed in…" or "Signed in to the hosted MCPortal as @handle") and returns it as `identity`; `open_room` returns `identity` too, for the toolbar. Sharing and profile tools refused on a local MCPortal now say it's in ghost mode.
+- **The plan for linking:** a local MCPortal will be able to sign in to your hosted account and keep fetching on your machine while your room, clips and shares live on the hosted server. Revised plan in `docs/plans/local-hosted-hybrid.md`.
+
 ### Reading with your agent ([plan](docs/plans/attention.md))
 - **Ask about a passage:** select text in the reader or a docs page and a bar offers **Ask about this** and **Clip quote**. Asking gives your agent the passage (fenced as the site's text, with the page and the nearest heading), then posts a fixed "Let's talk about the passage I just highlighted" in your voice: the site's words never go into your message. Hosts that can't post messages get the passage as context and a nudge to ask; hosts that can't take context offer **Copy quote**. Nothing is sent until you click.
 - **Clip quote** keeps the selection as a quote clip with its page as the source.
