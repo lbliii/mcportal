@@ -199,7 +199,8 @@ MCPortal is a **reading platform with light social**, driven by your agent. Anyt
 - **React** with one lightweight signal, so Following can surface what people liked
 
 **Later**
-- Standing intents: scheduled checks and digests ("tell me when anthropics/* ships a release")
+- Standing intents: scheduled checks and digests ("tell me when anthropics/* ships a release"); first, watches for artists with concerts near you ([plan](docs/plans/watches.md))
+- MCP 2026-07-28: serve the stateless protocol alongside today's, still without dependencies ([plan](docs/plans/mcp-2026-07-28.md))
 - Built-in views of your own reading (what you read and save, by topic and source)
 - Pictures in the reader view; clearer handling of paywalled articles
 - More sign-in options (Google, email link, passkeys) as extra identities on the same account
