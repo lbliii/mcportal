@@ -104,6 +104,43 @@
   .card .item-meta { margin-top: auto; flex-wrap: nowrap; overflow: hidden; white-space: nowrap; }
   :root.fullscreen .card { flex-basis: 264px; width: 264px; height: 176px; }
   .shelf .portal-foot { border: 0; padding: 0 var(--mp-space-12) var(--mp-space-4); }
+  /* a portal's title opens it at the portal level */
+  button.portal-title { min-width: 0; min-height: var(--mp-control-minimum); padding: 0; border: 0; background: none; color: inherit; font: inherit; font-weight: 600; text-align: left; cursor: pointer; }
+  button.portal-title:hover { text-decoration: underline; text-underline-offset: 2px; }
+  /* the portal level: one portal filling the frame, growing with its items */
+  .grid.portal-level { display: block; height: auto; overflow: visible; padding: var(--mp-space-10); }
+  .level { background: var(--mp-surface-card); border: 1px solid var(--mp-border-divider); border-top: 3px solid var(--mp-source-color); border-radius: var(--mp-radius-card); }
+  .level-head { display: flex; align-items: center; gap: var(--mp-space-8); padding: var(--mp-space-6) var(--mp-space-8) var(--mp-space-6) var(--mp-space-4); border-bottom: 1px solid var(--mp-border-divider); }
+  .level-title { margin: 0; min-width: 0; font-size: var(--mp-type-16); font-weight: var(--mp-weight-heading); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .level-title:focus { outline: none; }
+  .level-head .tools { margin-left: auto; display: flex; }
+  .level .items { overflow: visible; }
+  /* zooming between levels (View Transitions): the portal or story grows into the next level */
+  ::view-transition-group(mp-zoom) { animation-duration: 300ms; animation-timing-function: ease-in-out; }
+  ::view-transition-old(root), ::view-transition-new(root) { animation-duration: 200ms; }
+  /* front page (docs/plans/room-layouts.md): one column of sections that grows with its content; nothing scrolls inside it */
+  .grid.frontpage { display: block; height: auto; overflow: visible; padding: var(--mp-space-12) var(--mp-space-12) var(--mp-space-4); }
+  .fp-head { padding: 0 var(--mp-space-2) var(--mp-space-10); margin-bottom: var(--mp-space-12); border-bottom: 2px solid var(--mp-text-primary); }
+  .fp-kicker, .fp-label { color: var(--mp-text-secondary); font-size: var(--mp-type-11); font-weight: var(--mp-weight-strong); text-transform: uppercase; letter-spacing: 0.06em; }
+  .fp-title { margin: var(--mp-space-2) 0 0; font-size: var(--mp-type-22); font-weight: var(--mp-weight-heading); line-height: var(--mp-line-heading); }
+  .fp-intro { margin: var(--mp-space-4) 0 0; color: var(--mp-text-secondary); }
+  .fp-ask { margin-top: var(--mp-space-6); min-height: var(--mp-control-minimum); }
+  .fp-top { display: grid; gap: var(--mp-space-12); align-items: start; margin-bottom: var(--mp-space-16); }
+  .fp-picks ul { list-style: none; margin: var(--mp-space-4) 0 0; padding: 0; display: grid; gap: var(--mp-space-4); }
+  .fp-label { margin: 0; padding: 0 var(--mp-space-8) var(--mp-space-4); border-bottom: 1px solid var(--mp-border-divider); }
+  .fp-blocks { display: grid; gap: var(--mp-space-10); align-items: start; }
+  .fp-more { display: block; margin: 0 var(--mp-space-12) var(--mp-space-8); min-height: var(--mp-control-minimum); }
+  .fp-end { margin: var(--mp-space-16) 0 var(--mp-space-8); padding-top: var(--mp-space-10); border-top: 1px solid var(--mp-border-divider); color: var(--mp-text-secondary); text-align: center; font-size: var(--mp-type-12-5); }
+  @container (min-width: 600px) { .fp-top.has-picks { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); } .fp-blocks { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @container (min-width: 1100px) { .fp-blocks { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  /* the lead: the source's colour on top, its picture across, a larger title */
+  .item.lead { border: 1px solid var(--mp-border-divider); border-top: 3px solid var(--mp-source-color); border-radius: var(--mp-radius-card); padding: var(--mp-space-8) var(--mp-space-4) var(--mp-space-6); }
+  .item.lead .thumb { width: 100%; height: auto; aspect-ratio: 16 / 9; margin-bottom: var(--mp-space-8); }
+  .item.lead .item-title { font-size: var(--mp-type-20); font-weight: var(--mp-weight-heading); line-height: var(--mp-line-heading); }
+  .item.lead .item-summary { font-size: var(--mp-type-13-5); -webkit-line-clamp: 4; margin-top: var(--mp-space-6); }
+  .item-from { display: flex; align-items: center; gap: var(--mp-space-6); padding: 0 var(--mp-space-8) var(--mp-space-4); color: var(--mp-text-secondary); font-size: var(--mp-type-11-5); }
+  .item-why { margin: var(--mp-space-6) var(--mp-space-8) var(--mp-space-2); padding-left: var(--mp-space-10); border-left: 3px solid var(--mp-border-selected); font-size: var(--mp-type-12-5); }
+  .item-why-label { display: block; color: var(--mp-text-secondary); font-size: var(--mp-type-11); font-weight: var(--mp-weight-strong); text-transform: uppercase; letter-spacing: 0.04em; }
   /* add a source */
   .add-sheet { margin: 8px 10px 0; padding: var(--mp-space-8); border: 1px solid var(--mp-border-divider); border-radius: var(--mp-radius-card); background: var(--mp-surface-card); }
   .add-row { display: flex; gap: var(--mp-space-6); }
@@ -139,6 +176,9 @@
   .card.media .thumb { height: 118px; border-radius: 0; }
   .card-body { display: flex; flex-direction: column; gap: var(--mp-space-4); flex: 1; min-height: 0; padding: var(--mp-space-8) 11px 9px; }
   .card.media .item-title { -webkit-line-clamp: 2; }
+  /* unseen items read heavier than ones already seen, beside their New mark (docs/plans/room-layouts.md) */
+  .item.new .item-title { font-weight: var(--mp-weight-strong); }
+  .card.new .item-title { font-weight: var(--mp-weight-heading); }
   .card.media .item-summary { display: none; }
   :root.fullscreen .card.media { height: 246px; }
   :root.fullscreen .card.media .thumb { height: 148px; }

@@ -11,6 +11,7 @@ import { test } from 'node:test';
 import { Accounts, makeBootstrap } from '../src/accounts.ts';
 import { AuthStore } from '../src/auth/store.ts';
 import { MemoryClipStore } from '../src/clips.ts';
+import { MemoryEditionStore } from '../src/editions.ts';
 import { MemoryHandoffStore } from '../src/handoffs.ts';
 import { TtlCache } from '../src/lib/cache.ts';
 import { memoryPersistence } from '../src/lib/document.ts';
@@ -41,6 +42,7 @@ async function hosted() {
     reading: new FileReadingStore(await mkdtemp(path.join(tmpdir(), 'mcportal-linked-'))),
     seen: new FileSeenStore(null),
     handoffs: new MemoryHandoffStore(),
+    editions: new MemoryEditionStore(),
   });
   const auth = new AuthStore(authPersistence);
   const signIn = async (githubId: number, login: string) => {
@@ -213,6 +215,24 @@ test('linked offline: the room as last synced, with a notice; seen marks are dro
     clock += 60_000;
     assert.equal((await mac.call('open_room')).structuredContent.notice, undefined, 'back online, nothing to say');
     assert.equal((mac.ctx.store as unknown as { health(): { offline: boolean } }).health().offline, false);
+  } finally {
+    await h.app.close();
+  }
+});
+
+test('linked: highlights picked on one device lead the room on another', async () => {
+  const h = await hosted();
+  try {
+    const { accountId, tokens } = await h.signIn(42, 'lawrence');
+    const mac = device(h.app, accountId, fixed(tokens.access_token));
+    const office = device(h.app, accountId, fixed(tokens.access_token));
+    await mac.call('build_room', { packs: ['developer'] });
+    const [first, second] = (await mac.call('list_new_items')).structuredContent.items;
+    const shown = await mac.call('show_highlights', { title: 'Morning', picks: [{ ref: second.ref, why: 'Yours.' }, { ref: first.ref, why: 'Also.' }] });
+    assert.match(shown.content[0]!.text, /The room leads with them/);
+    const room = await office.call('open_room');
+    assert.deepEqual(room.structuredContent.edition.picks.map((p: any) => p.ref), [second.ref, first.ref]);
+    assert.deepEqual(room.structuredContent.lead, { ref: second.ref, portalId: second.portalId, itemId: second.item.id, by: 'agent', why: 'Yours.' });
   } finally {
     await h.app.close();
   }

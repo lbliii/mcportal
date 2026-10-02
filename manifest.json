@@ -50,7 +50,7 @@
     },
     {
       "name": "show_highlights",
-      "description": "Show your picks from list_new_items as a highlights card: each item's ref and a one-line reason it's worth the user's time."
+      "description": "Show your picks from list_new_items, best first, as a highlights card: each item's ref and a one-line reason it's worth the user's time."
     },
     {
       "name": "read_source",

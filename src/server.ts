@@ -8,6 +8,7 @@ import { constants } from 'node:fs';
 import { access, mkdir } from 'node:fs/promises';
 import { createInterface } from 'node:readline';
 import { Accounts, bootstrapFromEnv } from './accounts.ts';
+import { FileEditionStore, type EditionStore } from './editions.ts';
 import { FileHandoffStore, type HandoffStore } from './handoffs.ts';
 import { FileReadingStore, type ReadingStore } from './reading.ts';
 import { FileSeenStore, type SeenStore } from './seen.ts';
@@ -79,15 +80,15 @@ async function writableDir(dir: string): Promise<void> {
 }
 
 /** Postgres when DATABASE_URL is set (hosted), otherwise files in the data directory. */
-async function openStorage(dataDir: string): Promise<{ store: ProfileStore; reading: ReadingStore; handoffs: HandoffStore; seen: SeenStore; clips: ClipStore; authPersistence?: AuthPersistence; accountsPersistence: AuthPersistence; profilesPersistence: AuthPersistence; social: SocialStore; storage: 'files' | 'postgres'; checkStorage: () => Promise<void> }> {
+async function openStorage(dataDir: string): Promise<{ store: ProfileStore; reading: ReadingStore; handoffs: HandoffStore; seen: SeenStore; editions: EditionStore; clips: ClipStore; authPersistence?: AuthPersistence; accountsPersistence: AuthPersistence; profilesPersistence: AuthPersistence; social: SocialStore; storage: 'files' | 'postgres'; checkStorage: () => Promise<void> }> {
   const url = process.env.DATABASE_URL;
-  if (!url) return { store: new FileProfileStore(dataDir), reading: new FileReadingStore(dataDir), handoffs: new FileHandoffStore(dataDir), seen: new FileSeenStore(dataDir), clips: new FileClipStore(dataDir), accountsPersistence: fileAuthPersistence(dataDir, 'accounts.json'), profilesPersistence: fileAuthPersistence(dataDir, 'public-profiles.json'), social: new DocumentSocialStore(fileAuthPersistence(dataDir, 'social.json')), storage: 'files', checkStorage: () => writableDir(dataDir) };
-  const { connect, ensureSchema, importFiles, PgClipStore, PgHandoffStore, PgReadingStore, PgSeenStore, PgProfileStore, PgSocialStore, pgAuthPersistence } = await import('./db.ts');
+  if (!url) return { store: new FileProfileStore(dataDir), reading: new FileReadingStore(dataDir), handoffs: new FileHandoffStore(dataDir), seen: new FileSeenStore(dataDir), editions: new FileEditionStore(dataDir), clips: new FileClipStore(dataDir), accountsPersistence: fileAuthPersistence(dataDir, 'accounts.json'), profilesPersistence: fileAuthPersistence(dataDir, 'public-profiles.json'), social: new DocumentSocialStore(fileAuthPersistence(dataDir, 'social.json')), storage: 'files', checkStorage: () => writableDir(dataDir) };
+  const { connect, ensureSchema, importFiles, PgClipStore, PgEditionStore, PgHandoffStore, PgReadingStore, PgSeenStore, PgProfileStore, PgSocialStore, pgAuthPersistence } = await import('./db.ts');
   const db = await connect(url);
   await ensureSchema(db);
   const imported = await importFiles(db, dataDir);
   if (!imported.skipped) log.info('storage.imported', { from: dataDir, profiles: imported.profiles, auth: imported.auth });
-  return { store: new PgProfileStore(db), reading: new PgReadingStore(db), handoffs: new PgHandoffStore(db), seen: new PgSeenStore(db), clips: new PgClipStore(db), authPersistence: pgAuthPersistence(db), accountsPersistence: pgAuthPersistence(db, 'accounts'), profilesPersistence: pgAuthPersistence(db, 'public-profiles'), social: new PgSocialStore(db), storage: 'postgres', checkStorage: async () => { await db.query('SELECT 1'); } };
+  return { store: new PgProfileStore(db), reading: new PgReadingStore(db), handoffs: new PgHandoffStore(db), seen: new PgSeenStore(db), editions: new PgEditionStore(db), clips: new PgClipStore(db), authPersistence: pgAuthPersistence(db), accountsPersistence: pgAuthPersistence(db, 'accounts'), profilesPersistence: pgAuthPersistence(db, 'public-profiles'), social: new PgSocialStore(db), storage: 'postgres', checkStorage: async () => { await db.query('SELECT 1'); } };
 }
 
 export function main(argv = process.argv): void {
@@ -120,11 +121,12 @@ async function start(argv: string[]): Promise<void> {
     const reading = new FileReadingStore(dataDir);
     const handoffs = new FileHandoffStore(dataDir);
     const seen = new FileSeenStore(dataDir);
+    const editions = new FileEditionStore(dataDir);
     const userId = process.env.MCPORTAL_USER || 'default';
     const session = new LocalSession({
       dataDir,
       localUser: userId,
-      local: { store, reading, handoffs, seen, clips },
+      local: { store, reading, handoffs, seen, editions, clips },
       base: { fetcher, cache, deliver: (format) => deliverToFile(format, userId, { store, reading, clips }, dataDir) },
       hostedUrl: process.env.MCPORTAL_HOSTED_URL || undefined,
     });
@@ -140,7 +142,7 @@ async function start(argv: string[]): Promise<void> {
     process.exitCode = 1;
     return;
   }
-  const { store, reading, handoffs, seen, clips, authPersistence, accountsPersistence, profilesPersistence, social: socialStore, storage, checkStorage } = await openStorage(dataDir);
+  const { store, reading, handoffs, seen, editions, clips, authPersistence, accountsPersistence, profilesPersistence, social: socialStore, storage, checkStorage } = await openStorage(dataDir);
   const accounts = new Accounts(accountsPersistence, { ...bootstrapFromEnv(process.env) });
   await accounts.load();
   const suspended = (id: string) => accounts.actor(id).status !== 'active';
@@ -151,11 +153,11 @@ async function start(argv: string[]): Promise<void> {
   const session = local ? new LocalSession({
     dataDir,
     localUser: config.staticUser,
-    local: { store, reading, handoffs, seen, clips },
+    local: { store, reading, handoffs, seen, editions, clips },
     base: { fetcher, cache, deliver: (format) => deliverToFile(format, config.staticUser, { store, reading, clips }, dataDir) },
     hostedUrl: process.env.MCPORTAL_HOSTED_URL || undefined,
   }) : undefined;
-  const server = createApp(config, { store, reading, handoffs, seen, clips, publicProfiles, social, fetcher, cache, log, authPersistence, storage, checkStorage, accounts, session });
+  const server = createApp(config, { store, reading, handoffs, seen, editions, clips, publicProfiles, social, fetcher, cache, log, authPersistence, storage, checkStorage, accounts, session });
   server.listen(config.port, config.host, () => {
     const mode = config.github ? `GitHub OAuth${config.allowedGithubUsers.length ? ` (allowed: ${config.allowedGithubUsers.join(', ')})` : ' (any GitHub user)'}` : config.staticToken ? 'static token' : 'no auth (loopback only)';
     log.info('http.ready', { host: config.host, port: config.port, publicUrl: config.publicUrl, auth: mode, storage: storage === 'postgres' ? 'postgres' : dataDir });

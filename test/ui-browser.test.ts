@@ -69,11 +69,12 @@ function room() {
 
 let app: Running;
 const seen = new FileSeenStore(null);
+const profiles = new MemoryProfileStore({ default: room() });
 let page: Page;
 
 before(async () => {
   if (skip) return;
-  app = await startApp({ allowUnauthenticated: true }, fetcher, { store: new MemoryProfileStore({ default: room() }), seen });
+  app = await startApp({ allowUnauthenticated: true }, fetcher, { store: profiles, seen });
   page = await Page.open(chrome!);
 });
 
@@ -215,4 +216,80 @@ test('browser: a nested docs index opens inside the viewer, and its up button go
   await page.click('.docs-up');
   await page.waitFor(`!document.querySelector('.docs-up') && /Deploy/.test(document.querySelector('.docs-toc')?.textContent ?? '')`, 'the parent docs again');
   assert.deepEqual(page.problems, []);
+});
+
+test('browser: the front page leads with the picks, pages each portal, and nothing in it scrolls', { skip }, async () => {
+  // Twelve saved items, so the Saved block has pages; the first two HN items new.
+  const saved = Array.from({ length: 12 }, (_, i) => ({ url: `https://example.com/saved-${i}`, title: `Saved ${i}`, savedAt: '2026-09-01T00:00:00.000Z' }));
+  await profiles.put('default', validateProfile({ ...room(), layout: 'frontpage', saved }));
+  const hn = (await tool('open_room', {})).portals.find((p: any) => p.portalId === 'hn-top').items.map((i: any) => i.id);
+  await seen.deleteAll('default');
+  await seen.mark('default', [{ portalId: 'hn-top', itemIds: hn.slice(2) }]);
+  const [first, second] = (await tool('list_new_items', { portals: ['hn-top'] })).items;
+  await tool('show_highlights', { title: 'Morning edition', picks: [{ ref: second.ref, why: 'The one you asked about.' }, { ref: first.ref, why: 'Also good.' }] });
+  try {
+    page.problems.length = 0;
+    await page.goto(`${app.base}/preview`);
+    await page.waitFor(`document.querySelector('#grid.frontpage .fp-block') && !document.querySelector('.skeleton')`, 'the front page');
+    assert.equal(await page.eval(`document.querySelector('.fp-title').textContent`), 'Morning edition');
+    assert.match(await page.eval<string>(`document.querySelector('.fp-kicker').textContent`), /· 2 new$/);
+    assert.equal(await page.eval(`document.querySelector('.item.lead .item-title').textContent`), `New${second.item.title}`, "the agent's first pick leads");
+    assert.match(await page.eval<string>(`document.querySelector('.item.lead .item-why').textContent`), /The one you asked about\./);
+    assert.deepEqual(await page.eval(`[...document.querySelectorAll('.fp-picks .item-title')].map((n) => n.textContent)`), [`New${first.item.title}`]);
+    // Picked stories aren't repeated in their portal's block.
+    const hnRows = await page.eval<string[]>(`[...document.querySelectorAll('[data-portal="hn-top"] .item-title')].map((n) => n.textContent)`);
+    assert.ok(!hnRows.some((t) => t.endsWith(first.item.title) || t.endsWith(second.item.title)), 'picks are not repeated');
+    assert.equal(await page.eval(`document.getElementById('frontEnd').textContent`), "You're caught up.", 'both new stories are on the page');
+    // The Saved block shows three, then five more a click, then the rest.
+    const rows = () => page.eval<number>(`document.querySelectorAll('[data-portal="saved"] li').length`);
+    const more = () => page.eval<string>(`(() => { const b = document.querySelector('[data-portal="saved"] .fp-more'); return b.hidden ? '' : b.textContent; })()`);
+    assert.equal(await rows(), 3);
+    assert.equal(await more(), '5 more of 9');
+    await page.click('[data-portal="saved"] .fp-more');
+    assert.equal(await rows(), 8);
+    assert.equal(await more(), '4 more of 4');
+    await page.click('[data-portal="saved"] .fp-more');
+    assert.equal(await rows(), 12);
+    assert.equal(await more(), '', 'no more to show');
+    const scrolling = await page.eval<string[]>(`[...document.querySelectorAll('#grid, #grid *')].filter((n) => { const s = getComputedStyle(n); return (/auto|scroll/.test(s.overflowY) && n.scrollHeight > n.clientHeight + 1) || (/auto|scroll/.test(s.overflowX) && n.scrollWidth > n.clientWidth + 1); }).map((n) => n.className)`);
+    assert.deepEqual(scrolling, [], 'nothing scrolls inside the front page');
+    assert.deepEqual(page.problems, []);
+  } finally {
+    await profiles.put('default', room());
+  }
+});
+
+test('browser: a portal opens to fill the room; the reader returns to it, and Escape steps back out', { skip }, async () => {
+  const saved = Array.from({ length: 14 }, (_, i) => ({ url: `https://example.com/saved-${i}`, title: `Saved ${i}`, savedAt: '2026-09-01T00:00:00.000Z' }));
+  await profiles.put('default', validateProfile({ ...room(), saved: [{ url: ARTICLE, title: 'Hijacking the PS5', savedAt: '2026-09-01T00:00:00.000Z' }, ...saved] }));
+  const escape = () => page.eval(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))`);
+  try {
+    await openRoom();
+    await page.eval(`document.getElementById('grid').scrollLeft = 120`);
+    const lane = await page.eval<number>(`document.getElementById('grid').scrollLeft`);
+    await page.eval(`document.querySelector('[data-portal="saved"]').dataset.marker = 'the same node'`);
+    await page.click('[data-portal="saved"] .portal-title');
+    await page.waitFor(`document.querySelector('#grid.portal-level [data-portal-level="saved"]')`, 'the Saved portal level');
+    assert.equal(await page.eval(`document.querySelector('.level-title').textContent`), 'Saved');
+    assert.equal(await page.eval(`document.activeElement.className`), 'level-title', 'focus moves to the portal');
+    assert.equal(await page.eval(`document.querySelectorAll('.level li').length`), 10, 'ten at first, inline');
+    await page.click('.level .fp-more');
+    assert.equal(await page.eval(`document.querySelectorAll('.level li').length`), 15);
+    // The reader opens over the portal and comes back to it.
+    await page.click('.level .item-main');
+    await page.waitFor(`!document.getElementById('reader').hidden && document.querySelector('#reader h1')`, 'the reader');
+    await page.click('#reader .reader-top .ib');
+    await page.waitFor(`document.getElementById('reader').hidden && document.querySelector('.level')`, 'back at the portal');
+    assert.equal(await page.eval(`document.querySelectorAll('.level li').length`), 15, 'still showing what it showed');
+    await escape();
+    await page.waitFor(`!document.querySelector('.level') && document.querySelector('[data-portal="saved"]')`, 'back in the room');
+    assert.equal(await page.eval(`document.querySelector('[data-portal="saved"]').dataset.marker`), 'the same node', "the room's own nodes come back, not a redraw");
+    assert.equal(await page.eval<number>(`document.getElementById('grid').scrollLeft`), lane, 'the lane is where it was');
+    assert.equal(await page.eval(`document.activeElement.className`), 'portal-title', 'focus returns to the portal title');
+    await escape();
+    assert.ok(await page.eval(`document.querySelector('[data-portal="saved"]')`), 'Escape in the room does nothing');
+    assert.deepEqual(page.problems, []);
+  } finally {
+    await profiles.put('default', room());
+  }
 });

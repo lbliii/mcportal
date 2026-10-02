@@ -22,8 +22,8 @@
   }
   for (const b of $$('[data-layout]')) {
     b.addEventListener('click', () => {
-      const layout = b.dataset.layout;
-      if ((layout === 'columns' || layout === 'shelves') && state.profile && state.profile.layout !== layout) saveSettings({ layout });
+      const layout = layoutNamed(b.dataset.layout);
+      if (layout && state.profile && state.profile.layout !== layout) saveSettings({ layout });
     });
   }
   $('btnOpenIn').addEventListener('click', () => {

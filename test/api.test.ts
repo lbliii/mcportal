@@ -8,6 +8,7 @@ import { memoryPersistence } from '../src/accounts.ts';
 import { API_PATH, handleCalls, MIN_CLIENT_VERSION, versionAtLeast, type ApiResult } from '../src/api/calls.ts';
 import { API_METHODS } from '../src/api/methods.ts';
 import { buildClip, MemoryClipStore } from '../src/clips.ts';
+import { MemoryEditionStore } from '../src/editions.ts';
 import { MemoryHandoffStore } from '../src/handoffs.ts';
 import { TtlCache } from '../src/lib/cache.ts';
 import { createFixtureFetcher } from '../src/lib/fixture-fetch.ts';
@@ -39,7 +40,7 @@ async function hosted() {
   const social = new Social({ store: new DocumentSocialStore(), profiles });
   await profiles.set('alice', { handle: 'alice' });
   await profiles.set('bob', { handle: 'bob' });
-  const shared = { store, clips: new MemoryClipStore(), reading: new FileReadingStore(await mkdtemp(path.join(tmpdir(), 'mcportal-api-'))), seen: new FileSeenStore(null), handoffs: new MemoryHandoffStore(), publicProfiles: profiles, social, fetcher: createFixtureFetcher(), cache: new TtlCache() };
+  const shared = { store, clips: new MemoryClipStore(), reading: new FileReadingStore(await mkdtemp(path.join(tmpdir(), 'mcportal-api-'))), seen: new FileSeenStore(null), handoffs: new MemoryHandoffStore(), editions: new MemoryEditionStore(), publicProfiles: profiles, social, fetcher: createFixtureFetcher(), cache: new TtlCache() };
   const ctx = (userId: string, extra: Partial<ToolContext> = {}): ToolContext => ({ ...shared, userId, actor: { accountId: userId, role: 'user', status: 'active' }, ...extra });
   return { ...shared, ctx };
 }
@@ -212,4 +213,18 @@ test('api access: suspended accounts are refused, budgets apply, and bugs are re
   const broken = h.ctx('alice', { clips: { ...new MemoryClipStore(), usage: async () => { throw new TypeError('secret internal detail'); } } as never });
   const [r] = (await handleCalls({ calls: [{ id: 1, method: 'clips.usage' }] }, broken, API_METHODS))!;
   assert.ok('error' in r! && r.error.code === 'internal' && !r.error.message.includes('secret'));
+});
+
+test('api editions: rebuilt and dated by the server, refs checked, per account', async () => {
+  const h = await hosted();
+  const alice = h.ctx('alice');
+  assert.equal(await call(alice, 'editions.get'), null);
+  assert.equal(await call(alice, 'editions.put', { title: ' Morning ', picks: [{ ref: 'hn/0123abcd', why: 'Yours.' }] }), null);
+  const edition = await call(alice, 'editions.get');
+  assert.equal(edition.title, 'Morning');
+  assert.deepEqual(edition.picks, [{ ref: 'hn/0123abcd', why: 'Yours.' }]);
+  assert.ok(Date.parse(edition.expiresAt) > Date.now(), 'the server sets the dates');
+  assert.equal(await call(h.ctx('bob'), 'editions.get'), null, 'per account');
+  assert.equal(await code(call(alice, 'editions.put', { title: 'x', picks: [{ ref: 'not a ref', why: 'x' }] })), 'invalid_argument');
+  assert.equal(await code(call(alice, 'editions.put', { title: 'x', picks: [{ ref: 'hn/0123abcd', why: 'x' }], createdAt: '2020-01-01' })), 'invalid_argument', 'no dates from the caller');
 });

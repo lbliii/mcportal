@@ -11,6 +11,7 @@ import { test } from 'node:test';
 import { Accounts, makeBootstrap } from '../src/accounts.ts';
 import { buildClip, FileClipStore } from '../src/clips.ts';
 import { FileHandoffStore } from '../src/handoffs.ts';
+import { FileEditionStore } from '../src/editions.ts';
 import { TtlCache } from '../src/lib/cache.ts';
 import { memoryPersistence } from '../src/lib/document.ts';
 import { createFixtureFetcher } from '../src/lib/fixture-fetch.ts';
@@ -45,7 +46,7 @@ async function setUp() {
     accounts: new Accounts(memoryPersistence(), makeBootstrap([], [])),
   });
   const dataDir = await mkdtemp(path.join(tmpdir(), 'mcportal-link-'));
-  const local = { store: new FileProfileStore(dataDir), clips: new FileClipStore(dataDir), reading: new FileReadingStore(dataDir), seen: new FileSeenStore(dataDir), handoffs: new FileHandoffStore(dataDir) };
+  const local = { store: new FileProfileStore(dataDir), clips: new FileClipStore(dataDir), reading: new FileReadingStore(dataDir), seen: new FileSeenStore(dataDir), handoffs: new FileHandoffStore(dataDir), editions: new FileEditionStore(dataDir) };
   const session = new LocalSession({ dataDir, localUser: 'default', local, base: { fetcher: createFixtureFetcher(), cache: new TtlCache() }, hostedUrl: app.base });
   const call = async (name: string, args: Record<string, unknown> = {}) => {
     const res = await handleMessage({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }, await session.context());

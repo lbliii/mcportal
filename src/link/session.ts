@@ -13,6 +13,7 @@ import { AppError, errorCode } from '../lib/errors.ts';
 import { buildExport, describeImport, importExport, parseExport, type ExportFormat } from '../portability.ts';
 import type { ProfileStore } from '../store.ts';
 import type { ClipStore } from '../clip-stores.ts';
+import type { EditionStore } from '../editions.ts';
 import type { HandoffStore } from '../handoffs.ts';
 import type { ReadingStore } from '../reading.ts';
 import type { SeenStore } from '../seen.ts';
@@ -47,6 +48,7 @@ export interface LocalStores {
   reading: ReadingStore;
   seen: SeenStore;
   handoffs: HandoffStore;
+  editions: EditionStore;
 }
 
 export interface LocalSessionOptions {

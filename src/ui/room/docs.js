@@ -220,4 +220,9 @@
       window.scrollTo(previous.x, previous.y);
     }
   }
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('reader').hidden) closeReader(); });
+  // Escape steps out one level: the reader to where it opened from, an open portal to the room.
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (!$('reader').hidden) closeReader();
+    else if (portalLevel && !$('grid').hidden) closePortal();
+  });

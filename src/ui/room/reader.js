@@ -142,8 +142,12 @@
     const generation = ++readerGeneration;
     const reader = $('reader');
     rememberRoomNavigation();
-    $('grid').hidden = true; reader.hidden = false; reader.scrollTop = 0; window.scrollTo(0, 0);
-    reader.replaceChildren(readerTop(item.url, true), el('h1', null, item.title), el('div', { class: 'byline' }, 'Unrolling the scroll…'));
+    // The story grows into the reader's title (where the browser can animate it).
+    await transition(() => {
+      $('grid').hidden = true; reader.hidden = false; reader.scrollTop = 0; window.scrollTo(0, 0);
+      reader.replaceChildren(readerTop(item.url, true), el('h1', null, item.title), el('div', { class: 'byline' }, 'Unrolling the scroll…'));
+    }, takeZoomSource(), () => $first('h1', reader));
+    if (generation !== readerGeneration) return;
     try {
       const result = await callTool('read_article', { url: item.url });
       if (generation !== readerGeneration) return;

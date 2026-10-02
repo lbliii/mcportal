@@ -9,6 +9,7 @@
  */
 import type { Clip, ClipPatch, ClipQuery, ClipSummary } from '../clips.ts';
 import type { ClipStore } from '../clip-stores.ts';
+import type { Edition, EditionStore } from '../editions.ts';
 import type { Handoff, HandoffInput, HandoffStore } from '../handoffs.ts';
 import { AppError, errorCode } from '../lib/errors.ts';
 import { KeyedMutex } from '../lib/files.ts';
@@ -293,6 +294,33 @@ export class RemoteHandoffStore extends Linked implements HandoffStore {
   }
 }
 
+/**
+ * The edition, like seen sets, is a convenience: offline the room just doesn't lead with
+ * picks, and new picks are shown in their card but not kept.
+ */
+export class RemoteEditionStore extends Linked implements EditionStore {
+  async get(userId: string): Promise<Edition | undefined> {
+    this.mine(userId);
+    try {
+      return (await this.client.call<Edition | null>('editions.get')) ?? undefined;
+    } catch (error) {
+      if (unreachable(error)) return undefined;
+      throw error;
+    }
+  }
+
+  /** The hosted server dates it; only what the agent chose goes. */
+  async put(userId: string, edition: Edition): Promise<void> {
+    this.mine(userId);
+    await this.client.call('editions.put', dropUndefined({ title: edition.title, intro: edition.intro, picks: edition.picks }))
+      .catch((error: unknown) => { if (!unreachable(error)) throw error; });
+  }
+
+  async deleteAll(): Promise<void> {
+    throw onAccountPage('Deleting your edition');
+  }
+}
+
 /** Public profiles: your own, and anyone's by handle. */
 export function remoteProfiles(client: StateClient, accountId: string): ProfileDirectory {
   const mine = (id: string) => { if (id !== accountId) throw new Error('A linked MCPortal reads only its own public profile by account.'); };
@@ -342,6 +370,7 @@ export function linkedStores(client: StateClient, accountId: string, options: { 
     reading: new RemoteReadingStore(client, accountId),
     seen: new RemoteSeenStore(client, accountId),
     handoffs: new RemoteHandoffStore(client, accountId),
+    editions: new RemoteEditionStore(client, accountId),
     publicProfiles: remoteProfiles(client, accountId),
     social: remoteSocial(client, accountId),
   };

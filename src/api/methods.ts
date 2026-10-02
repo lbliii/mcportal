@@ -1,12 +1,13 @@
 /**
  * The hosted state API's methods: the storage and social interfaces the tools use
- * (ProfileStore, ClipStore, ReadingStore, SeenStore, HandoffStore, SocialService,
+ * (ProfileStore, ClipStore, ReadingStore, SeenStore, HandoffStore, EditionStore, SocialService,
  * ProfileDirectory), as a linked local MCPortal calls them.
  *
  * The rule for each: the server checks what the store would otherwise trust its
  * caller with, the same way the tool does. So clips are rebuilt here (buildClip, with
  * an id the server picks), shares name a clip or saved item the server looks up, seen
- * marks are limited to portals in the room, and featured sources must be portals in
+ * marks are limited to portals in the room, editions are rebuilt from refs and reasons
+ * within the highlights limits, and featured sources must be portals in
  * the room. Other people's account ids never leave: they're "@handle" here (publicRef).
  * Where a tool's inputSchema already describes a method's params, it's reused.
  *
@@ -15,6 +16,8 @@
  */
 import { clipInput } from '../portability.ts';
 import { buildClip, CLIP_LIMITS, newClipId, type ClipKind } from '../clips.ts';
+import { buildEdition } from '../editions.ts';
+import { parseRef, PICKS } from '../highlights.ts';
 import { AppError } from '../lib/errors.ts';
 import { clean } from '../lib/text.ts';
 import { httpUrl, validateProfile, type Profile } from '../profile.ts';
@@ -48,6 +51,7 @@ const clipsOf = (ctx: ToolContext) => need(ctx.clips, 'Clips are not available o
 const readingOf = (ctx: ToolContext) => need(ctx.reading, 'Reading history is not available on this server.');
 const seenOf = (ctx: ToolContext) => need(ctx.seen, 'Seen tracking is not available on this server.');
 const handoffsOf = (ctx: ToolContext) => need(ctx.handoffs, 'Handoffs are not available on this server.');
+const editionsOf = (ctx: ToolContext) => need(ctx.editions, 'Editions are not available on this server.');
 const socialOf = (ctx: ToolContext) => need(ctx.social, 'Sharing is not available on this server.');
 const profilesOf = (ctx: ToolContext) => need(ctx.publicProfiles, 'Public profiles are not available on this server.');
 
@@ -158,6 +162,21 @@ export const API_METHODS: Record<string, ApiMethod> = {
   'handoffs.list': params(NO_PARAMS, (_p, ctx) => handoffsOf(ctx).list(ctx.userId)),
   'handoffs.markOpened': params<{ code: string }>({ type: 'object', required: ['code'], additionalProperties: false, properties: { code: { type: 'string', maxLength: 20 } } },
     async (p, ctx) => { await handoffsOf(ctx).markOpened(ctx.userId, p.code); return null; }, 'write'),
+
+  // ---- the edition: the agent's latest highlights, rebuilt here (dates set by the server)
+  'editions.get': params(NO_PARAMS, async (_p, ctx) => (await editionsOf(ctx).get(ctx.userId)) ?? null),
+  'editions.put': params<{ title: string; intro?: string; picks: Array<{ ref: string; why: string }> }>(
+    { type: 'object', required: ['title', 'picks'], additionalProperties: false, properties: {
+      title: { type: 'string', minLength: 1, maxLength: PICKS.title },
+      intro: { type: 'string', maxLength: PICKS.intro },
+      picks: { type: 'array', minItems: 1, maxItems: PICKS.max, items: { type: 'object', required: ['ref', 'why'], additionalProperties: false, properties: { ref: { type: 'string', maxLength: 100 }, why: { type: 'string', maxLength: PICKS.why } } } },
+    } },
+    async (p, ctx) => {
+      if (p.picks.some((pick) => !parseRef(pick.ref))) throw new AppError('invalid_argument', 'Each pick names an item by ref, as list_new_items gives them.');
+      const title = clean(p.title, PICKS.title), intro = clean(p.intro, PICKS.intro);
+      await editionsOf(ctx).put(ctx.userId, buildEdition({ title, ...(intro ? { intro } : {}), picks: p.picks.map((pick) => ({ ref: pick.ref.trim(), why: clean(pick.why, PICKS.why) })) }));
+      return null;
+    }, 'write'),
 
   // ---- public profiles: anyone's by handle, only your own otherwise
   'profiles.mine': params(NO_PARAMS, async (_p, ctx) => (await profilesOf(ctx).get(ctx.userId)) ?? null),

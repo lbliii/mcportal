@@ -92,8 +92,15 @@ declare global {
   type Handoff = import('../handoffs.ts').Handoff;
   type Identity = import('../tools/kit.ts').Identity;
 
-  /** The room's state: the profile, who it belongs to, the portals as last loaded, saved URLs, and each portal's fallback art style. */
-  type RoomState = { profile: Profile | null; identity: Identity | null; portals: Map<string, PortalResult>; saved: Set<string>; art: Map<string, number> };
+  type RoomEdition = import('../highlights.ts').RoomEdition;
+  type Lead = import('../highlights.ts').Lead;
+
+  /**
+   * The room's state: the profile, who it belongs to, the portals as last loaded, saved
+   * URLs, each portal's fallback art style, the agent's edition and the room's lead
+   * (open_room), and the labs on.
+   */
+  type RoomState = { profile: Profile | null; identity: Identity | null; portals: Map<string, PortalResult>; saved: Set<string>; art: Map<string, number>; edition?: RoomEdition | undefined; lead?: Lead | undefined; labs: string[] };
 
   // ---- Admin page data (src/admin.ts: /admin/api/state and the POST actions).
   // admin.ts builds reports and usage as `unknown`, so their shapes are spelled out here

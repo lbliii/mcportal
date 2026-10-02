@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Room layouts ([plan](docs/plans/room-layouts.md))
+- **Your agent's picks lead the room:** `show_highlights` now keeps its picks as the room's edition for 24 hours, replacing the last. `open_room` returns the picks still in their feeds, in the agent's order, and what the room leads with: the agent's first pick, else the first new item, else the top item of the first feed. Only the refs and the agent's own words are stored; items are found again in the live feeds, so no site text is kept. Editions aren't exported and are deleted with your account. `show_highlights` is no longer marked read-only. Postgres gains `mcportal_editions` (schema version 7).
+- **Front page (lab, `MCPORTAL_LABS=frontpage`):** a third layout made for the chat column. Your agent's lead story and picks with their reasons, then each portal's top three stories (picks aren't repeated) with "5 more" pages, ending with "You're caught up" or how many new stories wait inside your portals. Nothing in it scrolls on its own; the page grows instead. Without highlights, a button asks your agent to pick them. Offered in the toolbar and to the model only while the lab is on.
+- **Open a portal:** a portal's title opens it to fill the room, in every layout: ten stories at a time inline, all of them fullscreen. The reader opens over it and comes back to it; Back or Escape returns to the room exactly as you left it. Where the browser can, the portal grows into place and a story into the reader (not with reduced motion).
+- **Unseen items read heavier:** titles you haven't had on screen are bolder, beside their **New** mark.
+- Under the hood, columns and shelves are entries in one layout registry and items draw through one component with forms, so new layouts don't touch existing ones. Both render exactly as before.
+
 ### One portal, local or hosted ([plan](docs/plans/local-hosted-hybrid.md))
 - **Who you are, at a glance:** the room's toolbar ends with an identity chip. Signed in, it shows your handle (or your GitHub login before you claim one) and opens your space. Running without an account, it shows **Ghost mode** with a ghost icon and a dashed outline: your portal stays where MCPortal runs and nothing is shared. The old space button is folded into it.
 - **"Am I signed in?" has an answer:** `account_settings` starts with the mode ("Ghost mode: not signed in…" or "Signed in to the hosted MCPortal as @handle") and returns it as `identity`; `open_room` returns `identity` too, for the toolbar. Sharing and profile tools refused on a local MCPortal now say it's in ghost mode.

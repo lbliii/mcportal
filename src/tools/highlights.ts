@@ -1,8 +1,10 @@
 /**
  * The highlights tools: list_new_items (candidates and taste signals for the agent to
- * rank) and show_highlights (the agent's picks as a card). See src/highlights.ts.
+ * rank) and show_highlights (the agent's picks as a card, kept as the room's edition).
+ * See src/highlights.ts and src/editions.ts.
  */
-import { candidateLine, candidates, findByRef, parseRef, PICKS, tasteSignals, type Candidate } from '../highlights.ts';
+import { buildEdition, EDITION_HOURS } from '../editions.ts';
+import { candidateLine, candidates, findByRef, parseRef, PICKS, tasteSignals, type HighlightPick } from '../highlights.ts';
 import { clean } from '../lib/text.ts';
 import { findPortal } from '../profile.ts';
 import { tracksSeen } from '../seen.ts';
@@ -49,8 +51,8 @@ export const HIGHLIGHT_TOOLS: ToolDef[] = [
   {
     name: 'show_highlights',
     title: 'Show highlights',
-    access: 'read',
-    description: "Show your picks from list_new_items as a highlights card: each item's ref and a one-line reason it's worth the user's time. The card shows the source's own title and link.",
+    access: 'write',
+    description: "Show your picks from list_new_items, best first, as a highlights card: each item's ref and a one-line reason it's worth the user's time. The room then leads with them for a day.",
     inputSchema: {
       type: 'object',
       required: ['picks'],
@@ -66,14 +68,14 @@ export const HIGHLIGHT_TOOLS: ToolDef[] = [
         },
       },
     },
-    annotations: { readOnlyHint: true, openWorldHint: true },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     _meta: { ui: { resourceUri: ROOM_URI } },
     async handler(args, ctx) {
       const profile = await ctx.store.get(ctx.userId);
       const picks = args.picks as Array<{ ref: string; why: string }>;
       // Load each named portal once (cached), and find each pick among its real items.
       const portals = new Map<string, Awaited<ReturnType<typeof portalFor>> | null>();
-      const shown: Array<Candidate & { why: string }> = [];
+      const shown: HighlightPick[] = [];
       const unknown: string[] = [];
       for (const pick of picks) {
         const ref = parseRef(pick.ref);
@@ -89,7 +91,9 @@ export const HIGHLIGHT_TOOLS: ToolDef[] = [
       if (!shown.length) return toolError(`None of those refs name an item in the room (${unknown.join(', ')}). Use refs from list_new_items.`, 'invalid_argument');
       const title = clean(args.title, PICKS.title) || 'Highlights';
       const intro = clean(args.intro, PICKS.intro);
-      return ok(`Showing ${shown.length} highlight(s) in a card.${unknown.length ? ` Skipped refs that name nothing in the room: ${unknown.join(', ')}.` : ''}`,
+      // The room's edition: only the refs and your words are kept; open_room finds the items again.
+      await ctx.editions?.put(ctx.userId, buildEdition({ title, intro, picks: shown.map(({ ref, why }) => ({ ref, why })) }));
+      return ok(`Showing ${shown.length} highlight(s) in a card.${ctx.editions ? ` The room leads with them for ${EDITION_HOURS} hours.` : ''}${unknown.length ? ` Skipped refs that name nothing in the room: ${unknown.join(', ')}.` : ''}`,
         { highlights: { title, ...(intro ? { intro } : {}), picks: shown } } satisfies ToolResults['show_highlights']);
     },
   },

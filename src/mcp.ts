@@ -41,7 +41,7 @@ const UI_DIR = new URL('./ui/', import.meta.url);
 /** Files inlined into the room where it says <!--include:name--> or /*include:name*\/, so the page stays self-contained. */
 export const UI_INCLUDES = [
   'design/tokens.css', 'design/primitives.css', 'design/palettes.js', 'design/theme.js', 'art.js', 'brand/icons.js', 'brand/mark-line.svg', 'brand/badge.svg', 'brand/wordmark.svg',
-  'room/room.css', 'room/bridge.js', 'room/dom.js', 'room/room.js', 'room/seen.js', 'room/reader.js', 'room/reading.js', 'room/passage.js', 'room/handoff.js', 'room/highlights.js', 'room/docs.js', 'room/social.js', 'room/add.js', 'room/toolbar.js', 'room/boot.js',
+  'room/room.css', 'room/bridge.js', 'room/dom.js', 'room/room.js', 'room/items.js', 'room/layouts.js', 'room/levels.js', 'room/seen.js', 'room/reader.js', 'room/reading.js', 'room/passage.js', 'room/handoff.js', 'room/highlights.js', 'room/docs.js', 'room/social.js', 'room/add.js', 'room/toolbar.js', 'room/boot.js',
 ];
 
 /** JSON that is safe to embed inside a <script> element. */
