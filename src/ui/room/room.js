@@ -7,6 +7,7 @@
     root.classList.add('welcome-view');
     $('grid').hidden = true; $('reader').hidden = true;
     $('roomName').textContent = rebuilding ? 'start over' : 'welcome';
+    drawIdentity(data.identity);
     setStatus('');
     /** @type {Set<string>} */
     const chosen = new Set();
@@ -84,6 +85,7 @@
     state.saved = new Set(state.profile.saved.map((s) => s.url));
     state.portals = new Map(data.portals.map((p) => [p.portalId, p]));
     $('roomName').textContent = data.profile.name;
+    drawIdentity(data.identity);
     drawLayout();
     setUpdated(data.generatedAt);
     if (data.notice) toast(data.notice);

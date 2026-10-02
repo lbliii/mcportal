@@ -159,7 +159,9 @@ test('export_data writes a file locally; import_portal works through the tool', 
   const imported = await call(other, 'import_portal', { data: exported });
   assert.match(imported.content[0]!.text, /Imported:/);
   assert.ok((await call(other, 'import_portal', { data: 'not json' })).isError);
-  assert.match((await call(portal(), 'account_settings')).content[0]!.text, /runs on your machine/);
+  const settings = await call(portal(), 'account_settings');
+  assert.match(settings.content[0]!.text, /^Ghost mode: not signed in/);
+  assert.deepEqual(settings.structuredContent!.identity, { mode: 'ghost' });
 });
 
 test('multipart: fields and a file, binary-safe; malformed bodies throw', async () => {

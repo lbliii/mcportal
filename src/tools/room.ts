@@ -10,7 +10,7 @@ import { SEEN_BATCH, tracksSeen, withNews } from '../seen.ts';
 import { describeDiff, describeLayout, diffProfiles, findPortal, normalizeSourceConfig, type PortalInput, type Profile, type ProfileDiff } from '../profile.ts';
 import { clipsPortal, clipsQuery, followingPortal, loadPortal, pinnedPortal, savedPortal } from '../sources.ts';
 import type { PortalResult } from '../types.ts';
-import { ok, toolError, toolFailure, untrusted, ROOM_URI, type CallToolResult, type ToolContext, type ToolDef } from './kit.ts';
+import { identityOf, ok, toolError, toolFailure, untrusted, ROOM_URI, type CallToolResult, type ToolContext, type ToolDef } from './kit.ts';
 import type { ToolResults } from './results.ts';
 
 /** Any portal's current items: profile-backed ones from the profile and stores, the rest fetched (cached unless `force`). */
@@ -81,7 +81,7 @@ export const ROOM_TOOLS: ToolDef[] = [
     annotations: { readOnlyHint: true, openWorldHint: true },
     _meta: { ui: { resourceUri: ROOM_URI } },
     async handler(args, ctx) {
-      const profile = await ctx.store.get(ctx.userId);
+      const [profile, identity] = await Promise.all([ctx.store.get(ctx.userId), identityOf(ctx)]);
       const notice = ctx.store.takeNotice?.(ctx.userId);
       if (!profile.onboarded || args.setup === true) {
         const packs = packSummaries();
@@ -92,12 +92,12 @@ export const ROOM_TOOLS: ToolDef[] = [
           `Starter packs (pick up to ${MAX_PACKS} with build_room): ${packs.map((p) => `${p.id} (${p.label}: ${p.sources.join(', ')})`).join('; ')}.`,
           'For interests no pack covers, build from the closest packs (or none), then use find_source and add_portal for specific sites, channels or feeds.',
         ].join('\n');
-        return ok(text, { profile, portals: [], onboarding: { packs, maxPacks: MAX_PACKS, rebuilding: profile.onboarded }, generatedAt: new Date().toISOString() } satisfies ToolResults['open_room']);
+        return ok(text, { profile, portals: [], onboarding: { packs, maxPacks: MAX_PACKS, rebuilding: profile.onboarded }, identity, generatedAt: new Date().toISOString() } satisfies ToolResults['open_room']);
       }
       const specs = profile.columns.flatMap((c) => c.panels);
       await ctx.seen?.keepOnly(ctx.userId, specs.map((p) => p.id));
       const portals = await withNews(await Promise.all(specs.map((p) => portalFor(p, profile, ctx))), ctx.userId, ctx.seen);
-      return ok(summarizePortals(profile, portals, notice), { profile, portals, notice, generatedAt: new Date().toISOString() } satisfies ToolResults['open_room']);
+      return ok(summarizePortals(profile, portals, notice), { profile, portals, notice, identity, generatedAt: new Date().toISOString() } satisfies ToolResults['open_room']);
     },
   },
   {

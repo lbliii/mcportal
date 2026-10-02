@@ -134,7 +134,7 @@
     },
     {
       "name": "account_settings",
-      "description": "Link to the user's account page, where they sign in with GitHub to download everything or delete their account."
+      "description": "Whether the user is signed in (as whom) or in ghost mode, and the account page, where they download everything or delete their account (only there, never a tool)."
     },
     {
       "name": "list_reading",

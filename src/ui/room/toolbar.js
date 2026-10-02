@@ -29,7 +29,26 @@
   $('btnOpenIn').addEventListener('click', () => {
     if (state.profile) saveSettings({ openIn: state.profile.openIn === 'chat' ? 'card' : 'chat' });
   });
-  $('btnSpace').addEventListener('click', () => loadSpace('', false));
+  // Who the room belongs to: your handle (your space) when signed in, ghost mode when not.
+  /** @param {Identity} identity */
+  function drawIdentity(identity) {
+    state.identity = identity;
+    const who = $('btnWho');
+    const ghost = identity.mode === 'ghost';
+    const name = ghost ? 'Ghost mode' : identity.handle ? `@${identity.handle}` : (identity.login ?? 'Signed in');
+    const title = ghost
+      ? 'Ghost mode: no account. Your portal stays on this computer and nothing is shared.'
+      : identity.handle ? `Signed in as @${identity.handle}. Open your space: what people who follow you see.` : `Signed in as ${name}. Open your space to claim a handle.`;
+    who.classList.toggle('ghost', ghost);
+    who.title = title;
+    who.setAttribute('aria-label', title);
+    who.replaceChildren(ghost ? icon('ghost') : icon('space'), el('span', { class: 'who-name' }, name));
+    who.hidden = false;
+  }
+  $('btnWho').addEventListener('click', () => {
+    if (state.identity?.mode === 'hosted') return loadSpace('', false);
+    toast('Ghost mode: no account. Your portal stays on this computer, and nothing is shared or synced.');
+  });
   $('btnRefresh').addEventListener('click', async () => {
     if (!state.profile) return loadRoom();
     setStatus('Scanning the ether for fresh dispatches…');
