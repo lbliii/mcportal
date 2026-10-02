@@ -44,6 +44,21 @@
   .seg .ib svg { width: var(--mp-icon-small); height: var(--mp-icon-small); }
   .seg .ib:hover:not([aria-pressed="true"]) { background: none; color: var(--mp-text-primary); }
   .seg .ib[aria-pressed="true"] { background: var(--mp-action-primary); color: var(--mp-action-on-primary); }
+  .who { display: inline-flex; align-items: center; gap: 5px; flex: none; max-width: 180px; height: var(--mp-control-minimum); padding: 0 var(--mp-space-8) 0 5px; margin-left: 3px; border: 1px solid var(--mp-border-divider); border-radius: 999px; background: none; color: var(--mp-text-secondary); font: inherit; font-size: var(--mp-type-12); cursor: pointer; }
+  .who:hover, .who:focus-visible { background: var(--mp-surface-hover); color: var(--mp-text-primary); outline: none; }
+  .who svg { flex: none; width: var(--mp-icon-small); height: var(--mp-icon-small); fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; }
+  .who-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .who.ghost { border-style: dashed; }
+  .who.offline { border-style: dotted; color: var(--mp-text-secondary); opacity: 0.8; }
+  .who-wrap { position: relative; display: inline-flex; }
+  .who-menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: var(--mp-layer-sticky); width: min(300px, calc(100vw - 24px)); padding: var(--mp-space-12); background: var(--mp-surface-canvas); border: 1px solid var(--mp-border-divider); border-radius: var(--mp-radius-card); box-shadow: 0 8px 24px rgb(0 0 0 / 0.14); font-size: var(--mp-type-12); color: var(--mp-text-primary); }
+  .who-menu p { margin: var(--mp-space-6) 0; line-height: 1.45; }
+  .who-menu .muted { color: var(--mp-text-secondary); }
+  .who-head { display: flex; align-items: center; gap: 6px; font-size: var(--mp-type-14, 14px); }
+  .who-head svg { width: var(--mp-icon-normal); height: var(--mp-icon-normal); fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; }
+  .who-actions { display: flex; flex-wrap: wrap; gap: var(--mp-space-6); margin-top: var(--mp-space-8); }
+  .who-menu .btn.primary { margin-top: var(--mp-space-4); }
+  @container (max-width: 560px) { .who { padding: 0; width: var(--mp-control-minimum); justify-content: center; } .who-name { display: none; } }
   .sep { width: 1px; height: 16px; background: var(--mp-border-divider); margin: 0 3px; }
   :root.article-view .room-only, :root.welcome-view .room-only { display: none !important; }
 

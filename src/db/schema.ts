@@ -47,7 +47,7 @@ export async function connect(url: string, options: { searchPath?: string } = {}
   return pool as unknown as Queryable;
 }
 
-const SCHEMA_VERSION = '7';
+export const SCHEMA_VERSION = '7';
 
 export async function ensureSchema(db: Queryable): Promise<void> {
   await db.query(`CREATE TABLE IF NOT EXISTS mcportal_meta (key text PRIMARY KEY, value text NOT NULL)`);

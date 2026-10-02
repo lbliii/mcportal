@@ -34,7 +34,12 @@ export interface ReadingStore {
 export const READING_LIMIT = 1000;
 export function canonicalReadingUrl(value: unknown): string {
   if (typeof value !== 'string' || value.length > 4096) throw invalid('Reading URL must be an HTTP(S) URL of at most 4096 characters.');
-  const url = new URL(value);
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw invalid('Reading URL must be an HTTP(S) URL.');
+  }
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) throw invalid('Reading URL must be HTTP(S), without credentials.');
   url.hash = '';
   return url.href;

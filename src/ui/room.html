@@ -24,12 +24,15 @@
     <button class="ib" data-layout="shelves" data-icon="shelves" aria-pressed="false" title="Shelves: one sideways row per source" aria-label="Shelves layout"></button>
     <button class="ib" data-layout="frontpage" data-icon="frontpage" aria-pressed="false" title="Front page: your agent's picks, then each source's top stories" aria-label="Front page layout" hidden></button>
   </div>
-  <button class="ib room-only" id="btnSpace" data-icon="space" title="Your space: what people who follow you see" aria-label="Open your space"></button>
   <button class="ib room-only" id="btnAdd" data-icon="plus" aria-pressed="false" title="Add a source: any site, feed, subreddit, YouTube channel or repo" aria-label="Add a source"></button>
   <button class="ib room-only" id="btnOpenIn" data-icon="chat" aria-pressed="false" title="Open stories as their own card in the conversation" aria-label="Open stories in chat" hidden></button>
   <button class="ib room-only" id="btnSources" data-icon="sources" aria-pressed="false" title="Show where each portal's data came from" aria-label="Show sources"></button>
   <button class="ib room-only" id="btnRefresh" data-icon="refresh" title="Refresh all portals" aria-label="Refresh all portals"></button>
   <button class="ib" id="btnExpand" data-icon="expand" title="Fullscreen: step all the way through" aria-label="Fullscreen"></button>
+  <div class="who-wrap room-only">
+    <button class="who" id="btnWho" aria-haspopup="dialog" aria-controls="whoMenu" hidden></button>
+    <div class="who-menu" id="whoMenu" role="dialog" aria-label="Your account" hidden></div>
+  </div>
 </header>
 <section id="addSheet" class="add-sheet room-only" hidden>
   <form class="add-row" id="addForm">

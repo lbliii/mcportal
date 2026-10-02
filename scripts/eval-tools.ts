@@ -162,7 +162,7 @@ async function run(): Promise<void> {
   const runs = Number(flag('runs') ?? 1);
   const suite = flag('suite');
   const client = new Anthropic();
-  const surfaces = { local: await serverSurface('local'), 'hosted-new': await serverSurface('hosted-new'), 'hosted-active': await serverSurface('hosted-active') };
+  const surfaces = { local: await serverSurface('local'), linked: await serverSurface('linked'), 'hosted-new': await serverSurface('hosted-new'), 'hosted-active': await serverSurface('hosted-active') };
   const scores: Scores = {
     ...(!suite || suite === 'selection' ? await selection(client, model, effort, runs, flag('only'), surfaces) : {}),
     ...(!suite || suite === 'injection' ? await injection(client, model, effort, runs, surfaces['hosted-active']) : {}),

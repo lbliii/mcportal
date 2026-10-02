@@ -8,6 +8,7 @@
  *   POST /account/import           upload an MCPortal export (signed in, same origin, CSRF)
  *   POST /account/delete           delete everything (signed in, same origin, CSRF, typed confirmation)
  *   POST /account/logout
+ *   POST /account/devices/revoke   sign one app or device out (signed in, same origin, CSRF)
  *   GET  /download/<token>         a one-time link from the export_data tool (15 minutes)
  *   GET  /upload/<token>           a one-time link from import_portal: pick a file (15 minutes)
  *   POST /upload/<token>
@@ -171,6 +172,7 @@ export class AccountPage {
     const profile = await this.deps.store.get(s.accountId);
     const clips = this.deps.clips ? (await this.deps.clips.usage(s.accountId)).count : 0;
     const pub = await this.deps.publicProfiles?.get(s.accountId);
+    const grants = await this.deps.oauth.grantsOf(s.accountId);
     const portals = profile.columns.reduce((n, c) => n + c.panels.length, 0);
     const login = escapeHtml(s.login);
     const labels: Record<ExportFormat, string> = { mcportal: 'Everything (MCPortal export, JSON)', bookmarks: 'Saved items (bookmarks file)', clips: 'Clips (Markdown, .tar.gz)', opml: 'Sources (OPML)' };
@@ -178,6 +180,12 @@ export class AccountPage {
 <h1>Your MCPortal account</h1>
 <p>Signed in as <b>@${login}</b>${pub ? `. Public profile: <b>@${escapeHtml(pub.handle)}</b>` : '. No public profile'}.</p>
 <p class="muted">${portals} portal(s), ${profile.saved.length} saved item(s), ${clips} clip(s).</p>
+<h2 style="font-size:16px">Signed-in apps and devices</h2>
+${grants.length ? `<ul>${grants.map((g) => `<li><form method="post" action="/account/devices/revoke" style="display:flex;gap:8px;align-items:center;margin:0 0 6px">
+  <input type="hidden" name="csrf" value="${escapeHtml(s.csrf)}"><input type="hidden" name="grant" value="${escapeHtml(g.grantId)}">
+  <span><b>${escapeHtml(g.clientName)}</b> <span class="muted">${g.lastUsedAt ? `last used ${new Date(g.lastUsedAt).toISOString().slice(0, 10)}` : ''}</span></span>
+  <button>Revoke</button></form></li>`).join('')}</ul>
+<p class="muted">Revoking signs that app or device out at once; it can sign in again.</p>` : '<p class="muted">None right now.</p>'}
 <h2 style="font-size:16px">Download your data</h2>
 <ul>${EXPORT_FORMATS.map((f) => `<li><a href="/account/export/${f}">${labels[f]}</a></li>`).join('')}</ul>
 <h2 style="font-size:16px">Import</h2>
@@ -280,7 +288,7 @@ ${uploadForm('/account/import', s.csrf)}
       return true;
     }
 
-    if ((route === '/account/delete' || route === '/account/logout') && req.method === 'POST') {
+    if ((route === '/account/delete' || route === '/account/logout' || route === '/account/devices/revoke') && req.method === 'POST') {
       let form: URLSearchParams;
       try {
         form = await readForm(req, MAX_FORM);
@@ -289,6 +297,12 @@ ${uploadForm('/account/import', s.csrf)}
       }
       if (!sameOrigin(req, this.deps.publicUrl) || !this.sessions.csrfMatches(current.session, form.get('csrf'))) {
         return sendHtml(res, 403, page('Refused', '<p>That request didn\'t come from your account page. <a href="/account">Go back</a>.</p>')), true;
+      }
+      if (route === '/account/devices/revoke') {
+        const revoked = await this.deps.oauth.revokeGrantOf(current.session.accountId, form.get('grant') ?? '');
+        if (revoked) this.deps.log?.info('account.device_revoked', {});
+        redirect(res, '/account');
+        return true;
       }
       if (route === '/account/logout') {
         this.sessions.end(current.key);

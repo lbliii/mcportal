@@ -127,11 +127,16 @@ function box(x: number, y: number, w: number, h: number, r = R): string {
  * The room's icons, on the Line mark's 24-unit grid and stroke. Where an icon has a frame,
  * it borrows the mark: columns are two doorways, the front page is a lead block over its lines, the bookmark and the "open original" frame are
  * arch-topped, a space is someone's doorway, refresh runs around a tilted orbit, and the feed
- * icon's dot is the moon's size. Everything else keeps the familiar shape with the house corner.
+ * icon's dot is the moon's size, and ghost mode is a doorway with a wavy hem. Everything else keeps the familiar shape with the house corner.
  */
 function icons(): Record<string, Icon> {
   // A shelf row: one picture, then the next running off the edge.
   const shelf = (y: number) => `${box(3.5, y, 7.5, 6, 2.5)}M20.5 ${y}H16.5a2.5 2.5 0 0 0-2.5 2.5v1a2.5 2.5 0 0 0 2.5 2.5h4`;
+  // A ghost: a doorway's arch with a wavy hem, and two eyes.
+  const hem = (w: number, waves: number) => {
+    const step = w / (waves * 2);
+    return `q${r2(-step / 2)} -2 ${r2(-step)} 0` + `t${r2(-step)} 0`.repeat(waves * 2 - 1);
+  };
   const bubble = 'M7 5h10a3 3 0 0 1 3 3v6.5a3 3 0 0 1-3 3h-6l-3.5 2.5v-2.5H7a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3z';
   return {
     columns: { d: arch(7.25, 19.5, 6.5, 15) + arch(16.75, 19.5, 6.5, 15) },
@@ -155,6 +160,7 @@ function icons(): Record<string, Icon> {
     bookmark: { d: 'M7 20V9.5a5 5 0 0 1 10 0V20l-5-3.5z' },
     share: { d: 'M12 14.5V4.5M8 8.5l4-4 4 4M5.5 12.5v4.5a3 3 0 0 0 3 3h7a3 3 0 0 0 3-3v-4.5' },
     space: { d: `${arch(12, 20, 14, 16)}M8.75 20a3.25 3.25 0 0 1 6.5 0`, dot: [12, 12.25, 2.1] },
+    ghost: { d: `M5 19.5V11a7 7 0 0 1 14 0v8.5${hem(14, 3)}zM9.75 10v1.75M14.25 10v1.75` },
   };
 }
 

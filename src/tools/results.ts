@@ -16,6 +16,7 @@ import type { Candidate, HighlightPick, Lead, RoomEdition } from '../highlights.
 import type { Lab } from '../labs.ts';
 import type { ReadingState } from '../reading.ts';
 import type { Article, Item, PortalResult, Provenance } from '../types.ts';
+import type { Identity } from './kit.ts';
 
 /** A starter pack as the welcome screen lists it. */
 export type PackSummary = { id: string; label: string; blurb: string; sources: string[] };
@@ -26,6 +27,8 @@ export type RoomResult = {
   portals: PortalResult[];
   notice?: string | undefined;
   generatedAt: string;
+  /** Signed in (and as whom) or ghost mode, for the toolbar. */
+  identity: Identity;
   onboarding?: { packs: PackSummary[]; maxPacks: number; rebuilding: boolean };
   /** The agent's latest highlights still in the room (src/editions.ts). */
   edition?: RoomEdition;
@@ -89,6 +92,8 @@ export type ToolResults = {
   share: { share: SharedItem };
   relationship: { handle?: string; layoutChanged?: boolean; profile?: Profile };
   record_reading: { reading: ReadingState };
+  link_account: { url: string };
+  unlink_account: { identity: Identity };
   get_reading: { reading: ReadingState | null };
   list_reading: { reading: ReadingState[] };
 };

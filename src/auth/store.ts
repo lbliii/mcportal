@@ -40,6 +40,16 @@ export interface TokenRecord extends Identity {
   expiresAt: number;
 }
 
+/** One signed-in app or device, as the account page lists it. */
+export interface GrantSummary {
+  grantId: string;
+  clientName: string;
+  /** When its client last used MCPortal (ms), 0 if unknown. */
+  lastUsedAt: number;
+  /** When it stops working unless used again (the refresh token's expiry, ms). */
+  expiresAt: number;
+}
+
 export interface IssuedTokens {
   access_token: string;
   token_type: 'Bearer';
@@ -172,6 +182,41 @@ export class AuthStore {
       let n = 0;
       for (const [hash, r] of Object.entries(d.tokens)) if (r.userId === userId) { delete d.tokens[hash]; n++; }
       return n;
+    });
+  }
+
+  /**
+   * The user's signed-in apps and devices: one entry per grant that can still be
+   * refreshed, newest use first, with the client's name.
+   */
+  async grantsOf(userId: string): Promise<GrantSummary[]> {
+    const d = await this.load(0);
+    const grants = new Map<string, GrantSummary>();
+    for (const r of Object.values(d.tokens)) {
+      if (r.userId !== userId || r.kind !== 'refresh' || r.expiresAt <= this.now()) continue;
+      const client = d.clients[r.clientId];
+      grants.set(r.grantId, { grantId: r.grantId, clientName: client?.client_name ?? 'An MCP client', lastUsedAt: (client?.last_used_at ?? 0) * 1000, expiresAt: r.expiresAt });
+    }
+    return [...grants.values()].sort((a, b) => b.lastUsedAt - a.lastUsedAt);
+  }
+
+  /** Sign one app or device out (the account page's Revoke). False if the grant isn't the user's. */
+  revokeGrantOf(userId: string, grantId: string): Promise<boolean> {
+    return this.write((d) => {
+      if (!Object.values(d.tokens).some((r) => r.grantId === grantId && r.userId === userId)) return false;
+      this.revokeGrant(d, grantId);
+      return true;
+    });
+  }
+
+  /**
+   * Token revocation (RFC 7009): the grant behind an access or refresh token, if it was
+   * issued to `clientId`. Unknown tokens are not an error, so the answer says nothing.
+   */
+  revokeToken(token: string, clientId: string): Promise<void> {
+    return this.write((d) => {
+      const r = d.tokens[hashToken(token)];
+      if (r && r.clientId === clientId) this.revokeGrant(d, r.grantId);
     });
   }
 

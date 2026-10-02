@@ -11,6 +11,7 @@ import { after, before, test } from 'node:test';
 import { FileClipStore, MemoryClipStore, type ClipStore } from '../src/clip-stores.ts';
 import { buildClip } from '../src/clips.ts';
 import { memoryPersistence } from '../src/lib/document.ts';
+import type { AppError } from '../src/lib/errors.ts';
 import { defaultProfile, validateProfile } from '../src/profile.ts';
 import { buildEdition, FileEditionStore, MemoryEditionStore, type EditionStore } from '../src/editions.ts';
 import { FileHandoffStore, HANDOFF_LIMIT, MemoryHandoffStore, type HandoffStore } from '../src/handoffs.ts';
@@ -111,6 +112,31 @@ for (const b of BACKENDS) {
     assert.deepEqual((await store.get(u)).saved.map((s) => s.url).sort(), urls, 'concurrent updates all land');
     await store.delete(u);
     assert.equal((await store.get(u)).name, defaultProfile().name, 'deleted');
+  });
+
+  test(`contract (${b.name}): profile revisions`, { skip: b.skip }, async () => {
+    const store = await b.profiles();
+    const u = user('r');
+    assert.equal((await store.versioned(u)).rev, 0, 'never written');
+    const named = (name: string) => validateProfile({ ...defaultProfile(), name, onboarded: true });
+    await store.put(u, named('one'));
+    assert.equal((await store.versioned(u)).rev, 1);
+    await store.update(u, (p) => ({ profile: { ...p, name: 'two' }, result: undefined }));
+    assert.equal((await store.versioned(u)).rev, 2, 'update writes count');
+    await store.update(u, () => ({ result: undefined }));
+    assert.equal((await store.versioned(u)).rev, 2, 'a read-only update does not');
+    assert.equal(await store.replaceIf(u, named('three'), 2), 3);
+    const { profile, rev } = await store.versioned(u);
+    assert.equal(profile.name, 'three');
+    assert.equal(rev, 3);
+    assert.ok(!('rev' in profile) && !('rev' in (await store.get(u))), 'the revision is not part of the profile');
+    await assert.rejects(store.replaceIf(u, named('stale'), 2), (e: AppError) => e.code === 'conflict' && e.details?.rev === 3);
+    assert.equal((await store.get(u)).name, 'three', 'a stale replace changes nothing');
+    assert.equal(await store.replaceIf(user('fresh'), named('first'), 0), 1, 'replacing a never-written profile at 0');
+    // Racing replaces at the same revision: exactly one wins.
+    const results = await Promise.allSettled([4, 5, 6].map((n) => store.replaceIf(u, named(`race ${n}`), 3)));
+    assert.equal(results.filter((r) => r.status === 'fulfilled').length, 1, 'one replace wins');
+    assert.equal((await store.versioned(u)).rev, 4);
   });
 
   test(`contract (${b.name}): clips`, { skip: b.skip }, async () => {

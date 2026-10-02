@@ -71,8 +71,7 @@ export const CLIP_TOOLS: ToolDef[] = [
       if (!ctx.clips) return noStore();
       let clip: Clip;
       try {
-        clip = buildClip(fromContent(args));
-        await ctx.clips.add(ctx.userId, clip);
+        clip = await ctx.clips.add(ctx.userId, buildClip(fromContent(args)));
       } catch (error) {
         return toolFailure(error, 'Not clipped: ');
       }

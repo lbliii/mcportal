@@ -9,8 +9,12 @@ import { CLIP_LIMITS, ClipError, clampLimit, normalizeTags, patchClip, queryWord
 import { atomicWrite, defaultDataDir, KeyedMutex, safeFileId } from './lib/files.ts';
 
 export interface ClipStore {
-  /** Throws ClipError when the user is at a limit. */
-  add(userId: string, clip: Clip): Promise<void>;
+  /**
+   * Keep a clip built by buildClip, and resolve to the clip as stored: use that one
+   * afterwards (a linked MCPortal's hosted server builds it again and assigns the id).
+   * Throws ClipError when the user is at a limit.
+   */
+  add(userId: string, clip: Clip): Promise<Clip>;
   get(userId: string, id: string): Promise<Clip | undefined>;
   /** Newest first, without content. */
   list(userId: string, query?: ClipQuery): Promise<ClipSummary[]>;
@@ -57,11 +61,11 @@ abstract class DocumentClipStore implements ClipStore {
     });
   }
 
-  add(userId: string, clip: Clip): Promise<void> {
+  add(userId: string, clip: Clip): Promise<Clip> {
     return this.edit(userId, (clips) => {
       const refused = clipQuotaProblem({ count: clips.length, bytes: clips.reduce((sum, c) => sum + c.bytes, 0) }, clip.bytes);
       if (refused) throw new ClipError(refused, 'limit_exceeded');
-      return { clips: [clip, ...clips.filter((c) => c.id !== clip.id)], result: undefined };
+      return { clips: [clip, ...clips.filter((c) => c.id !== clip.id)], result: structuredClone(clip) };
     });
   }
 

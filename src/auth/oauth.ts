@@ -198,6 +198,7 @@ export class OAuthServer {
       issuer: base,
       authorization_endpoint: `${base}/oauth/authorize`,
       token_endpoint: `${base}/oauth/token`,
+      revocation_endpoint: `${base}/oauth/revoke`,
       registration_endpoint: `${base}/oauth/register`,
       response_types_supported: ['code'],
       grant_types_supported: ['authorization_code', 'refresh_token'],
@@ -294,6 +295,7 @@ export class OAuthServer {
       if (route === '/oauth/authorize' && req.method === 'POST') return await this.authorizeDecision(req, res), true;
       if (route === '/oauth/callback' && req.method === 'GET') return await this.githubCallback(req, res, url), true;
       if (route === '/oauth/token' && req.method === 'POST') return await this.token(req, res), true;
+      if (route === '/oauth/revoke' && req.method === 'POST') return await this.revoke(req, res), true;
       sendJson(res, 404, { error: 'not_found' });
       return true;
     } catch (error) {
@@ -499,6 +501,26 @@ export class OAuthServer {
   private async githubIdentity(ghCode: string): Promise<GithubIdentity | { error: string }> {
     if (!this.config.github) return { error: 'GitHub sign-in is not configured' };
     return githubIdentity(this.fetcher, this.config.github, ghCode, `${this.config.publicUrl}/oauth/callback`);
+  }
+
+  /**
+   * Token revocation (RFC 7009), for public clients: the token's whole grant goes, if
+   * it was issued to client_id. Always 200, so it can't be used to test tokens.
+   */
+  private async revoke(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    if (!this.limits.token.take(this.clientIp(req))) throw new OAuthError('slow_down', 'Too many token requests', 429);
+    const body = await readForm(req);
+    if (body.token && body.client_id) await this.store.revokeToken(body.token, body.client_id);
+    sendJson(res, 200, {}, CORS);
+  }
+
+  /** The user's signed-in apps and devices (the account page). */
+  grantsOf(userId: string): ReturnType<AuthStore['grantsOf']> {
+    return this.store.grantsOf(userId);
+  }
+
+  revokeGrantOf(userId: string, grantId: string): Promise<boolean> {
+    return this.store.revokeGrantOf(userId, grantId);
   }
 
   private async token(req: IncomingMessage, res: ServerResponse): Promise<void> {
