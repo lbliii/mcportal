@@ -106,6 +106,11 @@ test('resources/read serves the self-contained room app', async () => {
   for (const [, script] of content.text.matchAll(/<script>([\s\S]*?)<\/script>/g)) new vm.Script(script); // throws on a syntax error
   const missing = await rpc(ctx(), 'resources/read', { uri: 'ui://nope' });
   assert.equal(missing.error?.code, -32602);
+
+  // The same CSP (no external origins) on the listing, so hosts can review it when they connect.
+  const listed = ((await rpc(ctx(), 'resources/list')).result as any).resources[0];
+  assert.deepEqual(listed._meta.ui.csp, { connectDomains: [], resourceDomains: [] });
+  assert.deepEqual(listed._meta.ui, content._meta.ui);
 });
 
 test('room fragments: every src/ui/room file is included, in order, and no include marker is left', async () => {

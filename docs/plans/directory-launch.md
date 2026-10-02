@@ -33,19 +33,19 @@ Get MCPortal listed in Claude's directory first and OpenAI's (ChatGPT and Codex)
 
 ## Phase 1: the tool contract (code)
 
-- [ ] Every tool states all three hints: `readOnlyHint`, `destructiveHint`, `openWorldHint`. About 32 tools are missing `openWorldHint`, which hosts read as `true`. Only tools that fetch the open web (sources, articles, docs, thumbnails) should be `true`.
-- [ ] A test that fails if a tool is missing a title or any of the three hints, or has a write tool marked read-only.
-- [ ] Review the descriptions against both directories' rules:
+- [x] Every tool states all three hints: `readOnlyHint`, `destructiveHint`, `openWorldHint` (required by the `ToolAnnotations` type). `openWorldHint` is `true` for tools that reach the web or make something visible to other people (`share`, `relationship`, `set_public_profile`). `build_room` is now destructive (it replaces the layout); `export_data` isn't read-only (it writes a file, or makes a link).
+- [x] A test that fails if a tool is missing a title or any of the three hints, or has a write tool marked read-only (`test/tool-contract.test.ts`).
+- [x] Review the descriptions against both directories' rules (2026-10-02: they give usage guidance such as "only when they ask", which is allowed; no tool both reads and writes):
   - narrow and accurate
   - no instructions aimed at the model beyond how to use the tool
   - no tool that both reads and writes
-- [ ] `test/footprint-ceilings.json` covers all 47 tools (today 41).
+- [x] `test/footprint-ceilings.json` covers every tool the model sees. The 6 without a ceiling are app-only (`visibility: ['app']`), so they cost the model nothing.
 - [ ] MCP Apps metadata:
-  - CSP on the `resources/list` entry as well as `resources/read`
-  - `_meta.ui.domain`, unique to MCPortal and required by OpenAI
-  - `ui/open-link` origins we own, declared so Claude doesn't ask to confirm each link
+  - [x] CSP on the `resources/list` entry as well as `resources/read`
+  - [ ] `_meta.ui.domain`, required by OpenAI: moved to Phase 9. Its format is host-specific (Claude uses hash-based `*.claudemcpcontent.com` names, ChatGPT URL-derived `*.oaiusercontent.com` ones), it depends on the custom domain (D5), and a wrong value could break the room in Claude. Set it from the client's identity, or confirm in Phase 6 that Claude ignores ChatGPT's value.
+  - [ ] `ui/open-link` origins we own: a field in Claude's submission form (Phase 7), not code
 - [ ] Error text is specific everywhere. This is mostly done (coded tool errors with a reference number); audit what the hosted server returns for 5xx.
-- [ ] Prefer CIMD over dynamic client registration in our OAuth metadata, as Anthropic recommends for directory traffic. Both already work; check the advertised order and keep DCR.
+- [x] CIMD and dynamic client registration are both advertised (`client_id_metadata_document_supported`, `registration_endpoint`); clients pick CIMD when they support it. Nothing to change.
 
 ## Phase 2: policies and trust (docs and site)
 
@@ -74,10 +74,10 @@ Get MCPortal listed in Claude's directory first and OpenAI's (ChatGPT and Codex)
 An audit on 2026-10-02 found the foundations solid (sign-in tokens stored only as hashes, the GitHub token used once and dropped, SSRF-safe fetching, CSRF on the account page, no content or IPs in logs), but the privacy policy promises things the code doesn't do. Every statement on `/privacy` must be true before open sign-up.
 
 **Statements that aren't true today:**
-- [ ] **Logs:** the policy says logs don't record your user ID. They record `userRef`, a hash with a fixed prefix (`src/lib/log.ts`). GitHub ids are sequential and the repo will be public, so it can be reversed. Key the hash with a secret (`MCPORTAL_LOG_KEY`), and say what logs keep.
-- [ ] **Backups:** the policy promises point-in-time recovery and that backups roll over within 30 days. Nothing sets that up. Configure backups with 30-day retention (Phase 4), or change the wording until they exist.
-- [ ] **What we store:** add reading history (up to 1,000 URLs, titles and progress per user), seen marks, highlights (editions), handoffs (a URL and passage), and the device name recorded when a computer links. Add the account-page cookie (1 hour) to the cookie section.
-- [ ] **"Keeps only your GitHub user ID and login":** make clear this is about GitHub data, not everything stored.
+- [x] **Logs:** `userRef` is now an HMAC with a random key made at startup (`src/lib/log.ts`): consistent within one server process, not reversible, new after each restart. The policy says what logs keep.
+- [x] **Backups (wording):** the policy no longer promises point-in-time recovery or 30-day rollover; it says the page will state retention once scheduled backups exist. Setting them up is Phase 4.
+- [x] **What we store:** add reading history (up to 1,000 URLs, titles and progress per user), seen marks, highlights (editions), handoffs (a URL and passage), and the device name recorded when a computer links. Add the account-page cookie (1 hour) to the cookie section.
+- [x] **"Keeps only your GitHub user ID and login":** make clear this is about GitHub data, not everything stored.
 
 **Deletion that leaves traces** (`deleteAccountData`, `src/account.ts`):
 - [ ] OAuth client records from linked computers keep the computer's hostname; delete the user's clients.
@@ -209,6 +209,7 @@ Billing lives only on the hosted website:
 
 - [ ] Developer identity verification (D6).
 - [ ] Domain verification at `/.well-known/openai-apps-challenge` on the custom domain.
+- [ ] `_meta.ui.domain` for ChatGPT (see Phase 1): unique to MCPortal, without breaking Claude.
 - [ ] Allow the OpenAI OAuth callback (`chatgpt.com/connector_platform_oauth_redirect`). Our redirect-URI check already accepts any https URL; add a test for this one.
 - [ ] Submit with the test cases, video, reviewer credentials and an optional country allowlist.
 - [ ] Afterwards: OpenAI rescans the server daily, so tool changes go live after automated checks, and changes to skills or listing details mean a new upload.

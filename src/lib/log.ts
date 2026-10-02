@@ -9,8 +9,7 @@
  * floor (default info). Fields are for ids, names, counts and timings: never tokens,
  * profile contents or third-party text. User ids are logged only as userRef() hashes.
  */
-import { randomBytes } from 'node:crypto';
-import { sha256Hex } from './ids.ts';
+import { createHmac, randomBytes } from 'node:crypto';
 
 export const LOG_LEVELS = ['debug', 'info', 'warn', 'error'] as const;
 export type LogLevel = (typeof LOG_LEVELS)[number];
@@ -96,7 +95,16 @@ export function requestId(): string {
   return randomBytes(6).toString('hex');
 }
 
-/** A stable, non-reversible handle for a user id, so logs can be correlated without naming anyone. */
+/**
+ * Keys userRef. Account ids are guessable (github-<sequential id>), so an unkeyed hash
+ * could be reversed by hashing every id; this key exists only in the running process.
+ */
+const USER_REF_KEY = randomBytes(32);
+
+/**
+ * A handle for a user id, so one server process's logs can be correlated without naming
+ * anyone. Not reversible, and different after every restart.
+ */
 export function userRef(userId: string): string {
-  return sha256Hex(`mcportal-log:${userId}`).slice(0, 10);
+  return createHmac('sha256', USER_REF_KEY).update(userId).digest('hex').slice(0, 10);
 }
