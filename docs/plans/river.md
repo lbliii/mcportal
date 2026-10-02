@@ -1,6 +1,6 @@
 # Plan: the river, one stream across the room
 
-Status: phase 1 built, 2026-10-02. Builds on [room-layouts.md](room-layouts.md) (layout
+Status: phases 1 and 2 built, 2026-10-02. Builds on [room-layouts.md](room-layouts.md) (layout
 registry, item forms, editions, portal level) and comes before reblogging. Research:
 [Feed and grid design lessons](../../reports/Feed%20and%20grid%20design%20lessons.md),
 [River and reblog design research](../../reports/River%20and%20reblog%20design%20research.md).
@@ -190,6 +190,19 @@ a column of cards running off the bottom.
 
 As above. Browser test: page twice, refresh a portal, check nothing on screen moved and
 the pill appears.
+
+Done. The river remembers how many units it shows, not pages, so switching between inline
+and fullscreen keeps what's on screen; each later page starts at a focusable separator
+("Stories 11 to 20") that "more" sends focus to. Inline, "Open the full river" joins the
+button from the third page when the host offers fullscreen. Fullscreen loads the next page
+of 20 as the end nears, twice, then asks. The order first drawn is kept (`keepPlaces`):
+a refresh or a save updates stories in place, and what's new to the river waits behind
+"N new since you started", which redraws from the top. Coming back to the page refreshes
+portals past their freshness, at most every 5 minutes; nothing polls. The end says "You're
+caught up." when only new stories were left, else "That's everything your portals
+fetched.", with a Refresh button. The page height is written after every size change
+inline, for every layout (bridge.js), not only the river. `aria-busy` stays false: pages
+come from memory, so there's nothing to wait for.
 
 ### 3. Following in the stream
 

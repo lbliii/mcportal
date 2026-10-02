@@ -94,7 +94,7 @@
   .mi svg { width: 12px; height: 12px; }
   .mi:hover, .mi:focus-visible { color: var(--mp-action-primary); background: var(--mp-surface-inset); outline: none; }
   .mi.go { margin-left: auto; }
-  .mi.go + .mi.save, .mi.save:first-child { margin-left: 0; }
+  .mi.go + .mi.save, .mi.save:first-child, .mi.save + .mi.go { margin-left: 0; }   /* the actions stay together at the end */
   .mi.save[aria-pressed="true"], .ib.save[aria-pressed="true"] { color: var(--mp-source-saved); }
   .mi.save[aria-pressed="true"] svg, .ib.save[aria-pressed="true"] svg { fill: currentColor; }
   .portal-foot { display: none; padding: 7px var(--mp-space-12); border-top: 1px solid var(--mp-border-divider); color: var(--mp-text-secondary); font-size: var(--mp-type-11-5); word-break: break-all; }
@@ -169,7 +169,14 @@
   .river-lost, .river-aside { margin: 0 0 var(--mp-space-8); padding: 0 var(--mp-space-8); color: var(--mp-text-secondary); font-size: var(--mp-type-12-5); }
   .river-lost { color: var(--mp-status-error); }
   .river-aside { margin-top: var(--mp-space-8); text-align: center; }
-  .river-col > .fp-more { margin: var(--mp-space-8) auto; }
+  .river-more { display: flex; flex-wrap: wrap; justify-content: center; gap: 0 var(--mp-space-16); }
+  .river-more .fp-more { margin: var(--mp-space-8) 0; }
+  .river-page { margin: 0; padding: var(--mp-space-6) var(--mp-space-8); border-top: 1px solid var(--mp-border-divider); color: var(--mp-text-secondary); font-size: var(--mp-type-11); font-weight: var(--mp-weight-strong); text-transform: uppercase; letter-spacing: 0.06em; }
+  .river-page:focus { outline: 2px solid var(--mp-action-primary); outline-offset: -2px; }
+  .river-page + .item.story { border-top: 0; }
+  /* what arrived since the river was drawn: asked for, never pushed in above the reader */
+  .river-arrived { position: sticky; top: var(--mp-space-8); z-index: 2; display: block; margin: var(--mp-space-8) auto 0; min-height: var(--mp-control-minimum); padding: var(--mp-space-4) var(--mp-space-12); border: 0; border-radius: 999px; background: var(--mp-action-primary); color: var(--mp-action-on-primary); font: inherit; font-size: var(--mp-type-12-5); font-weight: var(--mp-weight-strong); cursor: pointer; }
+  .river-end .link-btn { min-height: var(--mp-control-minimum); }
   @container (max-width: 599px) { .grid.river { padding-inline: 0; } }
   /* the lead: the source's colour on top, its picture across, a larger title */
   .item.lead { border: 1px solid var(--mp-border-divider); border-top: 3px solid var(--mp-source-color); border-radius: var(--mp-radius-card); padding: var(--mp-space-8) var(--mp-space-4) var(--mp-space-6); }

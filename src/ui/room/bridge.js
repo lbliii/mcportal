@@ -193,18 +193,23 @@
 
   /** @param {string} mode */
   function setDisplayMode(mode) {
+    const changed = displayMode !== mode;
     displayMode = mode;
     root.classList.toggle('fullscreen', mode === 'fullscreen');
+    if (mode === 'fullscreen') root.style.height = '';
     root.classList.toggle('framed', mode === 'fullscreen' || Boolean(DEV));
     const full = mode === 'fullscreen';
     $('btnExpand').replaceChildren(icon(full ? 'collapse' : 'expand'));
     $('btnExpand').title = full ? 'Exit fullscreen' : 'Fullscreen: step all the way through';
     $('btnExpand').setAttribute('aria-label', $('btnExpand').title);
+    if (changed && state.profile?.layout === 'river') redrawRiver();   // its page size and loading differ by mode
   }
 
   // Tell the host how tall we are so the inline frame fits the content. Measure the
   // body, not documentElement.scrollHeight: that never drops below the frame's current
-  // height, so the frame could grow (reader view) but never shrink back.
+  // height, so the frame could grow (reader view) but never shrink back. Inline, the page's
+  // own height is written too: a host has been reported to read it instead of the message
+  // (claude-ai-mcp issue #69). Fullscreen, the host sizes the frame.
   let lastHeight = 0;
   /** @type {ReturnType<typeof setTimeout> | undefined} */
   let sizeTimer;
@@ -212,6 +217,7 @@
     clearTimeout(sizeTimer);
     sizeTimer = setTimeout(() => {
       const height = Math.ceil(document.body.getBoundingClientRect().height);
+      root.style.height = DEV || displayMode === 'fullscreen' ? '' : `${height}px`;
       if (Math.abs(height - lastHeight) > 2) { lastHeight = height; hostNotify('ui/notifications/size-changed', { width: Math.ceil(window.innerWidth), height }); }
     }, 60);
   }).observe(document.body);

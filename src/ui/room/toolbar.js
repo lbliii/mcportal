@@ -212,14 +212,17 @@
     const path = e.composedPath();
     if (!$('whoMenu').hidden && !path.includes($('whoMenu')) && !path.includes($('btnWho'))) showWhoMenu(false);
   });
-  $('btnRefresh').addEventListener('click', async () => {
+  /** Refresh every portal the room can fetch itself (pinned ones are the agent's). */
+  async function refreshAll() {
     if (!state.profile) return loadRoom();
     setStatus('Scanning the ether for fresh dispatches…');
     await Promise.all([...state.portals.values()].filter((p) => !p.pin).map((p) => refreshPortal(p.portalId)));
     setUpdated();
-  });
-  $('btnExpand').addEventListener('click', async () => {
+  }
+  $('btnRefresh').addEventListener('click', refreshAll);
+  async function toggleFullscreen() {
     const want = displayMode === 'fullscreen' ? 'inline' : 'fullscreen';
     try { const r = await hostRequest('ui/request-display-mode', { mode: want }, 5000); setDisplayMode((r && r.mode) || want); }
     catch { toast("Fullscreen isn't available here"); }
-  });
+  }
+  $('btnExpand').addEventListener('click', toggleFullscreen);
