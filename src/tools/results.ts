@@ -10,10 +10,9 @@ import type { Clip, ClipSummary } from '../clips.ts';
 import type { FetchedSource, SourceCandidate } from '../discover.ts';
 import type { Profile, ProfileDiff, SourceSettings } from '../profile.ts';
 import type { FeaturedSource, PublicProfile } from '../public-profiles.ts';
-import type { SharedItem } from '../social.ts';
+import type { Reblogger, SharedItem } from '../social.ts';
 import type { Handoff } from '../handoffs.ts';
 import type { Candidate, HighlightPick, Lead, RoomEdition } from '../highlights.ts';
-import type { Lab } from '../labs.ts';
 import type { ReadingState } from '../reading.ts';
 import type { Article, Item, PortalResult, Provenance } from '../types.ts';
 import type { Identity } from './kit.ts';
@@ -35,7 +34,7 @@ export type RoomResult = {
   /** What the room leads with. */
   lead?: Lead;
   /** Labs this server has on (src/labs.ts), so the room can offer them. */
-  labs?: Lab[];
+  labs?: string[];
 };
 
 /** After a save or unsave: the saved list, the room, and the Saved portal redrawn. */
@@ -88,8 +87,11 @@ export type ToolResults = {
   get_clip: { clip: Clip };
   clip: { clip: ClipSummary; profile: Profile; layoutChanged: boolean; portals: PortalResult[] };
   open_space: SpaceResult;
-  get_share: { share: SharedItem };
+  /** labs: the server's, so a card offers what the room would. */
+  get_share: { share: SharedItem; rebloggers?: Reblogger[]; labs?: string[] };
   share: { share: SharedItem };
+  share_settings: { share: SharedItem };
+  unshare: { removed: boolean };
   relationship: { handle?: string; layoutChanged?: boolean; profile?: Profile };
   record_reading: { reading: ReadingState };
   account_settings: { identity: Identity; url: string | null };

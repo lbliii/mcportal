@@ -7,6 +7,7 @@
  * coded tool error and anything else into `internal`, logged with its stack.
  */
 import { randomBytes } from 'node:crypto';
+import { ACTIVE_LABS } from '../labs.ts';
 import type { Action, Actor } from '../access.ts';
 import type { ClipStore } from '../clips.ts';
 import type { UsageBudget } from '../lib/budget.ts';
@@ -65,7 +66,14 @@ export interface ToolContext extends SourceDeps {
   log?: Logger | undefined;
   /** Per-tool counters for the admin page (hosted). */
   metrics?: ToolMetrics | undefined;
+  /** The labs on for this server. Absent: MCPORTAL_LABS (src/labs.ts). Tests and embedders set it. */
+  labs?: readonly string[] | undefined;
 }
+
+/** The labs on for this caller's server. */
+export const labsOf = (ctx: Pick<ToolContext, 'labs'>): readonly string[] => ctx.labs ?? ACTIVE_LABS;
+/** Whether a lab is on for this caller's server. */
+export const labOn = (ctx: Pick<ToolContext, 'labs'>, lab: string): boolean => labsOf(ctx).includes(lab);
 
 export interface CallToolResult {
   content: Array<{ type: 'text'; text: string }>;
@@ -108,6 +116,11 @@ export interface ToolDef {
    * runs (or gets a clear `unavailable` error). Default: always listed.
    */
   available?: (reach: Reach) => boolean;
+  /**
+   * Arguments a lab adds, and the description that names them: listed and accepted only
+   * while the lab is on, so a lab costs the model nothing until it's turned on.
+   */
+  lab?: { name: string; properties: Record<string, unknown>; description: string };
   /** Budget units per call (default 1); a function when it depends on the arguments. */
   cost?: number | ((args: Record<string, unknown>) => number);
   handler: (args: Record<string, unknown>, ctx: ToolContext) => Promise<CallToolResult>;
@@ -147,6 +160,8 @@ export interface Reach {
   social: 'none' | 'new' | 'active';
   /** 'none' on a hosted server; a local MCPortal is 'unlinked' (ghost mode) or 'linked'. */
   link: 'none' | 'unlinked' | 'linked';
+  /** The labs on for this server. */
+  labs: readonly string[];
 }
 
 export const hasSocial = (ctx: ToolContext): boolean => Boolean(ctx.social && ctx.publicProfiles);
@@ -154,9 +169,10 @@ export const hasSocial = (ctx: ToolContext): boolean => Boolean(ctx.social && ct
 /** The caller's reach (one profile read and, for an account without a handle, one relations read). */
 export async function reachOf(ctx: ToolContext): Promise<Reach> {
   const link = !ctx.link ? 'none' : ctx.link.linked ? 'linked' : 'unlinked';
-  if (!ctx.social || !ctx.publicProfiles) return { social: 'none', link };
-  if (await ctx.publicProfiles.get(ctx.userId)) return { social: 'active', link };
-  return { social: (await ctx.social.uses(ctx.userId)) ? 'active' : 'new', link };
+  const labs = labsOf(ctx);
+  if (!ctx.social || !ctx.publicProfiles) return { social: 'none', link, labs };
+  if (await ctx.publicProfiles.get(ctx.userId)) return { social: 'active', link, labs };
+  return { social: (await ctx.social.uses(ctx.userId)) ? 'active' : 'new', link, labs };
 }
 
 /**
@@ -218,6 +234,15 @@ export function untrusted(label: string, body: string): string {
   ].join('\n');
 }
 
-export function publicToolList(tools: readonly ToolDef[], reach?: Reach): Array<Omit<ToolDef, 'handler' | 'access' | 'cost' | 'available'>> {
-  return tools.filter((t) => !reach || !t.available || t.available(reach)).map(({ handler: _handler, access: _access, cost: _cost, available: _available, ...tool }) => tool);
+export function publicToolList(tools: readonly ToolDef[], reach?: Reach): Array<Omit<ToolDef, 'handler' | 'access' | 'cost' | 'available' | 'lab'>> {
+  return tools.filter((t) => !reach || !t.available || t.available(reach)).map((t) => {
+    const { handler: _handler, access: _access, cost: _cost, available: _available, lab: _lab, ...tool } = t;
+    return { ...tool, ...(t.lab && reach?.labs.includes(t.lab.name) ? { description: t.lab.description } : {}), inputSchema: schemaFor(t, reach?.labs ?? []) };
+  });
+}
+
+/** A tool's input schema, with its lab's arguments while the lab is on. */
+export function schemaFor(tool: Pick<ToolDef, 'inputSchema' | 'lab'>, labs: readonly string[]): Record<string, unknown> {
+  if (!tool.lab || !labs.includes(tool.lab.name)) return tool.inputSchema;
+  return { ...tool.inputSchema, properties: { ...(tool.inputSchema.properties as Record<string, unknown>), ...tool.lab.properties } };
 }

@@ -48,6 +48,8 @@ export interface PublicProfile {
   accent?: Accent;
   /** Sources from their portal they recommend. Copies: visitors never read anyone's portal. */
   sources?: FeaturedSource[];
+  /** Who may reblog their new posts, unless a post says otherwise. Absent: anyone. */
+  reblogs?: 'followers' | 'nobody';
   createdAt: string;
   updatedAt: string;
 }
@@ -60,6 +62,8 @@ export interface PublicProfileInput {
   accent?: string | undefined;
   /** Replaces the featured list; [] clears it. */
   sources?: Array<{ title?: string; source: string; config: unknown }> | undefined;
+  /** Who may reblog new posts by default: anyone, followers or nobody. */
+  reblogs?: string | undefined;
 }
 
 /** Only sources MCPortal fetches itself can be featured; configs are re-validated. */
@@ -212,11 +216,14 @@ export class PublicProfiles {
       if (input.accent !== undefined && input.accent !== '' && !(ACCENTS as readonly string[]).includes(input.accent)) throw new HandleError(`accent must be one of ${ACCENTS.join(', ')}`);
       const accent = input.accent !== undefined ? ((input.accent || undefined) as Accent | undefined) : current?.accent;
       const sources = input.sources !== undefined ? normalizeFeatured(input.sources) : current?.sources;
+      if (input.reblogs !== undefined && !['anyone', 'followers', 'nobody'].includes(input.reblogs)) throw new HandleError('reblogs must be one of anyone, followers, nobody');
+      const reblogs = input.reblogs !== undefined ? (input.reblogs === 'anyone' ? undefined : input.reblogs as 'followers' | 'nobody') : current?.reblogs;
       if (displayName) profile.displayName = displayName;
       if (bio) profile.bio = bio;
       if (spaceTitle) profile.spaceTitle = spaceTitle;
       if (accent) profile.accent = accent;
       if (sources?.length) profile.sources = sources;
+      if (reblogs) profile.reblogs = reblogs;
       doc.profiles[accountId] = profile;
       return { profile: { ...profile }, created: !current, ...(released ? { released } : {}) };
     });

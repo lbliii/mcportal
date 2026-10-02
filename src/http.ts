@@ -80,6 +80,8 @@ export interface AppDeps {
   editions?: EditionStore | undefined;
   /** Clips; defaults to files under the data directory. */
   clips?: ClipStore | undefined;
+  /** The labs on (default MCPORTAL_LABS). */
+  labs?: readonly string[] | undefined;
   /** Handles and public profiles (only with GitHub sign-in: a single-token server has no social layer). */
   publicProfiles?: PublicProfiles | undefined;
   /** Shares and follows (also only with GitHub sign-in). */
@@ -240,6 +242,7 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
   const context = (userId: string, reqLog: Logger): ToolContext => ({
     log: reqLog,
     store: deps.store, reading, handoffs, seen, editions, clips, publicProfiles, social, fetcher: deps.fetcher, cache: deps.cache, userId, budget, metrics, actor: accounts.actor(userId),
+    labs: deps.labs,
     accountUrl: account?.url,
     uploadLink: account ? () => account.uploadLink(userId) : undefined,
     localFiles: !account && config.allowUnauthenticated && isLoopbackHost(config.host),

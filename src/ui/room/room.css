@@ -36,6 +36,9 @@
   .ib:hover, .ib:focus-visible { background: var(--mp-surface-hover); color: var(--mp-text-primary); outline: none; }
   .ib[aria-pressed="true"] { color: var(--mp-action-primary); background: var(--mp-surface-selected); }
   .ib svg, .mi svg { width: var(--mp-icon-normal); height: var(--mp-icon-normal); fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; }
+  /* A state mark (reblog's moon) is drawn only while its button is pressed, so state never rests on colour alone. */
+  .icon-state { display: none; }
+  [aria-pressed="true"] .icon-state, .on > svg .icon-state { display: inline; }
   .ib.sm { width: var(--mp-control-minimum); height: var(--mp-control-minimum); }
   .ib.sm svg { width: var(--mp-icon-small); height: var(--mp-icon-small); }
   /* a two-way switch: a pill track whose chosen half fills in */
@@ -91,7 +94,7 @@
   .mi svg { width: 12px; height: 12px; }
   .mi:hover, .mi:focus-visible { color: var(--mp-action-primary); background: var(--mp-surface-inset); outline: none; }
   .mi.go { margin-left: auto; }
-  .mi.go + .mi.save, .mi.save:first-child { margin-left: 0; }
+  .mi.go + .mi.save, .mi.save:first-child, .mi.save + .mi.go { margin-left: 0; }   /* the actions stay together at the end */
   .mi.save[aria-pressed="true"], .ib.save[aria-pressed="true"] { color: var(--mp-source-saved); }
   .mi.save[aria-pressed="true"] svg, .ib.save[aria-pressed="true"] svg { fill: currentColor; }
   .portal-foot { display: none; padding: 7px var(--mp-space-12); border-top: 1px solid var(--mp-border-divider); color: var(--mp-text-secondary); font-size: var(--mp-type-11-5); word-break: break-all; }
@@ -138,6 +141,73 @@
   .fp-end { margin: var(--mp-space-16) 0 var(--mp-space-8); padding-top: var(--mp-space-10); border-top: 1px solid var(--mp-border-divider); color: var(--mp-text-secondary); text-align: center; font-size: var(--mp-type-12-5); }
   @container (min-width: 600px) { .fp-top.has-picks { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); } .fp-blocks { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   @container (min-width: 1100px) { .fp-blocks { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  /* river (docs/plans/river.md): one reading column of stories separated by rules; nothing scrolls inside it */
+  .grid.river { display: block; height: auto; overflow: visible; padding: var(--mp-space-12) var(--mp-space-12) var(--mp-space-4); }
+  .river-col { max-width: 640px; margin: 0 auto; }
+  .river-head { padding: 0 var(--mp-space-8) var(--mp-space-8); border-bottom: 2px solid var(--mp-text-primary); }
+  .river-head h1 { margin: 0; }
+  .river-picks { padding-top: var(--mp-space-12); }
+  .river-picks .fp-label { padding-bottom: 0; border-bottom: 0; }
+  .river-feed { display: block; }
+  .river-picks + .river-feed { border-top: 2px solid var(--mp-text-primary); }
+  .item.story { padding: var(--mp-space-12) var(--mp-space-8); border-radius: 0; border-top: 1px solid var(--mp-border-divider); }
+  .river-feed > .item.story:first-child, .river-picks .fp-label + .item.story { border-top: 0; }
+  .story .item-from { flex-wrap: wrap; padding: 0 0 var(--mp-space-6); }
+  .story-portal { min-height: 24px; padding: 0; border: 0; background: none; color: var(--mp-text-primary); font: inherit; font-weight: var(--mp-weight-strong); cursor: pointer; }
+  .story-portal:hover { text-decoration: underline; text-underline-offset: 2px; }
+  .story-also::before, .story-when::before { content: '·'; margin-right: var(--mp-space-6); }
+  .story-context { color: var(--mp-text-secondary); font-size: var(--mp-type-11-5); padding-bottom: var(--mp-space-4); }
+  /* reblog (docs/plans/reblog.md): a menu button; the moon fills the doorway once reblogged */
+  .mi.reblog { gap: 3px; }
+  .mi.reblog.on { color: var(--mp-action-reblogged); }
+  .mi.reblog:disabled { opacity: 0.45; cursor: not-allowed; }
+  .mi.reblog:disabled:hover { color: inherit; background: none; }
+  .reblog-label { display: none; }
+  @container (min-width: 600px) { .story .reblog-label, .share-actions .reblog-label { display: inline; } }
+  :root.fullscreen .story .reblog-label { display: inline; }
+  .reblog-count { font-variant-numeric: tabular-nums; }
+  .share-actions { display: flex; gap: var(--mp-space-8); margin: var(--mp-space-12) 0; }
+  .share-actions .mi.reblog { margin: 0; padding: var(--mp-space-4) var(--mp-space-8); border: 1px solid var(--mp-border-control); border-radius: var(--mp-radius-control); }
+  .share-actions .mi.reblog svg { width: var(--mp-icon-normal); height: var(--mp-icon-normal); }
+  /* the stamp: the icon lands like a print stamp, a little off register, then settles */
+  @keyframes mp-stamp { 0% { transform: scale(1.35) rotate(-8deg); filter: drop-shadow(1.5px 1px 0 var(--mp-brand-brick)); } 55% { transform: scale(0.92); filter: drop-shadow(1px 0.5px 0 var(--mp-brand-brick)); } 100% { transform: none; filter: none; } }
+  @media (prefers-reduced-motion: no-preference) { .mi.reblog.stamp svg { animation: mp-stamp 420ms var(--mp-ease-standard); } }
+  .reblog-menu { position: absolute; z-index: var(--mp-layer-toast); min-width: 13rem; max-width: 18rem; padding: var(--mp-space-4); background: var(--mp-surface-raised); color: var(--mp-text-primary); border: 1px solid var(--mp-border-divider); border-radius: var(--mp-radius-control); box-shadow: 0 6px 20px rgb(0 0 0 / 0.16); }
+  .reblog-menu > [role="menuitem"] { display: block; width: 100%; min-height: 32px; padding: var(--mp-space-6) var(--mp-space-10); border: 0; border-radius: var(--mp-radius-sm); background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+  .reblog-menu > [role="menuitem"]:hover, .reblog-menu [role="menuitem"]:focus-visible { background: var(--mp-surface-hover); outline: none; }
+  .reblog-nudge { padding: var(--mp-space-6) var(--mp-space-10) var(--mp-space-8); margin-bottom: var(--mp-space-4); border-bottom: 1px solid var(--mp-border-divider); color: var(--mp-text-secondary); font-size: var(--mp-type-12-5); }
+  .story-removed { margin: var(--mp-space-8) 0 0; color: var(--mp-text-secondary); font-size: var(--mp-type-12-5); font-style: italic; }
+  .share-reblogs { margin: var(--mp-space-16) 0; padding-top: var(--mp-space-10); border-top: 1px solid var(--mp-border-divider); }
+  .share-reblogs h2 { margin: 0 0 var(--mp-space-6); font-size: var(--mp-type-14); }
+  .share-reblogs ul { margin: 0 0 var(--mp-space-10); padding-left: var(--mp-space-16); }
+  .share-reblogs li { margin: var(--mp-space-2) 0; }
+  .share-reblogs .row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--mp-space-8); }
+  .post .pr { display: flex; align-items: center; gap: var(--mp-space-4); margin: 0 0 var(--mp-space-6); color: var(--mp-text-secondary); font-size: var(--mp-type-11-5); }
+  .post .pr svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; }
+  /* a sharer's note: their words, set apart from the source's */
+  .story-note { max-width: 34em; margin: var(--mp-space-8) 0 0; padding-left: var(--mp-space-10); border-left: 3px solid var(--mp-source-following); font-size: var(--mp-type-13-5); white-space: pre-wrap; }
+  .story-note-by { display: block; color: var(--mp-text-secondary); font-size: var(--mp-type-11-5); font-weight: var(--mp-weight-strong); white-space: normal; }
+  .story .thumb { width: 100%; height: auto; aspect-ratio: 1.91 / 1; margin-bottom: var(--mp-space-8); }
+  .story .item-title { display: block; font-size: var(--mp-type-18); font-weight: var(--mp-weight-heading); line-height: var(--mp-line-heading); }
+  .story .item-summary { max-width: 34em; font-size: var(--mp-type-13-5); -webkit-line-clamp: 4; margin-top: var(--mp-space-4); }
+  .story .item-meta { margin-top: var(--mp-space-8); }
+  .story .item-why { margin-left: 0; margin-right: 0; }
+  .river-fold { border-top: 1px solid var(--mp-border-divider); padding: 0 var(--mp-space-8); }
+  .river-fold .link-btn { display: inline-flex; align-items: center; gap: var(--mp-space-6); min-height: var(--mp-control-minimum); }
+  .river-divider { margin: var(--mp-space-12) 0 0; padding: var(--mp-space-8) var(--mp-space-8) var(--mp-space-4); border-top: 2px solid var(--mp-text-primary); color: var(--mp-text-secondary); font-size: var(--mp-type-11); font-weight: var(--mp-weight-strong); text-transform: uppercase; letter-spacing: 0.06em; }
+  .river-divider + .item.story { border-top: 0; }
+  .river-lost, .river-aside { margin: 0 0 var(--mp-space-8); padding: 0 var(--mp-space-8); color: var(--mp-text-secondary); font-size: var(--mp-type-12-5); }
+  .river-lost { color: var(--mp-status-error); }
+  .river-aside { margin-top: var(--mp-space-8); text-align: center; }
+  .river-more { display: flex; flex-wrap: wrap; justify-content: center; gap: 0 var(--mp-space-16); }
+  .river-more .fp-more { margin: var(--mp-space-8) 0; }
+  .river-page { margin: 0; padding: var(--mp-space-6) var(--mp-space-8); border-top: 1px solid var(--mp-border-divider); color: var(--mp-text-secondary); font-size: var(--mp-type-11); font-weight: var(--mp-weight-strong); text-transform: uppercase; letter-spacing: 0.06em; }
+  .river-page:focus { outline: 2px solid var(--mp-action-primary); outline-offset: -2px; }
+  .river-page + .item.story { border-top: 0; }
+  /* what arrived since the river was drawn: asked for, never pushed in above the reader */
+  .river-arrived { position: sticky; top: var(--mp-space-8); z-index: 2; display: block; margin: var(--mp-space-8) auto 0; min-height: var(--mp-control-minimum); padding: var(--mp-space-4) var(--mp-space-12); border: 0; border-radius: 999px; background: var(--mp-action-primary); color: var(--mp-action-on-primary); font: inherit; font-size: var(--mp-type-12-5); font-weight: var(--mp-weight-strong); cursor: pointer; }
+  .river-end .link-btn { min-height: var(--mp-control-minimum); }
+  @container (max-width: 599px) { .grid.river { padding-inline: 0; } }
   /* the lead: the source's colour on top, its picture across, a larger title */
   .item.lead { border: 1px solid var(--mp-border-divider); border-top: 3px solid var(--mp-source-color); border-radius: var(--mp-radius-card); padding: var(--mp-space-8) var(--mp-space-4) var(--mp-space-6); }
   .item.lead .thumb { width: 100%; height: auto; aspect-ratio: 16 / 9; margin-bottom: var(--mp-space-8); }

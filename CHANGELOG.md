@@ -9,6 +9,27 @@
 - The support page says how soon we reply, and only mentions invite-only sign-up while sign-up is invite-only.
 - The public pages no longer link to the source code, which isn't public yet; `MCPORTAL_SOURCE_URL` brings the links back.
 
+## v0.7.0 — 2026-10-02
+
+### The river (lab, `MCPORTAL_LABS=river`) ([plan](docs/plans/river.md), [research](reports/River%20and%20reblog%20design%20research.md))
+- **One stream across your room:** a fourth layout that merges every portal into one column. Your agent's picks first (only when there's an edition), then what's new, a "You're caught up" divider, then what you've seen. Each portal keeps its own order and portals merge by time; the same link from two portals is one story ("also on Hacker News"). More than three in a row from one portal fold into "N more from X", which opens in place. Docs and pinned portals are named at the end rather than merged.
+- **Stories:** the portal and its age on top (its name opens the portal), the picture across at 1.91:1, a larger title, a four-line summary at reading width, every action, separated by rules. j/k move between stories, o opens, s saves. A `role="feed"` of articles for screen readers.
+- **Pages that end:** ten at a time inline ("10 more", focus moves to a "Stories 11 to 20" separator; "Open the full river" from the third page), twenty in fullscreen, where the next page loads as you near the end, at most twice. Switching modes keeps what's on screen.
+- **Nothing moves while you read:** a refresh or a save updates stories in place; stories new to the river wait behind "N new since you started". Coming back to the page refreshes portals past their freshness, at most every five minutes; nothing polls.
+- **People you follow:** a follow's share of a link in your feeds is that feed's story, lifted to where they shared it, with "@ana shared" above it and their note in their own voice.
+
+### Reblogging (lab, `MCPORTAL_LABS=reblog`) ([plan](docs/plans/reblog.md))
+- **Pass someone's post on, with the credit staying theirs:** a reblog references the original rather than copying it, so its note and clip are drawn live, and the count pools on the original. Reblogging a reblog reblogs the original and credits who you saw it through ("via @ben"). One reblog per person per post; `unshare` undoes it.
+- **The author decides:** each post says who may reblog it (anyone, their followers, nobody), with an account default (`set_public_profile`'s `reblogs`). Followers-only posts can't be reblogged at all. Authors can change it later or remove their post from one reblog for good (`share_settings`); the reblog then says its author removed it. A deleted, hidden or suspended original leaves the reblogger's note and the link. Blocks with the original's author hide the reblog; muting someone hides their posts reblogged by others too.
+- **In the room:** a door-shaped reblog button with a menu (Reblog, Reblog with a note, Undo reblog), the moon filling the doorway once you have, a new ink green, and a small print-stamp effect (not with reduced motion). If you haven't opened a story, the menu offers "Read it first?" without getting in the way. In the river, several follows reblogging one post are one card ("@ben and @dee reblogged @cy") with at most two notes: the original's and one reblog's. Your own post's card shows who reblogged it, removes it from one, and sets who can reblog it.
+- **For agents:** `share` takes `reblogOf` and `reblogs`; `get_share` says who reblogged a post; `share_settings` is new. All of it is listed only while the lab is on.
+- **Postgres schema version 8:** shares gain `root_id`, with an index for finding reblogs and a unique index for one reblog per account per post.
+
+### Under the hood
+- **Labs per server:** labs now travel in each request's tool context (default `MCPORTAL_LABS`), and a tool can declare arguments that exist only while a lab is on, so a lab costs the model nothing until it's on. Token budgets gain a `hosted-labs` profile.
+- **The inline room sets its own height** after every size change as well as telling the host, for hosts that read the page's height instead.
+- **Fix:** a Saved story's share button no longer drifts away from the other actions.
+
 ## v0.6.1 — 2026-10-02
 
 ### Deleting an account leaves nothing behind ([plan](docs/plans/directory-launch.md))

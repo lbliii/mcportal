@@ -268,6 +268,208 @@ test('browser: the front page leads with the picks, pages each portal, and nothi
   }
 });
 
+test('browser: the river merges the room into one stream: picks, new, a divider, seen; duplicates join, runs fold, pages count units', { skip }, async () => {
+  // The first two HN stories new; the agent picks the second. Saved holds a copy of the first
+  // (so it joins that story) and twelve old items, which run together at the end and fold.
+  await profiles.put('default', validateProfile({ ...room(), layout: 'river' }));
+  const hnItems = (await tool('open_room', {})).portals.find((p: any) => p.portalId === 'hn-top').items;
+  const saved = [{ url: `${hnItems[0].url}#comments`, title: 'A copy', savedAt: '2026-09-01T00:00:00.000Z' },
+    ...Array.from({ length: 12 }, (_, i) => ({ url: `https://example.com/saved-${i}`, title: `Saved ${i}`, savedAt: '2026-09-01T00:00:00.000Z' }))];
+  await profiles.put('default', validateProfile({ ...room(), layout: 'river', saved }));
+  await seen.deleteAll('default');
+  await seen.mark('default', [{ portalId: 'hn-top', itemIds: hnItems.slice(2).map((i: any) => i.id) }]);
+  const [first, second] = (await tool('list_new_items', { portals: ['hn-top'] })).items;
+  await tool('show_highlights', { title: 'Morning edition', picks: [{ ref: second.ref, why: 'The one you asked about.' }] });
+  const units = () => page.eval<number>(`document.querySelectorAll('.river-feed > article, .river-feed > .river-fold').length`);
+  try {
+    page.problems.length = 0;
+    await page.goto(`${app.base}/preview`);
+    await page.waitFor(`document.querySelector('#grid.river .river-feed article') && !document.querySelector('.skeleton')`, 'the river');
+    assert.equal(await page.eval(`document.querySelector('.river-picks .fp-label').textContent`), 'Morning edition');
+    assert.deepEqual(await page.eval(`[...document.querySelectorAll('.river-picks .item-title')].map((n) => n.textContent)`), [`New${second.item.title}`], "the agent's pick leads, apart from the stream");
+    assert.match(await page.eval<string>(`document.querySelector('.river-picks .item-why').textContent`), /The one you asked about\./);
+    // New first, then the divider, then what's been seen; the pick isn't repeated.
+    const feed = await page.eval<string[]>(`[...document.querySelectorAll('.river-feed > *')].map((n) => n.matches('article') ? n.querySelector('.item-title').textContent : n.className)`);
+    assert.equal(feed[0], `New${first.item.title}`);
+    assert.equal(feed[1], 'river-divider');
+    assert.ok(!feed.some((t) => t.endsWith(second.item.title)), 'the pick is not repeated');
+    assert.match(await page.eval<string>(`document.querySelector('.river-feed > article .item-from').textContent`), /also on Saved/, 'the saved copy joins the story');
+    assert.equal(await page.eval(`document.querySelector('.river-feed').getAttribute('role')`), 'feed');
+    assert.equal(await page.eval(`document.querySelector('.river-feed > article').getAttribute('aria-posinset')`), '2', 'numbered after the pick');
+    assert.match(await page.eval<string>(`document.querySelector('.river-aside').textContent`), /Also in your room: Example Docs/, 'docs are named, not merged');
+    assert.equal(await page.eval(`document.querySelectorAll('.mi.reblog').length`), 0, 'ghost mode reblogs nothing');
+    // A page is ten units; the next page brings the fold, which opens in place.
+    assert.equal(await units(), 10);
+    assert.match(await page.eval<string>(`document.querySelector('.river-more .fp-more').textContent`), /^2 more of 2$/);
+    await page.click('.river-more .fp-more');
+    assert.equal(await units(), 12);
+    assert.equal(await page.eval(`document.querySelector('.river-fold').textContent`), '9 more from Saved');
+    assert.equal(await page.eval(`document.querySelectorAll('.river-feed [data-story^="saved"]').length`), 3, 'three of the run, then the fold');
+    await page.click('.river-fold .link-btn');
+    assert.equal(await page.eval(`document.querySelectorAll('.river-feed [data-story^="saved"]').length`), 12);
+    assert.equal(await page.eval(`document.activeElement.closest('article')?.dataset.story`), `saved\nhttps://example.com/saved-3`, 'focus moves to the first revealed story');
+    assert.equal(await page.eval(`document.querySelector('.river-end').firstChild.textContent`), "That's everything your portals fetched.");
+    // j and k move between stories.
+    await page.eval(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', bubbles: true }))`);
+    assert.equal(await page.eval(`document.activeElement.closest('article')?.dataset.story`), `saved\nhttps://example.com/saved-2`);
+    const scrolling = await page.eval<string[]>(`[...document.querySelectorAll('#grid, #grid *')].filter((n) => { const s = getComputedStyle(n); return (/auto|scroll/.test(s.overflowY) && n.scrollHeight > n.clientHeight + 1) || (/auto|scroll/.test(s.overflowX) && n.scrollWidth > n.clientWidth + 1); }).map((n) => n.className)`);
+    assert.deepEqual(scrolling, [], 'nothing scrolls inside the river');
+    assert.deepEqual(page.problems, []);
+  } finally {
+    await profiles.put('default', room());
+  }
+});
+
+test('browser: river pages end on a separator that takes focus, and a refresh waits behind the arrivals button without moving anything', { skip }, async () => {
+  // Twenty-five old saved items: after the feeds' stories they run together and fold.
+  const saved = Array.from({ length: 25 }, (_, i) => ({ url: `https://example.com/saved-${i}`, title: `Saved ${i}`, savedAt: new Date(Date.UTC(2026, 7, 25 - i)).toISOString() }));
+  await profiles.put('default', validateProfile({ ...room(), layout: 'river', saved }));
+  await seen.deleteAll('default');
+  const stories = () => page.eval<string[]>(`[...document.querySelectorAll('.river-feed > article')].map((n) => n.dataset.story)`);
+  try {
+    page.problems.length = 0;
+    await page.goto(`${app.base}/preview`);
+    await page.waitFor(`document.querySelector('#grid.river .river-feed article') && !document.querySelector('.skeleton')`, 'the river');
+    // The feeds' stories, three saved and a fold: page 2 holds the last few.
+    await page.click('.river-more .fp-more');
+    assert.equal(await page.eval(`document.activeElement.dataset.from`), '11', 'focus goes to the new page');
+    assert.match(await page.eval<string>(`document.activeElement.textContent`), /^Stories 11 to 1\d$/);
+    await page.click('.river-fold .link-btn');
+    await page.click('.river-more .fp-more');
+    assert.equal(await page.eval(`document.activeElement.dataset.from`), '21');
+    assert.equal(await page.eval(`document.activeElement.textContent`), 'Stories 21 to 30');
+    assert.equal(await page.eval(`document.querySelectorAll('.river-page').length`), 2);
+    // Something arrives; refreshing doesn't move a single story, it waits behind a button.
+    const before = await stories();
+    await tool('save_item', { url: 'https://example.com/arrived', title: 'Arrived' });
+    await page.click('#btnRefresh');
+    const arrived = await page.waitFor<string>(`document.querySelector('.river-arrived')?.textContent`, 'the arrivals button');
+    assert.equal(arrived, '1 new story since you started');
+    assert.deepEqual(await stories(), before, 'nothing on screen moved');
+    await page.click('.river-arrived');
+    await page.waitFor(`!document.querySelector('.river-arrived')`, 'the arrivals merged in');
+    assert.ok((await stories()).includes('saved\nhttps://example.com/arrived'), 'the new story is in the river');
+    // Fullscreen pages are twenty, and the next loads itself as the end nears. The river
+    // shows what it showed (thirty units) when the mode changes.
+    await page.eval(`document.documentElement.classList.add('fullscreen')`);
+    await page.click('#btnRefresh');
+    assert.equal(await page.eval(`document.querySelectorAll('.river-feed > article, .river-feed > .river-fold').length`), 30);
+    const units = () => page.eval<number>(`document.querySelectorAll('.river-feed > article, .river-feed > .river-fold').length`);
+    const shownBefore = await units();
+    await page.eval(`window.scrollTo(0, document.body.scrollHeight)`);
+    await page.waitFor(`document.querySelectorAll('.river-feed > article, .river-feed > .river-fold').length > ${shownBefore}`, 'the next page to load itself');
+    await page.eval(`document.documentElement.classList.remove('fullscreen')`);
+    assert.deepEqual(page.problems, []);
+  } finally {
+    await profiles.put('default', room());
+  }
+});
+
+test("browser: in the river, follows' shares and reblogs join their stories with credit and a two-note trail; the reblog menu reblogs, undoes, and nudges to read first", { skip }, async () => {
+  // The test server has no social layer: the page's open_room result gets a Following portal
+  // and a signed-in identity on the way in, and share/unshare are answered in the page.
+  // @ana shares HN's top story; @ben and @dee reblog @cy's post; @eve reblogged a removed
+  // post; @fay's post can't be reblogged.
+  const { identifier } = await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => {
+    const real = window.fetch;
+    window.__calls = [];
+    const answer = (result) => new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result }), { status: 200, headers: { 'content-type': 'application/json' } });
+    window.fetch = async (url, init) => {
+      const body = init && typeof init.body === 'string' ? JSON.parse(init.body) : null;
+      const name = body && body.params && body.params.name;
+      if (url === '/mcp' && (name === 'share' || name === 'unshare')) {
+        window.__calls.push({ name, args: body.params.arguments });
+        return answer(name === 'share' ? { content: [], structuredContent: { share: { id: 's_mine' } } } : { content: [], structuredContent: { removed: true } });
+      }
+      const res = await real(url, init);
+      if (name !== 'open_room') return res;
+      const json = await res.json();
+      const room = json.result && json.result.structuredContent;
+      const hn = room && room.portals && room.portals.find((p) => p.portalId === 'hn-top');
+      if (hn) {
+        const now = new Date().toISOString();
+        const share = (id, extra) => ({ id, kind: 'link', canReblog: true, ...extra });
+        room.identity = { mode: 'hosted', handle: 'reader' };
+        if (!location.search.includes('nolab')) room.labs = ['river', 'reblog'];   // ?nolab: the reblog lab off
+        room.profile.columns.push({ width: 1, panels: [{ id: 'following', source: 'following', title: 'Following', config: {} }] });
+        room.portals.push({ portalId: 'following', source: 'following', title: 'Following', provenance: { source: 'following', endpoint: 'shares from people you follow', fetchedAt: now, cached: false, ttlSeconds: 0 }, items: [
+          { id: 's_ana', title: hn.items[0].title, url: hn.items[0].url, summary: 'Read the comments.', meta: ['@ana', 'link'], publishedAt: now, share: share('s_ana') },
+          { id: 's_ben', title: 'A post by cy', url: 'https://example.com/cy', summary: 'Ben agrees.', meta: ['@ben', 'reblogged @cy', 'link'], publishedAt: now, share: share('s_ben', { reblog: { root: 's_cy', by: 'cy', note: "Cy's own words." }, reblogs: 3 }) },
+          { id: 's_dee', title: 'A post by cy', url: 'https://example.com/cy', meta: ['@dee', 'reblogged @cy', 'link'], publishedAt: now, share: share('s_dee', { reblog: { root: 's_cy', by: 'cy', note: "Cy's own words." }, reblogs: 3 }) },
+          { id: 's_eve', title: 'Gone now', url: 'https://example.com/gone', summary: 'Still worth it.', meta: ['@eve', 'reblogged a removed post', 'link'], publishedAt: now, share: share('s_eve', { reblog: { root: 's_x', removed: 'removed' } }) },
+          { id: 's_fay', title: 'Just for fay', url: 'https://example.com/fay', meta: ['@fay', 'link'], publishedAt: now, share: share('s_fay', { canReblog: false }) },
+        ] });
+      }
+      return new Response(JSON.stringify(json), { status: res.status, headers: { 'content-type': 'application/json' } });
+    };
+  })();` });
+  await profiles.put('default', validateProfile({ ...room(), layout: 'river' }));
+  const hnTitle = (await tool('open_room', {})).portals.find((p: any) => p.portalId === 'hn-top').items[0].title;
+  /** The story with this title. */
+  const find = (title: string) => `[...document.querySelectorAll('.river-feed > article')].find((n) => n.querySelector('.item-title').textContent.endsWith(${JSON.stringify(title)}))`;
+  const read = (title: string) => page.eval<{ context: string | null; trail: string[]; removed: string | null; from: string; reblog: { label: string; disabled: boolean } | null } | null>(`(() => {
+    const node = ${find(title)};
+    const b = node && node.querySelector('.mi.reblog');
+    return node ? { context: node.querySelector('.story-context')?.textContent ?? null, trail: [...node.querySelectorAll('.story-note')].map((n) => n.textContent), removed: node.querySelector('.story-removed')?.textContent ?? null,
+      from: node.querySelector('.item-from').textContent, reblog: b ? { label: b.getAttribute('aria-label'), disabled: b.disabled } : null } : null;
+  })()`);
+  const menu = () => page.eval<string[]>(`[...document.querySelectorAll('.reblog-menu [role="menuitem"]')].map((n) => n.textContent)`);
+  try {
+    page.problems.length = 0;
+    await page.goto(`${app.base}/preview`);
+    await page.waitFor(`document.querySelector('#grid.river .river-feed article') && !document.querySelector('.skeleton')`, 'the river');
+    const shared = await read(hnTitle);
+    assert.equal(shared?.context, '@ana shared', "the share joins HN's story");
+    assert.deepEqual(shared?.trail, ['@anaRead the comments.']);
+    assert.doesNotMatch(shared?.from ?? '', /Following/);
+    const cy = await read('A post by cy');
+    assert.equal(cy?.context, '@ben and @dee reblogged @cy', 'two reblogs of one post are one card');
+    assert.deepEqual(cy?.trail, ["@cyCy's own words.", '@benBen agrees.'], "the original's note, then a reblog's: two voices");
+    assert.equal(cy?.reblog?.label, 'Reblog (3 reblogs)', 'the count pools on the original');
+    assert.equal((await read('Gone now'))?.removed, 'The original post was removed.');
+    assert.deepEqual((await read('Just for fay'))?.reblog, { label: "You can't reblog this post", disabled: true });
+
+    // The menu: Reblog and Reblog with a note, plus a nudge to read it first.
+    await page.eval(`${find('A post by cy')}.querySelector('.mi.reblog').click()`);
+    assert.deepEqual(await menu(), ['Reblog', 'Reblog with a note']);
+    assert.equal(await page.eval(`document.activeElement.textContent`), 'Reblog', 'focus moves into the menu');
+    await page.waitFor(`document.querySelector('.reblog-nudge')`, 'the read-it-first nudge');
+    assert.match(await page.eval<string>(`document.querySelector('.reblog-nudge').textContent`), /You haven't read this yet\. Read it first\?/);
+    await page.eval(`document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`);
+    assert.equal(await page.eval(`document.querySelector('.reblog-menu')`), null);
+    assert.equal(await page.eval(`document.activeElement.classList.contains('reblog')`), true, 'Escape returns focus to the button');
+    await page.eval(`${find('A post by cy')}.querySelector('.mi.reblog').click()`);
+    await page.eval(`[...document.querySelectorAll('.reblog-menu [role="menuitem"]')].find((n) => n.textContent === 'Reblog').click()`);
+    await page.waitFor(`${find('A post by cy')}.querySelector('.mi.reblog').classList.contains('on')`, 'the reblog to land');
+    assert.equal((await read('A post by cy'))?.reblog?.label, 'Undo reblog (4 reblogs)');
+    assert.deepEqual(await page.eval(`window.__calls.at(-1)`), { name: 'share', args: { reblogOf: 's_ben' } }, "it reblogs the post behind the story; the server finds cy's original");
+    assert.match(await page.eval<string>(`document.getElementById('toast').textContent`), /Sent through the portal!/);
+    await page.eval(`${find('A post by cy')}.querySelector('.mi.reblog').click()`);
+    assert.deepEqual(await menu(), ['Undo reblog']);
+    await page.eval(`document.querySelector('.reblog-menu [role="menuitem"]').click()`);
+    await page.waitFor(`!${find('A post by cy')}.querySelector('.mi.reblog').classList.contains('on')`, 'the undo');
+    assert.deepEqual(await page.eval(`window.__calls.at(-1)`), { name: 'unshare', args: { id: 's_mine' } });
+    assert.equal((await read('A post by cy'))?.reblog?.label, 'Reblog (3 reblogs)');
+
+    // A story no one has posted: reblogging with a note saves it first, then opens the composer.
+    const plain = await page.eval<string>(`[...document.querySelectorAll('.river-feed > article')].find((n) => n.dataset.story.startsWith('gh-mcp')).querySelector('.item-title').textContent`);
+    await page.eval(`[...document.querySelectorAll('.river-feed > article')].find((n) => n.dataset.story.startsWith('gh-mcp')).querySelector('.mi.reblog').click()`);
+    await page.eval(`[...document.querySelectorAll('.reblog-menu [role="menuitem"]')].find((n) => n.textContent === 'Reblog with a note').click()`);
+    await page.waitFor(`!document.getElementById('reader').hidden && document.querySelector('#reader .composer')`, 'the composer');
+    assert.match(await page.eval<string>(`document.querySelector('#reader .composer').textContent`), new RegExp(`Reblog “${plain.replace(/^New/, '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}” to your space`));
+    assert.ok((await tool('open_room', {})).profile.saved.length > 1, 'saved first');
+    // The reblog lab off: no reblog buttons; stories keep phase 3's share button.
+    await page.goto(`${app.base}/preview?nolab`);
+    await page.waitFor(`document.querySelector('#grid.river .river-feed article') && !document.querySelector('.skeleton')`, 'the river, lab off');
+    assert.equal(await page.eval(`document.querySelectorAll('.mi.reblog').length`), 0);
+    assert.ok(await page.eval<number>(`document.querySelectorAll('.story [aria-label="Share to your space"]').length`) > 0);
+    assert.deepEqual(page.problems, []);
+  } finally {
+    await page.send('Page.removeScriptToEvaluateOnNewDocument', { identifier });
+    await profiles.put('default', room());
+  }
+});
+
 test('browser: a portal opens to fill the room; the reader returns to it, and Escape steps back out', { skip }, async () => {
   const saved = Array.from({ length: 14 }, (_, i) => ({ url: `https://example.com/saved-${i}`, title: `Saved ${i}`, savedAt: '2026-09-01T00:00:00.000Z' }));
   await profiles.put('default', validateProfile({ ...room(), saved: [{ url: ARTICLE, title: 'Hijacking the PS5', savedAt: '2026-09-01T00:00:00.000Z' }, ...saved] }));

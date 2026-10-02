@@ -251,7 +251,7 @@ There's no per-portal choice. The ideas from the brainstorm all fit once we add 
 | `cards` | Today's shelf cards | Anything |
 | `gallery` | Pictures first, mosaic | YouTube, art, design feeds |
 | `frontpage` | Lead story, secondaries, headlines | News, a Space |
-| `river` | Several sources merged into one timeline | A column you scan once |
+| `river` | Now a room layout: every portal merged into one stream ([plan](plans/river.md)) | Wandering, and reblogs later |
 | `deck` | One at a time: read, archive, snooze | Saved items |
 | `quotes` | Pull quotes | Clips |
 | `changelog` | Versions grouped by project | GitHub releases, changelog feeds |
@@ -267,7 +267,7 @@ Some views need new data (a `docs` source, stored read state for `deck` and `wat
 |---|---|
 | Reading | `open_room` · `arrange_room` · `remove_portal` · `find_source` · `add_portal` · `read_source` · `refresh_portal` (app) · `read_article` · `get_thumbnails` (app) · `list_sources` |
 | Collecting | `save_item` · `remove_saved` · `pin_portal` · `clip` · `search_clips` · `get_clip` · `update_clip` · `delete_clip` |
-| Social | `get_public_profile` · `set_public_profile` · `remove_public_profile` · `open_space` · `share` · `unshare` · `get_share` · `list_shares` · `relationship` · `list_connections` · `report` |
+| Social | `get_public_profile` · `set_public_profile` · `remove_public_profile` · `open_space` · `share` · `unshare` · `get_share` · `share_settings` · `list_shares` · `relationship` · `list_connections` · `report` |
 | Onboarding & portability | `build_room` · `import_opml` · `export_data` · `import_portal` · `account_settings` |
 
 ## 8. Vocabulary (decided 2026-09-30)

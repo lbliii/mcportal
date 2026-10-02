@@ -1,22 +1,35 @@
 /**
- * Sharing tools: share, unshare, get_share, list_shares, relationship,
- * list_connections, report. Everything other people wrote (notes, titles,
+ * Sharing tools: share (and reblog), unshare, get_share, share_settings, list_shares,
+ * relationship, list_connections, report. Everything other people wrote (notes, titles,
  * clips) reaches the model fenced as untrusted: another user's note is exactly
  * where someone would try to plant instructions.
  */
 import { clean } from '../lib/text.ts';
 import { httpUrl } from '../profile.ts';
 import { clipText, type ClipData } from '../clips.ts';
-import { AUDIENCES, type SharedItem } from '../social.ts';
+import { AUDIENCES, REBLOG_RULES, type Reblogger, type SharedItem } from '../social.ts';
 import { isAppError } from '../lib/errors.ts';
 import { ensurePortal } from '../layout.ts';
-import { HOSTED_ONLY, socialActive, socialEntry, ok, toolError, untrusted, ROOM_URI, type CallToolResult, type ToolContext, type ToolDef } from './kit.ts';
+import { HOSTED_ONLY, labOn, labsOf, socialActive, socialEntry, ok, toolError, untrusted, ROOM_URI, type CallToolResult, type ToolContext, type ToolDef } from './kit.ts';
 import type { ToolResults } from './results.ts';
 
 export function shareLine(s: SharedItem): string {
   const who = s.mine ? 'you' : `@${s.author.handle}`;
   const to = s.audience === 'mcportal' ? 'everyone on MCPortal' : 'followers';
-  return `- [${s.id}] ${who} shared ${s.kind === 'clip' ? `a ${s.clip?.kind ?? 'clip'}` : 'a link'}: ${s.title}${s.url ? ` <${s.url}>` : ''} · to ${to} · ${s.createdAt.slice(0, 10)}${s.hiddenAt ? ' · hidden by an admin' : ''}${s.note ? `\n  note: ${clean(s.note, 300)}` : ''}`;
+  const original = s.original && 'author' in s.original ? s.original : undefined;
+  const what = s.reblogOf
+    ? `reblogged ${original ? `@${original.author.handle}'s post` : s.original && 'removed' in s.original && s.original.removed === 'detached' ? 'a post its author removed from this reblog' : 'a post that was removed'}${s.via ? ` (via @${s.via})` : ''}`
+    : `shared ${s.kind === 'clip' ? `a ${s.clip?.kind ?? 'clip'}` : 'a link'}`;
+  const reblogs = [s.reblogCount ? `${s.reblogCount} reblog${s.reblogCount === 1 ? '' : 's'}` : '', s.reblogs && !s.reblogOf ? `reblogs: ${s.reblogs} only` : '', s.myReblog && !s.mine ? 'you reblogged it' : ''].filter(Boolean);
+  return `- [${s.id}] ${who} ${what}: ${s.title}${s.url ? ` <${s.url}>` : ''} · to ${to} · ${s.createdAt.slice(0, 10)}${reblogs.map((r) => ` · ${r}`).join('')}${s.hiddenAt ? ' · hidden by an admin' : ''}`
+    + `${original?.note ? `\n  @${original.author.handle}'s note: ${clean(original.note, 300)}` : ''}${s.note ? `\n  note: ${clean(s.note, 300)}` : ''}`;
+}
+
+/** "Reblogged by @a, @b and 3 more." */
+function rebloggedBy(list: Reblogger[]): string {
+  if (!list.length) return '';
+  const names = list.slice(0, 5).map((r) => `@${r.handle}${r.detached ? ' (removed by you)' : ''}`);
+  return `Reblogged by ${names.join(', ')}${list.length > 5 ? ` and ${list.length - 5} more` : ''}.`;
 }
 
 /** A refused request as a sentence (the rules' messages have no final stop). */
@@ -98,20 +111,31 @@ export const SOCIAL_TOOLS: ToolDef[] = [
         audience: { type: 'string', enum: AUDIENCES },
       },
     },
+    // Reblogging (docs/plans/reblog.md) is a lab until it's had real use.
+    lab: {
+      name: 'reblog',
+      properties: { reblogOf: { type: 'string', description: 'post id' }, reblogs: { type: 'string', enum: REBLOG_RULES } },
+      description: "Share one of the user's saved links (savedUrl) or clips (clipId), or reblog a post (reblogOf), with a note, to their followers or everyone on MCPortal. Only when they ask; ask first if they haven't read it; if you write the note, share only after they approve its exact words.",
+    },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     async handler(args, ctx) {
       if (!ctx.social) return toolError(HOSTED_ONLY.sharing, 'unavailable');
       try {
+        if (typeof args.reblogOf === 'string' && args.reblogOf) {
+          const reblog = await ctx.social.reblog(ctx.userId, { id: args.reblogOf, note: args.note, audience: args.audience });
+          const original = reblog.original && 'author' in reblog.original ? `@${reblog.original.author.handle}'s post` : 'the post';
+          return ok(`Reblogged ${original} (id ${reblog.id}; undo with unshare).\n${untrusted('your reblog', shareLine(reblog))}`, { share: reblog } satisfies ToolResults['share']);
+        }
         let input: Parameters<NonNullable<ToolContext['social']>['share']>[1];
         if (typeof args.clipId === 'string' && args.clipId) {
           const clip = await ctx.clips?.get(ctx.userId, args.clipId);
           if (!clip) return toolError(`No clip with id "${clean(args.clipId, 40)}". Use search_clips to find it.`, 'not_found');
-          input = { kind: 'clip', title: clip.title, url: clip.source.url, clip, note: args.note, audience: args.audience };
+          input = { kind: 'clip', title: clip.title, url: clip.source.url, clip, note: args.note, audience: args.audience, reblogs: args.reblogs };
         } else {
           const url = httpUrl(args.savedUrl);
           const saved = url ? (await ctx.store.get(ctx.userId)).saved.find((s) => s.url === url) : undefined;
           if (!saved) return toolError('Share a saved item (savedUrl, save it first with save_item) or a clip (clipId).');
-          input = { kind: 'link', title: saved.title, url: saved.url, note: args.note, audience: args.audience };
+          input = { kind: 'link', title: saved.title, url: saved.url, note: args.note, audience: args.audience, reblogs: args.reblogs };
         }
         const shared = await ctx.social.share(ctx.userId, input);
         return ok(`Shared (id ${shared.id}).\n${untrusted('your share', shareLine(shared))}`, { share: shared } satisfies ToolResults['share']);
@@ -125,7 +149,7 @@ export const SOCIAL_TOOLS: ToolDef[] = [
     title: 'Remove a share',
     access: 'write',
     available: socialActive,
-    description: "Remove one of the user's shares. Only when they ask.",
+    description: "Remove one of the user's shares or reblogs (undoing a reblog). Only when they ask.",
     inputSchema: { type: 'object', required: ['id'], additionalProperties: false, properties: { id: { type: 'string' } } },
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     async handler(args, ctx) {
@@ -139,7 +163,7 @@ export const SOCIAL_TOOLS: ToolDef[] = [
     title: 'Show a share',
     access: 'read',
     available: socialActive,
-    description: 'Show one share in full (the note and the shared link or clip), as a card in the conversation. Ids come from the Following portal or list_shares.',
+    description: 'Show one share or reblog in full (notes, the link or clip, who reblogged it), as a card in the conversation. Ids come from the Following portal or list_shares.',
     inputSchema: { type: 'object', required: ['id'], additionalProperties: false, properties: { id: { type: 'string' } } },
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
     _meta: { ui: { resourceUri: ROOM_URI } },
@@ -147,8 +171,42 @@ export const SOCIAL_TOOLS: ToolDef[] = [
       if (!ctx.social) return toolError(HOSTED_ONLY.sharing, 'unavailable');
       const share = await ctx.social.get(ctx.userId, String(args.id ?? ''));
       if (!share) return toolError('That share isn\'t available.', 'not_found');
-      const body = share.clip ? `\n\n${clipText(share.clip.data)}` : '';
-      return ok(`Showing share ${share.id} in a card.\n${untrusted(share.mine ? 'your share' : `a share by @${share.author.handle}`, `${shareLine(share)}${body}`)}`, { share } satisfies ToolResults['get_share']);
+      const original = share.original && 'author' in share.original ? share.original : undefined;
+      const clip = original?.clip ?? share.clip;
+      const body = clip ? `\n\n${clipText(clip.data)}` : '';
+      // Who reblogged it: the original's reblogs, as this viewer may see them.
+      const rebloggers = share.reblogCount || share.mine ? await ctx.social.reblogsOf(ctx.userId, share.id, { limit: 50 }).catch(() => []) : [];
+      const by = rebloggedBy(rebloggers);
+      return ok(`Showing share ${share.id} in a card.${by ? ` ${by}` : ''}\n${untrusted(share.mine ? 'your share' : `a share by @${share.author.handle}`, `${shareLine(share)}${body}`)}`,
+        { share, ...(rebloggers.length ? { rebloggers } : {}), ...(labsOf(ctx).length ? { labs: [...labsOf(ctx)] } : {}) } satisfies ToolResults['get_share']);
+    },
+  },
+  {
+    name: 'share_settings',
+    title: 'Change who can reblog a post',
+    access: 'write',
+    available: (reach) => socialActive(reach) && reach.labs.includes('reblog'),
+    description: "Change who may reblog one of the user's posts, or remove it from someone's reblog of it (detach: the reblog's id; permanent). Only when they ask.",
+    inputSchema: {
+      type: 'object',
+      required: ['id'],
+      additionalProperties: false,
+      properties: { id: { type: 'string' }, reblogs: { type: 'string', enum: REBLOG_RULES }, detach: { type: 'string' } },
+    },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+    async handler(args, ctx) {
+      if (!ctx.social) return toolError(HOSTED_ONLY.sharing, 'unavailable');
+      if (!labOn(ctx, 'reblog')) return toolError("Reblogging isn't on for this MCPortal yet.", 'unavailable');
+      if (args.reblogs === undefined && args.detach === undefined) return toolError('Say who may reblog it (reblogs) or which reblog to remove it from (detach).');
+      try {
+        const share = await ctx.social.shareSettings(ctx.userId, String(args.id ?? ''), { reblogs: args.reblogs, detach: args.detach });
+        const who = args.reblogs === 'nobody' ? 'Nobody' : args.reblogs === 'followers' ? 'Only your followers' : 'Anyone signed in';
+        const done = [args.reblogs !== undefined ? `${who} can reblog it from now on; reblogs made before stay.` : '',
+          args.detach !== undefined ? 'Removed your post from that reblog, for good: it now says its author removed it.' : ''].filter(Boolean).join(' ');
+        return ok(`${done}\n${untrusted('your share', shareLine(share))}`, { share } satisfies ToolResults['share_settings']);
+      } catch (error) {
+        return fail(error);
+      }
     },
   },
   {

@@ -23,6 +23,7 @@
     <button class="ib" data-layout="columns" data-icon="columns" aria-pressed="true" title="Columns: scroll sideways, then down each column" aria-label="Columns layout"></button>
     <button class="ib" data-layout="shelves" data-icon="shelves" aria-pressed="false" title="Shelves: one sideways row per source" aria-label="Shelves layout"></button>
     <button class="ib" data-layout="frontpage" data-icon="frontpage" aria-pressed="false" title="Front page: your agent's picks, then each source's top stories" aria-label="Front page layout" hidden></button>
+    <button class="ib" data-layout="river" data-icon="river" aria-pressed="false" title="River: every source in one stream, newest first" aria-label="River layout" hidden></button>
   </div>
   <button class="ib room-only" id="btnAdd" data-icon="plus" aria-pressed="false" title="Add a source: any site, feed, subreddit, YouTube channel or repo" aria-label="Add a source"></button>
   <button class="ib room-only" id="btnOpenIn" data-icon="chat" aria-pressed="false" title="Open stories as their own card in the conversation" aria-label="Open stories in chat" hidden></button>
@@ -79,13 +80,14 @@
     const svg = document.createElementNS(NS, 'svg');
     svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('aria-hidden', 'true');
     svg.setAttribute('stroke-width', String(ICON_STROKE));
-    const { d, dot } = /** @type {Record<string, { d: string, dot?: number[] }>} */ (ICONS)[name] ?? { d: '' };
+    const { d, dot, state } = /** @type {Record<string, { d: string, dot?: number[], state?: true }>} */ (ICONS)[name] ?? { d: '' };
     const path = document.createElementNS(NS, 'path'); path.setAttribute('d', d);
     svg.append(path);
     if (dot) {
       const circle = document.createElementNS(NS, 'circle');
       circle.setAttribute('cx', String(dot[0])); circle.setAttribute('cy', String(dot[1])); circle.setAttribute('r', String(dot[2]));
       circle.setAttribute('fill', 'currentColor'); circle.setAttribute('stroke', 'none');
+      if (state) circle.setAttribute('class', 'icon-state');   // shown only while its button is pressed
       svg.append(circle);
     }
     return svg;
@@ -101,6 +103,7 @@
   /*include:room/room.js*/
   /*include:room/items.js*/
   /*include:room/layouts.js*/
+  /*include:room/river.js*/
   /*include:room/levels.js*/
   /*include:room/seen.js*/
   /*include:room/reader.js*/
@@ -110,6 +113,7 @@
   /*include:room/highlights.js*/
   /*include:room/docs.js*/
   /*include:room/social.js*/
+  /*include:room/reblog.js*/
   /*include:room/add.js*/
   /*include:room/toolbar.js*/
   /*include:room/boot.js*/
