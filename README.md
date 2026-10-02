@@ -203,6 +203,5 @@ MCPortal is a **reading platform with light social**, driven by your agent. Anyt
 - MCP 2026-07-28: serve the stateless protocol alongside today's, still without dependencies ([plan](docs/plans/mcp-2026-07-28.md))
 - Built-in views of your own reading (what you read and save, by topic and source)
 - Pictures in the reader view; clearer handling of paywalled articles
-- More sign-in options (Google, email link, passkeys) as extra identities on the same account
 - Link cards for sites without feeds (e.g. TikTok via oEmbed), shared rooms for groups
 - Postgres row-level security as a third access layer

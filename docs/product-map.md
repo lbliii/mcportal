@@ -122,7 +122,6 @@ How MCPortal is part of the agent, not only something displayed next to it.
 | **Transports** | Stdio (plugin, Codex) and Streamable HTTP (`/mcp`) | ✅ |
 | | MCP 2026-07-28 (stateless, `server/discover`) alongside 2025-era clients ([plan](plans/mcp-2026-07-28.md)) | 🗺 |
 | **Identity & access** | OAuth 2.1 with GitHub sign-in; one `authorize()` gate for every tool; invites, suspension, allowlist; single-user static token | ✅ |
-| | More sign-in options (Google, email link, passkeys) | 🗺 |
 | **Storage** | Files locally; Postgres hosted (PITR on) | ✅ |
 | | Scheduled backups; row-level security | 🗺 |
 | **Fetch boundary** | Public-IP-only safe fetch, size/time/redirect caps, linear-time HTML tokenizer | ✅ |
