@@ -7,7 +7,7 @@ import { clean } from '../lib/text.ts';
 import { arrange, spreadColumns, withLayout, type Arrangement } from '../layout.ts';
 import { MAX_PACKS, packSummaries, STARTER_PACKS } from '../packs.ts';
 import { SEEN_BATCH, tracksSeen, withNews } from '../seen.ts';
-import { describeDiff, describeLayout, diffProfiles, findPortal, normalizeSourceConfig, type PortalInput, type Profile, type ProfileDiff } from '../profile.ts';
+import { describeDiff, describeLayout, diffProfiles, findPortal, normalizeSourceConfig, LAYOUTS, type Layout, type PortalInput, type Profile, type ProfileDiff } from '../profile.ts';
 import { clipsPortal, clipsQuery, followingPortal, loadPortal, pinnedPortal, savedPortal } from '../sources.ts';
 import type { PortalResult } from '../types.ts';
 import { ok, toolError, toolFailure, untrusted, ROOM_URI, type CallToolResult, type ToolContext, type ToolDef } from './kit.ts';
@@ -111,7 +111,7 @@ export const ROOM_TOOLS: ToolDef[] = [
       additionalProperties: false,
       properties: {
         packs: { type: 'array', maxItems: MAX_PACKS, items: { type: 'string', enum: STARTER_PACKS.map((p) => p.id) } },
-        layout: { type: 'string', enum: ['columns', 'shelves'], description: 'Default shelves (picture rows).' },
+        layout: { type: 'string', enum: [...LAYOUTS], description: 'Default shelves (picture rows).' },
       },
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
@@ -129,7 +129,7 @@ export const ROOM_TOOLS: ToolDef[] = [
       }
       // Sources in pack order, spread over at most 8 columns, packs kept together.
       const sources = ids.flatMap((id) => STARTER_PACKS.find((p) => p.id === id)!.portals);
-      const layout = args.layout === 'columns' ? 'columns' : 'shelves';
+      const layout: Layout = LAYOUTS.find((l) => l === args.layout) ?? 'shelves';
       const profile = await ctx.store.update(ctx.userId, (before) => {
         const built = withLayout(before, { layout, columns: spreadColumns(sources), onboarded: true });
         return { profile: built, result: built };
@@ -152,7 +152,7 @@ export const ROOM_TOOLS: ToolDef[] = [
         retitle: { type: 'array', items: { type: 'object', required: ['portal', 'title'], additionalProperties: false, properties: { portal: { type: 'string' }, title: { type: 'string' } } } },
         configure: { type: 'array', items: { type: 'object', required: ['portal', 'config'], additionalProperties: false, properties: { portal: { type: 'string' }, config: { type: 'object', description: 'Settings to change (list_sources)' } } } },
         name: { type: 'string' },
-        layout: { type: 'string', enum: ['columns', 'shelves'], description: 'columns side by side, or one sideways row per portal' },
+        layout: { type: 'string', enum: [...LAYOUTS], description: 'columns side by side, or one sideways row per portal' },
         openIn: { type: 'string', enum: ['card', 'chat'], description: 'stories open in the room, or as their own card in the chat' },
       },
     },

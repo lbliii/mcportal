@@ -106,9 +106,13 @@ Transitions run in the iframe. These numbers set the front page's breakpoints.
 
 ### 2. Component layer (no visual change)
 
-Extract the layout registry, the item component with forms (`row` and `tile` reproduce
-today's rows and cards exactly), the portal block, the view state, and the transition
-helper. The preview matrix must show no visual difference for columns and shelves.
+Done. `room/layouts.js` holds the registry (`ROOM_LAYOUTS`: each layout's grid class,
+how it draws the room, how it draws one portal) and the portal parts every layout shares
+(label, items or error/empty state, footer). `room/items.js` holds `renderItem(item,
+portal, form, look)` with the `row` and `tile` forms. `build_room` and `arrange_room`
+take their layout enums from `LAYOUTS`. Verified: the `#grid` hashes match the phase 0
+baseline exactly, and switching layouts, refreshing and saving work with no console
+errors. The view state and transition helper move to phase 5, where they're first used.
 
 ### 3. Rank
 

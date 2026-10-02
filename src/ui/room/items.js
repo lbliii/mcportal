@@ -1,0 +1,72 @@
+  // room/items.js: one item, drawn in a form (docs/plans/room-layouts.md)
+  // ------------------------------------------------------------ item forms
+  // Every layout draws items through renderItem. A form is how much room an item gets:
+  // row (a line in a portal list) or tile (a card in a shelf). New forms (lead, quote,
+  // clip) join ITEM_FORMS; each keeps one content-opening button with its actions
+  // beside it, never inside it.
+  /** @typedef {'row' | 'tile'} ItemForm */
+  /** How a tile looks: its portal's colour, and whether its shelf shows pictures. @typedef {{ color?: string, media?: boolean }} ItemLook */
+
+  /** @param {Item} item @param {PortalResult} portal @param {ItemForm} [form] @param {ItemLook} [look] */
+  function renderItem(item, portal, form = 'row', look = {}) {
+    return ITEM_FORMS[form](item, portal, look);
+  }
+
+  // Compact meta: "364 points" -> ▲364, "192 comments" -> a comment-count link to the
+  // discussion, "by someone" dropped (kept in the tooltip). Unknown strings pass through.
+  /** @param {Item} item */
+  function compactMeta(item) {
+    /** @type {Array<HTMLElement | null>} */
+    const out = [];
+    let byline = '';
+    for (const m of item.meta) {
+      let hit;
+      if ((hit = /^([\d.,]+k?) points?$/.exec(m))) out.push(el('span', { class: 'mi', style: 'cursor:default' }, icon('up'), hit[1]));
+      else if ((hit = /^([\d.,]+k?) comments?$/.exec(m))) {
+        const url = item.discussionUrl && item.discussionUrl !== item.url ? item.discussionUrl : null;
+        out.push(url
+          ? el('button', { class: 'mi', title: 'Open the discussion', 'aria-label': `${hit[1]} comments, open the discussion`, onclick: (/** @type {MouseEvent} */ e) => { e.stopPropagation(); openLink(url); } }, icon('comment'), hit[1])
+          : el('span', { class: 'mi', style: 'cursor:default' }, icon('comment'), hit[1]));
+      } else if (/^by /.test(m)) byline = m;
+      else out.push(el('span', null, m));
+    }
+    if (item.publishedAt) out.push(el('span', null, ago(item.publishedAt)));
+    return { out, byline };
+  }
+
+  /** The title line: the New mark, a GitHub owner's avatar, the title. @param {Item} item */
+  function itemTitle(item) {
+    const avatar = item.image && item.image.kind === 'avatar' ? avatarImg(item) : null;
+    return el('span', { class: 'item-title' }, item.new ? el('span', { class: 'new-mark' }, 'New') : null, avatar, item.title);
+  }
+
+  /** A click anywhere on the item but its buttons and links opens it. @param {Item} item @param {PortalResult} portal */
+  const openOnClick = (item, portal) => (/** @type {MouseEvent} */ e) => { if (!/** @type {Element} */ (e.target).closest('button, a')) openItem(item, portal); };
+
+  /** @type {Record<ItemForm, (item: Item, portal: PortalResult, look: ItemLook) => HTMLElement>} */
+  const ITEM_FORMS = {
+    /** A line in a portal's list: title, summary, a thumbnail beside them, and every action. */
+    row(item, portal) {
+      const { out, byline } = compactMeta(item);
+      if (item.url) out.push(el('button', { class: 'mi go', title: 'Open the original', 'aria-label': 'Open the original', onclick: () => openLink(item.url ?? '') }, icon('external')));   // checked just before
+      out.push(saveButton(item, portal.source));
+      if (portal.source === 'saved' && item.url) out.push(el('button', { class: 'mi go', title: 'Share to your space', 'aria-label': 'Share to your space', onclick: () => openComposer(item) }, icon('share')));
+      const text = [itemTitle(item), item.summary ? el('span', { class: 'item-summary' }, item.summary) : null];
+      const main = el('button', { class: 'item-main', type: 'button', title: byline, onclick: () => openItem(item, portal) },
+        item.image && item.image.kind === 'thumb' ? el('span', { class: 'item-row' }, thumbBox(item, portal), el('span', { class: 'item-text' }, text)) : text);
+      return el('div', { class: 'item', onclick: openOnClick(item, portal) }, main,
+        out.length ? el('div', { class: 'item-meta' }, out) : null);
+    },
+
+    /** A card in a shelf. In a media shelf every card gets a picture area, so the row stays even. */
+    tile(item, portal, { color = '', media = false }) {
+      const meta = compactMeta(item).out;
+      const save = saveButton(item, portal.source);
+      if (save) { save.classList.add('go'); meta.push(save); }
+      const content = [itemTitle(item), media ? null : item.summary ? el('span', { class: 'item-summary' }, item.summary) : null];
+      const main = el('button', { class: 'card-main', type: 'button', title: item.title, onclick: () => openItem(item, portal) },
+        media ? [thumbBox(item.image && item.image.kind === 'thumb' ? item : { ...item, image: undefined }, portal), el('span', { class: 'card-body' }, content)] : content);
+      return el('div', { class: media ? 'card media' : 'card', style: `--mp-source-color:${color}`, onclick: openOnClick(item, portal) }, main,
+        meta.length ? el('div', { class: 'item-meta' }, meta) : null);
+    },
+  };

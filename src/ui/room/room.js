@@ -1,4 +1,4 @@
-  // room/room.js: the room: welcome, portal rendering, pictures, saving, loadRoom
+  // room/room.js: the room: welcome, pictures, saving, refreshing, loadRoom (layouts.js draws it)
   // ------------------------------------------------------------ welcome (first run, or "start over")
   /** @param {ToolResults['open_room']} data */
   function renderWelcome(data) {
@@ -87,90 +87,6 @@
     drawLayout();
     setUpdated(data.generatedAt);
     if (data.notice) toast(data.notice);
-  }
-
-  function drawLayout() {
-    const p = /** @type {Profile} */ (state.profile);   // callers draw only once a room is loaded
-    assignArt(p);
-    const shelves = p.layout === 'shelves';
-    const grid = $('grid');
-    grid.classList.toggle('shelves', shelves);
-    grid.replaceChildren(...(shelves
-      ? p.columns.flatMap((col) => col.panels).map((spec) => renderShelf(spec.id))
-      : p.columns.map((col) => el('div', { class: 'col', style: `--mp-column-weight:${col.width}` }, col.panels.map((spec) => renderPortal(spec.id))))));
-    for (const b of $$('[data-layout]')) b.setAttribute('aria-pressed', String(b.dataset.layout === p.layout));
-    $('btnOpenIn').setAttribute('aria-pressed', String(p.openIn === 'chat'));
-  }
-
-  /** @param {string} portalId */
-  function renderShelf(portalId) {
-    const portal = state.portals.get(portalId);
-    const wrap = el('section', { class: 'shelf', 'data-portal': portalId });
-    if (!portal) { wrap.append(el('div', { class: 'empty' }, 'Stand by…')); return wrap; }
-    const color = sourceColor(portal.source, artStyle(portal));
-    const row = el('div', { class: 'shelf-row' });
-    const page = (/** @type {number} */ dir) => row.scrollBy({ left: dir * Math.max(200, row.clientWidth - 60), behavior: scrollBehavior() });
-    wrap.append(el('div', { class: 'shelf-head' },
-      el('span', { class: 'dot', style: `background:${color}` }),
-      el('span', { class: 'portal-title', title: portal.title }, portal.title),
-      el('span', { class: 'portal-count' }, portalCount(portal)),
-      el('span', { class: 'tools' },
-        iconButton('left', `Scroll ${portal.title} left`, () => page(-1)),
-        iconButton('right', `Scroll ${portal.title} right`, () => page(1)),
-        refreshButton(portal))));
-    if (portal.error) wrap.append(el('div', { class: 'error' }, `Signal lost in the ion storm (${portal.error}). Try refreshing this portal.`));
-    else if (!portal.items.length) wrap.append(el('div', { class: 'empty' }, 'All quiet on this frequency… for now. New posts will show up here.'));
-    else {
-      // A picture row only when most items have pictures; otherwise it's mostly empty boxes.
-      const withThumbs = portal.items.filter((i) => i.image && i.image.kind === 'thumb').length;
-      const media = withThumbs >= 2 && withThumbs * 2 >= portal.items.length;
-      row.append(...portal.items.map((item) => watchNew(renderCard(item, portal, color, media), item, portal)));
-      wrap.append(row);
-    }
-    const p = portal.provenance;
-    wrap.append(el('div', { class: 'portal-foot' }, portal.pin ? pinnedFoot(portal)
-      : `${p.source} · ${p.endpoint} · fetched ${new Date(p.fetchedAt).toLocaleTimeString()}${p.cached ? ' (cached)' : ''}`));
-    primePictures(wrap);
-    return wrap;
-  }
-
-  /**
-   * In a media shelf every card gets a picture area, so the row stays even.
-   * @param {Item} item @param {PortalResult} portal @param {string} color @param {boolean} media
-   */
-  function renderCard(item, portal, color, media) {
-    const meta = compactMeta(item).out;
-    const save = saveButton(item, portal.source);
-    if (save) { save.classList.add('go'); meta.push(save); }
-    const avatar = item.image && item.image.kind === 'avatar' ? avatarImg(item) : null;
-    const content = [el('span', { class: 'item-title' }, item.new ? el('span', { class: 'new-mark' }, 'New') : null, avatar, item.title), media ? null : item.summary ? el('span', { class: 'item-summary' }, item.summary) : null];
-    const main = el('button', { class: 'card-main', type: 'button', title: item.title, onclick: () => openItem(item, portal) },
-      media ? [thumbBox(item.image && item.image.kind === 'thumb' ? item : { ...item, image: undefined }, portal), el('span', { class: 'card-body' }, content)] : content);
-    return el('div', { class: media ? 'card media' : 'card', style: `--mp-source-color:${color}`, onclick: (/** @type {MouseEvent} */ e) => { if (!/** @type {Element} */ (e.target).closest('button, a')) openItem(item, portal); } }, main,
-      meta.length ? el('div', { class: 'item-meta' }, meta) : null);
-  }
-
-  /** @param {string} portalId */
-  function renderPortal(portalId) {
-    if (state.profile && state.profile.layout === 'shelves') return renderShelf(portalId);
-    const portal = state.portals.get(portalId);
-    const wrap = el('section', { class: 'portal', 'data-portal': portalId });
-    if (!portal) { wrap.append(el('div', { class: 'empty' }, 'Stand by…')); return wrap; }
-    const color = sourceColor(portal.source, artStyle(portal));
-    const refresh = el('span', { class: 'tools' }, refreshButton(portal));
-    wrap.append(el('div', { class: 'portal-head' },
-      el('span', { class: 'dot', style: `background:${color}` }),
-      el('span', { class: 'portal-title', title: portal.title }, portal.title),
-      el('span', { class: 'portal-count' }, portalCount(portal)),
-      refresh));
-    if (portal.error) wrap.append(el('div', { class: 'error' }, `Signal lost in the ion storm (${portal.error}). Try refreshing this portal.`));
-    else if (!portal.items.length) wrap.append(el('div', { class: 'empty' }, 'All quiet on this frequency… for now. New posts will show up here.'));
-    else wrap.append(el('ul', { class: 'items' }, portal.items.map((item) => el('li', null, watchNew(renderItem(item, portal), item, portal)))));
-    const p = portal.provenance;
-    wrap.append(el('div', { class: 'portal-foot' }, portal.pin ? pinnedFoot(portal)
-      : `${p.source} · ${p.endpoint} · fetched ${new Date(p.fetchedAt).toLocaleTimeString()}${p.cached ? ' (cached)' : ''} · fresh for ${p.ttlSeconds}s`));
-    primePictures(wrap);
-    return wrap;
   }
 
   // ------------------------------------------------------------ pictures
@@ -332,42 +248,6 @@
       toast(`Curses! Couldn't ${was ? 'remove' : 'save'} that: ${errorText(error)}`);
     }
     markSaved();
-  }
-
-  // Compact meta: "364 points" -> ▲364, "192 comments" -> a comment-count link to the
-  // discussion, "by someone" dropped (kept in the tooltip). Unknown strings pass through.
-  /** @param {Item} item */
-  function compactMeta(item) {
-    /** @type {Array<HTMLElement | null>} */
-    const out = [];
-    let byline = '';
-    for (const m of item.meta) {
-      let hit;
-      if ((hit = /^([\d.,]+k?) points?$/.exec(m))) out.push(el('span', { class: 'mi', style: 'cursor:default' }, icon('up'), hit[1]));
-      else if ((hit = /^([\d.,]+k?) comments?$/.exec(m))) {
-        const url = item.discussionUrl && item.discussionUrl !== item.url ? item.discussionUrl : null;
-        out.push(url
-          ? el('button', { class: 'mi', title: 'Open the discussion', 'aria-label': `${hit[1]} comments, open the discussion`, onclick: (/** @type {MouseEvent} */ e) => { e.stopPropagation(); openLink(url); } }, icon('comment'), hit[1])
-          : el('span', { class: 'mi', style: 'cursor:default' }, icon('comment'), hit[1]));
-      } else if (/^by /.test(m)) byline = m;
-      else out.push(el('span', null, m));
-    }
-    if (item.publishedAt) out.push(el('span', null, ago(item.publishedAt)));
-    return { out, byline };
-  }
-
-  /** @param {Item} item @param {PortalResult} portal */
-  function renderItem(item, portal) {
-    const { out, byline } = compactMeta(item);
-    if (item.url) out.push(el('button', { class: 'mi go', title: 'Open the original', 'aria-label': 'Open the original', onclick: () => openLink(item.url ?? '') }, icon('external')));   // checked just before
-    out.push(saveButton(item, portal.source));
-    if (portal.source === 'saved' && item.url) out.push(el('button', { class: 'mi go', title: 'Share to your space', 'aria-label': 'Share to your space', onclick: () => openComposer(item) }, icon('share')));
-    const avatar = item.image && item.image.kind === 'avatar' ? avatarImg(item) : null;
-    const text = [el('span', { class: 'item-title' }, item.new ? el('span', { class: 'new-mark' }, 'New') : null, avatar, item.title), item.summary ? el('span', { class: 'item-summary' }, item.summary) : null];
-    const main = el('button', { class: 'item-main', type: 'button', title: byline, onclick: () => openItem(item, portal) },
-      item.image && item.image.kind === 'thumb' ? el('span', { class: 'item-row' }, thumbBox(item, portal), el('span', { class: 'item-text' }, text)) : text);
-    return el('div', { class: 'item', onclick: (/** @type {MouseEvent} */ e) => { if (!/** @type {Element} */ (e.target).closest('button, a')) openItem(item, portal); } }, main,
-      out.length ? el('div', { class: 'item-meta' }, out) : null);
   }
 
   // Pinned portals hold data the agent fetched with another tool, so only the agent can
