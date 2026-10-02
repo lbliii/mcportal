@@ -82,7 +82,7 @@ test('tools/list links open_room to the UI and hides app-only tools from the mod
   assert.equal(local.length, tools.length - 11);
   const fresh = await names(ctx(social(false)));
   assert.deepEqual(tools.map((t) => t.name).filter((n) => !fresh.includes(n)).sort(), ['get_public_profile', 'get_share', 'list_connections', 'list_shares', 'remove_public_profile', 'share', 'unshare']);
-  assert.deepEqual(tools.map((t) => t.name), ['open_room', 'build_room', 'arrange_room', 'remove_portal', 'refresh_portal', 'read_source', 'find_source', 'add_portal', 'list_sources', 'import_opml', 'read_article', 'get_thumbnails', 'save_item', 'remove_saved', 'pin_portal', 'open_docs', 'read_doc_page', 'search_docs', 'clip', 'search_clips', 'get_clip', 'update_clip', 'delete_clip', 'get_public_profile', 'set_public_profile', 'remove_public_profile', 'export_data', 'import_portal', 'account_settings', 'open_space', 'share', 'unshare', 'get_share', 'list_shares', 'relationship', 'list_connections', 'report', 'record_reading', 'get_reading', 'list_reading']);
+  assert.deepEqual(tools.map((t) => t.name), ['open_room', 'build_room', 'arrange_room', 'remove_portal', 'refresh_portal', 'read_source', 'find_source', 'add_portal', 'list_sources', 'import_opml', 'read_article', 'get_thumbnails', 'save_item', 'remove_saved', 'pin_portal', 'open_docs', 'read_doc_page', 'search_docs', 'open_handoff', 'create_handoff', 'clip', 'search_clips', 'get_clip', 'update_clip', 'delete_clip', 'get_public_profile', 'set_public_profile', 'remove_public_profile', 'export_data', 'import_portal', 'account_settings', 'open_space', 'share', 'unshare', 'get_share', 'list_shares', 'relationship', 'list_connections', 'report', 'record_reading', 'get_reading', 'list_reading']);
   assert.equal(tools.find((t) => t.name === 'open_room')._meta.ui.resourceUri, ROOM_URI);
   assert.deepEqual(tools.find((t) => t.name === 'refresh_portal')._meta.ui.visibility, ['app']);
   assert.equal(tools.find((t) => t.name === 'read_article')._meta.ui.resourceUri, ROOM_URI, 'reader renders as its own card');
@@ -117,7 +117,7 @@ test('room fragments: every src/ui/room file is included, in order, and no inclu
   }
   // The script fragments share one closure; their order is evaluation order.
   const order = [...page.matchAll(/\/\*include:(room\/[\w.]+\.js)\*\//g)].map((m) => m[1]);
-  assert.deepEqual(order, ['bridge', 'dom', 'room', 'reader', 'reading', 'passage', 'docs', 'social', 'add', 'toolbar', 'boot'].map((n) => `room/${n}.js`));
+  assert.deepEqual(order, ['bridge', 'dom', 'room', 'reader', 'reading', 'passage', 'handoff', 'docs', 'social', 'add', 'toolbar', 'boot'].map((n) => `room/${n}.js`));
 });
 
 // ---------------------------------------------------------------- tools

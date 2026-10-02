@@ -12,6 +12,7 @@ import { FileClipStore, MemoryClipStore, type ClipStore } from '../src/clip-stor
 import { buildClip } from '../src/clips.ts';
 import { memoryPersistence } from '../src/lib/document.ts';
 import { defaultProfile, validateProfile } from '../src/profile.ts';
+import { FileHandoffStore, HANDOFF_LIMIT, MemoryHandoffStore, type HandoffStore } from '../src/handoffs.ts';
 import { FileReadingStore, READING_LIMIT, type ReadingStore } from '../src/reading.ts';
 import { DocumentSocialStore, type SocialStore } from '../src/social-store.ts';
 import type { Share } from '../src/social.ts';
@@ -46,6 +47,7 @@ interface Backend {
   clips: () => Promise<ClipStore>;
   social: () => Promise<SocialStore>;
   reading: () => Promise<ReadingStore>;
+  handoffs: () => Promise<HandoffStore>;
 }
 
 const tmp = (what: string) => mkdtemp(path.join(tmpdir(), `mcportal-contract-${what}-`));
@@ -59,6 +61,7 @@ const BACKENDS: Backend[] = [
     clips: async () => new FileClipStore(await tmp('clips')),
     social: async () => new DocumentSocialStore(memoryPersistence()),
     reading: async () => new FileReadingStore(await tmp('reading')),
+    handoffs: async () => new FileHandoffStore(await tmp('handoffs')),
   },
   {
     name: 'memory',
@@ -67,6 +70,7 @@ const BACKENDS: Backend[] = [
     clips: async () => new MemoryClipStore(),
     social: async () => new DocumentSocialStore(),
     reading: async () => new FileReadingStore(await tmp('reading')),
+    handoffs: async () => new MemoryHandoffStore(),
   },
   {
     name: 'postgres',
@@ -75,6 +79,7 @@ const BACKENDS: Backend[] = [
     clips: async () => new (await pg()).PgClipStore(db!),
     social: async () => new (await pg()).PgSocialStore(db!),
     reading: async () => new (await pg()).PgReadingStore(db!),
+    handoffs: async () => new (await pg()).PgHandoffStore(db!),
   },
 ];
 
@@ -181,5 +186,23 @@ for (const b of BACKENDS) {
     await assert.rejects(store.import(u, new Array(READING_LIMIT + 1).fill({})), (e: { code?: string }) => e.code === 'limit_exceeded');
     await store.deleteAll(u);
     assert.equal(await store.get(u, 'https://example.com/a'), undefined);
+  });
+
+  test(`contract (${b.name}): handoffs`, { skip: b.skip }, async () => {
+    const store = await b.handoffs();
+    const u = user('h');
+    const page = { url: 'https://example.com/guide', title: 'Guide', place: { kind: 'article' as const } };
+    const first = await store.create(u, { ...page, anchor: { block: 3, heading: 'Install' }, passage: 'Run the installer.' });
+    assert.equal((await store.get(u, first.code.toUpperCase()))?.passage, 'Run the installer.', 'codes match however they are typed');
+    assert.equal(await store.get(user('other'), first.code), undefined, 'codes are per account');
+    const docs = await store.create(u, { url: 'https://docs.example.com/admin', title: 'Admin', place: { kind: 'docs', docs: 'https://docs.example.com' } });
+    assert.deepEqual((await store.list(u)).map((h) => h.code).sort(), [first.code, docs.code].sort());
+    assert.deepEqual((await store.get(u, docs.code))?.place, { kind: 'docs', docs: 'https://docs.example.com' });
+    await store.markOpened(u, first.code);
+    assert.ok((await store.get(u, first.code))?.openedAt);
+    for (let i = 0; i < HANDOFF_LIMIT; i++) await store.create(u, page);
+    assert.equal((await store.list(u)).length, HANDOFF_LIMIT, 'the oldest go past the limit');
+    await store.deleteAll(u);
+    assert.deepEqual(await store.list(u), []);
   });
 }

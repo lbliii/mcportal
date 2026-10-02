@@ -156,8 +156,9 @@
       // heads keeps only headings whose id is a string.
       otp.replaceChildren(...(heads.length > 1 ? [el('div', { class: 'otp-title' }, 'On this page'),
         ...heads.slice(0, 60).map((h) => el('a', { class: h.level === 3 ? 'l3' : null, onclick: () => scrollToAnchor(/** @type {string} */ (h.id)) }, h.text))] : []));
+      const handed = (() => { const body = $first('[data-passage-url]', column); return body ? applyHandoff(body) : false; })();
       markCurrentPage();
-      if (!hash || !scrollToAnchor(hash)) { reader.scrollTop = 0; window.scrollTo(0, 0); }
+      if (!handed && (!hash || !scrollToAnchor(hash))) { reader.scrollTop = 0; window.scrollTo(0, 0); }
       if (!DEV) {
         const safeTitle = String(page.title).replace(/[\u0000-\u001f\u007f\u2028\u2029"]/g, ' ').slice(0, 160);
         hostRequest('ui/update-model-context', {
@@ -191,7 +192,8 @@
     return el('div', { class: 'reader-top' },
       iconButton('back', withBack ? 'Back to your room' : 'Open your room', closeReader, 'ib'),
       url ? iconButton('external', 'Open the original', () => openLink(url), 'ib') : null,
-      title ? saveButton({ url, title }, 'reader', 'ib save') : null);
+      title ? saveButton({ url, title }, 'reader', 'ib save') : null,
+      title && (DEV || hostCapabilities.serverTools) ? iconButton('chat', 'Send to a new chat', () => sendToNewChat(null), 'ib') : null);
   }
   let readerGeneration = 0;
   /** @type {{ x: number, y: number, focus: HTMLElement | SVGElement | null, positions: Array<{ node: HTMLElement, left: number, top: number }> } | null} */

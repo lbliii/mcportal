@@ -11,6 +11,7 @@ import type { FetchedSource, SourceCandidate } from '../discover.ts';
 import type { Profile, ProfileDiff, SourceSettings } from '../profile.ts';
 import type { FeaturedSource, PublicProfile } from '../public-profiles.ts';
 import type { SharedItem } from '../social.ts';
+import type { Handoff } from '../handoffs.ts';
 import type { ReadingState } from '../reading.ts';
 import type { Article, Item, PortalResult, Provenance } from '../types.ts';
 
@@ -68,6 +69,8 @@ export type ToolResults = {
   open_docs: DocsSiteResult;
   read_doc_page: DocsPageResult;
   search_docs: { hits: DocHit[]; site: { title: string; toc: DocsToc } };
+  open_handoff: (ToolResults['read_article'] | (DocsSiteResult & { page: string })) & { handoff: Handoff };
+  create_handoff: { handoff: Handoff; prompt: string };
   get_clip: { clip: Clip };
   clip: { clip: ClipSummary; profile: Profile; layoutChanged: boolean; portals: PortalResult[] };
   open_space: SpaceResult;

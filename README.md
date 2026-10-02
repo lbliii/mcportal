@@ -137,6 +137,8 @@ The `/preview` page never contains secrets. With a static token it asks for the 
 | `remove_portal` | model | Remove portals by id or title (a pinned portal takes its items with it) |
 | `read_source` | model + app | Preview any source without changing the layout |
 | `read_article` | model + app | Reader view for one URL; renders as its own reader card |
+| `open_handoff` | model | Open a page sent from the reader to a new chat ("Open MCPortal handoff k7q2xm"), as a card where the user was, with any passage they selected |
+| `create_handoff` | app only | Store the page, place and passage under a short code for a new chat (kept 7 days, 50 per account) |
 | `list_sources` | model | Source types and their settings |
 | `refresh_portal` | app only | Reload one portal, bypassing cache |
 | `get_thumbnails` | app only | Fetch item pictures through the guarded fetcher as data URIs |

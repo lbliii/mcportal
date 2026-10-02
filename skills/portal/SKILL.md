@@ -17,6 +17,7 @@ MCPortal is the user's room: a set of portals, each a window onto one source. Th
 | "add <source>", "follow r/LocalLLaMA", "keep the Next.js docs in my room" | `find_source`, then `add_portal` with the candidate the user picks |
 | "what's on Hacker News?" (no layout change) | `read_source` |
 | "read this", "summarize that article" | `read_article` with the URL, then answer from its text |
+| "Open MCPortal handoff k7q2xm", "pick up what I sent from MCPortal" | `open_handoff` with the code (none for the newest), then talk about that page and passage |
 | "pin my open Jira bugs", "put #releases from Slack in my room" | Fetch it with that connector's tool, then `pin_portal` with a title, `from`, a `recipe` (the tool and arguments you used) and short items |
 | "refresh my pinned portal (id X)" | Run the recipe `open_room` shows for it, then `pin_portal` with `portalId` and the new items |
 

@@ -1,8 +1,8 @@
 {
   "totals": {
-    "local": 3589,
-    "hosted-new": 4137,
-    "hosted-active": 4612
+    "local": 3678,
+    "hosted-new": 4226,
+    "hosted-active": 4701
   },
   "tools": {
     "account_settings": 64,
@@ -23,6 +23,7 @@
     "list_shares": 92,
     "list_sources": 41,
     "open_docs": 149,
+    "open_handoff": 89,
     "open_room": 106,
     "open_space": 69,
     "pin_portal": 333,

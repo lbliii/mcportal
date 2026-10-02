@@ -9,6 +9,7 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { after, before, test } from 'node:test';
 import { MemoryClipStore } from '../src/clip-stores.ts';
+import { MemoryHandoffStore } from '../src/handoffs.ts';
 import { TtlCache } from '../src/lib/cache.ts';
 import { createFixtureFetcher } from '../src/lib/fixture-fetch.ts';
 import { handleMessage, roomHtml } from '../src/mcp.ts';
@@ -32,7 +33,7 @@ window.addEventListener('message', async (e) => {
   const m = e.data;
   window.log.push({ method: m.method, params: m.params });
   if (m.method === 'ui/initialize') send({ id: m.id, result: { protocolVersion: '2026-01-26', hostInfo: { name: 'fixture-host', version: '1' }, hostCapabilities: caps, hostContext: {} } });
-  else if (m.method === 'ui/notifications/initialized') send({ method: 'ui/notifications/tool-result', params: await (await fetch('/initial')).json() });
+  else if (m.method === 'ui/notifications/initialized') send({ method: 'ui/notifications/tool-result', params: await (await fetch('/initial' + location.search)).json() });
   else if (m.method === 'tools/call') { const r = await (await fetch('/rpc', { method: 'POST', body: JSON.stringify(m) })).json(); send({ id: m.id, result: r.result, error: r.error }); }
   else if (m.id !== undefined) send({ id: m.id, result: {} });
 });
@@ -45,14 +46,17 @@ let page: Page;
 
 before(async () => {
   if (skip) return;
-  ctx = { store: new MemoryProfileStore(), clips: new MemoryClipStore(), fetcher: createFixtureFetcher(), cache: new TtlCache(), userId: 'reader' };
+  ctx = { store: new MemoryProfileStore(), clips: new MemoryClipStore(), handoffs: new MemoryHandoffStore(), fetcher: createFixtureFetcher(), cache: new TtlCache(), userId: 'reader' };
   const call = (body: unknown) => handleMessage(body as never, ctx);
   server = createServer(async (req, res) => {
-    const path = new URL(req.url ?? '/', 'http://x').pathname;
+    const where = new URL(req.url ?? '/', 'http://x');
+    const path = where.pathname;
+    // The tool whose result the card shows: ?tool=…&args=… (JSON), else read_article.
+    const first = { name: where.searchParams.get('tool') ?? 'read_article', arguments: JSON.parse(where.searchParams.get('args') ?? JSON.stringify({ url: ARTICLE })) };
     let body = '';
     for await (const chunk of req) body += chunk;
     if (path === '/app') { res.setHeader('content-type', 'text/html'); res.end(await roomHtml()); }
-    else if (path === '/initial') { res.setHeader('content-type', 'application/json'); res.end(JSON.stringify((await call({ jsonrpc: '2.0', id: 0, method: 'tools/call', params: { name: 'read_article', arguments: { url: ARTICLE } } }) as { result: unknown }).result)); }
+    else if (path === '/initial') { res.setHeader('content-type', 'application/json'); res.end(JSON.stringify((await call({ jsonrpc: '2.0', id: 0, method: 'tools/call', params: first }) as { result: unknown }).result)); }
     else if (path === '/rpc') { res.setHeader('content-type', 'application/json'); res.end(JSON.stringify(await call(JSON.parse(body)))); }
     else { res.setHeader('content-type', 'text/html'); res.end(HOST); }
   });
@@ -70,9 +74,9 @@ after(async () => {
 const IN_FRAME = `document.querySelector('iframe').contentWindow`;
 
 /** Open the reader card on a host with these capabilities and select its second paragraph. */
-async function selectParagraph(caps: string): Promise<string> {
+async function selectParagraph(caps: string, card = ''): Promise<string> {
   page.problems.length = 0;
-  await page.goto(`${base}/?caps=${caps}`);
+  await page.goto(`${base}/?caps=${caps}${card}`);
   await page.waitFor(`${IN_FRAME}.document.querySelectorAll('[data-passage-url] p').length >= 2`, 'the reader card');
   const text = await page.eval<string>(`(() => { const w = ${IN_FRAME}; const p = w.document.querySelectorAll('[data-passage-url] p')[1]; const r = w.document.createRange(); r.selectNodeContents(p); const s = w.getSelection(); s.removeAllRanges(); s.addRange(r); return p.textContent.trim(); })()`);
   await page.waitFor(`${IN_FRAME}.document.querySelector('.passage-bar')`, 'the passage bar');
@@ -83,7 +87,7 @@ const press = (label: string) => page.eval(`[...${IN_FRAME}.document.querySelect
 
 test('passage: "Ask about this" gives the model the passage as fenced context, then posts fixed words', { skip }, async () => {
   const text = await selectParagraph('serverTools,updateModelContext,message');
-  assert.deepEqual(await barButtons(), ['Ask about this', 'Clip quote']);
+  assert.deepEqual(await barButtons(), ['Ask about this', 'Clip quote', 'Send to new chat']);
   await press('Ask about this');
   await page.waitFor(`window.log.some((m) => m.method === 'ui/message')`, 'the message to the host');
   const log = await page.eval<Array<{ method: string; params: any }>>(`window.log.filter((m) => m.method === 'ui/update-model-context' || m.method === 'ui/message')`);
@@ -115,7 +119,7 @@ test('passage: "Clip quote" keeps it as a quote clip with its source', { skip },
 
 test('passage: a host that can\'t take context offers Copy instead of Ask, and sends nothing', { skip }, async () => {
   await selectParagraph('serverTools');
-  assert.deepEqual(await barButtons(), ['Clip quote', 'Copy quote']);
+  assert.deepEqual(await barButtons(), ['Clip quote', 'Send to new chat', 'Copy quote']);
   assert.equal(await page.eval(`window.log.some((m) => m.method === 'ui/update-model-context' && m.params?.structuredContent?.passage)`), false, 'selecting alone shares nothing');
   assert.deepEqual(page.problems, []);
 });
@@ -126,5 +130,32 @@ test('passage: context but no messages: the passage is shared and the user is to
   await page.waitFor(`${IN_FRAME}.document.getElementById('toast').textContent.includes('Ask it in the chat')`, 'the ask-in-chat toast');
   assert.equal(await page.eval(`window.log.some((m) => m.method === 'ui/message')`), false);
   assert.equal(await page.eval(`window.log.some((m) => m.method === 'ui/update-model-context' && m.params?.structuredContent?.passage)`), true);
+  assert.deepEqual(page.problems, []);
+});
+
+test('handoff: "Send to new chat" stores the page, the passage and where it is, and shows what to say', { skip }, async () => {
+  const text = await selectParagraph('serverTools,updateModelContext,message');
+  assert.deepEqual(await barButtons(), ['Ask about this', 'Clip quote', 'Send to new chat']);
+  const block = await page.eval<number>(`(() => { const d = ${IN_FRAME}.document; const p = d.querySelectorAll('[data-passage-url] p')[1]; return [...d.querySelector('[data-passage-url]').children].indexOf(p); })()`);
+  await press('Send to new chat');
+  const said = await page.waitFor<string>(`${IN_FRAME}.document.querySelector('.handoff-sent code')?.textContent`, 'the sent panel');
+  const [handoff] = await ctx.handoffs!.list('reader');
+  assert.equal(said, `Open MCPortal handoff ${handoff!.code}`);
+  assert.equal(handoff!.url, ARTICLE);
+  assert.deepEqual(handoff!.place, { kind: 'article' });
+  assert.equal(handoff!.passage, text);
+  assert.equal(handoff!.anchor?.block, block);
+  assert.ok(await page.eval(`Boolean(${IN_FRAME}.document.querySelector('.reader-top [aria-label="Send to a new chat"]'))`), 'the whole page can be sent from the reader\'s top bar too');
+  assert.deepEqual(page.problems, []);
+});
+
+test('handoff: the new chat\'s card opens with the sent passage, and a way to its place in the page', { skip }, async () => {
+  const sent = await ctx.handoffs!.create('reader', { url: ARTICLE, title: 'Hijacking the PS5', place: { kind: 'article' }, anchor: { block: 3, heading: 'The Problem' }, passage: 'I often stream games with friends on Discord' });
+  page.problems.length = 0;
+  await page.goto(`${base}/?caps=serverTools,updateModelContext,message&tool=open_handoff&args=${encodeURIComponent(JSON.stringify({ code: sent.code }))}`);
+  const note = await page.waitFor<string>(`${IN_FRAME}.document.querySelector('.handoff-note blockquote')?.textContent`, 'the handoff note');
+  assert.equal(note, 'I often stream games with friends on Discord');
+  assert.equal(await page.eval(`${IN_FRAME}.document.querySelector('.handoff-note button')?.textContent`), 'Go to it in the page');
+  assert.ok((await ctx.handoffs!.get('reader', sent.code))?.openedAt, 'marked opened');
   assert.deepEqual(page.problems, []);
 });

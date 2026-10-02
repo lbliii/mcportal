@@ -16,6 +16,7 @@ import type { ToolMetrics } from '../lib/metrics.ts';
 import { clean } from '../lib/text.ts';
 import type { ExportFormat } from '../portability.ts';
 import type { PublicProfiles } from '../public-profiles.ts';
+import type { HandoffStore } from '../handoffs.ts';
 import type { ReadingStore } from '../reading.ts';
 import type { Social } from '../social.ts';
 import type { SourceDeps } from '../sources.ts';
@@ -26,6 +27,8 @@ export const ROOM_URI = 'ui://mcportal/room.html';
 export interface ToolContext extends SourceDeps {
   store: ProfileStore;
   reading?: ReadingStore | undefined;
+  /** Pages sent from the room to a new chat. Absent where they aren't set up; the handoff tools then refuse. */
+  handoffs?: HandoffStore | undefined;
   /** The user's clips. Absent where clips aren't set up; the clip tools then refuse. */
   clips?: ClipStore | undefined;
   /** Handles and public profiles: hosted only (local MCPortal has no social layer). */

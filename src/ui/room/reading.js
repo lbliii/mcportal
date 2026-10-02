@@ -14,8 +14,9 @@
    * Record and resume reading for the article now shown in `reader` (its blocks in `.body`).
    * Failures are quiet: history is a convenience, and a server may not keep it.
    * @param {string} url @param {string} title @param {HTMLElement} reader
+   * @param {boolean} [resume]  pick up where the user left off (not when a handoff already placed them)
    */
-  async function trackReading(url, title, reader) {
+  async function trackReading(url, title, reader, resume = true) {
     if (stopReading) stopReading();
     const body = reader.querySelector('.body');
     if (!body) return;
@@ -81,7 +82,7 @@
       if (stopReading !== stop) return;
       const block = reading && reading.status !== 'read' && reading.anchor ? reading.anchor.block ?? 0 : 0;
       const target = blocks()[block];
-      if (reading && block > 0 && target) {
+      if (resume && reading && block > 0 && target) {
         target.scrollIntoView({ block: 'start' });
         furthest = { block, progress: reading.progress ?? 0 };
         saved = `${furthest.block}:${furthest.progress}`;

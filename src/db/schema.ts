@@ -47,7 +47,7 @@ export async function connect(url: string, options: { searchPath?: string } = {}
   return pool as unknown as Queryable;
 }
 
-const SCHEMA_VERSION = '4';
+const SCHEMA_VERSION = '5';
 
 export async function ensureSchema(db: Queryable): Promise<void> {
   await db.query(`CREATE TABLE IF NOT EXISTS mcportal_meta (key text PRIMARY KEY, value text NOT NULL)`);
@@ -100,6 +100,15 @@ export async function ensureSchema(db: Queryable): Promise<void> {
     created_at timestamptz NOT NULL
   )`);
   await db.query(`CREATE INDEX IF NOT EXISTS mcportal_reports_status_created ON mcportal_reports (status, created_at DESC)`);
+  // v5: handoffs, pages sent from the room to a new chat (src/handoffs.ts).
+  await db.query(`CREATE TABLE IF NOT EXISTS mcportal_handoffs (
+    user_id text NOT NULL,
+    code text NOT NULL,
+    data jsonb NOT NULL,
+    created_at timestamptz NOT NULL,
+    expires_at timestamptz NOT NULL,
+    PRIMARY KEY (user_id, code)
+  )`);
   await db.query(
     `INSERT INTO mcportal_meta (key, value) VALUES ('schema_version', $1)
      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value WHERE mcportal_meta.value::int < EXCLUDED.value::int`,

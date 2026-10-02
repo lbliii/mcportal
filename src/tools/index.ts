@@ -6,6 +6,7 @@ import type { Action } from '../access.ts';
 import { ACCOUNT_TOOLS } from './account.ts';
 import { CLIP_TOOLS } from './clips.ts';
 import { DOCS_TOOLS } from './docs.ts';
+import { HANDOFF_TOOLS } from './handoffs.ts';
 import type { ToolDef } from './kit.ts';
 import { READER_TOOLS } from './reader.ts';
 import { READING_TOOLS } from './reading.ts';
@@ -20,6 +21,7 @@ export const TOOLS: readonly ToolDef[] = [
   ...READER_TOOLS,
   ...SAVED_TOOLS,
   ...DOCS_TOOLS,
+  ...HANDOFF_TOOLS,
   ...CLIP_TOOLS,
   ...ACCOUNT_TOOLS,
   ...SOCIAL_TOOLS,

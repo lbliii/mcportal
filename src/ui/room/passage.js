@@ -6,7 +6,7 @@
   // Nothing is sent until the user clicks.
   const PASSAGE_CHARS = 2000;
   const ASK_TEXT = "Let's talk about the passage I just highlighted in MCPortal.";
-  /** @typedef {{ text: string, url: string, title: string, heading: string, hint: string }} Passage */
+  /** @typedef {{ text: string, url: string, title: string, heading: string, block: number, hint: string }} Passage  block: the index of its first block in the page body */
   /** The selection the bar acts on, captured when it was shown. @type {Passage | null} */
   let passage = null;
   /** @type {HTMLElement | null} */
@@ -37,14 +37,17 @@
     if (!start || !body || !end || !body.contains(end)) return null;
     const text = selection.toString().replace(/[\u0000-\u0008\u000b-\u001f\u007f\u2028\u2029]/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
     if (text.length < 3) return null;
-    // The nearest heading at or before the passage's first block, for "the part about …".
-    let block = start.closest('[data-passage-url] > *');
-    let heading = '';
-    while (block && !heading) {
-      if (/^H[1-6]$/.test(block.tagName)) heading = (block.textContent ?? '').trim().slice(0, 200);
-      block = block.previousElementSibling;
+    const first = start.closest('[data-passage-url] > *');
+    const block = first ? [...body.children].indexOf(first) : 0;
+    return { text: text.slice(0, PASSAGE_CHARS), url: body.dataset.passageUrl ?? '', title: body.dataset.passageTitle ?? '', heading: headingAt(body, block), block, hint: body.dataset.passageHint ?? '' };
+  }
+
+  /** The nearest heading at or before a block of a page body, for "the part about …". @param {Element} body @param {number} index */
+  function headingAt(body, index) {
+    for (let node = body.children.item(index); node; node = node.previousElementSibling) {
+      if (/^H[1-6]$/.test(node.tagName)) return (node.textContent ?? '').trim().slice(0, 200);
     }
-    return { text: text.slice(0, PASSAGE_CHARS), url: body.dataset.passageUrl ?? '', title: body.dataset.passageTitle ?? '', heading, hint: body.dataset.passageHint ?? '' };
+    return '';
   }
 
   function hidePassageBar() {
@@ -76,6 +79,7 @@
       passageBar = el('div', { class: 'passage-bar', role: 'toolbar', 'aria-label': 'Selected passage' },
         canAsk ? el('button', { class: 'btn', type: 'button', onclick: () => passage && askAboutPassage(passage) }, 'Ask about this') : null,
         canClip ? el('button', { class: 'btn', type: 'button', onclick: () => passage && clipPassage(passage) }, 'Clip quote') : null,
+        canClip ? el('button', { class: 'btn', type: 'button', onclick: () => { const p = passage; hidePassageBar(); if (p) sendToNewChat(p); } }, 'Send to new chat') : null,
         canAsk ? null : el('button', { class: 'btn', type: 'button', onclick: () => passage && copyPassage(passage) }, 'Copy quote'));
       // Pressing a button mustn't clear the selection it acts on.
       passageBar.addEventListener('pointerdown', (e) => e.preventDefault());
