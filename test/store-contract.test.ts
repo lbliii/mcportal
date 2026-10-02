@@ -12,6 +12,7 @@ import { FileClipStore, MemoryClipStore, type ClipStore } from '../src/clip-stor
 import { buildClip } from '../src/clips.ts';
 import { memoryPersistence } from '../src/lib/document.ts';
 import { defaultProfile, validateProfile } from '../src/profile.ts';
+import { buildEdition, FileEditionStore, MemoryEditionStore, type EditionStore } from '../src/editions.ts';
 import { FileHandoffStore, HANDOFF_LIMIT, MemoryHandoffStore, type HandoffStore } from '../src/handoffs.ts';
 import { FileReadingStore, READING_LIMIT, type ReadingStore } from '../src/reading.ts';
 import { FileSeenStore, seenHash, SEEN_PER_PORTAL, type SeenStore } from '../src/seen.ts';
@@ -50,6 +51,7 @@ interface Backend {
   reading: () => Promise<ReadingStore>;
   handoffs: () => Promise<HandoffStore>;
   seen: () => Promise<SeenStore>;
+  editions: () => Promise<EditionStore>;
 }
 
 const tmp = (what: string) => mkdtemp(path.join(tmpdir(), `mcportal-contract-${what}-`));
@@ -65,6 +67,7 @@ const BACKENDS: Backend[] = [
     reading: async () => new FileReadingStore(await tmp('reading')),
     handoffs: async () => new FileHandoffStore(await tmp('handoffs')),
     seen: async () => new FileSeenStore(await tmp('seen')),
+    editions: async () => new FileEditionStore(await tmp('editions')),
   },
   {
     name: 'memory',
@@ -75,6 +78,7 @@ const BACKENDS: Backend[] = [
     reading: async () => new FileReadingStore(await tmp('reading')),
     handoffs: async () => new MemoryHandoffStore(),
     seen: async () => new FileSeenStore(null),
+    editions: async () => new MemoryEditionStore(),
   },
   {
     name: 'postgres',
@@ -85,6 +89,7 @@ const BACKENDS: Backend[] = [
     reading: async () => new (await pg()).PgReadingStore(db!),
     handoffs: async () => new (await pg()).PgHandoffStore(db!),
     seen: async () => new (await pg()).PgSeenStore(db!),
+    editions: async () => new (await pg()).PgEditionStore(db!),
   },
 ];
 
@@ -209,6 +214,22 @@ for (const b of BACKENDS) {
     assert.equal((await store.list(u)).length, HANDOFF_LIMIT, 'the oldest go past the limit');
     await store.deleteAll(u);
     assert.deepEqual(await store.list(u), []);
+  });
+
+  test(`contract (${b.name}): editions`, { skip: b.skip }, async () => {
+    const store = await b.editions();
+    const u = user('e');
+    assert.equal(await store.get(u), undefined, 'none until the agent shows highlights');
+    await store.put(u, buildEdition({ title: 'Morning', intro: 'Two for you.', picks: [{ ref: 'hn-top/0123abcd', why: 'You asked about this.' }] }));
+    const next = buildEdition({ title: 'Afternoon', picks: [{ ref: 'gh-mcp/89abcdef', why: 'New release.' }, { ref: 'hn-top/0123abcd', why: 'Still good.' }] });
+    await store.put(u, next);
+    assert.deepEqual(await store.get(u), next, 'the latest replaces the last');
+    assert.equal(await store.get(user('other')), undefined, 'editions are per account');
+    await store.put(u, buildEdition({ title: 'Old', picks: [{ ref: 'hn-top/0123abcd', why: 'x' }] }, new Date(Date.now() - 2 * 86_400_000)));
+    assert.equal(await store.get(u), undefined, 'an expired edition is gone');
+    await store.put(u, next);
+    await store.deleteAll(u);
+    assert.equal(await store.get(u), undefined);
   });
 
   test(`contract (${b.name}): seen`, { skip: b.skip }, async () => {

@@ -16,6 +16,7 @@ import type { ToolMetrics } from '../lib/metrics.ts';
 import { clean } from '../lib/text.ts';
 import type { ExportFormat } from '../portability.ts';
 import type { PublicProfiles } from '../public-profiles.ts';
+import type { EditionStore } from '../editions.ts';
 import type { HandoffStore } from '../handoffs.ts';
 import type { SeenStore } from '../seen.ts';
 import type { ReadingStore } from '../reading.ts';
@@ -32,6 +33,8 @@ export interface ToolContext extends SourceDeps {
   handoffs?: HandoffStore | undefined;
   /** What the user has seen in each portal, for "new". Absent: nothing is marked new. */
   seen?: SeenStore | undefined;
+  /** The agent's latest highlights, which the room leads with. Absent: highlights are only shown, not kept. */
+  editions?: EditionStore | undefined;
   /** The user's clips. Absent where clips aren't set up; the clip tools then refuse. */
   clips?: ClipStore | undefined;
   /** Handles and public profiles: hosted only (local MCPortal has no social layer). */

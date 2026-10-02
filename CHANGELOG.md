@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Room layouts ([plan](docs/plans/room-layouts.md))
+- **Your agent's picks lead the room:** `show_highlights` now keeps its picks as the room's edition for 24 hours, replacing the last. `open_room` returns the picks still in their feeds, in the agent's order, and what the room leads with: the agent's first pick, else the first new item, else the top item of the first feed. Only the refs and the agent's own words are stored; items are found again in the live feeds, so no site text is kept. Editions aren't exported and are deleted with your account. `show_highlights` is no longer marked read-only. Postgres gains `mcportal_editions` (schema version 7).
+- **Unseen items read heavier:** titles you haven't had on screen are bolder, beside their **New** mark.
+- Under the hood, columns and shelves are entries in one layout registry and items draw through one component with forms, so new layouts don't touch existing ones. Both render exactly as before.
+
 ### Reading with your agent ([plan](docs/plans/attention.md))
 - **Ask about a passage:** select text in the reader or a docs page and a bar offers **Ask about this** and **Clip quote**. Asking gives your agent the passage (fenced as the site's text, with the page and the nearest heading), then posts a fixed "Let's talk about the passage I just highlighted" in your voice: the site's words never go into your message. Hosts that can't post messages get the passage as context and a nudge to ask; hosts that can't take context offer **Copy quote**. Nothing is sent until you click.
 - **Clip quote** keeps the selection as a quote clip with its page as the source.

@@ -47,7 +47,7 @@ export async function connect(url: string, options: { searchPath?: string } = {}
   return pool as unknown as Queryable;
 }
 
-const SCHEMA_VERSION = '6';
+const SCHEMA_VERSION = '7';
 
 export async function ensureSchema(db: Queryable): Promise<void> {
   await db.query(`CREATE TABLE IF NOT EXISTS mcportal_meta (key text PRIMARY KEY, value text NOT NULL)`);
@@ -116,6 +116,13 @@ export async function ensureSchema(db: Queryable): Promise<void> {
     ids text[] NOT NULL,
     at timestamptz NOT NULL,
     PRIMARY KEY (user_id, portal_id)
+  )`);
+  // v7: each account's latest edition, the agent's highlights the room leads with (src/editions.ts).
+  await db.query(`CREATE TABLE IF NOT EXISTS mcportal_editions (
+    user_id text PRIMARY KEY,
+    data jsonb NOT NULL,
+    created_at timestamptz NOT NULL,
+    expires_at timestamptz NOT NULL
   )`);
   await db.query(
     `INSERT INTO mcportal_meta (key, value) VALUES ('schema_version', $1)

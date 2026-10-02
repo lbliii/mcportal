@@ -124,6 +124,9 @@
   .card.media .thumb { height: 118px; border-radius: 0; }
   .card-body { display: flex; flex-direction: column; gap: var(--mp-space-4); flex: 1; min-height: 0; padding: var(--mp-space-8) 11px 9px; }
   .card.media .item-title { -webkit-line-clamp: 2; }
+  /* unseen items read heavier than ones already seen, beside their New mark (docs/plans/room-layouts.md) */
+  .item.new .item-title { font-weight: var(--mp-weight-strong); }
+  .card.new .item-title { font-weight: var(--mp-weight-heading); }
   .card.media .item-summary { display: none; }
   :root.fullscreen .card.media { height: 246px; }
   :root.fullscreen .card.media .thumb { height: 148px; }

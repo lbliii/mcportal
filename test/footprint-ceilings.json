@@ -1,8 +1,8 @@
 {
   "totals": {
-    "local": 3954,
-    "hosted-new": 4502,
-    "hosted-active": 4977
+    "local": 3956,
+    "hosted-new": 4504,
+    "hosted-active": 4979
   },
   "tools": {
     "account_settings": 64,
@@ -41,7 +41,7 @@
     "search_docs": 133,
     "set_public_profile": 223,
     "share": 119,
-    "show_highlights": 141,
+    "show_highlights": 143,
     "unshare": 41,
     "update_clip": 102
   }

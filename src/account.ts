@@ -31,6 +31,7 @@ import { PageSessions, type PageSession } from './page-sessions.ts';
 import { buildExport, describeImport, EXPORT_FORMATS, importExport, parseExport, type ExportFile, type ExportFormat } from './portability.ts';
 import type { PublicProfiles } from './public-profiles.ts';
 import type { Social } from './social.ts';
+import type { EditionStore } from './editions.ts';
 import type { HandoffStore } from './handoffs.ts';
 import type { SeenStore } from './seen.ts';
 import type { ReadingStore } from './reading.ts';
@@ -50,6 +51,7 @@ export interface AccountDeps {
   reading?: ReadingStore | undefined;
   handoffs?: HandoffStore | undefined;
   seen?: SeenStore | undefined;
+  editions?: EditionStore | undefined;
   clips?: ClipStore | undefined;
   publicProfiles?: PublicProfiles | undefined;
   social?: Social | undefined;
@@ -96,15 +98,16 @@ function sendFile(res: ServerResponse, file: ExportFile): void {
 }
 
 /**
- * Delete an account and everything it owns: room, saved items, reading, handoffs, what they've seen, clips, public
+ * Delete an account and everything it owns: room, saved items, reading, handoffs, what they've seen, their edition, clips, public
  * profile (its handle stays held for 30 days), shares, follows, mutes and blocks
  * (reports they filed stay, anonymized), sign-in tokens, and the account.
  */
-export async function deleteAccountData(accountId: string, deps: Pick<AccountDeps, 'accounts' | 'oauth' | 'store' | 'reading' | 'handoffs' | 'seen' | 'clips' | 'publicProfiles' | 'social'>, by = accountId): Promise<{ clips: number; tokens: number }> {
+export async function deleteAccountData(accountId: string, deps: Pick<AccountDeps, 'accounts' | 'oauth' | 'store' | 'reading' | 'handoffs' | 'seen' | 'editions' | 'clips' | 'publicProfiles' | 'social'>, by = accountId): Promise<{ clips: number; tokens: number }> {
   await deps.store.delete(accountId);
   await deps.reading?.deleteAll(accountId);
   await deps.handoffs?.deleteAll(accountId);
   await deps.seen?.deleteAll(accountId);
+  await deps.editions?.deleteAll(accountId);
   const clips = deps.clips ? await deps.clips.deleteAll(accountId) : 0;
   await deps.social?.forget(accountId);
   await deps.publicProfiles?.remove(accountId);

@@ -75,7 +75,7 @@ What to add:
 | Component layer | `renderItem`, `renderCard`, `renderPortal`, `renderShelf` are separate functions in `room.js` with a `media` boolean | One item component with named **forms**: `row`, `lead`, `tile`, `quote`, `clip`; one portal-block component with sizes |
 | Item form | Implicit (has thumb? is video? is clip?) | `formOf(item, portal)` in the client, from the fields above plus the source; move to the server only if a source needs it |
 | Layout registry | Two branches in `drawLayout` | Registry above |
-| Picks in the room | Highlights render once as their own card; nothing persists them | Latest **edition** stored per user (picks, reasons, intro, time), returned by `open_room`, expiring after a day or when every pick is seen |
+| Picks in the room | Highlights render once as their own card; nothing persists them | Latest **edition** stored per user (picks, reasons, intro, time), returned by `open_room`, expiring after a day |
 | Lead fallback | None | Deterministic: first unseen item of the first portal with any, else first item |
 | Navigation model | View switches by root classes (`article-view`) and hidden flags | A small view state: `{ level: 'room' \| 'portal' \| 'item', portalId?, itemId? }` with back, used by Escape and the back control |
 | Portal level | Doesn't exist | A portal filling the frame, paged |
@@ -116,13 +116,21 @@ errors. The view state and transition helper move to phase 5, where they're firs
 
 ### 3. Rank
 
-- Unseen styling (weight plus the existing New mark) and "N new" in every portal head.
-- Editions: `show_highlights` stores the latest edition (new table `mcportal_editions`,
-  schema version 7; memory store alongside). `open_room` returns it with the room and
-  tells the agent its age, so it can offer to refresh.
-- Lead fallback as above. The agent's lead, when given, wins.
-- Tool surface: no new model tools; `show_highlights` gains an optional `lead` ref.
-  Eval cases updated per [tool-surface.md](tool-surface.md).
+Done.
+
+- Unseen titles are bolder beside their New mark; portal heads already said "N new".
+- Editions (`src/editions.ts`): `show_highlights` stores the latest per account (file,
+  memory and Postgres stores; `mcportal_editions`, schema version 7), lasting 24 hours.
+  Only refs and the agent's words are stored. `open_room` resolves the picks against the
+  live feeds (`resolveEdition`), drops ones that have left, returns `edition` and `lead`,
+  and tells the agent the edition's age and refs, never its stored words.
+- Lead (`leadOf`): the agent's first pick, else the first new item of a feed, else the
+  first feed's top item. Never the user's own saved or clipped items, never pinned data.
+- Tool surface: no new tools and no `lead` parameter; the agent orders its picks. The
+  description says "best first" and that the room leads with them. `show_highlights` is
+  no longer read-only (it writes the edition), +2 tokens.
+- Editions expire by time only. Expiring when every pick is seen would empty the top of
+  the front page a second after the user first looks at it.
 
 ### 4. Front page (labs)
 

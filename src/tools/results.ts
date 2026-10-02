@@ -12,7 +12,7 @@ import type { Profile, ProfileDiff, SourceSettings } from '../profile.ts';
 import type { FeaturedSource, PublicProfile } from '../public-profiles.ts';
 import type { SharedItem } from '../social.ts';
 import type { Handoff } from '../handoffs.ts';
-import type { Candidate } from '../highlights.ts';
+import type { Candidate, HighlightPick, Lead, RoomEdition } from '../highlights.ts';
 import type { ReadingState } from '../reading.ts';
 import type { Article, Item, PortalResult, Provenance } from '../types.ts';
 
@@ -26,6 +26,10 @@ export type RoomResult = {
   notice?: string | undefined;
   generatedAt: string;
   onboarding?: { packs: PackSummary[]; maxPacks: number; rebuilding: boolean };
+  /** The agent's latest highlights still in the room (src/editions.ts). */
+  edition?: RoomEdition;
+  /** What the room leads with. */
+  lead?: Lead;
 };
 
 /** After a save or unsave: the saved list, the room, and the Saved portal redrawn. */
@@ -62,7 +66,7 @@ export type ToolResults = {
   refresh_portal: { portal: PortalResult };
   mark_seen: { marked: number };
   list_new_items: { items: Candidate[]; signals: string[] };
-  show_highlights: { highlights: { title: string; intro?: string; picks: Array<Candidate & { why: string }> } };
+  show_highlights: { highlights: { title: string; intro?: string; picks: HighlightPick[] } };
   find_source: { candidates: Array<SourceSettings<FetchedSource> & Omit<SourceCandidate, 'source' | 'config'> & { preview: Item[] }>; hint?: string | undefined };
   add_portal: { profile: Profile; portal: PortalResult; portalId: string };
   import_opml: { profile: Profile; imported: number; failed: Array<{ url: string; title: string; error?: string | undefined }>; total: number };

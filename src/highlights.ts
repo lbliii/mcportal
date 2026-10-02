@@ -10,6 +10,7 @@ import type { Profile } from './profile.ts';
 import type { ReadingState } from './reading.ts';
 import { seenHash, tracksSeen } from './seen.ts';
 import type { ClipSummary } from './clips.ts';
+import type { Edition } from './editions.ts';
 import type { Item, PortalResult } from './types.ts';
 
 export const CANDIDATES = { perPortal: 8, total: 60, excerpt: 160 };
@@ -27,6 +28,46 @@ export function parseRef(ref: unknown): { portalId: string; hash: string } | nul
 export const findByRef = (items: Item[], hash: string) => items.find((i) => seenHash(i.id).startsWith(hash));
 
 export interface Candidate { ref: string; portalId: string; portalTitle: string; source: PortalResult['source']; item: Item }
+/** A candidate the agent picked, with its reason. */
+export type HighlightPick = Candidate & { why: string };
+
+/** The edition as the room shows it: the picks still in their portals, in the agent's order. */
+export interface RoomEdition { title: string; intro?: string; createdAt: string; picks: HighlightPick[] }
+
+/**
+ * What the room leads with: the agent's first pick; without an edition, the first new
+ * item of the first portal that has one; else the first portal's top item. Only feed
+ * portals (not the user's own saved or clipped things, not pinned data) lead.
+ */
+export interface Lead { ref: string; portalId: string; itemId: string; by: 'agent' | 'new' | 'top'; why?: string }
+
+/** Portals whose items can be picked or lead: feeds that track seen, loaded, not pinned. */
+const feedPortals = (portals: PortalResult[]) => portals.filter((p) => tracksSeen(p.source) && !p.error && !p.pin);
+
+/** The stored edition's picks found among the room's current items; undefined when none are left. */
+export function resolveEdition(edition: Edition | undefined, portals: PortalResult[]): RoomEdition | undefined {
+  if (!edition) return undefined;
+  const byId = new Map(portals.filter((p) => !p.error).map((p) => [p.portalId, p]));
+  const picks = edition.picks.flatMap(({ ref, why }): HighlightPick[] => {
+    const parsed = parseRef(ref);
+    const portal = parsed ? byId.get(parsed.portalId) : undefined;
+    const item = parsed && portal ? findByRef(portal.items, parsed.hash) : undefined;
+    return portal && item ? [{ ref: itemRef(portal.portalId, item), portalId: portal.portalId, portalTitle: portal.title, source: portal.source, item, why }] : [];
+  });
+  return picks.length ? { title: edition.title, ...(edition.intro ? { intro: edition.intro } : {}), createdAt: edition.createdAt, picks } : undefined;
+}
+
+export function leadOf(edition: RoomEdition | undefined, portals: PortalResult[]): Lead | undefined {
+  const first = edition?.picks[0];
+  if (first) return { ref: first.ref, portalId: first.portalId, itemId: first.item.id, by: 'agent', why: first.why };
+  const feeds = feedPortals(portals).filter((p) => p.items.length);
+  for (const p of feeds) {
+    const item = p.items.find((i) => i.new);
+    if (item) return { ref: itemRef(p.portalId, item), portalId: p.portalId, itemId: item.id, by: 'new' };
+  }
+  const top = feeds[0];
+  return top ? { ref: itemRef(top.portalId, top.items[0]!), portalId: top.portalId, itemId: top.items[0]!.id, by: 'top' } : undefined;
+}
 
 /**
  * Items the user hasn't seen, at most CANDIDATES.perPortal from each portal (in the
@@ -34,8 +75,7 @@ export interface Candidate { ref: string; portalId: string; portalTitle: string;
  * CANDIDATES.total. A portal with no seen set yet has seen nothing: all of it counts.
  */
 export function candidates(portals: PortalResult[], seen: Map<string, Set<string>> | null): Candidate[] {
-  const lanes = portals
-    .filter((p) => tracksSeen(p.source) && !p.error && !p.pin)
+  const lanes = feedPortals(portals)
     .map((p) => {
       const set = seen?.get(p.portalId);
       return p.items.filter((i) => !set || !set.has(seenHash(i.id))).slice(0, CANDIDATES.perPortal)

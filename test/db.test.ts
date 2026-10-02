@@ -145,7 +145,7 @@ test('pg clips: round-trip, search, tags, paging, isolation, limits; v1 upgrades
   await db.query(`UPDATE mcportal_meta SET value = '1' WHERE key = 'schema_version'`);
   await ensureSchema(db);
   const version = await db.query<{ value: string }>(`SELECT value FROM mcportal_meta WHERE key = 'schema_version'`);
-  assert.equal(version.rows[0]!.value, '6');
+  assert.equal(version.rows[0]!.value, '7');
 
   const t0 = new Date('2026-09-01T00:00:00Z');
   const a = buildClip({ kind: 'quote', text: 'Point-in-time recovery, 100% of the time', tags: ['infra'] }, t0);
@@ -208,7 +208,7 @@ test('pg social: shares, feed rules, relations, hiding, reports, forget; schema 
   const { PublicProfiles } = await import('../src/public-profiles.ts');
   const { memoryPersistence } = await import('../src/accounts.ts');
   const version = await db.query<{ value: string }>(`SELECT value FROM mcportal_meta WHERE key = 'schema_version'`);
-  assert.equal(version.rows[0]!.value, '4');
+  assert.equal(version.rows[0]!.value, '7');
   let now = Date.parse('2026-10-01T00:00:00Z');
   const profiles = new PublicProfiles(memoryPersistence());
   for (const [id, handle] of [['pa', 'pg_alice'], ['pb', 'pg_bob'], ['pc', 'pg_carol']]) await profiles.set(id!, { handle });

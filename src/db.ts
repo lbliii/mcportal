@@ -10,7 +10,7 @@
  * (schema version, import marker).
  *
  * Each part lives in ./db/: schema.ts (pool and tables), one file per store
- * (profiles, clips, social, reading, handoffs, seen), auth.ts (mcportal_kv documents) and import.ts.
+ * (profiles, clips, social, reading, handoffs, seen, editions), auth.ts (mcportal_kv documents) and import.ts.
  * This barrel keeps `import('./db.ts')` working for the server, the admin CLI and tests.
  */
 export { connect, ensureSchema, type Queryable } from './db/schema.ts';
@@ -20,5 +20,6 @@ export { PgSocialStore } from './db/social.ts';
 export { PgReadingStore } from './db/reading.ts';
 export { PgHandoffStore } from './db/handoffs.ts';
 export { PgSeenStore } from './db/seen.ts';
+export { PgEditionStore } from './db/editions.ts';
 export { pgAuthPersistence } from './db/auth.ts';
 export { importFiles } from './db/import.ts';

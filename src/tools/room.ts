@@ -5,6 +5,7 @@
  */
 import { clean } from '../lib/text.ts';
 import { arrange, spreadColumns, withLayout, type Arrangement } from '../layout.ts';
+import { leadOf, resolveEdition, type RoomEdition } from '../highlights.ts';
 import { MAX_PACKS, packSummaries, STARTER_PACKS } from '../packs.ts';
 import { SEEN_BATCH, tracksSeen, withNews } from '../seen.ts';
 import { describeDiff, describeLayout, diffProfiles, findPortal, normalizeSourceConfig, LAYOUTS, type Layout, type PortalInput, type Profile, type ProfileDiff } from '../profile.ts';
@@ -33,9 +34,14 @@ export function itemLine(item: PortalResult['items'][number]): string {
 /** Items per portal in open_room's text: enough to say what's new; the room card shows the rest. */
 const ROOM_ITEMS = 3;
 
-function summarizePortals(profile: Profile, portals: PortalResult[], notice?: string): string {
+/** "3h ago" for the agent. */
+const hoursAgo = (iso: string, now = Date.now()) => { const h = Math.round((now - Date.parse(iso)) / 3_600_000); return h < 1 ? 'under an hour ago' : `${h}h ago`; };
+
+function summarizePortals(profile: Profile, portals: PortalResult[], notice?: string, edition?: RoomEdition): string {
   const lines = [`MCPortal room "${profile.name}": ${describeLayout(profile)}.`];
   if (notice) lines.push(`Notice for the user: ${notice}`);
+  // The edition's title, intro and reasons are the agent's own words; only refs name items.
+  if (edition) lines.push(`Your highlights from ${hoursAgo(edition.createdAt)}, ${edition.picks.length} still in the room, lead the room: ${edition.picks.map((p) => p.ref).join(', ')}. Refresh with list_new_items and show_highlights.`);
   for (const portal of portals) {
     if (portal.error) {
       lines.push(`\n[${portal.portalId}] could not load: ${clean(portal.error, 200)}`);
@@ -97,7 +103,10 @@ export const ROOM_TOOLS: ToolDef[] = [
       const specs = profile.columns.flatMap((c) => c.panels);
       await ctx.seen?.keepOnly(ctx.userId, specs.map((p) => p.id));
       const portals = await withNews(await Promise.all(specs.map((p) => portalFor(p, profile, ctx))), ctx.userId, ctx.seen);
-      return ok(summarizePortals(profile, portals, notice), { profile, portals, notice, generatedAt: new Date().toISOString() } satisfies ToolResults['open_room']);
+      const edition = resolveEdition(await ctx.editions?.get(ctx.userId), portals);
+      const lead = leadOf(edition, portals);
+      return ok(summarizePortals(profile, portals, notice, edition),
+        { profile, portals, notice, ...(edition ? { edition } : {}), ...(lead ? { lead } : {}), generatedAt: new Date().toISOString() } satisfies ToolResults['open_room']);
     },
   },
   {

@@ -28,6 +28,7 @@ import { ToolMetrics } from './lib/metrics.ts';
 import { readBody } from './lib/web.ts';
 import { handleMessage, RPC, rpcError, SERVER_INFO, roomHtml, type JsonRpcResponse } from './mcp.ts';
 import { FileClipStore, type ClipStore } from './clips.ts';
+import { FileEditionStore, type EditionStore } from './editions.ts';
 import { FileHandoffStore, type HandoffStore } from './handoffs.ts';
 import { FileReadingStore, type ReadingStore } from './reading.ts';
 import { FileSeenStore, type SeenStore } from './seen.ts';
@@ -63,6 +64,7 @@ export interface AppDeps {
   reading?: ReadingStore | undefined;
   handoffs?: HandoffStore | undefined;
   seen?: SeenStore | undefined;
+  editions?: EditionStore | undefined;
   /** Clips; defaults to files under the data directory. */
   clips?: ClipStore | undefined;
   /** Handles and public profiles (only with GitHub sign-in: a single-token server has no social layer). */
@@ -196,14 +198,15 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
   const reading = deps.reading ?? new FileReadingStore(config.dataDir);
   const handoffs = deps.handoffs ?? new FileHandoffStore(config.dataDir);
   const seen = deps.seen ?? new FileSeenStore(config.dataDir);
+  const editions = deps.editions ?? new FileEditionStore(config.dataDir);
   const clips = deps.clips ?? new FileClipStore(config.dataDir);
   const publicProfiles = oauth ? deps.publicProfiles : undefined;
   const social = oauth && publicProfiles ? deps.social : undefined;
   // The account page needs GitHub sign-in; without it, exports are written to the data directory.
-  const account = oauth ? new AccountPage({ accounts, oauth, store: deps.store, reading, handoffs, seen, clips, publicProfiles, social, publicUrl: config.publicUrl, log, now: deps.now }) : undefined;
+  const account = oauth ? new AccountPage({ accounts, oauth, store: deps.store, reading, handoffs, seen, editions, clips, publicProfiles, social, publicUrl: config.publicUrl, log, now: deps.now }) : undefined;
   const context = (userId: string, reqLog: Logger): ToolContext => ({
     log: reqLog,
-    store: deps.store, reading, handoffs, seen, clips, publicProfiles, social, fetcher: deps.fetcher, cache: deps.cache, userId, budget, metrics, actor: accounts.actor(userId),
+    store: deps.store, reading, handoffs, seen, editions, clips, publicProfiles, social, fetcher: deps.fetcher, cache: deps.cache, userId, budget, metrics, actor: accounts.actor(userId),
     accountUrl: account?.url,
     uploadLink: account ? () => account.uploadLink(userId) : undefined,
     localFiles: !account && config.allowUnauthenticated && isLoopbackHost(config.host),
