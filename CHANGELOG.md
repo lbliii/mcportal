@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.6.1 — 2026-10-02
+
 ### Shipping device linking ([plan](docs/plans/local-hosted-hybrid.md))
 - **Sign in from the welcome screen:** a local MCPortal's first-run screen offers **Already have a portal? Sign in to bring it here**, which starts the same sign-in as the account chip.
 - **Privacy policy:** a section on MCPortal on your own computer: ghost mode sends nothing to the service; signed in, your room is stored by the service while feeds are still fetched from your computer, tokens stay in a file only you can read, and you can revoke a computer from the account page.
