@@ -1,6 +1,6 @@
 # Plan: the river, one stream across the room
 
-Status: proposed, 2026-10-02. Builds on [room-layouts.md](room-layouts.md) (layout
+Status: phase 1 built, 2026-10-02. Builds on [room-layouts.md](room-layouts.md) (layout
 registry, item forms, editions, portal level) and comes before reblogging. Research:
 [Feed and grid design lessons](../../reports/Feed%20and%20grid%20design%20lessons.md),
 [River and reblog design research](../../reports/River%20and%20reblog%20design%20research.md).
@@ -94,10 +94,10 @@ room, like Reeder's hide-from-Home). That's a portal config field, set from the 
 overflow menu ("Quiet this portal") or by the agent with `arrange_room`. Not in the first
 cut.
 
-## The card: a new item form, `post`
+## The card: a new item form, `story`
 
-`renderItem(item, portal, 'post', look)` joins `row`, `tile` and `lead` in
-`room/items.js`. Top to bottom:
+`renderItem(item, portal, 'story', look)` joins `row`, `tile` and `lead` in
+`room/items.js` (named `story`, not `post`: Space posts already use `.post`). Top to bottom:
 
 - **Context row,** only for Following: "@handle shared" (later "@handle reblogged"), muted,
   on its own line above the from line, as Tumblr, Mastodon and Bluesky place social
@@ -177,17 +177,19 @@ Tests: `arrange.test.ts` for the enum and lab; a browser test that loads a fixtu
 in `river`, checks order (picks, new, divider, seen), dedupe, one fold and its expansion,
 that a page counts units not items, the feed roles, and that nothing scrolls internally; design preview gets a `river` view at 360/760/1000.
 
+Done. `room/river.js` holds the merge (`riverStories`), folding (`riverUnits`), paging
+(`riverPage`) and drawing; layouts gained an optional `redraw` for a layout without
+portal blocks, and refreshes and saves go through one `redrawPortal`. Picks show only
+when the agent left an edition: the room's fallback lead isn't labelled a pick. Stories
+are `article`s in a `role="feed"`, numbered with `aria-posinset`; j/k/o/s work. Paging is
+the simple version (10 units a page, "N more of M", focus to the first new story); phase 2
+adds the separator, fullscreen loading, the height write and the pill. The toolbar icon is
+a column of cards running off the bottom.
+
 ### 2. Paging, end states, refresh pill
 
 As above. Browser test: page twice, refresh a portal, check nothing on screen moved and
 the pill appears.
-
-The reblog icon is already in the set (`reblog` in `scripts/brand.ts`): the repost loop
-drawn as a doorway, one arrow along the sill and up the left jamb, the other over the arch
-and down the right. Its moon is a state mark (`state: true`), drawn only while the button
-is `aria-pressed`, so being reblogged never rests on colour alone. The reblogged colour
-gets its own token (`--mp-action-reblogged`, an ink green) rather than reusing
-`--mp-status-success`, which sits too close to the link and primary colour.
 
 ### 3. Following in the stream
 
@@ -195,6 +197,13 @@ Following items already carry `publishedAt` and `share`; give them the "@handle 
 from line and the share's note. Share from any card. This is the hand-off point for the
 reblog plan, which adds reblog chains, the reblog button and "reblogged from" lines to
 this form.
+
+The reblog icon is already in the set (`reblog` in `scripts/brand.ts`): the repost loop
+drawn as a doorway, one arrow along the sill and up the left jamb, the other over the arch
+and down the right. Its moon is a state mark (`state: true`), drawn only while the button
+is `aria-pressed`, so being reblogged never rests on colour alone. The reblogged colour
+gets its own token (`--mp-action-reblogged`, an ink green) rather than reusing
+`--mp-status-success`, which sits too close to the link and primary colour.
 
 ### 4. Evaluate
 

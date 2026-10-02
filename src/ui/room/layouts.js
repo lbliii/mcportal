@@ -8,6 +8,7 @@
    * @property {string | null} gridClass the grid's extra class, if any
    * @property {(profile: Profile) => HTMLElement[]} draw the grid's children
    * @property {(portalId: string) => HTMLElement} portal one portal
+   * @property {() => void} [redraw] for a layout without portal blocks: draw it again after one portal changes
    */
 
   /** @type {Record<Profile['layout'], RoomLayout>} */
@@ -104,6 +105,17 @@
         return wrap;
       },
     },
+
+    /**
+     * The river (river.js): every portal merged into one stream. It has no portal blocks, so a
+     * portal that changes redraws it whole; where one portal is needed alone, columns draws it.
+     */
+    river: {
+      gridClass: 'river',
+      draw: (profile) => drawRiver(profile),
+      portal: (portalId) => ROOM_LAYOUTS.columns.portal(portalId),
+      redraw: () => redrawRiver(),
+    },
   };
 
   // ------------------------------------------------------------ front page parts
@@ -173,7 +185,9 @@
   }
 
   /** @type {Array<Profile['layout']>} */
-  const LAYOUT_NAMES = ['columns', 'shelves', 'frontpage'];
+  const LAYOUT_NAMES = ['columns', 'shelves', 'frontpage', 'river'];
+  /** Layouts that are labs: offered while the server has the lab on, and kept for whoever chose one. */
+  const LAB_LAYOUTS = ['frontpage', 'river'];
   /** A layout by name (a toolbar button's), if there is one. @param {string | undefined} name */
   const layoutNamed = (name) => LAYOUT_NAMES.find((l) => l === name);
 
@@ -192,13 +206,21 @@
     if (layout === ROOM_LAYOUTS.frontpage) frontEnd();
     for (const b of $$('[data-layout]')) b.setAttribute('aria-pressed', String(b.dataset.layout === p.layout));
     // A lab's layout is offered while the server has the lab on, and kept for whoever chose it.
-    $first('[data-layout="frontpage"]')?.toggleAttribute('hidden', !(state.labs.includes('frontpage') || p.layout === 'frontpage'));
+    for (const lab of LAB_LAYOUTS) $first(`[data-layout="${lab}"]`)?.toggleAttribute('hidden', !(state.labs.includes(lab) || p.layout === lab));
     $('btnOpenIn').setAttribute('aria-pressed', String(p.openIn === 'chat'));
   }
 
   /** One portal, as the current layout draws it. @param {string} portalId */
   function renderPortal(portalId) {
     return (state.profile ? layoutOf(state.profile) : ROOM_LAYOUTS.columns).portal(portalId);
+  }
+
+  /** A portal's items changed (a refresh, a save): draw it again where the room shows it. @param {string} portalId */
+  function redrawPortal(portalId) {
+    const layout = state.profile ? layoutOf(state.profile) : ROOM_LAYOUTS.columns;
+    if (layout.redraw) layout.redraw();
+    else $first(`[data-portal="${CSS.escape(portalId)}"]`)?.replaceWith(renderPortal(portalId));
+    portalChanged(portalId);
   }
 
   // ------------------------------------------------------------ portal parts

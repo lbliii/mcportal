@@ -1,14 +1,15 @@
   // room/items.js: one item, drawn in a form (docs/plans/room-layouts.md)
   // ------------------------------------------------------------ item forms
   // Every layout draws items through renderItem. A form is how much room an item gets:
-  // row (a line in a portal list), tile (a card in a shelf) or lead (the front page's
-  // first story). New forms join ITEM_FORMS; each keeps one content-opening button with
+  // row (a line in a portal list), tile (a card in a shelf), lead (the front page's
+  // first story) or story (one in the river). New forms join ITEM_FORMS; each keeps one content-opening button with
   // its actions beside it, never inside it.
-  /** @typedef {'row' | 'tile' | 'lead'} ItemForm */
+  /** @typedef {'row' | 'tile' | 'lead' | 'story'} ItemForm */
   /**
    * How an item looks: its portal's colour, whether its shelf shows pictures, whether it
-   * names its portal (outside one), and the agent's reason for picking it (its own words).
-   * @typedef {{ color?: string, media?: boolean, from?: boolean, why?: string }} ItemLook
+   * names its portal (outside one), the agent's reason for picking it (its own words), and
+   * the other portals that have the same story.
+   * @typedef {{ color?: string, media?: boolean, from?: boolean, why?: string, also?: string[] }} ItemLook
    */
 
   /** @param {Item} item @param {PortalResult} portal @param {ItemForm} [form] @param {ItemLook} [look] */
@@ -18,8 +19,8 @@
 
   // Compact meta: "364 points" -> ▲364, "192 comments" -> a comment-count link to the
   // discussion, "by someone" dropped (kept in the tooltip). Unknown strings pass through.
-  /** @param {Item} item */
-  function compactMeta(item) {
+  /** @param {Item} item @param {boolean} [when] the item's age at the end (the river shows it in the from line) */
+  function compactMeta(item, when = true) {
     /** @type {Array<HTMLElement | null>} */
     const out = [];
     let byline = '';
@@ -34,7 +35,7 @@
       } else if (/^by /.test(m)) byline = m;
       else out.push(el('span', null, m));
     }
-    if (item.publishedAt) out.push(el('span', null, ago(item.publishedAt)));
+    if (when && item.publishedAt) out.push(el('span', null, ago(item.publishedAt)));
     return { out, byline };
   }
 
@@ -44,9 +45,9 @@
     return el('span', { class: 'item-title' }, item.new ? el('span', { class: 'new-mark' }, 'New') : null, avatar, item.title);
   }
 
-  /** A row's and the lead's actions: points and comments, then open the original, save, share. @param {Item} item @param {PortalResult} portal */
-  function itemActions(item, portal) {
-    const { out, byline } = compactMeta(item);
+  /** A row's and the lead's actions: points and comments, then open the original, save, share. @param {Item} item @param {PortalResult} portal @param {boolean} [when] */
+  function itemActions(item, portal, when = true) {
+    const { out, byline } = compactMeta(item, when);
     if (item.url) out.push(el('button', { class: 'mi go', title: 'Open the original', 'aria-label': 'Open the original', onclick: () => openLink(item.url ?? '') }, icon('external')));   // checked just before
     out.push(saveButton(item, portal.source));
     if (portal.source === 'saved' && item.url) out.push(el('button', { class: 'mi go', title: 'Share to your space', 'aria-label': 'Share to your space', onclick: () => openComposer(item) }, icon('share')));
@@ -81,6 +82,25 @@
         itemTitle(item), item.summary ? el('span', { class: 'item-summary' }, item.summary) : null);
       return el('div', { class: 'item lead', style: `--mp-source-color:${color}`, onclick: openOnClick(item, portal) }, itemFrom(portal, color), main,
         out.length ? el('div', { class: 'item-meta' }, out) : null, why ? itemWhy(why) : null);
+    },
+
+    /**
+     * A story in the river: who shared it (Following), the portal it's from and its age, its
+     * picture across, a larger title, every action. The portal's name opens the portal.
+     */
+    story(item, portal, { color = '', why = '', also = [] }) {
+      const shared = portal.source === 'following' && /^@/.test(item.meta[0] ?? '') ? item.meta[0] : '';
+      const { out, byline } = itemActions(shared ? { ...item, meta: item.meta.slice(1) } : item, portal, false);
+      const main = el('button', { class: 'item-main', type: 'button', title: byline, onclick: (/** @type {MouseEvent} */ e) => openFrom(e, item, portal) },
+        item.image && item.image.kind === 'thumb' ? thumbBox(item, portal) : null,
+        itemTitle(item), item.summary ? el('span', { class: 'item-summary' }, item.summary) : null);
+      return el('article', { class: 'item story', style: `--mp-source-color:${color}`, onclick: openOnClick(item, portal) },
+        shared ? el('div', { class: 'story-context' }, `${shared} shared`) : null,
+        el('div', { class: 'item-from' }, el('span', { class: 'dot', style: `background:${color}` }),
+          el('button', { class: 'story-portal', type: 'button', title: `Open ${portal.title}`, onclick: () => openPortal(portal.portalId) }, portal.title),
+          also.length ? el('span', { class: 'story-also' }, `also on ${also.join(', ')}`) : null,
+          item.publishedAt ? el('span', { class: 'story-when' }, ago(item.publishedAt)) : null),
+        main, out.length ? el('div', { class: 'item-meta' }, out) : null, why ? itemWhy(why) : null);
     },
 
     /** A card in a shelf. In a media shelf every card gets a picture area, so the row stays even. */

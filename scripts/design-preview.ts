@@ -12,7 +12,7 @@ import {TtlCache} from '../src/lib/cache.ts';
 import {MemoryEditionStore} from '../src/editions.ts';
 import {page} from '../src/page.ts';
 import {serveSite,DEFAULT_SUPPORT_URL} from '../src/site.ts';
-const ctx={store:new MemoryProfileStore({room:{...defaultProfile(),onboarded:true},frontpage:{...defaultProfile(),onboarded:true,layout:'frontpage'}}),editions:new MemoryEditionStore(),fetcher:createFixtureFetcher(),cache:new TtlCache(),userId:'room'};
+const ctx={store:new MemoryProfileStore({room:{...defaultProfile(),onboarded:true},frontpage:{...defaultProfile(),onboarded:true,layout:'frontpage'},river:{...defaultProfile(),onboarded:true,layout:'river'}}),editions:new MemoryEditionStore(),fetcher:createFixtureFetcher(),cache:new TtlCache(),userId:'room'};
 const rpc=(name:string,args:Record<string,unknown>,userId:string)=>handleMessage({jsonrpc:'2.0',id:1,method:'tools/call',params:{name,arguments:args}},{...ctx,userId}).then((r)=>(r as {result:{structuredContent:any}}).result);
 const now='2026-09-30T12:00:00Z',url='https://example.com/guide';
 const blocks=[{type:'h',level:2,id:'room',text:'A room for your internet'},{type:'p',text:'Your agent brings reading, saved clips and shared ideas into one conversational space.'},{type:'callout',kind:'note',text:'Keep useful actions visible before hover.'},{type:'pre',text:'const theme = "adaptive";',lang:'javascript'}];
@@ -25,6 +25,8 @@ const result=(structuredContent:unknown)=>({content:[],structuredContent});
 async function fixture(view:string){
  // The front page as the agent leaves it: three picks with reasons, the lab on.
  if(view==='frontpage'){const items=(await rpc('list_new_items',{},'frontpage')).structuredContent.items;await rpc('show_highlights',{title:'Morning edition',intro:'Three worth your coffee.',picks:[items[1],items[4],items[2]].map((c:{ref:string},i:number)=>({ref:c.ref,why:['It answers the question you asked yesterday about agent tooling.','A release you have been waiting on.','Short, and close to what you saved last week.'][i]}))},'frontpage');const r=await rpc('open_room',{},'frontpage');r.structuredContent.labs=['frontpage'];return r;}
+ // The river with the same picks, the lab on.
+ if(view==='river'){const items=(await rpc('list_new_items',{},'river')).structuredContent.items;await rpc('show_highlights',{title:'Morning edition',picks:[items[1],items[4]].map((c:{ref:string},i:number)=>({ref:c.ref,why:['It answers the question you asked yesterday about agent tooling.','A release you have been waiting on.'][i]}))},'river');const r=await rpc('open_room',{},'river');r.structuredContent.labs=['river'];return r;}
  if(view==='shelves'){const r=await fixture('room') as {structuredContent:{profile:{layout:string}}};r.structuredContent.profile.layout='shelves';return r;}
  if(view==='welcome'||view==='room')return (await handleMessage({jsonrpc:'2.0',id:1,method:'tools/call',params:{name:'open_room',arguments:{}}},{...ctx,userId:view}))!.result;
  return result(view==='reader'?{article}:view==='docs'?docs:view==='clip'?{clip}:view==='share'?{share}:{space});
@@ -47,7 +49,7 @@ createServer(async(req,res)=>{try{
  if(u.pathname==='/site'){await serveSite(res,'/',{publicUrl:'http://127.0.0.1:8799',supportUrl:DEFAULT_SUPPORT_URL,inviteOnly:false});return;}
  if(u.pathname.startsWith('/site/')){const file=u.pathname.slice(6);if(!/^[\w.-]+$/.test(file))throw new Error('Invalid asset');res.setHeader('content-type',file.endsWith('.svg')?'image/svg+xml':file.endsWith('.ttf')?'font/ttf':'image/png');res.end(await readFile(new URL(`../src/site/${file}`,import.meta.url)));return;}
  res.end(`<!doctype html><html><head><meta name="viewport" content="width=device-width"><title>MCPortal design regression host</title><style>body{margin:0;font:14px system-ui;background:#000}header{padding:12px;background:#eee;color:#111}button,select{font:inherit;padding:6px;margin:4px}iframe{display:block;width:100%;height:900px;border:0;background:transparent}pre{margin:0;padding:12px;background:#eee;color:#111;white-space:pre-wrap}</style></head><body><header>
- <label>View <select id="view">${['welcome','room','shelves','frontpage','reader','docs','clip','share','space'].map(v=>`<option>${v}</option>`).join('')}</select></label>
+ <label>View <select id="view">${['welcome','room','shelves','frontpage','river','reader','docs','clip','share','space'].map(v=>`<option>${v}</option>`).join('')}</select></label>
  <label>Theme <select id="mode"><option>light</option><option>dark</option></select></label>
  <label>Display <select id="display"><option>inline</option><option>fullscreen</option></select></label>
  <label>Inputs <select id="inputs"><option>complete</option><option>theme-only</option><option>background-only</option><option>hostile</option><option>none</option></select></label>
@@ -90,7 +92,7 @@ createServer(async(req,res)=>{try{
   if(x||y)out.push((x&&y?'xy ':x?'x ':'y ')+n.tagName.toLowerCase()+(n.className&&typeof n.className==='string'?'.'+n.className.trim().split(/\\s+/).join('.'):''));}
   return [...new Set(out)];}
  document.querySelector('#run').onclick=async()=>{const rows=[];document.querySelector('#run').disabled=true;
-  for(const width of [360,760,1000])for(const view of ['welcome','room','shelves','frontpage','reader','docs','clip','share','space'])for(const input of ['complete','theme-only','background-only','hostile','none']){
+  for(const width of [360,760,1000])for(const view of ['welcome','room','shelves','frontpage','river','reader','docs','clip','share','space'])for(const input of ['complete','theme-only','background-only','hostile','none']){
    frame.style.width=width+'px';document.querySelector('#view').value=view;document.querySelector('#inputs').value=input;document.querySelector('#mode').value=width===1000?'dark':'light';document.querySelector('#display').value='inline';await load();
    for(let i=0;i<100&&!ready;i++)await delay(20);await delay(150);const failures=ready?check():['bridge timeout'];if(ready){frame.contentDocument.documentElement.style.fontSize='200%';failures.push(...check().map(f=>'200% text: '+f));frame.contentDocument.documentElement.style.fontSize='100%';}rows.push({width,view,input,failures,scrolls:ready?scrollers():[]});report.textContent=rows.length+'/135 checked…';
   }

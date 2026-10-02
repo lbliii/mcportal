@@ -45,12 +45,15 @@ export interface ColumnInput {
 /**
  * columns: side-by-side portals. shelves: one horizontally scrolling row per portal.
  * frontpage: the agent's picks, then each portal's top items, top to bottom (a lab).
+ * river: every portal merged into one stream, picks first, then new, then seen (a lab).
  */
-export const LAYOUTS = ['columns', 'shelves', 'frontpage'] as const;
+export const LAYOUTS = ['columns', 'shelves', 'frontpage', 'river'] as const;
 export type Layout = (typeof LAYOUTS)[number];
+/** Layouts that are labs, each behind the lab of the same name. */
+const LAB_LAYOUTS: readonly Layout[] = ['frontpage', 'river'];
 
-/** The layouts offered to the model and in the room: frontpage only while its lab is on. */
-export const offeredLayouts = (labs: readonly string[]): Layout[] => LAYOUTS.filter((l) => l !== 'frontpage' || labs.includes('frontpage'));
+/** The layouts offered to the model and in the room: a lab's layout only while its lab is on. */
+export const offeredLayouts = (labs: readonly string[]): Layout[] => LAYOUTS.filter((l) => !LAB_LAYOUTS.includes(l) || labs.includes(l));
 /** Where a story opens: card = reader inside the room, chat = its own reader card in the conversation. */
 export const OPEN_IN = ['card', 'chat'] as const;
 export type OpenIn = (typeof OPEN_IN)[number];

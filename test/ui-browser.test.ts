@@ -259,6 +259,57 @@ test('browser: the front page leads with the picks, pages each portal, and nothi
   }
 });
 
+test('browser: the river merges the room into one stream: picks, new, a divider, seen; duplicates join, runs fold, pages count units', { skip }, async () => {
+  // The first two HN stories new; the agent picks the second. Saved holds a copy of the first
+  // (so it joins that story) and twelve old items, which run together at the end and fold.
+  await profiles.put('default', validateProfile({ ...room(), layout: 'river' }));
+  const hnItems = (await tool('open_room', {})).portals.find((p: any) => p.portalId === 'hn-top').items;
+  const saved = [{ url: `${hnItems[0].url}#comments`, title: 'A copy', savedAt: '2026-09-01T00:00:00.000Z' },
+    ...Array.from({ length: 12 }, (_, i) => ({ url: `https://example.com/saved-${i}`, title: `Saved ${i}`, savedAt: '2026-09-01T00:00:00.000Z' }))];
+  await profiles.put('default', validateProfile({ ...room(), layout: 'river', saved }));
+  await seen.deleteAll('default');
+  await seen.mark('default', [{ portalId: 'hn-top', itemIds: hnItems.slice(2).map((i: any) => i.id) }]);
+  const [first, second] = (await tool('list_new_items', { portals: ['hn-top'] })).items;
+  await tool('show_highlights', { title: 'Morning edition', picks: [{ ref: second.ref, why: 'The one you asked about.' }] });
+  const units = () => page.eval<number>(`document.querySelectorAll('.river-feed > article, .river-feed > .river-fold').length`);
+  try {
+    page.problems.length = 0;
+    await page.goto(`${app.base}/preview`);
+    await page.waitFor(`document.querySelector('#grid.river .river-feed article') && !document.querySelector('.skeleton')`, 'the river');
+    assert.equal(await page.eval(`document.querySelector('.river-picks .fp-label').textContent`), 'Morning edition');
+    assert.deepEqual(await page.eval(`[...document.querySelectorAll('.river-picks .item-title')].map((n) => n.textContent)`), [`New${second.item.title}`], "the agent's pick leads, apart from the stream");
+    assert.match(await page.eval<string>(`document.querySelector('.river-picks .item-why').textContent`), /The one you asked about\./);
+    // New first, then the divider, then what's been seen; the pick isn't repeated.
+    const feed = await page.eval<string[]>(`[...document.querySelectorAll('.river-feed > *')].map((n) => n.matches('article') ? n.querySelector('.item-title').textContent : n.className)`);
+    assert.equal(feed[0], `New${first.item.title}`);
+    assert.equal(feed[1], 'river-divider');
+    assert.ok(!feed.some((t) => t.endsWith(second.item.title)), 'the pick is not repeated');
+    assert.match(await page.eval<string>(`document.querySelector('.river-feed > article .item-from').textContent`), /also on Saved/, 'the saved copy joins the story');
+    assert.equal(await page.eval(`document.querySelector('.river-feed').getAttribute('role')`), 'feed');
+    assert.equal(await page.eval(`document.querySelector('.river-feed > article').getAttribute('aria-posinset')`), '2', 'numbered after the pick');
+    assert.match(await page.eval<string>(`document.querySelector('.river-aside').textContent`), /Also in your room: Example Docs/, 'docs are named, not merged');
+    // A page is ten units; the next page brings the fold, which opens in place.
+    assert.equal(await units(), 10);
+    assert.match(await page.eval<string>(`document.querySelector('.river-col > .fp-more').textContent`), /^2 more of 2$/);
+    await page.click('.river-col > .fp-more');
+    assert.equal(await units(), 12);
+    assert.equal(await page.eval(`document.querySelector('.river-fold').textContent`), '9 more from Saved');
+    assert.equal(await page.eval(`document.querySelectorAll('.river-feed [data-story^="saved"]').length`), 3, 'three of the run, then the fold');
+    await page.click('.river-fold .link-btn');
+    assert.equal(await page.eval(`document.querySelectorAll('.river-feed [data-story^="saved"]').length`), 12);
+    assert.equal(await page.eval(`document.activeElement.closest('article')?.dataset.story`), `saved\nhttps://example.com/saved-3`, 'focus moves to the first revealed story');
+    assert.equal(await page.eval(`document.querySelector('.fp-end').textContent`), "That's everything your portals fetched.");
+    // j and k move between stories.
+    await page.eval(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', bubbles: true }))`);
+    assert.equal(await page.eval(`document.activeElement.closest('article')?.dataset.story`), `saved\nhttps://example.com/saved-2`);
+    const scrolling = await page.eval<string[]>(`[...document.querySelectorAll('#grid, #grid *')].filter((n) => { const s = getComputedStyle(n); return (/auto|scroll/.test(s.overflowY) && n.scrollHeight > n.clientHeight + 1) || (/auto|scroll/.test(s.overflowX) && n.scrollWidth > n.clientWidth + 1); }).map((n) => n.className)`);
+    assert.deepEqual(scrolling, [], 'nothing scrolls inside the river');
+    assert.deepEqual(page.problems, []);
+  } finally {
+    await profiles.put('default', room());
+  }
+});
+
 test('browser: a portal opens to fill the room; the reader returns to it, and Escape steps back out', { skip }, async () => {
   const saved = Array.from({ length: 14 }, (_, i) => ({ url: `https://example.com/saved-${i}`, title: `Saved ${i}`, savedAt: '2026-09-01T00:00:00.000Z' }));
   await profiles.put('default', validateProfile({ ...room(), saved: [{ url: ARTICLE, title: 'Hijacking the PS5', savedAt: '2026-09-01T00:00:00.000Z' }, ...saved] }));
