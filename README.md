@@ -67,7 +67,7 @@ To develop against Claude desktop (the room renders inline in chat, no deploymen
 
 Then `/portal`, or ask "open my room" ("open my portal" works too). Your profile is stored in `~/.mcportal/default.json`.
 
-**Ghost mode, or signed in.** A local MCPortal starts in ghost mode: no account, everything in `~/.mcportal`, nothing shared. To keep the same portal on every device and to share and follow, say "sign in to MCPortal" or click **Ghost mode → Sign in** in the room. You sign in with GitHub in your browser; this computer's portal is added to your hosted account (nothing is removed), and from then on MCPortal still runs and fetches on this computer while your room, clips and shares live in the account. **Sign out** copies the portal back to this computer first. `MCPORTAL_HOSTED_URL` picks the hosted MCPortal (default: the public one). See [the plan](docs/plans/local-hosted-hybrid.md) for how it works.
+**Ghost mode, or signed in.** A local MCPortal starts in ghost mode: no account, everything in `~/.mcportal`, nothing shared. To keep the same portal on every device and to share and follow, say "sign in to MCPortal", click **Ghost mode → Sign in** in the room, or **Already have a portal?** on the welcome screen. You sign in with GitHub in your browser; this computer's portal is added to your hosted account (nothing is removed), and from then on MCPortal still runs and fetches on this computer while your room, clips and shares live in the account. **Sign out** copies the portal back to this computer first. This is also the way in when your organization blocks custom connectors: install locally, then sign in. `MCPORTAL_HOSTED_URL` picks the hosted MCPortal (default: the public one). See [the plan](docs/plans/local-hosted-hybrid.md) for how it works.
 
 **Codex** (stdio), in `~/.codex/config.toml`:
 
@@ -199,9 +199,9 @@ MCPortal is a **reading platform with light social**, driven by your agent. Anyt
 - **React** with one lightweight signal, so Following can surface what people liked
 
 **Later**
-- Standing intents: scheduled checks and digests ("tell me when anthropics/* ships a release")
+- Standing intents: scheduled checks and digests ("tell me when anthropics/* ships a release"); first, watches for artists with concerts near you ([plan](docs/plans/watches.md))
+- MCP 2026-07-28: serve the stateless protocol alongside today's, still without dependencies ([plan](docs/plans/mcp-2026-07-28.md))
 - Built-in views of your own reading (what you read and save, by topic and source)
 - Pictures in the reader view; clearer handling of paywalled articles
-- More sign-in options (Google, email link, passkeys) as extra identities on the same account
 - Link cards for sites without feeds (e.g. TikTok via oEmbed), shared rooms for groups
 - Postgres row-level security as a third access layer

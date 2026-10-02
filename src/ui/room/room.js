@@ -35,6 +35,7 @@
       } catch { toast('The chat is beyond our reach. Tell your agent there instead.'); }
     };
     describe.addEventListener('keydown', (e) => { if (e.key === 'Enter') askAgent(); });
+    const signingIn = el('div', { class: 'building', hidden: true });   // the account menu is hidden here, so sign-in reports under the actions
     $('welcome').replaceChildren(...present([
       /** @type {Element} */ ($('brandBadge').content.firstElementChild).cloneNode(true),   // the template holds the badge
       el('h1', null, rebuilding ? 'Start over' : 'Choose your destiny!'),
@@ -46,7 +47,11 @@
         rebuilding
           ? el('button', { class: 'link-btn', onclick: () => { loading = null; loadRoom(); } }, 'Cancel')
           : el('button', { class: 'link-btn', onclick: () => buildRoom([]) }, 'Skip. Show me what lurks inside.'),
-        rebuilding ? null : el('button', { class: 'link-btn', onclick: () => pickOpml() }, 'Fleeing another reader? Smuggle your subscriptions in (OPML)')),
+        rebuilding ? null : el('button', { class: 'link-btn', onclick: () => pickOpml() }, 'Fleeing another reader? Smuggle your subscriptions in (OPML)'),
+        !rebuilding && data.identity?.mode === 'ghost' && data.identity.canSignIn
+          ? el('button', { class: 'link-btn', onclick: () => { signingIn.hidden = false; signIn(signingIn); } }, 'Already have a portal? Sign in to bring it here')
+          : null),
+      signingIn,
       DEV ? null : el('div', { class: 'ask' },
         el('p', { class: 'lede' }, 'Into something stranger? Describe it and your agent will hunt down the sources.'),
         el('div', { class: 'add-row' }, describe, el('button', { class: 'btn', onclick: askAgent }, 'Ask your agent'))),

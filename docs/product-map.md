@@ -68,7 +68,7 @@ The core: live content from sources you chose, laid out your way, read cleanly.
 | | Portal art: generated vintage sci-fi print scenes when an item has no picture, one style per source | ✅ |
 | **Provenance** | "Show your work": every portal says its source, endpoint, fetch time, cache state and freshness | ✅ |
 | **Freshness** | Refresh one portal or all; per-source cache (HN 2 min, GitHub 5 min, RSS 10 min, reader 1 h, pictures 1 day) | ✅ |
-| **Intelligence** | Standing intents: scheduled checks and digests | 🗺 |
+| **Intelligence** | Standing intents: scheduled checks and digests; first, watches (artists → concerts near you) ([plan](plans/watches.md)) | 🗺 |
 | | Views of your own reading (what you read and save, by topic and source) | 🗺 |
 
 ### 3.2 Collecting
@@ -120,8 +120,8 @@ How MCPortal is part of the agent, not only something displayed next to it.
 | Feature set | Features | Status |
 |---|---|---|
 | **Transports** | Stdio (plugin, Codex) and Streamable HTTP (`/mcp`) | ✅ |
+| | MCP 2026-07-28 (stateless, `server/discover`) alongside 2025-era clients ([plan](plans/mcp-2026-07-28.md)) | 🗺 |
 | **Identity & access** | OAuth 2.1 with GitHub sign-in; one `authorize()` gate for every tool; invites, suspension, allowlist; single-user static token | ✅ |
-| | More sign-in options (Google, email link, passkeys) | 🗺 |
 | **Storage** | Files locally; Postgres hosted (PITR on) | ✅ |
 | | Scheduled backups; row-level security | 🗺 |
 | **Fetch boundary** | Public-IP-only safe fetch, size/time/redirect caps, linear-time HTML tokenizer | ✅ |

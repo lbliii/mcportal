@@ -57,8 +57,10 @@
     if (open) drawWhoMenu();
   }
 
+  /** @param {Element} target @param {...(Child | Child[])} children */
+  const fill = (target, ...children) => target.replaceChildren(...children.flat().filter(/** @returns {c is Node | string} */ (c) => c instanceof Node || typeof c === 'string'));
   /** @param {...(Child | Child[])} children */
-  const setWhoMenu = (...children) => $('whoMenu').replaceChildren(...children.flat().filter(/** @returns {c is Node | string} */ (c) => c instanceof Node || typeof c === 'string'));
+  const setWhoMenu = (...children) => fill($('whoMenu'), ...children);
 
   function drawWhoMenu() {
     const identity = state.identity;
@@ -87,17 +89,18 @@
         linked ? el('button', { class: 'btn', type: 'button', onclick: confirmSignOut }, 'Sign out') : null));
   }
 
-  async function signIn() {
-    setWhoMenu(el('p', null, 'Opening the sign-in page…'));
+  /** Start linking this computer; progress shows in the account menu, or in `target` (the welcome screen, where there's no menu). @param {Element} [target] */
+  async function signIn(target = $('whoMenu')) {
+    fill(target, el('p', null, 'Opening the sign-in page…'));
     try {
       const { url } = (await callTool('link_account')).structuredContent;
       await openLink(url);
-      setWhoMenu(
+      fill(target,
         el('p', null, 'Finish signing in with GitHub in your browser. This computer\'s portal is added to your account, and this room updates when you\'re done.'),
         el('button', { class: 'btn', type: 'button', onclick: () => { showWhoMenu(false); loadRoom(); } }, 'I\'ve signed in'));
       watchSignIn();
     } catch (error) {
-      setWhoMenu(el('p', { class: 'error' }, `Couldn't start signing in: ${errorText(error)}`));
+      fill(target, el('p', { class: 'error' }, `Couldn't start signing in: ${errorText(error)}`));
     }
   }
 
