@@ -185,6 +185,8 @@
     assignArt(p);
     const layout = layoutOf(p);
     const grid = $('grid');
+    portalLevel = null;   // drawing the room leaves any open portal
+    grid.classList.remove('portal-level');
     for (const other of Object.values(ROOM_LAYOUTS)) if (other.gridClass) grid.classList.toggle(other.gridClass, other === layout);
     grid.replaceChildren(...layout.draw(p));
     if (layout === ROOM_LAYOUTS.frontpage) frontEnd();
@@ -210,11 +212,11 @@
   /** @param {PortalResult} portal */
   const portalColor = (portal) => sourceColor(portal.source, artStyle(portal));
 
-  /** The dot in the source's colour, the title, the count. @param {PortalResult} portal */
+  /** The dot in the source's colour, the title (it opens the portal on its own), the count. @param {PortalResult} portal */
   function portalLabel(portal) {
     return [
       el('span', { class: 'dot', style: `background:${portalColor(portal)}` }),
-      el('span', { class: 'portal-title', title: portal.title }, portal.title),
+      el('button', { class: 'portal-title', type: 'button', title: `Open ${portal.title}`, onclick: () => openPortal(portal.portalId) }, portal.title),
       el('span', { class: 'portal-count' }, portalCount(portal)),
     ];
   }

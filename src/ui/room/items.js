@@ -59,7 +59,7 @@
   const itemWhy = (why) => el('div', { class: 'item-why' }, el('span', { class: 'item-why-label' }, 'Why this'), why);
 
   /** A click anywhere on the item but its buttons and links opens it. @param {Item} item @param {PortalResult} portal */
-  const openOnClick = (item, portal) => (/** @type {MouseEvent} */ e) => { if (!/** @type {Element} */ (e.target).closest('button, a')) openItem(item, portal); };
+  const openOnClick = (item, portal) => (/** @type {MouseEvent} */ e) => { if (!/** @type {Element} */ (e.target).closest('button, a')) openFrom(e, item, portal); };
 
   /** @type {Record<ItemForm, (item: Item, portal: PortalResult, look: ItemLook) => HTMLElement>} */
   const ITEM_FORMS = {
@@ -67,7 +67,7 @@
     row(item, portal, { color = '', from = false, why = '' }) {
       const { out, byline } = itemActions(item, portal);
       const text = [itemTitle(item), item.summary ? el('span', { class: 'item-summary' }, item.summary) : null];
-      const main = el('button', { class: 'item-main', type: 'button', title: byline, onclick: () => openItem(item, portal) },
+      const main = el('button', { class: 'item-main', type: 'button', title: byline, onclick: (/** @type {MouseEvent} */ e) => openFrom(e, item, portal) },
         item.image && item.image.kind === 'thumb' ? el('span', { class: 'item-row' }, thumbBox(item, portal), el('span', { class: 'item-text' }, text)) : text);
       return el('div', { class: 'item', onclick: openOnClick(item, portal) }, from ? itemFrom(portal, color) : null, main,
         out.length ? el('div', { class: 'item-meta' }, out) : null, why ? itemWhy(why) : null);
@@ -76,7 +76,7 @@
     /** The front page's first story: its picture across the top, a larger title, a longer summary. */
     lead(item, portal, { color = '', why = '' }) {
       const { out, byline } = itemActions(item, portal);
-      const main = el('button', { class: 'item-main', type: 'button', title: byline, onclick: () => openItem(item, portal) },
+      const main = el('button', { class: 'item-main', type: 'button', title: byline, onclick: (/** @type {MouseEvent} */ e) => openFrom(e, item, portal) },
         item.image && item.image.kind === 'thumb' ? thumbBox(item, portal) : null,
         itemTitle(item), item.summary ? el('span', { class: 'item-summary' }, item.summary) : null);
       return el('div', { class: 'item lead', style: `--mp-source-color:${color}`, onclick: openOnClick(item, portal) }, itemFrom(portal, color), main,
@@ -89,7 +89,7 @@
       const save = saveButton(item, portal.source);
       if (save) { save.classList.add('go'); meta.push(save); }
       const content = [itemTitle(item), media ? null : item.summary ? el('span', { class: 'item-summary' }, item.summary) : null];
-      const main = el('button', { class: 'card-main', type: 'button', title: item.title, onclick: () => openItem(item, portal) },
+      const main = el('button', { class: 'card-main', type: 'button', title: item.title, onclick: (/** @type {MouseEvent} */ e) => openFrom(e, item, portal) },
         media ? [thumbBox(item.image && item.image.kind === 'thumb' ? item : { ...item, image: undefined }, portal), el('span', { class: 'card-body' }, content)] : content);
       return el('div', { class: media ? 'card media' : 'card', style: `--mp-source-color:${color}`, onclick: openOnClick(item, portal) }, main,
         meta.length ? el('div', { class: 'item-meta' }, meta) : null);

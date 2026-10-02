@@ -78,9 +78,10 @@ test('a late article result cannot replace the view after home navigation', asyn
   let resolveTool!: (value: unknown) => void;
   const replaced: unknown[] = [];
   const reader = { hidden: true, scrollTop: 0, replaceChildren: (...children: unknown[]) => replaced.push(children) };
-  const context = vm.createContext({ $: (id: string) => id === 'reader' ? reader : {}, rememberRoomNavigation() {}, window: { scrollTo() {} }, readerTop() {}, el() {}, callTool: () => new Promise((resolve) => { resolveTool = resolve; }), articleNodes: () => { throw new Error('Stale article rendered'); } });
+  const context = vm.createContext({ $: (id: string) => id === 'reader' ? reader : {}, rememberRoomNavigation() {}, window: { scrollTo() {} }, readerTop() {}, el() {}, $first: () => null, takeZoomSource: () => null, transition: async (update: () => void) => update(), callTool: () => new Promise((resolve) => { resolveTool = resolve; }), articleNodes: () => { throw new Error('Stale article rendered'); } });
   vm.runInContext(`let readerGeneration = 0; ${shipped('openReader')}`, context);
   const opened = vm.runInContext(`openReader({url:'https://example.com'}, {title:'News'})`, context);
+  await new Promise((done) => setImmediate(done));   // past the transition, waiting on read_article
   vm.runInContext('readerGeneration++', context);
   resolveTool({ structuredContent: { article: {} } });
   await opened;

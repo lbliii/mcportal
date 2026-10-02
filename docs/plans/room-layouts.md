@@ -77,7 +77,7 @@ What to add:
 | Layout registry | Two branches in `drawLayout` | Registry above |
 | Picks in the room | Highlights render once as their own card; nothing persists them | Latest **edition** stored per user (picks, reasons, intro, time), returned by `open_room`, expiring after a day |
 | Lead fallback | None | Deterministic: first unseen item of the first portal with any, else first item |
-| Navigation model | View switches by root classes (`article-view`) and hidden flags | A small view state: `{ level: 'room' \| 'portal' \| 'item', portalId?, itemId? }` with back, used by Escape and the back control |
+| Navigation model | View switches by root classes (`article-view`) and hidden flags | The portal level is one more state (`portalLevel`) under the existing reader; Escape and Back step out one level |
 | Portal level | Doesn't exist | A portal filling the frame, paged |
 | Transitions | None | `transition(update)` helper: `document.startViewTransition` when supported and motion allowed, else plain update; shared `view-transition-name` per portal and item |
 | Paging and end states | Portals scroll internally | "Next 5" pager primitive; "You're caught up" end; section header primitive |
@@ -153,10 +153,19 @@ its content; nothing scrolls inside it (browser test and preview report).
 
 ### 5. Portal level and transitions
 
-Clicking a portal head (front page, columns or shelves) opens the portal level: the
-portal fills the frame, paged five at a time inline, scrolling in fullscreen. Back and
-Escape return to the room at the same place. Portal and item get shared transition
-names so the block grows into the portal and the row into the reader.
+Done (`room/levels.js`). A portal's title is a button in every layout; it opens the
+portal level, drawn inside the grid so the reader opens over it and returns to it with
+no changes to the reader. The room's own nodes are set aside and put back, so lanes,
+rows, pages shown and focus are exactly as they were; a refresh or save while a portal is
+open redraws it and redraws the room on the way back. Inline it shows 10 items and
+"10 more"; fullscreen shows them all; the page grows rather than scrolling inside.
+Back and Escape step out one level (reader → portal → room).
+
+`transition(update, from, to)` runs level changes as View Transitions with one shared
+name (`mp-zoom`): the portal grows into the level and back, the clicked story into the
+reader's title. Reduced motion or no support changes at once. Browser tests cover the
+round trip; the animation itself is unobserved so far, because the preview pane's page
+is hidden and browsers skip transitions there. Check it in a real host (phase 1).
 
 ### 6. Inline ergonomics for columns and shelves
 

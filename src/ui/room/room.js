@@ -241,6 +241,7 @@
         else if (data.portal) {
           const node = $first(`[data-portal="${CSS.escape(data.portal.portalId)}"]`);
           if (node) node.replaceWith(renderPortal(data.portal.portalId));
+          portalChanged(data.portal.portalId);
         }
       }
       if (!was && !data.layoutChanged) toast('Saved!');
@@ -284,9 +285,9 @@
     } catch (error) {
       toast(errorText(error));
     }
-    const fresh = renderPortal(portalId);
     const current = $first(`[data-portal="${CSS.escape(portalId)}"]`);
-    if (current) current.replaceWith(fresh);
+    if (current) current.replaceWith(renderPortal(portalId));
+    portalChanged(portalId);
   }
 
   function loadRoom() {

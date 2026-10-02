@@ -259,3 +259,38 @@ test('browser: the front page leads with the picks, pages each portal, and nothi
     await profiles.put('default', room());
   }
 });
+
+test('browser: a portal opens to fill the room; the reader returns to it, and Escape steps back out', { skip }, async () => {
+  const saved = Array.from({ length: 14 }, (_, i) => ({ url: `https://example.com/saved-${i}`, title: `Saved ${i}`, savedAt: '2026-09-01T00:00:00.000Z' }));
+  await profiles.put('default', validateProfile({ ...room(), saved: [{ url: ARTICLE, title: 'Hijacking the PS5', savedAt: '2026-09-01T00:00:00.000Z' }, ...saved] }));
+  const escape = () => page.eval(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))`);
+  try {
+    await openRoom();
+    await page.eval(`document.getElementById('grid').scrollLeft = 120`);
+    const lane = await page.eval<number>(`document.getElementById('grid').scrollLeft`);
+    await page.eval(`document.querySelector('[data-portal="saved"]').dataset.marker = 'the same node'`);
+    await page.click('[data-portal="saved"] .portal-title');
+    await page.waitFor(`document.querySelector('#grid.portal-level [data-portal-level="saved"]')`, 'the Saved portal level');
+    assert.equal(await page.eval(`document.querySelector('.level-title').textContent`), 'Saved');
+    assert.equal(await page.eval(`document.activeElement.className`), 'level-title', 'focus moves to the portal');
+    assert.equal(await page.eval(`document.querySelectorAll('.level li').length`), 10, 'ten at first, inline');
+    await page.click('.level .fp-more');
+    assert.equal(await page.eval(`document.querySelectorAll('.level li').length`), 15);
+    // The reader opens over the portal and comes back to it.
+    await page.click('.level .item-main');
+    await page.waitFor(`!document.getElementById('reader').hidden && document.querySelector('#reader h1')`, 'the reader');
+    await page.click('#reader .reader-top .ib');
+    await page.waitFor(`document.getElementById('reader').hidden && document.querySelector('.level')`, 'back at the portal');
+    assert.equal(await page.eval(`document.querySelectorAll('.level li').length`), 15, 'still showing what it showed');
+    await escape();
+    await page.waitFor(`!document.querySelector('.level') && document.querySelector('[data-portal="saved"]')`, 'back in the room');
+    assert.equal(await page.eval(`document.querySelector('[data-portal="saved"]').dataset.marker`), 'the same node', "the room's own nodes come back, not a redraw");
+    assert.equal(await page.eval<number>(`document.getElementById('grid').scrollLeft`), lane, 'the lane is where it was');
+    assert.equal(await page.eval(`document.activeElement.className`), 'portal-title', 'focus returns to the portal title');
+    await escape();
+    assert.ok(await page.eval(`document.querySelector('[data-portal="saved"]')`), 'Escape in the room does nothing');
+    assert.deepEqual(page.problems, []);
+  } finally {
+    await profiles.put('default', room());
+  }
+});

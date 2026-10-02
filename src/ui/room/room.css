@@ -89,6 +89,20 @@
   .card .item-meta { margin-top: auto; flex-wrap: nowrap; overflow: hidden; white-space: nowrap; }
   :root.fullscreen .card { flex-basis: 264px; width: 264px; height: 176px; }
   .shelf .portal-foot { border: 0; padding: 0 var(--mp-space-12) var(--mp-space-4); }
+  /* a portal's title opens it at the portal level */
+  button.portal-title { min-width: 0; min-height: var(--mp-control-minimum); padding: 0; border: 0; background: none; color: inherit; font: inherit; font-weight: 600; text-align: left; cursor: pointer; }
+  button.portal-title:hover { text-decoration: underline; text-underline-offset: 2px; }
+  /* the portal level: one portal filling the frame, growing with its items */
+  .grid.portal-level { display: block; height: auto; overflow: visible; padding: var(--mp-space-10); }
+  .level { background: var(--mp-surface-card); border: 1px solid var(--mp-border-divider); border-top: 3px solid var(--mp-source-color); border-radius: var(--mp-radius-card); }
+  .level-head { display: flex; align-items: center; gap: var(--mp-space-8); padding: var(--mp-space-6) var(--mp-space-8) var(--mp-space-6) var(--mp-space-4); border-bottom: 1px solid var(--mp-border-divider); }
+  .level-title { margin: 0; min-width: 0; font-size: var(--mp-type-16); font-weight: var(--mp-weight-heading); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .level-title:focus { outline: none; }
+  .level-head .tools { margin-left: auto; display: flex; }
+  .level .items { overflow: visible; }
+  /* zooming between levels (View Transitions): the portal or story grows into the next level */
+  ::view-transition-group(mp-zoom) { animation-duration: 300ms; animation-timing-function: ease-in-out; }
+  ::view-transition-old(root), ::view-transition-new(root) { animation-duration: 200ms; }
   /* front page (docs/plans/room-layouts.md): one column of sections that grows with its content; nothing scrolls inside it */
   .grid.frontpage { display: block; height: auto; overflow: visible; padding: var(--mp-space-12) var(--mp-space-12) var(--mp-space-4); }
   .fp-head { padding: 0 var(--mp-space-2) var(--mp-space-10); margin-bottom: var(--mp-space-12); border-bottom: 2px solid var(--mp-text-primary); }
