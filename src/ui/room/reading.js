@@ -2,7 +2,10 @@
   // ------------------------------------------------------------ reading history
   // Opening an article records it as opened and picks up where the user left off: the
   // furthest point they reached, so scrolling back up to leave doesn't lose it. That
-  // position is saved at most every POSITION_EVERY ms, and when they leave. Only the
+  // position is saved at most every POSITION_EVERY ms, and when they leave. Scrolling is
+  // watched from the moment the article shows, so a scroll while the history loads isn't
+  // missed; positions are only sent once the stored one is known (so they never overwrite
+  // it blind), and after the open is recorded (so the two writes can't cross). Only the
   // "Mark as read" button marks it read; progress never implies read. The model reads
   // this back with list_reading and never records reading itself (docs/reading-state.md).
   const POSITION_EVERY = 15000;
@@ -19,9 +22,12 @@
   async function trackReading(url, title, reader, resume = true) {
     if (stopReading) stopReading();
     const body = reader.querySelector('.body');
-    if (!body) return;
+    if (!(body instanceof HTMLElement)) return;
     const blocks = () => [...body.children];
     let read = false;
+    let ready = false;   // the stored position is known: saves may go out
+    /** @type {Promise<unknown>} */
+    let recorded = Promise.resolve();   // the open being recorded; position saves follow it
     let furthest = { block: 0, progress: 0 };
     let saved = '0:0';
     let measureTimer = 0;
@@ -41,9 +47,13 @@
     const save = () => {
       clearTimeout(saveTimer); saveTimer = 0;
       const key = `${furthest.block}:${furthest.progress}`;
-      if (read || key === saved) return;
+      if (!ready || read || key === saved) return;
       saved = key; lastSave = Date.now();
-      callTool('record_reading', { url, status: 'opened', progress: furthest.progress, anchor: { block: furthest.block } }).catch(() => {});
+      const update = { url, status: 'opened', progress: furthest.progress, anchor: { block: furthest.block } };
+      recorded.then(() => callTool('record_reading', update)).catch(() => {});
+    };
+    const queueSave = () => {
+      if (!saveTimer) saveTimer = window.setTimeout(save, Math.max(1000, POSITION_EVERY - (Date.now() - lastSave)));
     };
     const measure = () => {
       clearTimeout(measureTimer); measureTimer = 0;
@@ -51,22 +61,28 @@
       const here = position();
       if (here.progress <= furthest.progress) return;
       furthest = here;
-      if (!saveTimer) saveTimer = window.setTimeout(save, Math.max(1000, POSITION_EVERY - (Date.now() - lastSave)));
+      body.dataset.furthest = String(here.block);
+      queueSave();
     };
     const onScroll = () => {
       if (!body.isConnected) { stop(); return; }
       if (!measureTimer) measureTimer = window.setTimeout(measure, MEASURE_AFTER);
     };
     const onHide = () => { if (document.visibilityState === 'hidden') { measure(); save(); } };
-    const stop = () => {
-      if (stopReading !== stop) return;
+    const detach = () => {
       stopReading = null;
       document.removeEventListener('scroll', onScroll, true);
       document.removeEventListener('visibilitychange', onHide);
+    };
+    const stop = () => {
+      if (stopReading !== stop) return;
+      detach();
       if (measureTimer) measure();
       save();
     };
     stopReading = stop;
+    document.addEventListener('scroll', onScroll, { capture: true, passive: true });
+    document.addEventListener('visibilitychange', onHide);
 
     const button = el('button', { class: 'btn mark-read', type: 'button' }, 'Mark as read');
     button.addEventListener('click', async () => {
@@ -88,11 +104,13 @@
         saved = `${furthest.block}:${furthest.progress}`;
         toast('Picked up where you left off');
       }
-      await callTool('record_reading', { url, status: 'opened', title });
+      ready = true;
+      recorded = callTool('record_reading', { url, status: 'opened', title });
+      if (`${furthest.block}:${furthest.progress}` !== saved) queueSave();   // scrolled while the history loaded
+      await recorded;
     } catch {
-      return;   // no reading history here: don't watch
+      // no reading history here: stop watching
+      clearTimeout(measureTimer); clearTimeout(saveTimer);
+      if (stopReading === stop) detach();
     }
-    if (stopReading !== stop) return;
-    document.addEventListener('scroll', onScroll, { capture: true, passive: true });
-    document.addEventListener('visibilitychange', onHide);
   }
