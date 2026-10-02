@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.6.1 — 2026-10-02
+
 ### Deleting an account leaves nothing behind ([plan](docs/plans/directory-launch.md))
 - **Nothing names you after you delete your account:** the sign-in records of apps only you used (which can carry your computer's name) go with it, the audit log no longer says whose entries were yours, reports you made or that were about you stop naming you (open reports about you are closed), and your handles stay reserved for 30 days without saying whose. In file mode, unreadable copies of your room and an empty clips file go too. A test creates every kind of data, deletes the account, and searches what's left.
 - **Admins can delete an account for you** if you can't sign in any more: `mcportal admin delete <login> --confirm`, recorded in the audit log.
