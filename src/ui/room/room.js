@@ -113,7 +113,7 @@
     wrap.append(el('div', { class: 'shelf-head' },
       el('span', { class: 'dot', style: `background:${color}` }),
       el('span', { class: 'portal-title', title: portal.title }, portal.title),
-      el('span', { class: 'portal-count' }, portal.error ? '' : String(portal.items.length)),
+      el('span', { class: 'portal-count' }, portalCount(portal)),
       el('span', { class: 'tools' },
         iconButton('left', `Scroll ${portal.title} left`, () => page(-1)),
         iconButton('right', `Scroll ${portal.title} right`, () => page(1)),
@@ -124,7 +124,7 @@
       // A picture row only when most items have pictures; otherwise it's mostly empty boxes.
       const withThumbs = portal.items.filter((i) => i.image && i.image.kind === 'thumb').length;
       const media = withThumbs >= 2 && withThumbs * 2 >= portal.items.length;
-      row.append(...portal.items.map((item) => renderCard(item, portal, color, media)));
+      row.append(...portal.items.map((item) => watchNew(renderCard(item, portal, color, media), item, portal)));
       wrap.append(row);
     }
     const p = portal.provenance;
@@ -143,7 +143,7 @@
     const save = saveButton(item, portal.source);
     if (save) { save.classList.add('go'); meta.push(save); }
     const avatar = item.image && item.image.kind === 'avatar' ? avatarImg(item) : null;
-    const content = [el('span', { class: 'item-title' }, avatar, item.title), media ? null : item.summary ? el('span', { class: 'item-summary' }, item.summary) : null];
+    const content = [el('span', { class: 'item-title' }, item.new ? el('span', { class: 'new-mark' }, 'New') : null, avatar, item.title), media ? null : item.summary ? el('span', { class: 'item-summary' }, item.summary) : null];
     const main = el('button', { class: 'card-main', type: 'button', title: item.title, onclick: () => openItem(item, portal) },
       media ? [thumbBox(item.image && item.image.kind === 'thumb' ? item : { ...item, image: undefined }, portal), el('span', { class: 'card-body' }, content)] : content);
     return el('div', { class: media ? 'card media' : 'card', style: `--mp-source-color:${color}`, onclick: (/** @type {MouseEvent} */ e) => { if (!/** @type {Element} */ (e.target).closest('button, a')) openItem(item, portal); } }, main,
@@ -161,11 +161,11 @@
     wrap.append(el('div', { class: 'portal-head' },
       el('span', { class: 'dot', style: `background:${color}` }),
       el('span', { class: 'portal-title', title: portal.title }, portal.title),
-      el('span', { class: 'portal-count' }, portal.error ? '' : String(portal.items.length)),
+      el('span', { class: 'portal-count' }, portalCount(portal)),
       refresh));
     if (portal.error) wrap.append(el('div', { class: 'error' }, `Signal lost in the ion storm (${portal.error}). Try refreshing this portal.`));
     else if (!portal.items.length) wrap.append(el('div', { class: 'empty' }, 'All quiet on this frequency… for now. New posts will show up here.'));
-    else wrap.append(el('ul', { class: 'items' }, portal.items.map((item) => el('li', null, renderItem(item, portal)))));
+    else wrap.append(el('ul', { class: 'items' }, portal.items.map((item) => el('li', null, watchNew(renderItem(item, portal), item, portal)))));
     const p = portal.provenance;
     wrap.append(el('div', { class: 'portal-foot' }, portal.pin ? pinnedFoot(portal)
       : `${p.source} · ${p.endpoint} · fetched ${new Date(p.fetchedAt).toLocaleTimeString()}${p.cached ? ' (cached)' : ''} · fresh for ${p.ttlSeconds}s`));
@@ -363,7 +363,7 @@
     out.push(saveButton(item, portal.source));
     if (portal.source === 'saved' && item.url) out.push(el('button', { class: 'mi go', title: 'Share to your space', 'aria-label': 'Share to your space', onclick: () => openComposer(item) }, icon('share')));
     const avatar = item.image && item.image.kind === 'avatar' ? avatarImg(item) : null;
-    const text = [el('span', { class: 'item-title' }, avatar, item.title), item.summary ? el('span', { class: 'item-summary' }, item.summary) : null];
+    const text = [el('span', { class: 'item-title' }, item.new ? el('span', { class: 'new-mark' }, 'New') : null, avatar, item.title), item.summary ? el('span', { class: 'item-summary' }, item.summary) : null];
     const main = el('button', { class: 'item-main', type: 'button', title: byline, onclick: () => openItem(item, portal) },
       item.image && item.image.kind === 'thumb' ? el('span', { class: 'item-row' }, thumbBox(item, portal), el('span', { class: 'item-text' }, text)) : text);
     return el('div', { class: 'item', onclick: (/** @type {MouseEvent} */ e) => { if (!/** @type {Element} */ (e.target).closest('button, a')) openItem(item, portal); } }, main,

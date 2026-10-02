@@ -1,6 +1,6 @@
 # Plan: reading with your agent
 
-Status: phases 1–2 built (2026-10-02); phases 3–4 proposed. Four features, in build order: ask about a passage, send
+Status: phases 1–3 built (2026-10-02); phase 4 proposed. Four features, in build order: ask about a passage, send
 something to another chat, know what's new, and highlights picked by your agent.
 
 ## Goal
@@ -117,7 +117,8 @@ honest, MCPortal needs to know what the user has already seen.
     at most every 10 seconds and when the page is hidden. That's one budget unit per call.
   - Opening an item marks it too.
 - **A first visit isn't a flood:** a portal with no seen set shows no "new" badges. Its
-  first visit starts the set, and "new" starts counting from there.
+  first showing records every item it shows as the baseline (server side, in
+  `open_room` and `refresh_portal`), and "new" starts counting from there.
 - **Hosts without the room app** (text only; the client doesn't declare the MCP Apps
   extension at `initialize`) never mark anything through the UI. There, `open_room`
   marks the items it lists in its text. Open question below.

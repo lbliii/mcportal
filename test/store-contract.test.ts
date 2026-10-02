@@ -14,6 +14,7 @@ import { memoryPersistence } from '../src/lib/document.ts';
 import { defaultProfile, validateProfile } from '../src/profile.ts';
 import { FileHandoffStore, HANDOFF_LIMIT, MemoryHandoffStore, type HandoffStore } from '../src/handoffs.ts';
 import { FileReadingStore, READING_LIMIT, type ReadingStore } from '../src/reading.ts';
+import { FileSeenStore, seenHash, SEEN_PER_PORTAL, type SeenStore } from '../src/seen.ts';
 import { DocumentSocialStore, type SocialStore } from '../src/social-store.ts';
 import type { Share } from '../src/social.ts';
 import { FileProfileStore, MemoryProfileStore, type ProfileStore } from '../src/store.ts';
@@ -48,6 +49,7 @@ interface Backend {
   social: () => Promise<SocialStore>;
   reading: () => Promise<ReadingStore>;
   handoffs: () => Promise<HandoffStore>;
+  seen: () => Promise<SeenStore>;
 }
 
 const tmp = (what: string) => mkdtemp(path.join(tmpdir(), `mcportal-contract-${what}-`));
@@ -62,6 +64,7 @@ const BACKENDS: Backend[] = [
     social: async () => new DocumentSocialStore(memoryPersistence()),
     reading: async () => new FileReadingStore(await tmp('reading')),
     handoffs: async () => new FileHandoffStore(await tmp('handoffs')),
+    seen: async () => new FileSeenStore(await tmp('seen')),
   },
   {
     name: 'memory',
@@ -71,6 +74,7 @@ const BACKENDS: Backend[] = [
     social: async () => new DocumentSocialStore(),
     reading: async () => new FileReadingStore(await tmp('reading')),
     handoffs: async () => new MemoryHandoffStore(),
+    seen: async () => new FileSeenStore(null),
   },
   {
     name: 'postgres',
@@ -80,6 +84,7 @@ const BACKENDS: Backend[] = [
     social: async () => new (await pg()).PgSocialStore(db!),
     reading: async () => new (await pg()).PgReadingStore(db!),
     handoffs: async () => new (await pg()).PgHandoffStore(db!),
+    seen: async () => new (await pg()).PgSeenStore(db!),
   },
 ];
 
@@ -204,5 +209,25 @@ for (const b of BACKENDS) {
     assert.equal((await store.list(u)).length, HANDOFF_LIMIT, 'the oldest go past the limit');
     await store.deleteAll(u);
     assert.deepEqual(await store.list(u), []);
+  });
+
+  test(`contract (${b.name}): seen`, { skip: b.skip }, async () => {
+    const store = await b.seen();
+    const u = user('s');
+    assert.equal((await store.get(u, ['hn'])).size, 0);
+    await store.mark(u, [{ portalId: 'hn', itemIds: ['1', '2'] }, { portalId: 'gh', itemIds: ['x'] }]);
+    await store.mark(u, [{ portalId: 'hn', itemIds: ['2', '3'] }]);
+    const sets = await store.get(u, ['hn', 'gh', 'none']);
+    assert.deepEqual([...sets.get('hn')!].sort(), ['1', '2', '3'].map(seenHash).sort(), 'merged, no duplicates');
+    assert.equal(sets.has('none'), false);
+    assert.equal((await store.get(user('other'), ['hn'])).size, 0, 'per account');
+    await store.mark(u, [{ portalId: 'hn', itemIds: Array.from({ length: SEEN_PER_PORTAL }, (_, i) => `n${i}`) }]);
+    const capped = (await store.get(u, ['hn'])).get('hn')!;
+    assert.equal(capped.size, SEEN_PER_PORTAL);
+    assert.equal(capped.has(seenHash('1')), false, 'the oldest went');
+    await store.keepOnly(u, ['gh']);
+    assert.deepEqual([...(await store.get(u, ['hn', 'gh'])).keys()], ['gh']);
+    await store.deleteAll(u);
+    assert.equal((await store.get(u, ['gh'])).size, 0);
   });
 }

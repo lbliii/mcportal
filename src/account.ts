@@ -32,6 +32,7 @@ import { buildExport, describeImport, EXPORT_FORMATS, importExport, parseExport,
 import type { PublicProfiles } from './public-profiles.ts';
 import type { Social } from './social.ts';
 import type { HandoffStore } from './handoffs.ts';
+import type { SeenStore } from './seen.ts';
 import type { ReadingStore } from './reading.ts';
 import type { ProfileStore } from './store.ts';
 
@@ -48,6 +49,7 @@ export interface AccountDeps {
   store: ProfileStore;
   reading?: ReadingStore | undefined;
   handoffs?: HandoffStore | undefined;
+  seen?: SeenStore | undefined;
   clips?: ClipStore | undefined;
   publicProfiles?: PublicProfiles | undefined;
   social?: Social | undefined;
@@ -94,14 +96,15 @@ function sendFile(res: ServerResponse, file: ExportFile): void {
 }
 
 /**
- * Delete an account and everything it owns: room, saved items, reading, handoffs, clips, public
+ * Delete an account and everything it owns: room, saved items, reading, handoffs, what they've seen, clips, public
  * profile (its handle stays held for 30 days), shares, follows, mutes and blocks
  * (reports they filed stay, anonymized), sign-in tokens, and the account.
  */
-export async function deleteAccountData(accountId: string, deps: Pick<AccountDeps, 'accounts' | 'oauth' | 'store' | 'reading' | 'handoffs' | 'clips' | 'publicProfiles' | 'social'>, by = accountId): Promise<{ clips: number; tokens: number }> {
+export async function deleteAccountData(accountId: string, deps: Pick<AccountDeps, 'accounts' | 'oauth' | 'store' | 'reading' | 'handoffs' | 'seen' | 'clips' | 'publicProfiles' | 'social'>, by = accountId): Promise<{ clips: number; tokens: number }> {
   await deps.store.delete(accountId);
   await deps.reading?.deleteAll(accountId);
   await deps.handoffs?.deleteAll(accountId);
+  await deps.seen?.deleteAll(accountId);
   const clips = deps.clips ? await deps.clips.deleteAll(accountId) : 0;
   await deps.social?.forget(accountId);
   await deps.publicProfiles?.remove(accountId);
