@@ -5,11 +5,20 @@
  * Chrome is installed (set CHROME_PATH to point at one).
  */
 import assert from 'node:assert/strict';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { after, before, test } from 'node:test';
+import { FileClipStore } from '../src/clips.ts';
+import { FileEditionStore } from '../src/editions.ts';
+import { FileHandoffStore } from '../src/handoffs.ts';
+import { TtlCache } from '../src/lib/cache.ts';
 import { createFixtureFetcher } from '../src/lib/fixture-fetch.ts';
+import { LocalSession } from '../src/link/session.ts';
 import { defaultProfile, validateProfile } from '../src/profile.ts';
+import { FileReadingStore } from '../src/reading.ts';
 import { FileSeenStore, seenHash } from '../src/seen.ts';
-import { MemoryProfileStore } from '../src/store.ts';
+import { FileProfileStore, MemoryProfileStore } from '../src/store.ts';
 import type { Fetcher } from '../src/types.ts';
 import { findChrome, Page } from './browser.ts';
 import { startApp, type Running } from './helpers.ts';
@@ -291,5 +300,27 @@ test('browser: a portal opens to fill the room; the reader returns to it, and Es
     assert.deepEqual(page.problems, []);
   } finally {
     await profiles.put('default', room());
+  }
+});
+
+test('browser: a local first run offers signing in from the welcome screen, and reports there', { skip }, async () => {
+  // A local MCPortal in ghost mode whose hosted server can't be reached: the welcome
+  // screen's sign-in must show what happened even though the account menu is hidden there.
+  const dataDir = await mkdtemp(path.join(tmpdir(), 'mcportal-welcome-'));
+  const local = { store: new FileProfileStore(dataDir), clips: new FileClipStore(dataDir), reading: new FileReadingStore(dataDir), seen: new FileSeenStore(dataDir), handoffs: new FileHandoffStore(dataDir), editions: new FileEditionStore(dataDir) };
+  const session = new LocalSession({ dataDir, localUser: 'default', local, base: { fetcher, cache: new TtlCache() }, hostedUrl: 'http://127.0.0.1:9', fetch: async () => { throw new TypeError('fetch failed'); } });
+  const ghost = await startApp({ allowUnauthenticated: true, dataDir }, fetcher, { ...local, session });
+  try {
+    page.problems.length = 0;
+    await page.goto(`${ghost.base}/preview`);
+    const signIn = `[...document.querySelectorAll('.welcome-actions button')].find((b) => b.textContent.startsWith('Already have a portal?'))`;
+    await page.waitFor(signIn, 'the sign-in option on the welcome screen');
+    await page.eval(`${signIn}.click()`);
+    const report = await page.waitFor<string>(`(() => { const n = document.querySelector('.welcome-actions + .building'); return n && !n.hidden && /signing in/i.test(n.textContent) && n.textContent; })()`, 'the sign-in report under the actions');
+    assert.match(report, /Couldn't start signing in/);
+    assert.deepEqual(page.problems, []);
+  } finally {
+    await ghost.close();
+    await rm(dataDir, { recursive: true, force: true });
   }
 });
