@@ -88,6 +88,7 @@ declare global {
   type DocSection = Docs.DocSection;
   type DocPageRef = Docs.DocPageRef;
   type DocHit = Docs.DocHit;
+  type Handoff = import('../handoffs.ts').Handoff;
 
   /** The room's state: the profile, the portals as last loaded, saved URLs, and each portal's fallback art style. */
   type RoomState = { profile: Profile | null; portals: Map<string, PortalResult>; saved: Set<string>; art: Map<string, number> };

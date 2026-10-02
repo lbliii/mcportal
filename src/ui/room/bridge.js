@@ -88,6 +88,7 @@
     } else if (method === 'ui/notifications/tool-result') {
       toolRunning = false;
       const data = params.structuredContent;
+      pendingHandoff = data && data.handoff && typeof data.handoff.url === 'string' ? data.handoff : null;   // open_handoff: open at the sent place
       if (params.isError) {
         gotInitialResult = true;
         const message = (/** @type {Array<{ type?: string, text?: string }>} */ (params.content || [])).filter((c) => c.type === 'text').map((c) => c.text).join(' ');

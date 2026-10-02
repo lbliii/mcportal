@@ -118,7 +118,8 @@
     reader.hidden = false; reader.scrollTop = 0;
     reader.replaceChildren(...articleNodes(a, null, false));
     setStatus('');
-    trackReading(a.url, a.title, reader);
+    const body = $first('[data-passage-url]', reader);
+    trackReading(a.url, a.title, reader, !(body && applyHandoff(body)));
   }
 
   /** @param {string} url */

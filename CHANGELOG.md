@@ -5,6 +5,7 @@
 ### Reading with your agent ([plan](docs/plans/attention.md))
 - **Ask about a passage:** select text in the reader or a docs page and a bar offers **Ask about this** and **Clip quote**. Asking gives your agent the passage (fenced as the site's text, with the page and the nearest heading), then posts a fixed "Let's talk about the passage I just highlighted" in your voice: the site's words never go into your message. Hosts that can't post messages get the passage as context and a nudge to ask; hosts that can't take context offer **Copy quote**. Nothing is sent until you click.
 - **Clip quote** keeps the selection as a quote clip with its page as the source.
+- **Send to a new chat:** from the reader's top bar (the whole page) or the passage bar (a selection), MCPortal keeps a pointer to the page, where you were and what you selected under a short code, and shows what to say in a new chat: "Open MCPortal handoff k7q2xm". There `open_handoff` opens the page as a card at that place, with the passage, and gives the agent its text. Send two pages to two chats and keep driving this one. Codes work only in your account, last 7 days (50 at most), aren't exported, and are deleted with your account. Postgres gains `mcportal_handoffs` (schema version 5).
 
 ### Version 0.5.0: a tool surface for the long run (breaking)
 See [the plan](docs/plans/tool-surface.md).

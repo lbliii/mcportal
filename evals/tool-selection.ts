@@ -75,6 +75,10 @@ export const TOOL_CASES: ToolCase[] = [
   // No Jira tool is connected: the right first move is to say so, not pin invented items.
   { prompt: 'pin my open Jira bugs to my room', tool: null },
 
+  // Added 2026-10-02 (frozen from here): handoffs from the reader to a new chat
+  { prompt: 'Open MCPortal handoff k7q2xm', tool: 'open_handoff', args: { code: 'k7q2xm' } },
+  { prompt: 'pick up the page I just sent from MCPortal', tool: 'open_handoff' },
+
   // Not for MCPortal
   { prompt: "what's 17 times 23?", tool: null },
   { prompt: 'write me a haiku about autumn', tool: null },
