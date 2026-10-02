@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.7.0 — 2026-10-02
+
 ### The river (lab, `MCPORTAL_LABS=river`) ([plan](docs/plans/river.md), [research](reports/River%20and%20reblog%20design%20research.md))
 - **One stream across your room:** a fourth layout that merges every portal into one column. Your agent's picks first (only when there's an edition), then what's new, a "You're caught up" divider, then what you've seen. Each portal keeps its own order and portals merge by time; the same link from two portals is one story ("also on Hacker News"). More than three in a row from one portal fold into "N more from X", which opens in place. Docs and pinned portals are named at the end rather than merged.
 - **Stories:** the portal and its age on top (its name opens the portal), the picture across at 1.91:1, a larger title, a four-line summary at reading width, every action, separated by rules. j/k move between stories, o opens, s saves. A `role="feed"` of articles for screen readers.
