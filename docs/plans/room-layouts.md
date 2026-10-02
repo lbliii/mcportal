@@ -52,8 +52,8 @@ What to add:
 - **Layout per display mode.** The research points to the front page inline and columns
   in fullscreen. Add optional `inlineLayout` (default: same as `layout`) so a user can
   have both; profile `version` stays 1 because both fields are optional.
-- **Code rollback.** Tag `room-layouts-baseline` on `main` before phase 2, and keep the
-  design-preview screenshots of columns and shelves from phase 0 as the visual record.
+- **Code rollback.** The tag `room-layouts-baseline` marks `main` before any of this; the
+  design-preview host at that tag reproduces today's columns and shelves exactly.
 
 ## Do we have the bones?
 
@@ -88,9 +88,14 @@ What to add:
 
 ### 0. Baseline
 
-Tag `room-layouts-baseline`. Add 380 and 760 to the preview widths and capture
-columns/shelves screenshots inline and fullscreen. Add the nested-scroll assertion in
-report-only mode so today's violations are on record.
+Tag `room-layouts-baseline`. Add 760 to the preview widths (360 already stands in for
+phones) and a Display (inline/fullscreen) switch. Add the inner-scroll report in
+report-only mode so today's violations are on record: at 360 the columns lane and the
+shelf rows scroll sideways, at 760 the lane still does. The fixture host now advertises
+`serverTools`, `openLinks`, `message` and `updateModelContext`, so docs renders again.
+
+Baseline for phase 2: the room's `#grid` HTML (fetch times normalized) hashes to
+`daaa5bff3093` for columns and `b83b1454170c` for shelves at 360 and 1000.
 
 ### 1. Measure the hosts
 

@@ -45,16 +45,17 @@ createServer(async(req,res)=>{try{
  res.end(`<!doctype html><html><head><meta name="viewport" content="width=device-width"><title>MCPortal design regression host</title><style>body{margin:0;font:14px system-ui;background:#000}header{padding:12px;background:#eee;color:#111}button,select{font:inherit;padding:6px;margin:4px}iframe{display:block;width:100%;height:900px;border:0;background:transparent}pre{margin:0;padding:12px;background:#eee;color:#111;white-space:pre-wrap}</style></head><body><header>
  <label>View <select id="view">${['welcome','room','shelves','reader','docs','clip','share','space'].map(v=>`<option>${v}</option>`).join('')}</select></label>
  <label>Theme <select id="mode"><option>light</option><option>dark</option></select></label>
+ <label>Display <select id="display"><option>inline</option><option>fullscreen</option></select></label>
  <label>Inputs <select id="inputs"><option>complete</option><option>theme-only</option><option>background-only</option><option>hostile</option><option>none</option></select></label>
  <button id="switch">Theme-only switch</button><button id="reset">Reset inputs</button><button id="run">Run browser checks</button>
  <a href="/site">Site</a> <a href="/auth">Auth</a> <a href="/admin">Admin</a></header><iframe title="MCPortal" src="/app"></iframe><pre id="report" aria-live="polite">Loading fixture…</pre><script>
- const frame=document.querySelector('iframe'), report=document.querySelector('#report'), fields=['view','mode','inputs'];let ready=false, current=null;
+ const frame=document.querySelector('iframe'), report=document.querySelector('#report'), fields=['view','mode','display','inputs'];let ready=false, current=null;
  const presets={light:{'--color-background-primary':'#FFFFFF','--color-text-primary':'#1B1B1A','--color-text-secondary':'#646460'},dark:{'--color-background-primary':'#161616','--color-text-primary':'#ECECEA','--color-text-secondary':'#A5A59F'}};
- function context(){const mode=document.querySelector('#mode').value,input=document.querySelector('#inputs').value;return input==='none'?{}:{theme:mode,displayMode:'inline',availableDisplayModes:['inline','fullscreen'],styles:{variables:input==='complete'?presets[mode]:input==='background-only'?{'--color-background-primary':'#161616'}:input==='hostile'?{'--color-background-primary':'#888','--color-text-primary':'#888','--color-text-secondary':'transparent','--mp-surface-canvas':'transparent','--lane-h':'0px'}:{}}};}
+ function context(){const mode=document.querySelector('#mode').value,input=document.querySelector('#inputs').value;const display=document.querySelector('#display').value;return input==='none'?{}:{theme:mode,displayMode:display,availableDisplayModes:['inline','fullscreen'],styles:{variables:input==='complete'?presets[mode]:input==='background-only'?{'--color-background-primary':'#161616'}:input==='hostile'?{'--color-background-primary':'#888','--color-text-primary':'#888','--color-text-secondary':'transparent','--mp-surface-canvas':'transparent','--lane-h':'0px'}:{}}};}
  const send=(data)=>frame.contentWindow.postMessage({jsonrpc:'2.0',...data},'*');
  async function load(){ready=false;current=await(await fetch('/fixture?view='+document.querySelector('#view').value)).json();document.body.style.background=document.querySelector('#mode').value==='dark'?'#fff':'#000';frame.src='/app?view='+document.querySelector('#view').value+'&nonce='+Date.now();}
  window.addEventListener('message',async e=>{if(e.source!==frame.contentWindow)return;const m=e.data;
-  if(m.method==='ui/initialize')send({id:m.id,result:{protocolVersion:'2026-01-26',hostInfo:{name:'fixture-host',version:'1'},hostCapabilities:{},hostContext:context()}});
+  if(m.method==='ui/initialize')send({id:m.id,result:{protocolVersion:'2026-01-26',hostInfo:{name:'fixture-host',version:'1'},hostCapabilities:{serverTools:{},openLinks:{},message:{},updateModelContext:{}},hostContext:context()}});
   else if(m.method==='ui/notifications/initialized'){send({method:'ui/notifications/tool-result',params:current});ready=true;report.textContent='Fixture ready';}
   else if(m.method==='tools/call'){const r=await(await fetch('/rpc',{method:'POST',body:JSON.stringify(m)})).json();send({id:m.id,result:r.result,error:r.error});}
   else if(m.id!==undefined)send({id:m.id,result:{}});
@@ -65,6 +66,7 @@ createServer(async(req,res)=>{try{
  const delay=ms=>new Promise(r=>setTimeout(r,ms));
  const luminance=c=>{const x=c.match(/[\\d.]+/g).slice(0,3).map(Number).map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4});return x[0]*.2126+x[1]*.7152+x[2]*.0722;};
  const ratio=(a,b)=>{a=luminance(a);b=luminance(b);return (Math.max(a,b)+.05)/(Math.min(a,b)+.05)};
+ let focusUnchecked=false;
  function check(){const d=frame.contentDocument,w=frame.contentWindow,fail=[];const visible=n=>n.getClientRects().length&&w.getComputedStyle(n).visibility!=='hidden';
   const body=w.getComputedStyle(d.body);if(parseFloat(body.fontSize)<13)fail.push('rem scale shrank default text');if(body.backgroundColor==='rgba(0, 0, 0, 0)')fail.push('transparent backing');
   if(d.querySelector('.error')&&visible(d.querySelector('.error')))fail.push('render error: '+d.querySelector('.error').textContent);
@@ -73,15 +75,23 @@ createServer(async(req,res)=>{try{
    if(n.disabled||n.closest('.art,.thumb,.post img'))continue;let bg=n;while(bg&&w.getComputedStyle(bg).backgroundColor==='rgba(0, 0, 0, 0)')bg=bg.parentElement;
    if(bg&&ratio(s.color,w.getComputedStyle(bg).backgroundColor)<4.49)fail.push('text contrast '+(n.title||n.textContent.slice(0,24)));
   }
-  const first=[...d.querySelectorAll('button')].find(visible);if(first){first.focus();const s=w.getComputedStyle(first);if(s.outlineStyle==='none'||parseFloat(s.outlineWidth)<2)fail.push('missing keyboard focus');}
+  // A host window without focus never shows focus rings: say so rather than fail every case.
+  const first=[...d.querySelectorAll('button')].find(visible);if(first&&!document.hasFocus())focusUnchecked=true;else if(first){first.focus();const s=w.getComputedStyle(first);if(s.outlineStyle==='none'||parseFloat(s.outlineWidth)<2)fail.push('missing keyboard focus');}
   if(d.querySelector('img')&&[...d.querySelectorAll('img')].some(n=>w.getComputedStyle(n).filter!=='none'))fail.push('recoloured image');for(const card of d.querySelectorAll('.card')){const meta=card.querySelector('.item-meta');if(meta&&meta.getBoundingClientRect().bottom>card.getBoundingClientRect().bottom+1)fail.push('clipped card actions');}return [...new Set(fail)];
  }
+ // Report-only until room-layouts phase 6: what scrolls on its own inside the inline frame.
+ // Code blocks and tables are allowed to (design-system.md); everything else should page.
+ function scrollers(){const d=frame.contentDocument,w=frame.contentWindow,out=[];for(const n of d.querySelectorAll('body *')){if(n.closest('pre,table,.table-wrap'))continue;const s=w.getComputedStyle(n);
+  const y=/auto|scroll/.test(s.overflowY)&&n.scrollHeight>n.clientHeight+1,x=/auto|scroll/.test(s.overflowX)&&n.scrollWidth>n.clientWidth+1;
+  if(x||y)out.push((x&&y?'xy ':x?'x ':'y ')+n.tagName.toLowerCase()+(n.className&&typeof n.className==='string'?'.'+n.className.trim().split(/\\s+/).join('.'):''));}
+  return [...new Set(out)];}
  document.querySelector('#run').onclick=async()=>{const rows=[];document.querySelector('#run').disabled=true;
-  for(const width of [360,1000])for(const view of ['welcome','room','shelves','reader','docs','clip','share','space'])for(const input of ['complete','theme-only','background-only','hostile','none']){
-   frame.style.width=width+'px';document.querySelector('#view').value=view;document.querySelector('#inputs').value=input;document.querySelector('#mode').value=width===360?'light':'dark';await load();
-   for(let i=0;i<100&&!ready;i++)await delay(20);await delay(150);const failures=ready?check():['bridge timeout'];if(ready){frame.contentDocument.documentElement.style.fontSize='200%';failures.push(...check().map(f=>'200% text: '+f));frame.contentDocument.documentElement.style.fontSize='100%';}rows.push({width,view,input,failures});report.textContent=rows.length+'/80 checked…';
+  for(const width of [360,760,1000])for(const view of ['welcome','room','shelves','reader','docs','clip','share','space'])for(const input of ['complete','theme-only','background-only','hostile','none']){
+   frame.style.width=width+'px';document.querySelector('#view').value=view;document.querySelector('#inputs').value=input;document.querySelector('#mode').value=width===1000?'dark':'light';document.querySelector('#display').value='inline';await load();
+   for(let i=0;i<100&&!ready;i++)await delay(20);await delay(150);const failures=ready?check():['bridge timeout'];if(ready){frame.contentDocument.documentElement.style.fontSize='200%';failures.push(...check().map(f=>'200% text: '+f));frame.contentDocument.documentElement.style.fontSize='100%';}rows.push({width,view,input,failures,scrolls:ready?scrollers():[]});report.textContent=rows.length+'/120 checked…';
   }
-  frame.style.width='100%';window.designResults=rows;report.textContent=JSON.stringify({passed:rows.filter(r=>!r.failures.length).length,total:rows.length,failures:rows.filter(r=>r.failures.length)},null,2);document.querySelector('#run').disabled=false;
+  frame.style.width='100%';window.designResults=rows;const scrolling=rows.filter(r=>r.input==='complete'&&r.scrolls.length).map(r=>({width:r.width,view:r.view,scrolls:r.scrolls}));
+  report.textContent=JSON.stringify({passed:rows.filter(r=>!r.failures.length).length,total:rows.length,failures:rows.filter(r=>r.failures.length),...(focusUnchecked?{focus:'not checked: this window lacks focus; click into it and run again'}:{}),innerScrolling:scrolling},null,2);document.querySelector('#run').disabled=false;
  };load();
  </script></body></html>`);
 }catch(error){res.statusCode=500;res.end(String(error));}}).listen(8799,'127.0.0.1',()=>console.log('Design fixture host: http://127.0.0.1:8799'));
