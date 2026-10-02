@@ -114,14 +114,14 @@ test('browser: an item opens in the reader, and home returns to the room', { ski
   assert.deepEqual(page.problems, []);
 });
 
-/** The reading record for the article, once `ready` says it's there. */
+/** The reading record for the article, once `ready` says it's there (or the last one seen, after 10 seconds). */
 async function readingWhen(ready: (r: any) => boolean): Promise<any> {
-  for (let i = 0; i < 10; i++) {   // each call spends the budget the room needs too
+  const deadline = Date.now() + 10_000;
+  for (;;) {
     const r = (await tool('get_reading', { url: ARTICLE })).reading;
-    if (r && ready(r)) return r;
-    await new Promise((done) => setTimeout(done, 200));
+    if ((r && ready(r)) || Date.now() > deadline) return r;
+    await new Promise((done) => setTimeout(done, 250));   // each call spends the budget the room needs too
   }
-  return (await tool('get_reading', { url: ARTICLE })).reading;
 }
 
 /** A tool called straight over /mcp, as the model would. */
@@ -141,12 +141,11 @@ test('browser: the reader records opening and position, resumes there, and marks
   const opened = await readingWhen((r) => r.status === 'opened');
   assert.equal(opened?.status, 'opened', 'opening records it, no model involved');
   assert.equal(opened.readAt, undefined);
-  await new Promise((done) => setTimeout(done, 200));   // the reader starts watching once it has recorded the open
 
-  // Scroll halfway, then leave (Back scrolls up to itself first): the furthest point is saved on the way out.
+  // Scroll a third of the way, then leave (Back scrolls up to itself first): the furthest point is saved on the way out.
   const scrolled = await page.eval<number>(`(() => { const r = document.getElementById('reader'); r.scrollTop = (r.scrollHeight - r.clientHeight) / 3; return r.scrollTop; })()`);
   assert.ok(scrolled > 0, 'the article is long enough to scroll');
-  await new Promise((done) => setTimeout(done, 600));   // a reader pauses there
+  await page.waitFor(`Number(document.querySelector('#reader .body')?.dataset.furthest) > 0`, 'the reader to note how far it got');   // a reader pauses there
   await page.click('#reader [aria-label="Back to your room"]');
   await page.waitFor(`!document.getElementById('grid').hidden`, 'the room to come back');
   const left = await readingWhen((r) => r.anchor?.block > 0);
