@@ -95,7 +95,7 @@
         showAppError('The tool could not open this view', new Error(message || 'No error details returned'));
       } else if (data && data.site && Array.isArray(data.site.sections)) { gotInitialResult = true; showDocsCard(data); }
       else if (data && data.space && data.space.handle) { gotInitialResult = true; showSpaceCard(data.space); }
-      else if (data && data.share && data.share.id) { gotInitialResult = true; showShareCard(data.share); }
+      else if (data && data.share && data.share.id) { gotInitialResult = true; showShareCard(data.share, data.rebloggers); }
       else if (data && data.clip && data.clip.data) { gotInitialResult = true; showClipCard(data.clip); }
       else if (data && data.highlights && Array.isArray(data.highlights.picks)) { gotInitialResult = true; showHighlightsCard(data.highlights); }
       else if (data && data.article) { gotInitialResult = true; showArticleCard(data.article, data.saved); }

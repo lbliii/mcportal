@@ -9,7 +9,7 @@
    * How an item looks: its portal's colour, whether its shelf shows pictures, whether it
    * names its portal (outside one), the agent's reason for picking it (its own words), the
    * other portals that have the same story, and the people you follow who shared it.
-   * @typedef {{ color?: string, media?: boolean, from?: boolean, why?: string, also?: string[], shared?: Array<{ handle: string, note?: string | undefined }> }} ItemLook
+   * @typedef {{ color?: string, media?: boolean, from?: boolean, why?: string, also?: string[], shared?: Array<{ handle: string, note?: string | undefined, share?: Item['share'] }> }} ItemLook
    */
 
   /** @param {Item} item @param {PortalResult} portal @param {ItemForm} [form] @param {ItemLook} [look] */
@@ -45,13 +45,47 @@
     return el('span', { class: 'item-title' }, item.new ? el('span', { class: 'new-mark' }, 'New') : null, avatar, item.title);
   }
 
-  /** A row's and the lead's actions: points and comments, then open the original, save, share. @param {Item} item @param {PortalResult} portal @param {boolean} [when] */
-  function itemActions(item, portal, when = true) {
+  /**
+   * A row's and the lead's actions: points and comments, then open the original, save, share
+   * (Saved) or reblog (Following).
+   * @param {Item} item @param {PortalResult} portal @param {boolean} [when] @param {boolean} [reblog] add the reblog button for Following items
+   */
+  function itemActions(item, portal, when = true, reblog = true) {
     const { out, byline } = compactMeta(item, when);
     if (item.url) out.push(el('button', { class: 'mi go', title: 'Open the original', 'aria-label': 'Open the original', onclick: () => openLink(item.url ?? '') }, icon('external')));   // checked just before
     out.push(saveButton(item, portal.source));
     if (portal.source === 'saved' && item.url) out.push(el('button', { class: 'mi go', title: 'Share to your space', 'aria-label': 'Share to your space', onclick: () => openComposer(item) }, icon('share')));
+    if (reblog && portal.source === 'following' && item.share) out.push(reblogButton(reblogTarget(item, portal, item.share)));
     return { out, byline };
+  }
+
+  /**
+   * What the people you follow did with a story. The context row ("@ana shared", "@ben
+   * reblogged @ana", "Reblogged by @ben, @cy and 2 more"), the trail (the original's note,
+   * then one reblog's: never deeper), why the original is gone, and what the reblog button
+   * acts on (the post behind it, else the link).
+   * @param {Item} item @param {PortalResult} portal @param {NonNullable<ItemLook['shared']>} shared
+   */
+  function storySocial(item, portal, shared) {
+    const reblogs = shared.filter((s) => s.share?.reblog);
+    const original = reblogs[0]?.share?.reblog;
+    const direct = shared.find((s) => !s.share?.reblog);
+    const by = original ? original.by : direct?.handle;
+    let context = '';
+    if (reblogs.length > 2) context = `Reblogged by ${sharerNames(reblogs.map((s) => s.handle))}`;
+    else if (reblogs.length) context = `${sharerNames(reblogs.map((s) => s.handle))} reblogged ${original?.by ? `@${original.by}` : 'a removed post'}`;
+    else if (shared.length) context = `${sharerNames(shared.map((s) => s.handle))} shared`;
+    /** @type {Array<{ by: string, note: string }>} */
+    const trail = [];
+    const originalNote = original ? original.note : direct?.note;
+    if (by && originalNote) trail.push({ by, note: originalNote });
+    const reblogNote = reblogs.find((s) => s.note);
+    if (reblogNote?.note) trail.push({ by: reblogNote.handle, note: reblogNote.note });
+    const removed = original?.removed === 'detached' ? 'Its author removed the original post from this reblog.' : original?.removed ? 'The original post was removed.' : '';
+    // Reblog the post behind it (any of them reaches the same original); its count and your reblog come from the one that knows most.
+    const behind = [...shared].map((s) => s.share).filter((s) => s !== undefined).sort((a, b) => Number(Boolean(b.mine)) - Number(Boolean(a.mine)) || (b.reblogs ?? 0) - (a.reblogs ?? 0))[0];
+    const target = reblogTarget(item, portal, behind, by ? { by, note: originalNote } : undefined);
+    return { context, trail, removed, target };
   }
 
   /** "@a shared", "@a and @b", "@a, @b and 2 more". @param {string[]} handles */
@@ -97,24 +131,26 @@
      * portal's name opens the portal.
      */
     story(item, portal, { color = '', why = '', also = [], shared = [] }) {
-      // A Following item's meta is "@handle" and its kind, and its summary is the note: shown above, not twice.
+      // A Following item's meta is "@handle", "reblogged @x" and its kind, and its summary is the
+      // note: the context row and the trail say those, so they aren't repeated.
       const following = portal.source === 'following';
-      const meta = following ? item.meta.filter((m) => !m.startsWith('@') && m !== 'link') : item.meta;
-      const { out, byline } = itemActions({ ...item, meta }, portal, false);
-      const share = shareStoryButton(item, portal);
-      if (share) out.push(share);
-      const noted = shared.find((s) => s.note);
+      const meta = following ? item.meta.filter((m) => !m.startsWith('@') && !m.startsWith('reblogged ') && m !== 'link') : item.meta;
+      const { out, byline } = itemActions({ ...item, meta }, portal, false, false);
+      const { context, trail, removed, target } = storySocial(item, portal, shared);
+      const reblog = reblogButton(target);
+      if (reblog) out.push(reblog);
       const main = el('button', { class: 'item-main', type: 'button', title: byline, onclick: (/** @type {MouseEvent} */ e) => openFrom(e, item, portal) },
         item.image && item.image.kind === 'thumb' ? thumbBox(item, portal) : null,
         itemTitle(item), item.summary && !following ? el('span', { class: 'item-summary' }, item.summary) : null);
       return el('article', { class: 'item story', style: `--mp-source-color:${color}`, onclick: openOnClick(item, portal) },
-        shared.length ? el('div', { class: 'story-context' }, `${sharerNames(shared.map((s) => s.handle))} shared`) : null,
+        context ? el('div', { class: 'story-context' }, context) : null,
         el('div', { class: 'item-from' }, el('span', { class: 'dot', style: `background:${color}` }),
           el('button', { class: 'story-portal', type: 'button', title: `Open ${portal.title}`, onclick: () => openPortal(portal.portalId) }, portal.title),
           also.length ? el('span', { class: 'story-also' }, `also on ${also.join(', ')}`) : null,
           item.publishedAt ? el('span', { class: 'story-when' }, ago(item.publishedAt)) : null),
         main,
-        noted ? el('p', { class: 'story-note' }, el('span', { class: 'story-note-by' }, `@${noted.handle}`), noted.note) : null,
+        removed ? el('p', { class: 'story-removed' }, removed) : null,
+        trail.map((n) => el('p', { class: 'story-note' }, el('span', { class: 'story-note-by' }, `@${n.by}`), n.note)),
         out.length ? el('div', { class: 'item-meta' }, out) : null, why ? itemWhy(why) : null);
     },
 

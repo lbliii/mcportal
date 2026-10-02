@@ -18,7 +18,11 @@ const now='2026-09-30T12:00:00Z',url='https://example.com/guide';
 const blocks=[{type:'h',level:2,id:'room',text:'A room for your internet'},{type:'p',text:'Your agent brings reading, saved clips and shared ideas into one conversational space.'},{type:'callout',kind:'note',text:'Keep useful actions visible before hover.'},{type:'pre',text:'const theme = "adaptive";',lang:'javascript'}];
 const article={url,title:'Conversational portals',byline:'MCPortal fixtures',wordCount:230,blocks,provenance:{endpoint:url,fetchedAt:now,cached:false}};
 const clip={id:'c_fixture',title:'Ideas worth keeping',kind:'note',tags:['design'],createdAt:now,source:{kind:'conversation'},note:'A clipped thought from a conversation.',data:{kind:'note',blocks}};
-const share={id:'s_fixture',title:clip.title,kind:'clip',clip,note:'Bring the web into the conversation.',author:{handle:'reader'},audience:'mcportal',createdAt:now,mine:false};
+const share={id:'s_fixture',title:clip.title,kind:'clip',clip,note:'Bring the web into the conversation.',author:{handle:'reader'},audience:'mcportal',createdAt:now,mine:false,reblogCount:3,canReblog:true};
+// A reblog of that share, via someone else's; and the same share as its author sees it, with who reblogged it.
+const reblog={...share,id:'s_reblog',note:'Passing this on: the second half is the good part.',author:{handle:'curator'},reblogOf:{root:share.id,via:'s_via'},via:'wanderer',original:{id:share.id,author:{handle:'reader'},title:share.title,kind:'clip',clip,note:share.note,createdAt:now},myReblog:undefined,canReblog:true};
+const mypost={...share,mine:true,canReblog:false,reblogs:'followers'};
+const rebloggers=[{handle:'curator',reblogId:'s_reblog',createdAt:now,note:'Passing this on.'},{handle:'wanderer',reblogId:'s_via',createdAt:now},{handle:'lurker',reblogId:'s_cut',createdAt:now,detached:true}];
 const space={handle:'reader',spaceTitle:'Dispatches from my room',displayName:'Reader',bio:'Small discoveries, collected and shared.',accent:'teal',mine:false,following:false,followers:3,posts:[share],sources:[{source:'rss',title:'Design transmissions',config:{url:'https://example.com/feed.xml'}}]};
 const docs={docs:url,site:{title:'Portal handbook',sections:[{title:'Getting started',pages:[{title:'A room for your internet',url}]}]}};
 const result=(structuredContent:unknown)=>({content:[],structuredContent});
@@ -30,12 +34,17 @@ async function fixture(view:string){
   // Two follows' shares, signed in: one of a story already in a feed, one of a new link.
   const sc=r.structuredContent,hn=sc.portals.find((p:{source:string})=>p.source==='hn');sc.identity={mode:'hosted',handle:'reader'};sc.profile.columns.push({width:1,panels:[{id:'following',source:'following',title:'Following',config:{}}]});
   sc.portals.push({portalId:'following',source:'following',title:'Following',provenance:{source:'following',endpoint:'shares from people you follow',fetchedAt:now,cached:false,ttlSeconds:0},items:[
-   {id:'s_ana',title:hn.items.at(-1).title,url:hn.items.at(-1).url,summary:'The comments are the best part. Start with the third one.',meta:['@ana','link'],publishedAt:now,share:{id:'s_ana',kind:'link'}},
-   {id:'s_ben',title:'Field notes from a small web',url:'https://example.com/small-web',summary:'Short, kind and full of links worth following.',meta:['@ben','link'],publishedAt:now,share:{id:'s_ben',kind:'link'}}]});
+   {id:'s_ana',title:hn.items.at(-1).title,url:hn.items.at(-1).url,summary:'The comments are the best part. Start with the third one.',meta:['@ana','link'],publishedAt:now,share:{id:'s_ana',kind:'link',canReblog:true}},
+   {id:'s_ben',title:'Field notes from a small web',url:'https://example.com/small-web',summary:'Short, kind and full of links worth following.',meta:['@ben','link'],publishedAt:now,share:{id:'s_ben',kind:'link',canReblog:true,reblogs:4}},
+   // Reblogs: two follows passing on @cy's post (one card, two notes), one whose original is gone, one that can't be reblogged.
+   {id:'s_dee',title:'How the card catalogue learned to dream',url:'https://example.com/catalogue',summary:'Read this one slowly.',meta:['@dee','reblogged @cy','link'],publishedAt:now,share:{id:'s_dee',kind:'link',reblog:{root:'s_cy',by:'cy',note:'Libraries were the first search engines, and the best.'},reblogs:12,mine:'s_me',canReblog:false}},
+   {id:'s_eli',title:'How the card catalogue learned to dream',url:'https://example.com/catalogue',meta:['@eli','reblogged @cy','link'],publishedAt:now,share:{id:'s_eli',kind:'link',reblog:{root:'s_cy',by:'cy',note:'Libraries were the first search engines, and the best.'},reblogs:12,canReblog:false}},
+   {id:'s_fen',title:'A dispatch that went dark',url:'https://example.com/dark',summary:'Keeping the link anyway.',meta:['@fen','reblogged a removed post','link'],publishedAt:now,share:{id:'s_fen',kind:'link',reblog:{root:'s_gone',removed:'removed'},canReblog:false}},
+   {id:'s_gus',title:'Only for my followers',url:'https://example.com/gus',meta:['@gus','link'],publishedAt:now,share:{id:'s_gus',kind:'link',canReblog:false}}]});
   return r;}
  if(view==='shelves'){const r=await fixture('room') as {structuredContent:{profile:{layout:string}}};r.structuredContent.profile.layout='shelves';return r;}
  if(view==='welcome'||view==='room')return (await handleMessage({jsonrpc:'2.0',id:1,method:'tools/call',params:{name:'open_room',arguments:{}}},{...ctx,userId:view}))!.result;
- return result(view==='reader'?{article}:view==='docs'?docs:view==='clip'?{clip}:view==='share'?{share}:{space});
+ return result(view==='reader'?{article}:view==='docs'?docs:view==='clip'?{clip}:view==='share'?{share}:view==='reblog'?{share:reblog}:view==='mypost'?{share:mypost,rebloggers}:{space});
 }
 createServer(async(req,res)=>{try{
  const u=new URL(req.url??'/','http://127.0.0.1:8799');res.setHeader('content-type','text/html; charset=utf-8');
@@ -55,7 +64,7 @@ createServer(async(req,res)=>{try{
  if(u.pathname==='/site'){await serveSite(res,'/',{publicUrl:'http://127.0.0.1:8799',supportUrl:DEFAULT_SUPPORT_URL,inviteOnly:false});return;}
  if(u.pathname.startsWith('/site/')){const file=u.pathname.slice(6);if(!/^[\w.-]+$/.test(file))throw new Error('Invalid asset');res.setHeader('content-type',file.endsWith('.svg')?'image/svg+xml':file.endsWith('.ttf')?'font/ttf':'image/png');res.end(await readFile(new URL(`../src/site/${file}`,import.meta.url)));return;}
  res.end(`<!doctype html><html><head><meta name="viewport" content="width=device-width"><title>MCPortal design regression host</title><style>body{margin:0;font:14px system-ui;background:#000}header{padding:12px;background:#eee;color:#111}button,select{font:inherit;padding:6px;margin:4px}iframe{display:block;width:100%;height:900px;border:0;background:transparent}pre{margin:0;padding:12px;background:#eee;color:#111;white-space:pre-wrap}</style></head><body><header>
- <label>View <select id="view">${['welcome','room','shelves','frontpage','river','reader','docs','clip','share','space'].map(v=>`<option>${v}</option>`).join('')}</select></label>
+ <label>View <select id="view">${['welcome','room','shelves','frontpage','river','reader','docs','clip','share','reblog','mypost','space'].map(v=>`<option>${v}</option>`).join('')}</select></label>
  <label>Theme <select id="mode"><option>light</option><option>dark</option></select></label>
  <label>Display <select id="display"><option>inline</option><option>fullscreen</option></select></label>
  <label>Inputs <select id="inputs"><option>complete</option><option>theme-only</option><option>background-only</option><option>hostile</option><option>none</option></select></label>
@@ -98,7 +107,7 @@ createServer(async(req,res)=>{try{
   if(x||y)out.push((x&&y?'xy ':x?'x ':'y ')+n.tagName.toLowerCase()+(n.className&&typeof n.className==='string'?'.'+n.className.trim().split(/\\s+/).join('.'):''));}
   return [...new Set(out)];}
  document.querySelector('#run').onclick=async()=>{const rows=[];document.querySelector('#run').disabled=true;
-  for(const width of [360,760,1000])for(const view of ['welcome','room','shelves','frontpage','river','reader','docs','clip','share','space'])for(const input of ['complete','theme-only','background-only','hostile','none']){
+  for(const width of [360,760,1000])for(const view of ['welcome','room','shelves','frontpage','river','reader','docs','clip','share','reblog','mypost','space'])for(const input of ['complete','theme-only','background-only','hostile','none']){
    frame.style.width=width+'px';document.querySelector('#view').value=view;document.querySelector('#inputs').value=input;document.querySelector('#mode').value=width===1000?'dark':'light';document.querySelector('#display').value='inline';await load();
    for(let i=0;i<100&&!ready;i++)await delay(20);await delay(150);const failures=ready?check():['bridge timeout'];if(ready){frame.contentDocument.documentElement.style.fontSize='200%';failures.push(...check().map(f=>'200% text: '+f));frame.contentDocument.documentElement.style.fontSize='100%';}rows.push({width,view,input,failures,scrolls:ready?scrollers():[]});report.textContent=rows.length+'/135 checked…';
   }

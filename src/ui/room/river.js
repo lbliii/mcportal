@@ -17,7 +17,7 @@
   /** Portals that aren't streams of stories (tables of contents, the agent's data): named at the end instead. */
   const OFF_RIVER = new Set(['docs', 'pinned']);
 
-  /** Someone you follow who shared a story, with their note. @typedef {{ handle: string, note?: string | undefined }} Sharer */
+  /** Someone you follow who shared or reblogged a story: their note, and the post (for reblogging it). @typedef {{ handle: string, note?: string | undefined, share?: Item['share'] }} Sharer */
   /** @typedef {{ key: string, portal: PortalResult, item: Item, also: PortalResult[], shared: Sharer[], why?: string | undefined }} Story */
   /** @typedef {{ picks: Story[], fresh: Story[], seen: Story[] }} RiverStories */
   /** @typedef {{ story: Story } | { fold: Story[], key: string } | { divider: true }} RiverUnit */
@@ -52,7 +52,7 @@
   /** Who shared an item of a Following portal (its first meta is "@handle"), with their note (its summary). @param {PortalResult} portal @param {Item} item @returns {Sharer | null} */
   function sharerOf(portal, item) {
     const handle = item.meta[0] ?? '';
-    return portal.source === 'following' && handle.startsWith('@') ? { handle: handle.slice(1), note: item.summary } : null;
+    return portal.source === 'following' && handle.startsWith('@') ? { handle: handle.slice(1), note: item.summary, share: item.share } : null;
   }
 
   /**

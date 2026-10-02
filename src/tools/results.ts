@@ -91,6 +91,7 @@ export type ToolResults = {
   get_share: { share: SharedItem; rebloggers?: Reblogger[] };
   share: { share: SharedItem };
   share_settings: { share: SharedItem };
+  unshare: { removed: boolean };
   relationship: { handle?: string; layoutChanged?: boolean; profile?: Profile };
   record_reading: { reading: ReadingState };
   account_settings: { identity: Identity; url: string | null };

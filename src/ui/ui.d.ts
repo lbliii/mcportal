@@ -86,6 +86,7 @@ declare global {
   type ClipSummary = Clips.ClipSummary;
   type ClipData = Clips.ClipData;
   type SharedItem = Social.SharedItem;
+  type Reblogger = Social.Reblogger;
   type DocSection = Docs.DocSection;
   type DocPageRef = Docs.DocPageRef;
   type DocHit = Docs.DocHit;

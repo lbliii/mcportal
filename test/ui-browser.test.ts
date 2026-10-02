@@ -288,7 +288,7 @@ test('browser: the river merges the room into one stream: picks, new, a divider,
     assert.equal(await page.eval(`document.querySelector('.river-feed').getAttribute('role')`), 'feed');
     assert.equal(await page.eval(`document.querySelector('.river-feed > article').getAttribute('aria-posinset')`), '2', 'numbered after the pick');
     assert.match(await page.eval<string>(`document.querySelector('.river-aside').textContent`), /Also in your room: Example Docs/, 'docs are named, not merged');
-    assert.equal(await page.eval(`document.querySelectorAll('.story:not([data-story^="saved"]) [aria-label="Share to your space"]').length`), 0, 'ghost mode shares nothing');
+    assert.equal(await page.eval(`document.querySelectorAll('.mi.reblog').length`), 0, 'ghost mode reblogs nothing');
     // A page is ten units; the next page brings the fold, which opens in place.
     assert.equal(await units(), 10);
     assert.match(await page.eval<string>(`document.querySelector('.river-more .fp-more').textContent`), /^2 more of 2$/);
@@ -356,24 +356,38 @@ test('browser: river pages end on a separator that takes focus, and a refresh wa
   }
 });
 
-test('browser: in the river, a follow\'s share joins the story it shares, notes read in their own voice, and any story can be shared', { skip }, async () => {
-  // The test server has no social layer, so the page's open_room result gets a Following
-  // portal and a signed-in identity on the way in: @ana shares HN's top story, @ben a new link.
+test("browser: in the river, follows' shares and reblogs join their stories with credit and a two-note trail; the reblog menu reblogs, undoes, and nudges to read first", { skip }, async () => {
+  // The test server has no social layer: the page's open_room result gets a Following portal
+  // and a signed-in identity on the way in, and share/unshare are answered in the page.
+  // @ana shares HN's top story; @ben and @dee reblog @cy's post; @eve reblogged a removed
+  // post; @fay's post can't be reblogged.
   const { identifier } = await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => {
     const real = window.fetch;
+    window.__calls = [];
+    const answer = (result) => new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result }), { status: 200, headers: { 'content-type': 'application/json' } });
     window.fetch = async (url, init) => {
+      const body = init && typeof init.body === 'string' ? JSON.parse(init.body) : null;
+      const name = body && body.params && body.params.name;
+      if (url === '/mcp' && (name === 'share' || name === 'unshare')) {
+        window.__calls.push({ name, args: body.params.arguments });
+        return answer(name === 'share' ? { content: [], structuredContent: { share: { id: 's_mine' } } } : { content: [], structuredContent: { removed: true } });
+      }
       const res = await real(url, init);
-      if (url !== '/mcp' || !init || !String(init.body).includes('"name":"open_room"')) return res;
+      if (name !== 'open_room') return res;
       const json = await res.json();
       const room = json.result && json.result.structuredContent;
       const hn = room && room.portals && room.portals.find((p) => p.portalId === 'hn-top');
       if (hn) {
         const now = new Date().toISOString();
+        const share = (id, extra) => ({ id, kind: 'link', canReblog: true, ...extra });
         room.identity = { mode: 'hosted', handle: 'reader' };
         room.profile.columns.push({ width: 1, panels: [{ id: 'following', source: 'following', title: 'Following', config: {} }] });
         room.portals.push({ portalId: 'following', source: 'following', title: 'Following', provenance: { source: 'following', endpoint: 'shares from people you follow', fetchedAt: now, cached: false, ttlSeconds: 0 }, items: [
-          { id: 's_ana', title: hn.items[0].title, url: hn.items[0].url, summary: 'Read the comments.', meta: ['@ana', 'link'], publishedAt: now, share: { id: 's_ana', kind: 'link' } },
-          { id: 's_ben', title: 'A quiet blog post', url: 'https://example.com/quiet', summary: 'This one is lovely.', meta: ['@ben', 'link'], publishedAt: now, share: { id: 's_ben', kind: 'link' } },
+          { id: 's_ana', title: hn.items[0].title, url: hn.items[0].url, summary: 'Read the comments.', meta: ['@ana', 'link'], publishedAt: now, share: share('s_ana') },
+          { id: 's_ben', title: 'A post by cy', url: 'https://example.com/cy', summary: 'Ben agrees.', meta: ['@ben', 'reblogged @cy', 'link'], publishedAt: now, share: share('s_ben', { reblog: { root: 's_cy', by: 'cy', note: "Cy's own words." }, reblogs: 3 }) },
+          { id: 's_dee', title: 'A post by cy', url: 'https://example.com/cy', meta: ['@dee', 'reblogged @cy', 'link'], publishedAt: now, share: share('s_dee', { reblog: { root: 's_cy', by: 'cy', note: "Cy's own words." }, reblogs: 3 }) },
+          { id: 's_eve', title: 'Gone now', url: 'https://example.com/gone', summary: 'Still worth it.', meta: ['@eve', 'reblogged a removed post', 'link'], publishedAt: now, share: share('s_eve', { reblog: { root: 's_x', removed: 'removed' } }) },
+          { id: 's_fay', title: 'Just for fay', url: 'https://example.com/fay', meta: ['@fay', 'link'], publishedAt: now, share: share('s_fay', { canReblog: false }) },
         ] });
       }
       return new Response(JSON.stringify(json), { status: res.status, headers: { 'content-type': 'application/json' } });
@@ -381,29 +395,59 @@ test('browser: in the river, a follow\'s share joins the story it shares, notes 
   })();` });
   await profiles.put('default', validateProfile({ ...room(), layout: 'river' }));
   const hnTitle = (await tool('open_room', {})).portals.find((p: any) => p.portalId === 'hn-top').items[0].title;
-  /** The story with this title: its context line, note, from line, whether it has a summary, its meta. */
-  const read = (title: string) => page.eval<{ context: string | null; note: string | null; from: string; summary: boolean; meta: string } | null>(`(() => {
-    const node = [...document.querySelectorAll('.river-feed > article')].find((n) => n.querySelector('.item-title').textContent.endsWith(${JSON.stringify(title)}));
-    return node ? { context: node.querySelector('.story-context')?.textContent ?? null, note: node.querySelector('.story-note')?.textContent ?? null, from: node.querySelector('.item-from').textContent, summary: Boolean(node.querySelector('.item-summary')), meta: node.querySelector('.item-meta')?.textContent ?? '' } : null;
+  /** The story with this title. */
+  const find = (title: string) => `[...document.querySelectorAll('.river-feed > article')].find((n) => n.querySelector('.item-title').textContent.endsWith(${JSON.stringify(title)}))`;
+  const read = (title: string) => page.eval<{ context: string | null; trail: string[]; removed: string | null; from: string; reblog: { label: string; disabled: boolean } | null } | null>(`(() => {
+    const node = ${find(title)};
+    const b = node && node.querySelector('.mi.reblog');
+    return node ? { context: node.querySelector('.story-context')?.textContent ?? null, trail: [...node.querySelectorAll('.story-note')].map((n) => n.textContent), removed: node.querySelector('.story-removed')?.textContent ?? null,
+      from: node.querySelector('.item-from').textContent, reblog: b ? { label: b.getAttribute('aria-label'), disabled: b.disabled } : null } : null;
   })()`);
+  const menu = () => page.eval<string[]>(`[...document.querySelectorAll('.reblog-menu [role="menuitem"]')].map((n) => n.textContent)`);
   try {
     page.problems.length = 0;
     await page.goto(`${app.base}/preview`);
     await page.waitFor(`document.querySelector('#grid.river .river-feed article') && !document.querySelector('.skeleton')`, 'the river');
-    const joined = await read(hnTitle);
-    assert.equal(joined?.context, '@ana shared', "the share joins HN's story");
-    assert.equal(joined?.note, '@anaRead the comments.');
-    assert.doesNotMatch(joined?.from ?? '', /Following/, 'no "also on Following": the context line says it');
-    const own = await read('A quiet blog post');
-    assert.equal(own?.context, '@ben shared');
-    assert.equal(own?.note, '@benThis one is lovely.');
-    assert.equal(own?.summary, false, 'the note is not repeated as a summary');
-    assert.doesNotMatch(own?.meta ?? '', /link/);
-    // Sharing any story saves it first, then opens the composer.
-    await page.eval(`[...document.querySelectorAll('.river-feed > article')].find((n) => n.querySelector('.item-title').textContent === 'A quiet blog post').querySelector('[aria-label="Share to your space"]').click()`);
+    const shared = await read(hnTitle);
+    assert.equal(shared?.context, '@ana shared', "the share joins HN's story");
+    assert.deepEqual(shared?.trail, ['@anaRead the comments.']);
+    assert.doesNotMatch(shared?.from ?? '', /Following/);
+    const cy = await read('A post by cy');
+    assert.equal(cy?.context, '@ben and @dee reblogged @cy', 'two reblogs of one post are one card');
+    assert.deepEqual(cy?.trail, ["@cyCy's own words.", '@benBen agrees.'], "the original's note, then a reblog's: two voices");
+    assert.equal(cy?.reblog?.label, 'Reblog (3 reblogs)', 'the count pools on the original');
+    assert.equal((await read('Gone now'))?.removed, 'The original post was removed.');
+    assert.deepEqual((await read('Just for fay'))?.reblog, { label: "You can't reblog this post", disabled: true });
+
+    // The menu: Reblog and Reblog with a note, plus a nudge to read it first.
+    await page.eval(`${find('A post by cy')}.querySelector('.mi.reblog').click()`);
+    assert.deepEqual(await menu(), ['Reblog', 'Reblog with a note']);
+    assert.equal(await page.eval(`document.activeElement.textContent`), 'Reblog', 'focus moves into the menu');
+    await page.waitFor(`document.querySelector('.reblog-nudge')`, 'the read-it-first nudge');
+    assert.match(await page.eval<string>(`document.querySelector('.reblog-nudge').textContent`), /You haven't read this yet\. Read it first\?/);
+    await page.eval(`document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`);
+    assert.equal(await page.eval(`document.querySelector('.reblog-menu')`), null);
+    assert.equal(await page.eval(`document.activeElement.classList.contains('reblog')`), true, 'Escape returns focus to the button');
+    await page.eval(`${find('A post by cy')}.querySelector('.mi.reblog').click()`);
+    await page.eval(`[...document.querySelectorAll('.reblog-menu [role="menuitem"]')].find((n) => n.textContent === 'Reblog').click()`);
+    await page.waitFor(`${find('A post by cy')}.querySelector('.mi.reblog').classList.contains('on')`, 'the reblog to land');
+    assert.equal((await read('A post by cy'))?.reblog?.label, 'Undo reblog (4 reblogs)');
+    assert.deepEqual(await page.eval(`window.__calls.at(-1)`), { name: 'share', args: { reblogOf: 's_ben' } }, "it reblogs the post behind the story; the server finds cy's original");
+    assert.match(await page.eval<string>(`document.getElementById('toast').textContent`), /Sent through the portal!/);
+    await page.eval(`${find('A post by cy')}.querySelector('.mi.reblog').click()`);
+    assert.deepEqual(await menu(), ['Undo reblog']);
+    await page.eval(`document.querySelector('.reblog-menu [role="menuitem"]').click()`);
+    await page.waitFor(`!${find('A post by cy')}.querySelector('.mi.reblog').classList.contains('on')`, 'the undo');
+    assert.deepEqual(await page.eval(`window.__calls.at(-1)`), { name: 'unshare', args: { id: 's_mine' } });
+    assert.equal((await read('A post by cy'))?.reblog?.label, 'Reblog (3 reblogs)');
+
+    // A story no one has posted: reblogging with a note saves it first, then opens the composer.
+    const plain = await page.eval<string>(`[...document.querySelectorAll('.river-feed > article')].find((n) => n.dataset.story.startsWith('gh-mcp')).querySelector('.item-title').textContent`);
+    await page.eval(`[...document.querySelectorAll('.river-feed > article')].find((n) => n.dataset.story.startsWith('gh-mcp')).querySelector('.mi.reblog').click()`);
+    await page.eval(`[...document.querySelectorAll('.reblog-menu [role="menuitem"]')].find((n) => n.textContent === 'Reblog with a note').click()`);
     await page.waitFor(`!document.getElementById('reader').hidden && document.querySelector('#reader .composer')`, 'the composer');
-    assert.match(await page.eval<string>(`document.querySelector('#reader .composer').textContent`), /Share “A quiet blog post” to your space/);
-    assert.ok((await tool('open_room', {})).profile.saved.some((s: any) => s.url === 'https://example.com/quiet'), 'saved first');
+    assert.match(await page.eval<string>(`document.querySelector('#reader .composer').textContent`), new RegExp(`Reblog “${plain.replace(/^New/, '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}” to your space`));
+    assert.ok((await tool('open_room', {})).profile.saved.length > 1, 'saved first');
     assert.deepEqual(page.problems, []);
   } finally {
     await page.send('Page.removeScriptToEvaluateOnNewDocument', { identifier });

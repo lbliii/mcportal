@@ -1,6 +1,6 @@
 # Plan: reblogging
 
-Status: phases 1 and 2 built, 2026-10-02. Builds on the social layer (`src/social.ts`: shares,
+Status: phases 1–3 built, 2026-10-02. Builds on the social layer (`src/social.ts`: shares,
 follows, mute, block, report) and the river ([river.md](river.md), phases 1–3), and is
 the M2 social feature [local-hosted-hybrid.md](local-hosted-hybrid.md) opens to local
 installs. Research: [River and reblog design research](../../reports/River%20and%20reblog%20design%20research.md).
@@ -250,6 +250,30 @@ Space posts with counts, who reblogged, the settings and "Remove my post". Brows
 in the injected-social style of river phase 3, plus a hosted end-to-end test with two
 accounts (share, follow, reblog, undo, detach). Design preview: a reblog, a two-note
 trail, a tombstone and a reblogs-off post.
+
+Done. `room/reblog.js`: the button (`reblogButton`, a menu button whose name carries
+state and the pooled count; the moon shows through a `.on` state mark), its menu
+(Reblog / Reblog with a note / Undo reblog, arrow keys, Escape returns focus), the
+read-it-first nudge from `get_reading`, the stamp, and `reblogMarks` so every button for
+one post agrees after a change. A story a follow posted reblogs their post; a story no
+one posted is saved, then posted. The composer takes a verb, a quoted original and a
+done callback. The river's `storySocial` writes the context row ("@ben and @dee
+reblogged @cy", "Reblogged by …"), a two-note trail, and the removed line; the reblog
+button replaced phase 3's share button. Following rows in the other layouts get the
+button too. Share cards show a reblog's byline ("@curator reblogged @reader's note via
+@wanderer"), both notes, and on your own post its count, who reblogged it ("Remove my
+post from this reblog", asked twice) and "Who can reblog it". The Space grid marks
+reblogs. New: `reblogOff` icon, `--mp-action-reblogged` (#2E6B3A light, #7FCB8E dark),
+repaired for contrast against host colours like the other actions. Ghost mode shows no
+button; share cards (which only load signed in) do.
+
+Tests: a browser test in the injected-social style (credit lines, grouping, trail,
+removed, reblogs off, the menu, reblog and undo against an answered `share`/`unshare`,
+the nudge, and a plain story saving before the composer). The design preview has
+reblogs in its river and `reblog` and `mypost` share-card views; its 180 checks pass.
+Not done: the hosted end-to-end test with two real accounts; the reblog/undo calls in
+the browser test are answered in the page, and the server side is covered by the
+phase 1 and 2 tests.
 
 ### 4. Lab, then everyone
 

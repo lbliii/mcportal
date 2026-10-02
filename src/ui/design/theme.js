@@ -106,6 +106,7 @@ const MCPortalTheme = (() => {
     palette['border-divider'] = incoming['border-control'] || mix(foreground, canvas, .2);
     palette['action-primary'] = safe(house['action-primary'], palette['text-link']);
     palette['action-danger'] = safe(house['action-danger'], foreground);
+    palette['action-reblogged'] = safe(house['action-reblogged'], palette['text-link']);
     for (const role of ['primary', 'danger']) {
       const bg = palette[`action-${role}`], original = house[`action-on-${role}`];
       palette[`action-on-${role}`] = contrast(original, bg) >= 4.5 ? original

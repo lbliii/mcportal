@@ -176,6 +176,8 @@ function icons(): Record<string, Icon> {
     space: { d: `${arch(12, 20, 14, 16)}M8.75 20a3.25 3.25 0 0 1 6.5 0`, dot: [12, 12.25, 2.1] },
     ghost: { d: `M5 19.5V11a7 7 0 0 1 14 0v8.5${hem(14, 3)}zM9.75 10v1.75M14.25 10v1.75` },
     reblog: { d: doorLoop(12, 19.5, 13, 11.5, 2.5), dot: [12, 12.5, 1.8], state: true },
+    // Reblogs off: the same doorway, struck through.
+    reblogOff: { d: `${doorLoop(12, 19.5, 13, 11.5, 2.5)}M4 4l16 16` },
   };
 }
 
