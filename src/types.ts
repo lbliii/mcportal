@@ -33,6 +33,8 @@ export interface Item {
   clip?: { id: string; kind: ClipKind };
   /** Items of a following portal: open with get_share. */
   share?: { id: string; kind: 'link' | 'clip' };
+  /** Not yet seen by this user (src/seen.ts). */
+  new?: true;
 }
 
 /** "Show your work": where a block's data came from and how fresh it is. */
@@ -55,6 +57,8 @@ export interface PortalResult {
   errorCode?: ErrorCode;
   /** Pinned portals: where the items came from and how the agent fetches them again. */
   pin?: { from: string; recipe: string };
+  /** How many of its items are new to this user (portals that track it; src/seen.ts). */
+  newCount?: number;
 }
 
 /** A run of inline text: plain, a link (http(s), or "#anchor" within the page), code, or strong. */

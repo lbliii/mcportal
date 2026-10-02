@@ -47,7 +47,7 @@ export async function connect(url: string, options: { searchPath?: string } = {}
   return pool as unknown as Queryable;
 }
 
-const SCHEMA_VERSION = '5';
+const SCHEMA_VERSION = '6';
 
 export async function ensureSchema(db: Queryable): Promise<void> {
   await db.query(`CREATE TABLE IF NOT EXISTS mcportal_meta (key text PRIMARY KEY, value text NOT NULL)`);
@@ -108,6 +108,14 @@ export async function ensureSchema(db: Queryable): Promise<void> {
     created_at timestamptz NOT NULL,
     expires_at timestamptz NOT NULL,
     PRIMARY KEY (user_id, code)
+  )`);
+  // v6: what each account has seen in each portal (src/seen.ts).
+  await db.query(`CREATE TABLE IF NOT EXISTS mcportal_seen (
+    user_id text NOT NULL,
+    portal_id text NOT NULL,
+    ids text[] NOT NULL,
+    at timestamptz NOT NULL,
+    PRIMARY KEY (user_id, portal_id)
   )`);
   await db.query(
     `INSERT INTO mcportal_meta (key, value) VALUES ('schema_version', $1)

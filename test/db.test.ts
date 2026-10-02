@@ -145,7 +145,7 @@ test('pg clips: round-trip, search, tags, paging, isolation, limits; v1 upgrades
   await db.query(`UPDATE mcportal_meta SET value = '1' WHERE key = 'schema_version'`);
   await ensureSchema(db);
   const version = await db.query<{ value: string }>(`SELECT value FROM mcportal_meta WHERE key = 'schema_version'`);
-  assert.equal(version.rows[0]!.value, '5');
+  assert.equal(version.rows[0]!.value, '6');
 
   const t0 = new Date('2026-09-01T00:00:00Z');
   const a = buildClip({ kind: 'quote', text: 'Point-in-time recovery, 100% of the time', tags: ['infra'] }, t0);

@@ -59,6 +59,7 @@ export type ToolResults = {
   arrange_room: { profile: Profile; changes: ProfileDiff };
   remove_portal: { profile: Profile; changes: ProfileDiff };
   refresh_portal: { portal: PortalResult };
+  mark_seen: { marked: number };
   find_source: { candidates: Array<SourceSettings<FetchedSource> & Omit<SourceCandidate, 'source' | 'config'> & { preview: Item[] }>; hint?: string | undefined };
   add_portal: { profile: Profile; portal: PortalResult; portalId: string };
   import_opml: { profile: Profile; imported: number; failed: Array<{ url: string; title: string; error?: string | undefined }>; total: number };

@@ -58,6 +58,7 @@
   .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
   .portal-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .portal-count { color: var(--mp-text-secondary); font-size: var(--mp-type-12); }
+  .new-mark { display: inline-block; margin-right: var(--mp-space-6); padding: 0 var(--mp-space-4); border-radius: var(--mp-radius-xs); background: var(--mp-action-primary); color: var(--mp-action-on-primary); font-size: var(--mp-type-11); font-weight: var(--mp-weight-strong); line-height: 1.5; vertical-align: 0.1em; }
   .portal-head .tools { margin-left: auto; display: flex; gap: 1px; }
   .items { list-style: none; margin: 0; padding: 3px; flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
   .item { display: block; width: 100%; text-align: left; border: 0; background: none; padding: var(--mp-space-6) var(--mp-space-8); border-radius: var(--mp-radius-sm); cursor: pointer; }

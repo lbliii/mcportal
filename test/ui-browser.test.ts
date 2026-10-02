@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import { createFixtureFetcher } from '../src/lib/fixture-fetch.ts';
 import { defaultProfile, validateProfile } from '../src/profile.ts';
+import { FileSeenStore, seenHash } from '../src/seen.ts';
 import { MemoryProfileStore } from '../src/store.ts';
 import type { Fetcher } from '../src/types.ts';
 import { findChrome, Page } from './browser.ts';
@@ -67,11 +68,12 @@ function room() {
 }
 
 let app: Running;
+const seen = new FileSeenStore(null);
 let page: Page;
 
 before(async () => {
   if (skip) return;
-  app = await startApp({ allowUnauthenticated: true }, fetcher, { store: new MemoryProfileStore({ default: room() }) });
+  app = await startApp({ allowUnauthenticated: true }, fetcher, { store: new MemoryProfileStore({ default: room() }), seen });
   page = await Page.open(chrome!);
 });
 
@@ -163,6 +165,26 @@ test('browser: the reader records opening and position, resumes there, and marks
   assert.equal(read.status, 'read');
   assert.ok(read.readAt);
   assert.deepEqual((await tool('list_reading', {})).reading.map((r: any) => r.url), [], 'finished reading is not "in the middle of"');
+  assert.deepEqual(page.problems, []);
+});
+
+test('browser: new items are marked, and the ones on screen are recorded as seen', { skip }, async () => {
+  const ids: string[] = (await tool('open_room', {})).portals.find((p: any) => p.portalId === 'hn-top').items.map((i: any) => i.id);
+  // As if the first two arrived since the last visit.
+  await seen.deleteAll('default');
+  await seen.mark('default', [{ portalId: 'hn-top', itemIds: ids.slice(2) }]);
+  await openRoom();
+  assert.equal(await page.eval(`document.querySelectorAll('[data-portal="hn-top"] .new-mark').length`), 2);
+  assert.match(await page.eval<string>(`document.querySelector('[data-portal="hn-top"] .portal-count').textContent`), /· 2 new$/);
+  assert.equal(await page.eval(`document.querySelectorAll('[data-portal="gh-mcp"] .new-mark').length`), 0);
+  // On screen for a second, then sent in the next batch (every 10 seconds).
+  let set = new Set<string>();
+  for (let i = 0; i < 30 && !set.has(seenHash(ids[0]!)); i++) {
+    await new Promise((done) => setTimeout(done, 500));
+    set = (await seen.get('default', ['hn-top'])).get('hn-top') ?? new Set();
+  }
+  assert.ok(set.has(seenHash(ids[0]!)) && set.has(seenHash(ids[1]!)), 'both new items were recorded');
+  assert.equal(await page.eval(`document.querySelectorAll('[data-portal="hn-top"] .new-mark').length`), 2, 'the marks stay for this visit');
   assert.deepEqual(page.problems, []);
 });
 

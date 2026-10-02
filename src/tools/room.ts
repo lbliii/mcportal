@@ -1,11 +1,12 @@
 /**
- * The room tools: open_room, build_room, arrange_room, remove_portal, refresh_portal.
+ * The room tools: open_room, build_room, arrange_room, remove_portal, refresh_portal, mark_seen.
  * They show the room and change its layout (src/layout.ts arrange: only what a call
  * names can change); adding single portals lives in sources.ts.
  */
 import { clean } from '../lib/text.ts';
 import { arrange, spreadColumns, withLayout, type Arrangement } from '../layout.ts';
 import { MAX_PACKS, packSummaries, STARTER_PACKS } from '../packs.ts';
+import { SEEN_BATCH, tracksSeen, withNews } from '../seen.ts';
 import { describeDiff, describeLayout, diffProfiles, findPortal, normalizeSourceConfig, type PortalInput, type Profile, type ProfileDiff } from '../profile.ts';
 import { clipsPortal, clipsQuery, followingPortal, loadPortal, pinnedPortal, savedPortal } from '../sources.ts';
 import type { PortalResult } from '../types.ts';
@@ -40,10 +41,13 @@ function summarizePortals(profile: Profile, portals: PortalResult[], notice?: st
       lines.push(`\n[${portal.portalId}] could not load: ${clean(portal.error, 200)}`);
       continue;
     }
+    const fresh = portal.newCount ? `, ${portal.newCount} new` : '';
     if (portal.pin) {
-      lines.push(`\n[${portal.portalId}] ${portal.items.length} items pinned from ${portal.pin.from}, updated ${portal.provenance.fetchedAt}. To refresh: ${portal.pin.recipe}; then pin_portal with portalId ${portal.portalId}.`);
-    } else lines.push(`\n[${portal.portalId}] ${portal.items.length} items`);
-    lines.push(untrusted(portal.provenance.endpoint, [`portal title: ${portal.title}`, ...portal.items.slice(0, ROOM_ITEMS).map(itemLine)].join('\n')));
+      lines.push(`\n[${portal.portalId}] ${portal.items.length} items${fresh} pinned from ${portal.pin.from}, updated ${portal.provenance.fetchedAt}. To refresh: ${portal.pin.recipe}; then pin_portal with portalId ${portal.portalId}.`);
+    } else lines.push(`\n[${portal.portalId}] ${portal.items.length} items${fresh}`);
+    // New items first: they're what "what's new?" is asking about.
+    const first = [...portal.items.filter((i) => i.new), ...portal.items.filter((i) => !i.new)].slice(0, ROOM_ITEMS);
+    lines.push(untrusted(portal.provenance.endpoint, [`portal title: ${portal.title}`, ...first.map((i) => `${itemLine(i)}${i.new ? ' (new)' : ''}`)].join('\n')));
   }
   return lines.join('\n');
 }
@@ -90,7 +94,9 @@ export const ROOM_TOOLS: ToolDef[] = [
         ].join('\n');
         return ok(text, { profile, portals: [], onboarding: { packs, maxPacks: MAX_PACKS, rebuilding: profile.onboarded }, generatedAt: new Date().toISOString() } satisfies ToolResults['open_room']);
       }
-      const portals = await Promise.all(profile.columns.flatMap((c) => c.panels).map((p) => portalFor(p, profile, ctx)));
+      const specs = profile.columns.flatMap((c) => c.panels);
+      await ctx.seen?.keepOnly(ctx.userId, specs.map((p) => p.id));
+      const portals = await withNews(await Promise.all(specs.map((p) => portalFor(p, profile, ctx))), ctx.userId, ctx.seen);
       return ok(summarizePortals(profile, portals, notice), { profile, portals, notice, generatedAt: new Date().toISOString() } satisfies ToolResults['open_room']);
     },
   },
@@ -180,8 +186,43 @@ export const ROOM_TOOLS: ToolDef[] = [
       const profile = await ctx.store.get(ctx.userId);
       const spec = findPortal(profile, String(args.portalId ?? ''));
       if (!spec) return toolError(`No portal with id "${clean(args.portalId, 60)}"`, 'not_found');
-      const portal = await portalFor(spec, profile, ctx, true);
-      return ok(`${portal.portalId}: ${portal.items.length} items`, { portal } satisfies ToolResults['refresh_portal']);
+      const [portal] = await withNews([await portalFor(spec, profile, ctx, true)], ctx.userId, ctx.seen);
+      return ok(`${portal!.portalId}: ${portal!.items.length} items`, { portal: portal! } satisfies ToolResults['refresh_portal']);
+    },
+  },
+  {
+    name: 'mark_seen',
+    title: 'Mark items seen',
+    access: 'write',
+    description: "The room records the items the user has had on screen or opened, so the next open_room says what's new to them.",
+    inputSchema: {
+      type: 'object',
+      required: ['portals'],
+      additionalProperties: false,
+      properties: {
+        portals: {
+          type: 'array',
+          maxItems: SEEN_BATCH.portals,
+          items: {
+            type: 'object',
+            required: ['portalId', 'itemIds'],
+            additionalProperties: false,
+            properties: { portalId: { type: 'string' }, itemIds: { type: 'array', maxItems: SEEN_BATCH.items, items: { type: 'string', maxLength: 300 } } },
+          },
+        },
+      },
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+    _meta: { ui: { resourceUri: ROOM_URI, visibility: ['app'] } },
+    async handler(args, ctx) {
+      if (!ctx.seen) return toolError('Seen tracking is not available on this server.', 'unavailable');
+      const profile = await ctx.store.get(ctx.userId);
+      const tracked = new Set(profile.columns.flatMap((c) => c.panels).filter((p) => tracksSeen(p.source)).map((p) => p.id));
+      // Only portals in the room that track it; anything else is ignored, not refused.
+      const marks = (args.portals as Array<{ portalId: string; itemIds: string[] }>).filter((m) => tracked.has(m.portalId) && m.itemIds.length);
+      await ctx.seen.mark(ctx.userId, marks);
+      const marked = marks.reduce((n, m) => n + m.itemIds.length, 0);
+      return ok(`Marked ${marked} item(s) seen.`, { marked } satisfies ToolResults['mark_seen']);
     },
   },
 ];
