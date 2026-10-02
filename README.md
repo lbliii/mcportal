@@ -205,3 +205,4 @@ MCPortal is a **reading platform with light social**, driven by your agent. Anyt
 - Pictures in the reader view; clearer handling of paywalled articles
 - Link cards for sites without feeds (e.g. TikTok via oEmbed), shared rooms for groups
 - Postgres row-level security as a third access layer
+- Open source, a one-click Railway template for running your own, and maybe federation between instances someday ([plan](docs/plans/open-source.md))
