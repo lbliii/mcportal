@@ -10,7 +10,7 @@ import { randomInt } from 'node:crypto';
 import { readFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { AppError } from './lib/errors.ts';
-import { atomicWrite, defaultDataDir, KeyedMutex } from './lib/files.ts';
+import { atomicWrite, defaultDataDir, KeyedMutex, removeStale } from './lib/files.ts';
 import { sha256Hex } from './lib/ids.ts';
 import { clean } from './lib/text.ts';
 import { httpUrl } from './profile.ts';
@@ -49,6 +49,8 @@ export interface HandoffStore {
   list(userId: string): Promise<Handoff[]>;
   markOpened(userId: string, code: string): Promise<void>;
   deleteAll(userId: string): Promise<void>;
+  /** Retention: remove expired handoffs. Stores that keep them elsewhere (a linked MCPortal's) leave it out. */
+  purgeExpired?(): Promise<number>;
 }
 
 const invalid = (message: string) => new AppError('invalid_argument', message);
@@ -139,6 +141,12 @@ export class FileHandoffStore implements HandoffStore {
     });
   }
   deleteAll(userId: string) { return this.mutex.run(userId, () => rm(this.file(userId), { force: true })); }
+  /**
+   * A handoff expires HANDOFF_DAYS after it's created, and every write is a create or a
+   * mark on an existing one, so a file not written since then holds nothing live.
+   * (Expired handoffs in a file that's still in use go on its next write.)
+   */
+  purgeExpired() { return removeStale(path.join(this.dir, 'handoffs'), this.now().getTime() - HANDOFF_DAYS * 86_400_000); }
 }
 
 /** In memory, for tests. */
@@ -158,4 +166,13 @@ export class MemoryHandoffStore implements HandoffStore {
     this.byUser.set(userId, (this.byUser.get(userId) ?? []).map((h) => (h.code === normalizeCode(code) ? { ...h, openedAt: at } : h)));
   }
   async deleteAll(userId: string) { this.byUser.delete(userId); }
+  async purgeExpired() {
+    let n = 0;
+    for (const [user, list] of this.byUser) {
+      const live = list.filter(open(this.now()));
+      n += list.length - live.length;
+      if (live.length) this.byUser.set(user, live); else this.byUser.delete(user);
+    }
+    return n;
+  }
 }

@@ -80,16 +80,16 @@ An audit on 2026-10-02 found the foundations solid (sign-in tokens stored only a
 - [x] **"Keeps only your GitHub user ID and login":** make clear this is about GitHub data, not everything stored.
 
 **Deletion that leaves traces** (`deleteAccountData`, `src/account.ts`):
-- [ ] OAuth client records from linked computers keep the computer's hostname; delete the user's clients.
-- [ ] The audit log keeps `@login` after deletion; keep the event, drop the login.
-- [ ] Reports: drop the reason text of reports the user filed, and anonymize reports about them once resolved.
-- [ ] File mode: remove `.corrupt-*.json` backups and the emptied clips file.
-- [ ] An admin path to delete an account for someone who has lost access to GitHub (verified by hand, logged).
-- [ ] A test that creates every kind of data for an account, deletes it, and finds nothing left.
+- [x] App registrations only the user signed in with are deleted with the account (they can carry a computer's name); ones another account uses stay.
+- [x] The audit log keeps that things happened but not to whom: the account id (their GitHub id) and login become "deleted account", in entries and in invites they sent.
+- [x] Reports they filed lose their name, and once resolved their reason (an open one keeps it, since admins need it to act). Reports about them or their shares no longer name them, and open ones are resolved. Their handles stay held for 30 days, but no longer say whose.
+- [x] File mode: the room's unreadable copies (`.corrupt-*.json`) go with it, and a clips file is removed when it's empty.
+- [x] `mcportal admin delete <who> --confirm`, for someone who has lost GitHub access: the same deletion as the account page, recorded in the audit log under the admin who ran it. The support page and policy say to ask for it.
+- [x] `test/deletion.test.ts` creates every kind of data for an account (and a bystander), deletes it, and searches every file left for its id, login and computer name.
 
-**Retention: nothing grows forever:**
-- [ ] Purge expired highlights (editions) and handoffs on a schedule, not only when the same user writes again.
-- [ ] Set retention for resolved reports, pending invites, the audit log and unused OAuth clients, and state each one in the policy.
+**Retention: nothing grows forever** (`src/housekeeping.ts`, a minute after start and every 6 hours, on hosted and local servers):
+- [x] Expired highlights (editions) and handoffs are purged on schedule.
+- [x] Resolved reports go 180 days after they're resolved; pending invites lapse after 90 days; the audit log keeps a year at most (and the newest 2,000); app registrations nobody is signed in with go after 180 days unused (long, because apps like Claude sign in again with their registration when someone comes back). Each is stated in the privacy policy.
 
 **Smaller fixes:**
 - [ ] Tie the export download and upload links to the browser session that opens them; today anyone holding the link can use it for 15 minutes.

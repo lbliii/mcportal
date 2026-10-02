@@ -16,6 +16,13 @@ import { atomicWrite } from '../lib/files.ts';
 export const ACCESS_TTL_SECONDS = 3600;
 export const REFRESH_TTL_SECONDS = 30 * 24 * 3600;
 export const CLIENT_LIMITS = { clients: 500, redirectUris: 5, uriLength: 2048 };
+/**
+ * A registered client nobody holds tokens for is forgotten once it's gone unused this
+ * long, so a computer's name doesn't stay forever. Long, because apps such as Claude
+ * keep their registration and sign in with it again when someone comes back, and an
+ * unknown one fails until they reconnect. (A deleted account's clients go at once.)
+ */
+export const CLIENT_IDLE_SECONDS = 180 * 24 * 3600;
 
 export interface ClientRecord {
   client_id: string;
@@ -106,6 +113,9 @@ export class AuthStore {
       beforeWrite: (data) => {
         const now = this.now();
         for (const [hash, record] of Object.entries(data.tokens)) if (record.expiresAt <= now) delete data.tokens[hash];
+        const inUse = new Set(Object.values(data.tokens).map((t) => t.clientId));
+        const idleBefore = Math.floor(now / 1000) - CLIENT_IDLE_SECONDS;
+        for (const c of Object.values(data.clients)) if (!inUse.has(c.client_id) && c.last_used_at < idleBefore) delete data.clients[c.client_id];
         const clients = Object.values(data.clients);
         if (clients.length > CLIENT_LIMITS.clients) {
           clients.sort((a, b) => a.last_used_at - b.last_used_at);
@@ -176,11 +186,22 @@ export class AuthStore {
     return record;
   }
 
-  /** Revoke every token of a user (account deletion). Returns how many records went. */
+  /** Retention: expired tokens and unused clients go on every write; this is a write with no change. */
+  prune(): Promise<void> {
+    return this.write(() => undefined);
+  }
+
+  /**
+   * Revoke every token of a user (account deletion), and forget the clients only they
+   * used: a registration can carry a computer's name. Returns how many tokens went.
+   */
   revokeUser(userId: string): Promise<number> {
     return this.write((d) => {
       let n = 0;
-      for (const [hash, r] of Object.entries(d.tokens)) if (r.userId === userId) { delete d.tokens[hash]; n++; }
+      const theirs = new Set<string>();
+      for (const [hash, r] of Object.entries(d.tokens)) if (r.userId === userId) { theirs.add(r.clientId); delete d.tokens[hash]; n++; }
+      const stillUsed = new Set(Object.values(d.tokens).map((t) => t.clientId));
+      for (const id of theirs) if (!stillUsed.has(id)) delete d.clients[id];
       return n;
     });
   }

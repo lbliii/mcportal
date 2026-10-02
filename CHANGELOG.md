@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Deleting an account leaves nothing behind ([plan](docs/plans/directory-launch.md))
+- **Nothing names you after you delete your account:** the sign-in records of apps only you used (which can carry your computer's name) go with it, the audit log no longer says whose entries were yours, reports you made or that were about you stop naming you (open reports about you are closed), and your handles stay reserved for 30 days without saying whose. In file mode, unreadable copies of your room and an empty clips file go too. A test creates every kind of data, deletes the account, and searches what's left.
+- **Admins can delete an account for you** if you can't sign in any more: `mcportal admin delete <login> --confirm`, recorded in the audit log.
+- **Retention on a schedule:** expired highlights and handoffs, reports resolved more than 180 days ago, invites unused for 90 days, audit entries older than a year and app registrations unused for 180 days are removed every 6 hours, so the privacy policy's "how long" holds on a quiet server too. The policy now states each.
+- Under the hood, the server and the admin CLI open storage the same way (`src/storage.ts`).
+
 ## v0.6.0 — 2026-10-02
 
 MCPortal becomes one portal, local or hosted: run it on your computer in ghost mode or sign in to keep it in your account, with sharing, a Space and a handle. The room gains layouts led by your agent's picks, the tool surface is reworked for the long run (breaking; see "A tool surface for the long run" and "For hosts and agents"), and the service gets ready for directory review. 0.5.0 was never released on its own; its changes are here.

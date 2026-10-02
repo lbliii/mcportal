@@ -32,4 +32,5 @@ export class PgHandoffStore implements HandoffStore {
     await this.db.query(`UPDATE mcportal_handoffs SET data = data || jsonb_build_object('openedAt', $3::text) WHERE user_id = $1 AND code = $2`, [userId, normalizeCode(code), this.now().toISOString()]);
   }
   async deleteAll(userId: string) { await this.db.query('DELETE FROM mcportal_handoffs WHERE user_id = $1', [userId]); }
+  async purgeExpired() { return (await this.db.query('DELETE FROM mcportal_handoffs WHERE expires_at <= $1', [this.now().toISOString()])).rowCount ?? 0; }
 }

@@ -1,6 +1,6 @@
 /** Shares, follows, mutes, blocks and reports in their own tables. */
 import type { PageQuery, Relation, Report, Share, SocialStore } from '../social.ts';
-import { limitOf } from '../social-store.ts';
+import { DELETED_ID, DELETED_RESOLUTION, limitOf } from '../social-store.ts';
 import type { Queryable } from './schema.ts';
 
 const RELATION_TABLES: Record<Relation, string> = { follows: 'mcportal_follows', mutes: 'mcportal_mutes', blocks: 'mcportal_blocks' };
@@ -93,9 +93,21 @@ export class PgSocialStore implements SocialStore {
     return rows.length ? { ...rows[0]!.data, reporterId: rows[0]!.reporter_id } : undefined;
   }
 
-  async forget(accountId: string): Promise<void> {
+  async forget(accountId: string, at: string): Promise<void> {
+    const shares = (await this.db.query<{ id: string }>(`SELECT id FROM mcportal_shares WHERE account_id = $1`, [accountId])).rows.map((r) => r.id);
     await this.db.query(`DELETE FROM mcportal_shares WHERE account_id = $1`, [accountId]);
     for (const table of Object.values(RELATION_TABLES)) await this.db.query(`DELETE FROM ${table} WHERE a = $1 OR b = $1`, [accountId]);
-    await this.db.query(`UPDATE mcportal_reports SET reporter_id = 'deleted', data = data || '{"reporterId":"deleted"}'::jsonb WHERE reporter_id = $1`, [accountId]);
+    await this.db.query(
+      `UPDATE mcportal_reports SET reporter_id = $2, data = data || jsonb_build_object('reporterId', $2::text) || CASE WHEN status = 'resolved' THEN '{"reason":""}'::jsonb ELSE '{}'::jsonb END WHERE reporter_id = $1`,
+      [accountId, DELETED_ID]);
+    const about = `((data->>'targetKind' = 'profile' AND data->>'targetId' = $1) OR (data->>'targetKind' = 'share' AND data->>'targetId' = ANY($2::text[])))`;
+    await this.db.query(
+      `UPDATE mcportal_reports SET status = 'resolved', data = data || jsonb_build_object('status', 'resolved', 'resolvedAt', $3::text, 'resolvedBy', 'system', 'resolution', $4::text) WHERE status = 'open' AND ${about}`,
+      [accountId, shares, at, DELETED_RESOLUTION]);
+    await this.db.query(`UPDATE mcportal_reports SET data = data || jsonb_build_object('targetId', $3::text) WHERE ${about}`, [accountId, shares, DELETED_ID]);
+  }
+
+  async purgeReports(resolvedBefore: string): Promise<number> {
+    return (await this.db.query(`DELETE FROM mcportal_reports WHERE status = 'resolved' AND data->>'resolvedAt' < $1`, [resolvedBefore])).rowCount ?? 0;
   }
 }

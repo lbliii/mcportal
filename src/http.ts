@@ -38,6 +38,7 @@ import { FileSeenStore, type SeenStore } from './seen.ts';
 import type { ProfileStore } from './store.ts';
 import type { LocalSession } from './link/session.ts';
 import type { ToolContext } from './tools/kit.ts';
+import { retentionTasks, startHousekeeping } from './housekeeping.ts';
 import type { Fetcher } from './types.ts';
 
 export const MAX_BODY_BYTES = 1_000_000;
@@ -216,6 +217,8 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
   const social = oauth && publicProfiles ? deps.social : undefined;
   // The account page needs GitHub sign-in; without it, exports are written to the data directory.
   const account = oauth ? new AccountPage({ accounts, oauth, store: deps.store, reading, handoffs, seen, editions, clips, publicProfiles, social, publicUrl: config.publicUrl, log, now: deps.now }) : undefined;
+  // Retention on a schedule: what's kept only for a while goes even on a quiet server.
+  const stopHousekeeping = startHousekeeping(retentionTasks({ handoffs, editions, social, accounts, oauth }), log);
   const context = (userId: string, reqLog: Logger): ToolContext => ({
     log: reqLog,
     store: deps.store, reading, handoffs, seen, editions, clips, publicProfiles, social, fetcher: deps.fetcher, cache: deps.cache, userId, budget, metrics, actor: accounts.actor(userId),
@@ -403,6 +406,7 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
   server.on('clientError', (_error, socket) => {
     if (socket.writable) socket.end('HTTP/1.1 400 Bad Request\r\n\r\n');
   });
+  server.on('close', stopHousekeeping);
   server.requestTimeout = 300_000;   // room for an export upload on a slow connection; headersTimeout still guards slow-drip requests
   server.headersTimeout = 20_000;
   return server;

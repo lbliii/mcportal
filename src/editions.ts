@@ -8,7 +8,7 @@
  */
 import { readFile, rm } from 'node:fs/promises';
 import path from 'node:path';
-import { atomicWrite, defaultDataDir, KeyedMutex } from './lib/files.ts';
+import { atomicWrite, defaultDataDir, KeyedMutex, removeStale } from './lib/files.ts';
 import { sha256Hex } from './lib/ids.ts';
 
 export const EDITION_HOURS = 24;
@@ -27,6 +27,8 @@ export interface EditionStore {
   get(userId: string): Promise<Edition | undefined>;
   put(userId: string, edition: Edition): Promise<void>;
   deleteAll(userId: string): Promise<void>;
+  /** Retention: remove expired editions. Stores that keep them elsewhere (a linked MCPortal's) leave it out. */
+  purgeExpired?(): Promise<number>;
 }
 
 export function buildEdition(input: Pick<Edition, 'title' | 'intro' | 'picks'>, now = new Date()): Edition {
@@ -61,6 +63,8 @@ export class FileEditionStore implements EditionStore {
   }
   put(userId: string, edition: Edition) { return this.mutex.run(userId, () => atomicWrite(this.file(userId), JSON.stringify(edition))); }
   deleteAll(userId: string) { return this.mutex.run(userId, () => rm(this.file(userId), { force: true })); }
+  /** An edition expires EDITION_HOURS after it's written, so a file not written since then holds nothing live. */
+  purgeExpired() { return removeStale(path.join(this.dir, 'editions'), this.now().getTime() - EDITION_HOURS * 3_600_000); }
 }
 
 /** In memory, for tests. */
@@ -71,4 +75,9 @@ export class MemoryEditionStore implements EditionStore {
   async get(userId: string) { return live(this.byUser.get(userId), this.now()); }
   async put(userId: string, edition: Edition) { this.byUser.set(userId, edition); }
   async deleteAll(userId: string) { this.byUser.delete(userId); }
+  async purgeExpired() {
+    let n = 0;
+    for (const [user, edition] of this.byUser) if (!live(edition, this.now())) { this.byUser.delete(user); n++; }
+    return n;
+  }
 }

@@ -3,7 +3,7 @@
  * tests, one JSON file per user locally) that hold a user's clips as one document.
  * Postgres has its own in src/db/clips.ts. Re-exported from clips.ts.
  */
-import { readFile } from 'node:fs/promises';
+import { readFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { CLIP_LIMITS, ClipError, clampLimit, normalizeTags, patchClip, queryWords, searchTextOf, summaryOf, type Clip, type ClipPatch, type ClipQuery, type ClipSummary } from './clips.ts';
 import { atomicWrite, defaultDataDir, KeyedMutex, safeFileId } from './lib/files.ts';
@@ -144,7 +144,9 @@ export class FileClipStore extends DocumentClipStore {
     return Array.isArray(parsed.clips) ? (parsed.clips as Clip[]) : [];
   }
 
+  /** No clips, no file (deleting them all, or the account, leaves nothing behind). */
   protected async save(userId: string, clips: Clip[]): Promise<void> {
+    if (!clips.length) return rm(this.file(userId), { force: true });
     await atomicWrite(this.file(userId), `${JSON.stringify({ version: 1, clips })}\n`);
   }
 }

@@ -4,26 +4,25 @@
  *   node bin/mcportal.mjs            Streamable HTTP on $HOST:$PORT (default 127.0.0.1:8787) at /mcp
  *   node bin/mcportal.mjs --stdio    stdio transport (used by the local plugin)
  */
-import { constants } from 'node:fs';
-import { access, mkdir } from 'node:fs/promises';
 import { createInterface } from 'node:readline';
 import { Accounts, bootstrapFromEnv } from './accounts.ts';
-import { FileEditionStore, type EditionStore } from './editions.ts';
-import { FileHandoffStore, type HandoffStore } from './handoffs.ts';
-import { FileReadingStore, type ReadingStore } from './reading.ts';
-import { FileSeenStore, type SeenStore } from './seen.ts';
-import { FileClipStore, type ClipStore } from './clips.ts';
+import { FileEditionStore } from './editions.ts';
+import { FileHandoffStore } from './handoffs.ts';
+import { FileReadingStore } from './reading.ts';
+import { FileSeenStore } from './seen.ts';
+import { FileClipStore } from './clips.ts';
 import { deliverToFile } from './portability.ts';
 import { PublicProfiles } from './public-profiles.ts';
-import { DocumentSocialStore, Social, type SocialStore } from './social.ts';
-import { fileAuthPersistence, type AuthPersistence } from './auth/store.ts';
+import { Social } from './social.ts';
 import { createApp, configFromEnv, type AppConfig } from './http.ts';
 import { LocalSession } from './link/session.ts';
 import { TtlCache } from './lib/cache.ts';
 import { createFixtureFetcher } from './lib/fixture-fetch.ts';
 import { safeFetch } from './lib/safe-fetch.ts';
+import { retentionTasks, startHousekeeping } from './housekeeping.ts';
 import { handleMessage, RPC, rpcError, type JsonRpcResponse } from './mcp.ts';
-import { defaultDataDir, FileProfileStore, type ProfileStore } from './store.ts';
+import { openStorage } from './storage.ts';
+import { defaultDataDir, FileProfileStore } from './store.ts';
 import { errorStack } from './lib/errors.ts';
 import { loggerFromEnv, requestId } from './lib/log.ts';
 import type { ToolContext } from './tools/kit.ts';
@@ -78,24 +77,6 @@ function runStdio(contextFor: () => Promise<ToolContext>): void {
   log.info('stdio.ready', { data: defaultDataDir() });
 }
 
-/** The data directory exists (a fresh install creates it) and can be written. */
-async function writableDir(dir: string): Promise<void> {
-  await mkdir(dir, { recursive: true });
-  await access(dir, constants.W_OK);
-}
-
-/** Postgres when DATABASE_URL is set (hosted), otherwise files in the data directory. */
-async function openStorage(dataDir: string): Promise<{ store: ProfileStore; reading: ReadingStore; handoffs: HandoffStore; seen: SeenStore; editions: EditionStore; clips: ClipStore; authPersistence?: AuthPersistence; accountsPersistence: AuthPersistence; profilesPersistence: AuthPersistence; social: SocialStore; storage: 'files' | 'postgres'; checkStorage: () => Promise<void> }> {
-  const url = process.env.DATABASE_URL;
-  if (!url) return { store: new FileProfileStore(dataDir), reading: new FileReadingStore(dataDir), handoffs: new FileHandoffStore(dataDir), seen: new FileSeenStore(dataDir), editions: new FileEditionStore(dataDir), clips: new FileClipStore(dataDir), accountsPersistence: fileAuthPersistence(dataDir, 'accounts.json'), profilesPersistence: fileAuthPersistence(dataDir, 'public-profiles.json'), social: new DocumentSocialStore(fileAuthPersistence(dataDir, 'social.json')), storage: 'files', checkStorage: () => writableDir(dataDir) };
-  const { connect, ensureSchema, importFiles, PgClipStore, PgEditionStore, PgHandoffStore, PgReadingStore, PgSeenStore, PgProfileStore, PgSocialStore, pgAuthPersistence } = await import('./db.ts');
-  const db = await connect(url);
-  await ensureSchema(db);
-  const imported = await importFiles(db, dataDir);
-  if (!imported.skipped) log.info('storage.imported', { from: dataDir, profiles: imported.profiles, auth: imported.auth });
-  return { store: new PgProfileStore(db), reading: new PgReadingStore(db), handoffs: new PgHandoffStore(db), seen: new PgSeenStore(db), editions: new PgEditionStore(db), clips: new PgClipStore(db), authPersistence: pgAuthPersistence(db), accountsPersistence: pgAuthPersistence(db, 'accounts'), profilesPersistence: pgAuthPersistence(db, 'public-profiles'), social: new PgSocialStore(db), storage: 'postgres', checkStorage: async () => { await db.query('SELECT 1'); } };
-}
-
 export function main(argv = process.argv): void {
   void start(argv).catch((error) => {
     log.error('startup.failed', { error: errorStack(error) });
@@ -136,6 +117,8 @@ async function start(argv: string[]): Promise<void> {
       hostedUrl: process.env.MCPORTAL_HOSTED_URL || undefined,
       onLinked: stdioToolsChanged,
     });
+    // This computer's own handoffs and highlights expire too (a linked account's are the hosted server's to purge).
+    startHousekeeping(retentionTasks({ handoffs, editions }), log);
     runStdio(() => session.context());
     return;
   }
@@ -148,7 +131,7 @@ async function start(argv: string[]): Promise<void> {
     process.exitCode = 1;
     return;
   }
-  const { store, reading, handoffs, seen, editions, clips, authPersistence, accountsPersistence, profilesPersistence, social: socialStore, storage, checkStorage } = await openStorage(dataDir);
+  const { store, reading, handoffs, seen, editions, clips, authPersistence, accountsPersistence, profilesPersistence, social: socialStore, storage, checkStorage } = await openStorage(dataDir, log);
   const accounts = new Accounts(accountsPersistence, { ...bootstrapFromEnv(process.env) });
   await accounts.load();
   const suspended = (id: string) => accounts.actor(id).status !== 'active';

@@ -216,6 +216,11 @@ export class OAuthServer {
   }
 
   /** Sign a user out everywhere (account deletion). */
+  /** Retention: drop expired tokens and clients nobody has used in 180 days. */
+  pruneStored(): Promise<void> {
+    return this.store.prune();
+  }
+
   revokeUser(userId: string): Promise<number> {
     return this.store.revokeUser(userId);
   }
