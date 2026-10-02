@@ -7,7 +7,8 @@
  * code; not reaching the server at all is `upstream_unreachable`, with a message
  * meant for the user.
  */
-import { API_MAX_CALLS, API_PATH, CLIENT_HEADER } from '../api/calls.ts';
+import { API_EXPORT_PATH, API_IMPORT_PATH, API_MAX_CALLS, API_PATH, CLIENT_HEADER } from '../api/calls.ts';
+import type { ImportResult } from '../portability.ts';
 import { AppError, ERROR_CODES, type ErrorCode } from '../lib/errors.ts';
 import { SERVER_INFO } from '../mcp.ts';
 
@@ -38,13 +39,11 @@ const UNREACHABLE = "Can't reach your hosted MCPortal right now, so nothing was 
 export class StateClient {
   private queue: Pending[] = [];
   private scheduled = false;
-  private readonly url: string;
   private readonly fetch: typeof fetch;
   private readonly options: StateClientOptions;
 
   constructor(options: StateClientOptions) {
     this.options = options;
-    this.url = new URL(API_PATH, options.server).href;
     this.fetch = options.fetch ?? fetch;
   }
 
@@ -77,15 +76,38 @@ export class StateClient {
   }
 
   private async post(body: unknown): Promise<Result[]> {
+    const res = await this.request(API_PATH, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    const json = await res.json().catch(() => ({})) as { results?: Result[] };
+    if (!Array.isArray(json.results)) throw new AppError('upstream_error', 'Your hosted MCPortal gave an answer MCPortal can\'t read.');
+    return json.results;
+  }
+
+  /** A whole export from the hosted account, in any format. */
+  async download(format: string): Promise<{ body: Buffer; filename: string; summary: string }> {
+    const res = await this.request(`${API_EXPORT_PATH}?format=${encodeURIComponent(format)}`, { method: 'GET' }, 120_000);
+    const filename = /filename="([^"]+)"/.exec(res.headers.get('content-disposition') ?? '')?.[1] ?? `mcportal-export.${format === 'mcportal' ? 'json' : 'bin'}`;
+    return { body: Buffer.from(await res.arrayBuffer()), filename: filename.replace(/[^\w.-]/g, '_'), summary: clean(res.headers.get('x-mcportal-summary')) ?? 'your data' };
+  }
+
+  /** Add an MCPortal export to the hosted account, as the account page's import does. */
+  async upload(exportJson: string): Promise<{ result: ImportResult; summary: string }> {
+    const res = await this.request(API_IMPORT_PATH, { method: 'POST', headers: { 'content-type': 'application/json' }, body: exportJson }, 120_000);
+    return await res.json() as { result: ImportResult; summary: string };
+  }
+
+  /**
+   * One authenticated request: a refused token gets one refresh and a retry, and every
+   * failure becomes an AppError with a message for the user. Resolves only on 2xx.
+   */
+  private async request(pathAndQuery: string, init: RequestInit & { headers?: Record<string, string> }, timeoutMs = this.options.timeoutMs ?? 15_000): Promise<Response> {
     let token = await this.options.auth.token();
     for (let attempt = 0; ; attempt++) {
       let res: Response;
       try {
-        res = await this.fetch(this.url, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json', authorization: `Bearer ${token}`, [CLIENT_HEADER]: this.options.version ?? SERVER_INFO.version },
-          body: JSON.stringify(body),
-          signal: AbortSignal.timeout(this.options.timeoutMs ?? 15_000),
+        res = await this.fetch(new URL(pathAndQuery, this.options.server), {
+          ...init,
+          headers: { ...init.headers, authorization: `Bearer ${token}`, [CLIENT_HEADER]: this.options.version ?? SERVER_INFO.version },
+          signal: AbortSignal.timeout(timeoutMs),
         });
       } catch (error) {
         throw new AppError('upstream_unreachable', UNREACHABLE, { cause: error });
@@ -94,14 +116,13 @@ export class StateClient {
         const fresh = await this.options.auth.refresh(token);
         if (fresh) { token = fresh; continue; }
       }
-      const text = await res.text();
-      let json: { results?: Result[]; error_description?: string } = {};
-      try { json = JSON.parse(text) as typeof json; } catch { /* handled below */ }
+      if (res.ok) return res;
+      const json = await res.json().catch(() => ({})) as { error?: string; error_description?: string };
       if (res.status === 401) throw new AppError('unauthenticated', 'This computer is no longer signed in to your hosted MCPortal. Sign in again to keep using it.');
       if (res.status === 426) throw new AppError('unavailable', clean(json.error_description) ?? 'Update MCPortal to keep using your linked portal.');
       if (res.status === 429) throw new AppError('rate_limited', 'Your hosted MCPortal is busy; try again in a minute.');
-      if (!res.ok || !Array.isArray(json.results)) throw new AppError('upstream_error', `Your hosted MCPortal answered ${res.status}.`);
-      return json.results;
+      if (res.status === 400 && json.error && Object.hasOwn(ERROR_CODES, json.error)) throw new AppError(knownCode(json.error), clean(json.error_description) ?? 'Your hosted MCPortal refused that.');
+      throw new AppError('upstream_error', `Your hosted MCPortal answered ${res.status}.`);
     }
   }
 }

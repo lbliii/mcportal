@@ -21,7 +21,7 @@ import type { ToolContext } from '../src/tools/kit.ts';
 
 export const tokens = (text: string) => Math.ceil(text.length / 4);
 
-export const PROFILES = ['local', 'hosted-new', 'hosted-active'] as const;
+export const PROFILES = ['local', 'linked', 'hosted-new', 'hosted-active'] as const;
 export type Profile = (typeof PROFILES)[number];
 
 /** A tool as hosts pass it to a model. */
@@ -37,8 +37,11 @@ export interface Footprint {
 /** A caller in each profile: social stubs answer only the questions the tool list asks. */
 function contextFor(profile: Profile): ToolContext {
   const base: ToolContext = { store: new MemoryProfileStore(), fetcher: createFixtureFetcher(), cache: new TtlCache(), userId: 'footprint' };
-  if (profile === 'local') return base;
-  const active = profile === 'hosted-active';
+  // A local MCPortal (stdio) can sign in; once it has, it's social like a hosted one.
+  const link = (linked: boolean) => ({ linked, server: 'https://mcportal.example', start: async () => ({ url: '' }), unlink: async () => '' });
+  if (profile === 'local') return { ...base, link: link(false) };
+  const active = profile === 'hosted-active' || profile === 'linked';
+  if (profile === 'linked') return { ...base, link: link(true), publicProfiles: { get: async () => ({ handle: 'someone' }) } as never, social: { uses: async () => true } as never };
   return {
     ...base,
     publicProfiles: { get: async () => (active ? { handle: 'someone' } : undefined) } as never,

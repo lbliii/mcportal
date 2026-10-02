@@ -137,6 +137,10 @@
       "description": "Whether the user is signed in (as whom) or in ghost mode, and the account page, where they download everything or delete their account (only there, never a tool)."
     },
     {
+      "name": "link_account",
+      "description": "Sign this local MCPortal in to the user's hosted account, so their portal is the same everywhere and they can share."
+    },
+    {
       "name": "list_reading",
       "description": "What the user was reading: pages they opened and haven't finished, most recent first ('what was I in the middle of?')."
     }

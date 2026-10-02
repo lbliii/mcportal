@@ -35,6 +35,7 @@ declare global {
     btnRefresh: HTMLButtonElement;
     btnSources: HTMLButtonElement;
     btnWho: HTMLButtonElement;
+    whoMenu: HTMLDivElement;
     grid: HTMLElement;
     opmlFile: HTMLInputElement;
     reader: HTMLElement;

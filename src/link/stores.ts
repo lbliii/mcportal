@@ -134,6 +134,11 @@ export class RemoteProfileStore extends Linked implements ProfileStore {
     });
   }
 
+  /** A one-time notice for the next open_room (e.g. what signing in added). */
+  addNotice(text: string): void {
+    this.notice = this.notice ? `${this.notice}\n${text}` : text;
+  }
+
   takeNotice(userId: string): string | undefined {
     this.mine(userId);
     const notice = this.notice;

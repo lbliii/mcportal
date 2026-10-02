@@ -28,7 +28,10 @@
   <button class="ib room-only" id="btnSources" data-icon="sources" aria-pressed="false" title="Show where each portal's data came from" aria-label="Show sources"></button>
   <button class="ib room-only" id="btnRefresh" data-icon="refresh" title="Refresh all portals" aria-label="Refresh all portals"></button>
   <button class="ib" id="btnExpand" data-icon="expand" title="Fullscreen: step all the way through" aria-label="Fullscreen"></button>
-  <button class="who room-only" id="btnWho" hidden></button>
+  <div class="who-wrap room-only">
+    <button class="who" id="btnWho" aria-haspopup="dialog" aria-controls="whoMenu" hidden></button>
+    <div class="who-menu" id="whoMenu" role="dialog" aria-label="Your account" hidden></div>
+  </div>
 </header>
 <section id="addSheet" class="add-sheet room-only" hidden>
   <form class="add-row" id="addForm">
