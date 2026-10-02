@@ -17,7 +17,7 @@
 | Account | Signed in to the hosted service | Private. A stable internal ID; syncs the portal; invisible to other users |
 | Public profile | The user opts in (to share or be followed) | A claimed handle (e.g. `@lbliii`, suggested from the GitHub login), display name, optional bio and avatar |
 
-**Accounts vs. sign-in methods.** `accounts` holds MCPortal's ID, status and role. `identities` maps a provider identity (for now `github:<numeric id>`) to an account. Today's IDs (`github-<id>`) stay valid as account IDs, so no data moves; new accounts get the same form while GitHub is the only provider. A second provider (Google, email link, passkeys) would just be another `identities` row on the same account.
+**Accounts vs. sign-in methods.** `accounts` holds MCPortal's ID, status and role. `identities` maps a provider identity (`github:<numeric id>`) to an account. Today's IDs (`github-<id>`) stay valid as account IDs, so no data moves; new accounts get the same form. GitHub is the only sign-in method, permanently (decided 2026-10-02); the table keeps identities separate from accounts all the same.
 
 **Handles:**
 - 2–30 characters, `a-z 0-9 _`, unique and case-insensitive

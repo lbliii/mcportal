@@ -1,6 +1,6 @@
 {
   "name": "mcportal",
-  "version": "0.5.0",
+  "version": "0.6.1",
   "description": "Your personal, agent-composed reading room: portals onto Hacker News, GitHub and any RSS feed, arranged the way you ask, with reader view and no ads.",
   "author": {
     "name": "Lawrence Lane"

@@ -98,12 +98,19 @@ function sendFile(res: ServerResponse, file: ExportFile): void {
   res.end(file.body);
 }
 
+/** What deleting an account needs: every store, and something that can revoke its sign-ins. */
+export type DeletionDeps = Pick<AccountDeps, 'accounts' | 'store' | 'reading' | 'handoffs' | 'seen' | 'editions' | 'clips' | 'publicProfiles' | 'social'> & {
+  oauth: { revokeUser(userId: string): Promise<number> };
+};
+
 /**
- * Delete an account and everything it owns: room, saved items, reading, handoffs, what they've seen, their edition, clips, public
- * profile (its handle stays held for 30 days), shares, follows, mutes and blocks
- * (reports they filed stay, anonymized), sign-in tokens, and the account.
+ * Delete an account and everything it owns: room, saved items, reading, handoffs, what
+ * they've seen, their edition, clips, public profile, shares, follows, mutes and blocks,
+ * sign-ins and the apps only they used, and the account. What outlasts it names nobody:
+ * reports (anonymized; see SocialStore.forget), audit entries, and their handles, held
+ * for 30 days so nobody can pose as them. `by` is who asked (them, or an admin).
  */
-export async function deleteAccountData(accountId: string, deps: Pick<AccountDeps, 'accounts' | 'oauth' | 'store' | 'reading' | 'handoffs' | 'seen' | 'editions' | 'clips' | 'publicProfiles' | 'social'>, by = accountId): Promise<{ clips: number; tokens: number }> {
+export async function deleteAccountData(accountId: string, deps: DeletionDeps, by = accountId): Promise<{ clips: number; tokens: number }> {
   await deps.store.delete(accountId);
   await deps.reading?.deleteAll(accountId);
   await deps.handoffs?.deleteAll(accountId);
@@ -111,7 +118,7 @@ export async function deleteAccountData(accountId: string, deps: Pick<AccountDep
   await deps.editions?.deleteAll(accountId);
   const clips = deps.clips ? await deps.clips.deleteAll(accountId) : 0;
   await deps.social?.forget(accountId);
-  await deps.publicProfiles?.remove(accountId);
+  await deps.publicProfiles?.forget(accountId);
   const tokens = await deps.oauth.revokeUser(accountId);
   await deps.accounts.deleteAccount(accountId, by);
   return { clips, tokens };

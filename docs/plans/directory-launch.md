@@ -25,7 +25,7 @@ Get MCPortal listed in Claude's directory first and OpenAI's (ChatGPT and Codex)
 | # | Decision | Options | Leaning |
 |---|---|---|---|
 | D1 | Who can sign up | **Decided:** open to anyone with a GitHub account. Invites stay, as a way to bring friends in, not a gate. | — |
-| D2 | Code license | MIT, Apache-2.0, source-available (e.g. FSL), proprietary with a public repo | Undecided. The plugin listing needs a public repo, but not necessarily an open-source license. |
+| D2 | Code license | MIT, Apache-2.0, source-available (e.g. FSL), proprietary with a public repo | Undecided, leaning AGPL-3.0 ([open-source.md](open-source.md)). The plugin listing needs a public repo, but not necessarily an open-source license. |
 | D3 | How reviewers sign in | A reviewer-only sign-in on our authorization server; a dedicated GitHub account we hand over | Reviewer-only sign-in, used for both directories. A shared GitHub account breaks GitHub's terms (one login per person, and a review team is several people), and GitHub can ask for an emailed device code, which OpenAI rejects. Reviewer accounts aren't users, so the GitHub-only rule for users stands. |
 | D4 | Paid tier shape | Free plus ~$5/mo "Patron" with higher limits and more storage; free only at launch | Launch free. Add billing after the Claude listing is stable (Phase 8). |
 | D5 | Domain | Keep `*.up.railway.app`, or a custom domain | A custom domain before submitting. The listing, OAuth metadata, OpenAI domain verification and the MCP Apps `_meta.ui.domain` all tie to it, and moving later means a new OpenAI submission. |
@@ -80,16 +80,16 @@ An audit on 2026-10-02 found the foundations solid (sign-in tokens stored only a
 - [x] **"Keeps only your GitHub user ID and login":** make clear this is about GitHub data, not everything stored.
 
 **Deletion that leaves traces** (`deleteAccountData`, `src/account.ts`):
-- [ ] OAuth client records from linked computers keep the computer's hostname; delete the user's clients.
-- [ ] The audit log keeps `@login` after deletion; keep the event, drop the login.
-- [ ] Reports: drop the reason text of reports the user filed, and anonymize reports about them once resolved.
-- [ ] File mode: remove `.corrupt-*.json` backups and the emptied clips file.
-- [ ] An admin path to delete an account for someone who has lost access to GitHub (verified by hand, logged).
-- [ ] A test that creates every kind of data for an account, deletes it, and finds nothing left.
+- [x] App registrations only the user signed in with are deleted with the account (they can carry a computer's name); ones another account uses stay.
+- [x] The audit log keeps that things happened but not to whom: the account id (their GitHub id) and login become "deleted account", in entries and in invites they sent.
+- [x] Reports they filed lose their name, and once resolved their reason (an open one keeps it, since admins need it to act). Reports about them or their shares no longer name them, and open ones are resolved. Their handles stay held for 30 days, but no longer say whose.
+- [x] File mode: the room's unreadable copies (`.corrupt-*.json`) go with it, and a clips file is removed when it's empty.
+- [x] `mcportal admin delete <who> --confirm`, for someone who has lost GitHub access: the same deletion as the account page, recorded in the audit log under the admin who ran it. The support page and policy say to ask for it.
+- [x] `test/deletion.test.ts` creates every kind of data for an account (and a bystander), deletes it, and searches every file left for its id, login and computer name.
 
-**Retention: nothing grows forever:**
-- [ ] Purge expired highlights (editions) and handoffs on a schedule, not only when the same user writes again.
-- [ ] Set retention for resolved reports, pending invites, the audit log and unused OAuth clients, and state each one in the policy.
+**Retention: nothing grows forever** (`src/housekeeping.ts`, a minute after start and every 6 hours, on hosted and local servers):
+- [x] Expired highlights (editions) and handoffs are purged on schedule.
+- [x] Resolved reports go 180 days after they're resolved; pending invites lapse after 90 days; the audit log keeps a year at most (and the newest 2,000); app registrations nobody is signed in with go after 180 days unused (long, because apps like Claude sign in again with their registration when someone comes back). Each is stated in the privacy policy.
 
 **Smaller fixes:**
 - [ ] Tie the export download and upload links to the browser session that opens them; today anyone holding the link can use it for 15 minutes.
@@ -138,13 +138,14 @@ An audit on 2026-10-02 found the foundations solid (sign-in tokens stored only a
 
 ## Phase 5: release discipline
 
-- [ ] **Release script:** one command bumps the version everywhere it lives (`package.json`, `.claude-plugin/plugin.json`, `manifest.json`, `server.json`, `SERVER_INFO`), moves "Unreleased" in the CHANGELOG under a version, tags, and pushes. Plugin users only get updates when the version changes.
+- [x] **Release script** (`scripts/release.ts`, `npm run release`): `prepare` sets the version everywhere it's stated (package.json and its lockfile, the plugin, `SERVER_INFO`, then the generated `server.json` and `manifest.json`), moves "Unreleased" under it, runs the checks and opens a release PR; `publish`, after the merge, tags it and creates the GitHub release. Steps in CONTRIBUTING.md. Plugin users only get updates when the version changes.
 - [ ] **Catch up:** cut v0.5.0 (or v0.6.0) with the current "Unreleased" changelog, and update the README's "latest" line.
-- [ ] **Compatibility policy**, written down:
+- [x] **Compatibility policy**, written down (CONTRIBUTING.md, "Versions and the tool interface"):
   - `MIN_CLIENT_VERSION` only rises with a release note
   - a tool rename keeps the old name for one release, as a hidden alias that says it's moving
   - Claude listing name changes go through a listing edit
-- [ ] **README:** how to turn on auto-update for the plugin marketplace (it's off by default for third-party marketplaces).
+  - [ ] Build the alias mechanism before the first rename after listing (none is planned yet).
+- [x] **README:** how to turn on auto-update for the plugin marketplace (it's off by default for third-party marketplaces).
 
 ## Phase 6: certify the hosts
 

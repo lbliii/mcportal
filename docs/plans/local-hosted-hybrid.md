@@ -1,6 +1,6 @@
 # Plan: one portal, run locally or hosted
 
-**Status:** revised 2026-10-02 (replaces the 2026-09-30 proposal, which predated Postgres, the 0.5 tool names, clips and the social layer). Phases 1–6 built 2026-10-02 (modes in the open, contracts, hosted state API, remote stores, signing in and out, offline and polish); phase 7 (ship) next. **Milestone:** finishes M1.5 ("come back tomorrow on any device") and opens M2's social layer, reblogging first, to people who run MCPortal locally.
+**Status:** revised 2026-10-02 (replaces the 2026-09-30 proposal, which predated Postgres, the 0.5 tool names, clips and the social layer). Phases 1–6 built 2026-10-02 (modes in the open, contracts, hosted state API, remote stores, signing in and out, offline and polish); phase 7 (ship) docs and copy done 2026-10-02 (welcome-screen sign-in, privacy page, support, CONTRIBUTING); the author's Mac is linked; what remains is deploying them and checking the Mac and the hosted connector show the same portal. **Milestone:** finishes M1.5 ("come back tomorrow on any device") and opens M2's social layer, reblogging first, to people who run MCPortal locally.
 
 ## The problem
 

@@ -6,7 +6,8 @@
 
 - **v0.1 (M1):** plugin daily driver: MCP server, workspace app, `/portal`, Railway config.
 - **v0.2 (toward M1.5):** hardened after an adversarial review, plus **OAuth 2.1 with GitHub sign-in and per-user profiles**, so a hosted deployment can be added to Claude as a custom connector.
-- **v0.3 (M1.5, invite-only beta):** a chat-native workspace (columns lane, picture shelves, reader cards), **add anything** (MCPortal finds the feed), **thumbnails**, **starter packs** and **OPML import**, **saved items**, and a hosted service with **Postgres**, **usage limits**, **accounts, invites and an admin page**. See [CHANGELOG.md](CHANGELOG.md).
+- **v0.3 (M1.5, invite-only beta):** a chat-native workspace (columns lane, picture shelves, reader cards), **add anything** (MCPortal finds the feed), **thumbnails**, **starter packs** and **OPML import**, **saved items**, and a hosted service with **Postgres**, **usage limits**, **accounts, invites and an admin page**.
+- **v0.6:** **one portal, local or hosted** (ghost mode, or sign in to sync across devices), **sharing, Spaces and handles**, **room layouts** led by your agent's picks, a **tool surface reworked for the long run**, and readiness for directory review. See [CHANGELOG.md](CHANGELOG.md).
 
 ```
 you: /portal put GitHub on the left and add Simon Willison's blog
@@ -62,9 +63,11 @@ To develop against Claude desktop (the room renders inline in chat, no deploymen
 
 **Cowork:** add `~/Developer/mcportal` as a plugin marketplace from Cowork's plugin settings and install `mcportal`.
 
+**Updates:** a plugin marketplace you add yourself doesn't update automatically. Turn it on in `/plugin` → **Marketplaces** → `mcportal` → **Enable auto-update**, or update by hand with `claude plugin update mcportal@mcportal`. New releases arrive in your next session.
+
 Then `/portal`, or ask "open my room" ("open my portal" works too). Your profile is stored in `~/.mcportal/default.json`.
 
-**Ghost mode, or signed in.** A local MCPortal starts in ghost mode: no account, everything in `~/.mcportal`, nothing shared. To keep the same portal on every device and to share and follow, say "sign in to MCPortal" or click **Ghost mode → Sign in** in the room. You sign in with GitHub in your browser; this computer's portal is added to your hosted account (nothing is removed), and from then on MCPortal still runs and fetches on this computer while your room, clips and shares live in the account. **Sign out** copies the portal back to this computer first. `MCPORTAL_HOSTED_URL` picks the hosted MCPortal (default: the public one). See [the plan](docs/plans/local-hosted-hybrid.md) for how it works.
+**Ghost mode, or signed in.** A local MCPortal starts in ghost mode: no account, everything in `~/.mcportal`, nothing shared. To keep the same portal on every device and to share and follow, say "sign in to MCPortal", click **Ghost mode → Sign in** in the room, or **Already have a portal?** on the welcome screen. You sign in with GitHub in your browser; this computer's portal is added to your hosted account (nothing is removed), and from then on MCPortal still runs and fetches on this computer while your room, clips and shares live in the account. **Sign out** copies the portal back to this computer first. This is also the way in when your organization blocks custom connectors: install locally, then sign in. `MCPORTAL_HOSTED_URL` picks the hosted MCPortal (default: the public one). See [the plan](docs/plans/local-hosted-hybrid.md) for how it works.
 
 **Codex** (stdio), in `~/.codex/config.toml`:
 
@@ -197,9 +200,10 @@ MCPortal is a **reading platform with light social**, driven by your agent. Anyt
 - **React** with one lightweight signal, so Following can surface what people liked
 
 **Later**
-- Standing intents: scheduled checks and digests ("tell me when anthropics/* ships a release")
+- Standing intents: scheduled checks and digests ("tell me when anthropics/* ships a release"); first, watches for artists with concerts near you ([plan](docs/plans/watches.md))
+- MCP 2026-07-28: serve the stateless protocol alongside today's, still without dependencies ([plan](docs/plans/mcp-2026-07-28.md))
 - Built-in views of your own reading (what you read and save, by topic and source)
 - Pictures in the reader view; clearer handling of paywalled articles
-- More sign-in options (Google, email link, passkeys) as extra identities on the same account
 - Link cards for sites without feeds (e.g. TikTok via oEmbed), shared rooms for groups
 - Postgres row-level security as a third access layer
+- Open source, a one-click Railway template for running your own, and maybe federation between instances someday ([plan](docs/plans/open-source.md))

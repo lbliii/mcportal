@@ -66,11 +66,35 @@ Install the repo as a local plugin, which includes the `/portal` command and ski
 - **The room UI** (`src/ui/room.html`, `src/ui/room/*.js`, `src/ui/admin.html`) is plain JavaScript checked as strictly as the server: `npm run typecheck` runs `scripts/check-ui.ts`, which type-checks the assembled page with JSDoc types and points errors at the fragment files. Type every function with JSDoc; use `$('id')` (typed per id in `src/ui/ui.d.ts`; add new ids there), `$$`/`$first` for selectors, and `errorText(error)` in catch blocks. A JSDoc cast needs a comment saying why it holds.
 - **What tools return to the UI** is one contract, `src/tools/results.ts`: handlers check their `structuredContent` with `satisfies ToolResults['tool']`, and the UI's `callTool()` is typed by it. A tool the UI starts calling gets an entry there.
 - **Browser tests** (`test/ui-browser.test.ts`) drive the real room in headless Chrome against fixture data and fail on any page error. They skip without Chrome (`CHROME_PATH` points at one). A new view or flow gets a test there.
+- **Linked mode** (`src/link/`): a local MCPortal signed in to a hosted one runs the same tools against remote stores that call the hosted state API (`/api/v1/call`, `src/api/`). A store method the tools start using needs a state API method and a remote version; `test/linked.test.ts` runs the real tools against an in-process hosted app, and `test/link-signin.test.ts` covers signing in and out with a fake GitHub. To try signing in by hand, use a scratch `MCPORTAL_DATA_DIR` so your own `~/.mcportal/link.json` isn't touched, and `MCPORTAL_HOSTED_URL` for a hosted MCPortal other than the public one.
 - **Layout changes** go through `src/layout.ts` (`withLayout`, `addPortalTo`, `ensurePortal`), which never move or drop the user's other portals or saved items.
 
 ## Versions and the tool interface
 
-Hosts cache tool lists and agents learn tool names, so the tool interface (names, arguments, results in `src/tools/results.ts`) is versioned with the package: a change that breaks it (a renamed or removed tool or argument, a stricter schema, a different result shape) raises the minor version while we're below 1.0 and gets a line under "For hosts and agents" in the changelog. `package.json` holds the version; `npm test` checks that `src/mcp.ts`, the plugin, `server.json` and `manifest.json` agree, and `node scripts/distribution.ts` regenerates the last two.
+Hosts cache tool lists and agents learn tool names, so the tool interface (names, arguments, results in `src/tools/results.ts`) is versioned with the package: a change that breaks it (a renamed or removed tool or argument, a stricter schema, a different result shape) raises the minor version while we're below 1.0 and gets a line under "For hosts and agents" in the changelog. `package.json` holds the version; `npm test` checks that the lockfile, `src/mcp.ts`, the plugin, `server.json` and `manifest.json` agree, and `node scripts/distribution.ts` regenerates the last two. Don't change the version by hand: the release script does it.
+
+Once MCPortal is listed in a directory, tool names are a public contract:
+- **A renamed tool keeps its old name for one release,** as an alias that isn't listed and says where the tool moved. A removed tool says what replaces it for one release.
+- **`MIN_CLIENT_VERSION`** (`src/api/calls.ts`, the oldest local MCPortal the hosted state API accepts) only rises in a release whose notes say so, never in passing.
+- **Renaming a listed tool or the connector** also needs an edit to the directory listing, which is reviewed again.
+
+## Cutting a release
+
+Plugin users only get a release when the version changes, so changes reach them in releases, not merges. From an up-to-date `main` with nothing uncommitted:
+
+```bash
+npm run release -- prepare minor
+```
+
+`prepare` takes a version (`0.6.0`) or `patch`, `minor` or `major`. It sets the version everywhere it's stated, moves the changelog's "Unreleased" section under it, runs `npm run check`, and opens a `release/v<version>` PR whose description is the release notes. Add `--dry-run` to see the version and notes without changing anything.
+
+After the release PR is merged, from the merged `main`:
+
+```bash
+npm run release -- publish
+```
+
+That tags the merge commit `v<version>` and creates the GitHub release with that version's notes. Then deploy the hosted service from the same commit; `/health` reports the new version.
 
 ## Before opening a PR
 

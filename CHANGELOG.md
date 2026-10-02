@@ -2,6 +2,39 @@
 
 ## Unreleased
 
+## v0.6.1 — 2026-10-02
+
+### Deleting an account leaves nothing behind ([plan](docs/plans/directory-launch.md))
+- **Nothing names you after you delete your account:** the sign-in records of apps only you used (which can carry your computer's name) go with it, the audit log no longer says whose entries were yours, reports you made or that were about you stop naming you (open reports about you are closed), and your handles stay reserved for 30 days without saying whose. In file mode, unreadable copies of your room and an empty clips file go too. A test creates every kind of data, deletes the account, and searches what's left.
+- **Admins can delete an account for you** if you can't sign in any more: `mcportal admin delete <login> --confirm`, recorded in the audit log.
+- **Retention on a schedule:** expired highlights and handoffs, reports resolved more than 180 days ago, invites unused for 90 days, audit entries older than a year and app registrations unused for 180 days are removed every 6 hours, so the privacy policy's "how long" holds on a quiet server too. The policy now states each.
+- Under the hood, the server and the admin CLI open storage the same way (`src/storage.ts`).
+
+### Shipping device linking ([plan](docs/plans/local-hosted-hybrid.md))
+- **Sign in from the welcome screen:** a local MCPortal's first-run screen offers **Already have a portal? Sign in to bring it here**, which starts the same sign-in as the account chip.
+- **Privacy policy:** a section on MCPortal on your own computer: ghost mode sends nothing to the service; signed in, your room is stored by the service while feeds are still fetched from your computer, tokens stay in a file only you can read, and you can revoke a computer from the account page.
+- **Support and README:** organizations that block custom connectors can install MCPortal locally and sign in.
+- **CONTRIBUTING:** how linked mode fits together and how to try signing in without touching your own link.
+
+## v0.6.0 — 2026-10-02
+
+MCPortal becomes one portal, local or hosted: run it on your computer in ghost mode or sign in to keep it in your account, with sharing, a Space and a handle. The room gains layouts led by your agent's picks, the tool surface is reworked for the long run (breaking; see "A tool surface for the long run" and "For hosts and agents"), and the service gets ready for directory review. 0.5.0 was never released on its own; its changes are here.
+
+### Releases
+- **One command per release step:** `npm run release -- prepare <x.y.z | patch | minor | major>` sets the version everywhere it's stated (package.json and its lockfile, the plugin, `SERVER_INFO`, then the generated `server.json` and `manifest.json`), moves "Unreleased" under it, runs `npm run check` and opens a release PR. After the merge, `npm run release -- publish` tags it and creates the GitHub release from that version's notes. `--dry-run` previews either step. See CONTRIBUTING.md.
+
+### Ready for directory review ([plan](docs/plans/directory-launch.md))
+- **Every tool states what it does:** `readOnlyHint`, `destructiveHint` and `openWorldHint` are set on every tool, and a test keeps them consistent with what each tool does. Open-world means a tool reaches the web or makes something visible to other people (`share`, `relationship`, `set_public_profile`). `build_room` is now marked destructive (it replaces the layout), and `export_data` is no longer read-only (it writes a file, or makes a download link).
+- **The room's content-security policy** (no external origins) is on the `resources/list` entry as well as `resources/read`, so hosts can review it when they connect.
+- **Logs can't name you:** the user reference in logs is a keyed hash whose key is made at startup, so it can't be traced back to an account (an unkeyed hash of a GitHub id could be).
+- **The privacy policy matches what's stored:** it now lists reading history, seen marks, highlights, pages sent to a new chat, device names in app registrations and the account-page cookie; it no longer promises backups that aren't set up; it says what outlasts deleting your account; and it names WordPress.com's image service.
+
+### Signing in from the room
+- **The room follows your sign-in:** after **Sign in to sync and share**, the open room notices when you finish in the browser and redraws as signed in. It also re-checks who it belongs to when it comes back into view, so signing in or out through your agent shows up too.
+- **Claim a handle in the room:** the account menu's **Claim a handle** opens a form (suggested from your GitHub login) and opens your new space when it's done. Before, it only showed an error.
+- **Fix:** the account menu no longer closes itself when one of its buttons changes it, which hid the sign-in follow-up and the sign-out confirmation.
+- **For hosts and agents:** a local MCPortal sends `notifications/tools/list_changed` after signing in or out and after claiming a handle, so the agent sees the sharing tools without restarting.
+
 ### Fix: forms in real browsers
 - **Signing in and the account page work in a browser again.** Server-rendered pages were sent with `Referrer-Policy: no-referrer`, under which browsers send `Origin: null` with a form POST. Every form is checked for a same-origin Origin, so **Continue with GitHub** on the consent screen and the account page's sign out, import, **Revoke** and delete were refused as "Cross-site request refused". Pages now use `same-origin`, which still sends other sites no referrer. A headless-Chrome test now submits the consent screen and the account page's sign-out the way a person does (`test/ui-forms.test.ts`).
 
@@ -32,7 +65,7 @@
 - **Highlights:** ask "what's worth reading today?" and your agent calls `list_new_items` (what you haven't seen across the room, in turn by portal, at most 60, with what MCPortal knows of your taste: recent saves and finished reads, clip tags, the sites you read most), picks with the conversation and what it knows of you, and calls `show_highlights`: a card of the sources' own items, each with the agent's reason. Picks must name items the room really has. **Not for me** marks one seen. Nothing about the picks is stored.
 - **Send to a new chat:** from the reader's top bar (the whole page) or the passage bar (a selection), MCPortal keeps a pointer to the page, where you were and what you selected under a short code, and shows what to say in a new chat: "Open MCPortal handoff k7q2xm". There `open_handoff` opens the page as a card at that place, with the passage, and gives the agent its text. Send two pages to two chats and keep driving this one. Codes work only in your account, last 7 days (50 at most), aren't exported, and are deleted with your account. Postgres gains `mcportal_handoffs` (schema version 5).
 
-### Version 0.5.0: a tool surface for the long run (breaking)
+### A tool surface for the long run (breaking)
 See [the plan](docs/plans/tool-surface.md).
 - **Edit by patch (breaking):** `arrange_room` replaces `update_profile`. It takes only the changes you name (`move`, `width`, `retitle`, `configure`, `name`, `layout`, `openIn`), applies them all or none, and can't touch anything it isn't given, so "never drop a portal you weren't asked to" is a guarantee rather than a rule for the model. `remove_portal` is its own call, marked destructive, so hosts can ask before it runs. Portals are named by id or exact title. `get_profile` is gone: the room and its ids come from `open_room`. The room app's layout switch uses `arrange_room` too.
 - **One `content` for clips (breaking):** `clip` takes the clip as `content` text for every kind but an exchange: a quote, a note in markdown, a markdown table, a link's url, or an image as SVG markup or a data: URI. Exchanges keep `turns` and quotes keep `attribution`. `text`, `markdown`, `table`, `columns`, `rows`, `svg`, `image` and `url` are gone.

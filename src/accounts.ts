@@ -86,6 +86,19 @@ export interface GithubIdentity {
 export type Admission = { ok: true; account: Account } | { ok: false; reason: 'not_invited' | 'suspended' };
 
 const AUDIT_MAX = 2000;
+/** The audit log keeps a year at most, and an invite nobody used lapses after 90 days. */
+export const AUDIT_DAYS = 365;
+export const PENDING_INVITE_DAYS = 90;
+const DAY_MS = 86_400_000;
+/** What a deleted account is called in the records that outlast it. */
+export const DELETED = 'deleted account';
+
+/** Does the text name this login or id as a whole word? */
+function mentions(text: string, name: string): boolean {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(^|[^a-z0-9_-])${escaped}($|[^a-z0-9_-])`, 'i').test(text);
+}
+
 const RELOAD_MS = 30_000;
 const LOGIN = /^[a-z0-9](?:[a-z0-9-]{0,38})$/;
 
@@ -124,7 +137,10 @@ export class Accounts {
       maxAgeMs: RELOAD_MS,
       now: () => this.now(),
       beforeWrite: (doc) => {
+        const now = this.now();
+        doc.audit = doc.audit.filter((e) => e.at > now - AUDIT_DAYS * DAY_MS);
         if (doc.audit.length > AUDIT_MAX) doc.audit.splice(0, doc.audit.length - AUDIT_MAX);
+        for (const [login, invite] of Object.entries(doc.invites)) if (!invite.acceptedAt && invite.createdAt <= now - PENDING_INVITE_DAYS * DAY_MS) delete doc.invites[login];
       },
     });
   }
@@ -236,7 +252,8 @@ export class Accounts {
   /**
    * Remove an account, its sign-in identities and its (used) invite. The caller has
    * already deleted the account's data. Signing in again later is a new account, if
-   * config or a new invite lets them in.
+   * config or a new invite lets them in. The audit log keeps that things happened, but
+   * no longer says to whom: the account id (which is their GitHub id) and login go.
    */
   deleteAccount(accountId: string, by: string): Promise<boolean> {
     return this.write((doc) => {
@@ -245,9 +262,22 @@ export class Accounts {
       delete doc.accounts[accountId];
       for (const [key, id] of Object.entries(doc.identities)) if (id === accountId) delete doc.identities[key];
       for (const [login, invite] of Object.entries(doc.invites)) if (invite.accountId === accountId) delete doc.invites[login];
-      doc.audit.push({ at: this.now(), actor: by, action: 'account.deleted', target: accountId, ...(account.login ? { detail: `@${account.login}` } : {}) });
+      const names = [accountId, ...(account.login ? [account.login] : [])];
+      const theirs = (s: string) => names.includes(s.replace(/^@/, ''));
+      for (const invite of Object.values(doc.invites)) if (theirs(invite.invitedBy)) invite.invitedBy = DELETED;
+      for (const e of doc.audit) {
+        if (theirs(e.actor)) e.actor = DELETED;
+        if (theirs(e.target)) e.target = DELETED;
+        if (e.detail && names.some((n) => mentions(e.detail!, n))) delete e.detail;
+      }
+      doc.audit.push({ at: this.now(), actor: by === accountId ? DELETED : by, action: 'account.deleted', target: DELETED });
       return true;
     });
+  }
+
+  /** Retention: the audit log's age limit and lapsed invites apply on every write; this is a write with no change. */
+  prune(): Promise<void> {
+    return this.write(() => undefined);
   }
 
   // ---------------------------------------------------------------- admin (CLI / admin page only; never MCP tools)

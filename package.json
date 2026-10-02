@@ -1,6 +1,6 @@
 {
   "name": "mcportal",
-  "version": "0.5.0",
+  "version": "0.6.1",
   "description": "MCPortal: a personal, agent-composed workspace delivered as an MCP server with an MCP Apps UI.",
   "type": "module",
   "private": true,
@@ -22,7 +22,8 @@
     "design:check": "node scripts/design.ts --check",
     "check": "npm run typecheck && npm run design:check && npm test",
     "footprint": "node scripts/footprint.ts",
-    "eval:tools": "node scripts/eval-tools.ts"
+    "eval:tools": "node scripts/eval-tools.ts",
+    "release": "node scripts/release.ts"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.131.0",

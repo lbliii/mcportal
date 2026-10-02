@@ -39,6 +39,9 @@ export type Audience = (typeof AUDIENCES)[number];
 export const REBLOG_RULES = ['anyone', 'followers', 'nobody'] as const;
 export type ReblogRule = (typeof REBLOG_RULES)[number];
 
+/** How long a resolved report is kept. */
+export const REPORT_DAYS = 180;
+
 export const SOCIAL_LIMITS = { note: 500, sharesPerUser: 1000, follows: 2000, reason: 500, openReportsPerUser: 50 } as const;
 
 export interface Share {
@@ -484,6 +487,11 @@ export class Social {
   }
 
   forget(accountId: string): Promise<void> {
-    return this.store.forget(accountId);
+    return this.store.forget(accountId, this.at());
+  }
+
+  /** Retention: resolved reports are kept REPORT_DAYS after they were resolved. */
+  purgeReports(): Promise<number> {
+    return this.store.purgeReports(new Date(Date.parse(this.at()) - REPORT_DAYS * 86_400_000).toISOString());
   }
 }
