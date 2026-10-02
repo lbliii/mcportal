@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 import { SERVER_INFO } from '../src/mcp.ts';
 import { staleDistributionFiles } from '../scripts/distribution.ts';
+import { versionsInRepo } from '../scripts/release.ts';
 
 const read = async (path: string) => JSON.parse(await readFile(new URL(`../${path}`, import.meta.url), 'utf8')) as { version: string };
 
@@ -17,4 +18,6 @@ test('distribution: one version everywhere', async () => {
   assert.equal((await read('.claude-plugin/plugin.json')).version, version, '.claude-plugin/plugin.json');
   assert.equal((await read('server.json')).version, version);
   assert.equal((await read('manifest.json')).version, version);
+  // Every place the release script sets (scripts/release.ts), the lockfile included.
+  for (const [file, versions] of Object.entries(await versionsInRepo())) assert.deepEqual(versions, file === 'package-lock.json' ? [version, version] : [version], file);
 });
