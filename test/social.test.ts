@@ -88,6 +88,110 @@ test('sharing needs a public profile; going private or suspended hides shares; a
   await assert.rejects(social.share('b', { kind: 'link', title: 'x', url: 'https://example.com/x', note: 'x'.repeat(501) }), /too long/);
 });
 
+/** Whether a promise rejects with an error of this code. */
+const code = (expected: string) => (e: unknown) => (e as { code?: string }).code === expected;
+const link = (n: string, extra: Record<string, unknown> = {}) => ({ kind: 'link' as const, title: `Post ${n}`, url: `https://example.com/${n}`, audience: 'mcportal', ...extra });
+
+test("reblogs: the original's rule decides who may reblog, and a followers-only post never travels", async () => {
+  const { social } = await world();
+  const open = await social.share('a', { ...link('open'), note: "alice's words" });
+  const reblog = await social.reblog('b', { id: open.id, note: 'Worth it.', audience: 'mcportal' });
+  assert.deepEqual(reblog.reblogOf, { root: open.id }, 'a reblog references its original');
+  assert.equal(reblog.note, 'Worth it.');
+  assert.equal(reblog.title, 'Post open', 'title and link are a snapshot of the original');
+  assert.ok(reblog.original && 'author' in reblog.original && reblog.original.author.handle === 'alice' && reblog.original.note === "alice's words", 'the original is drawn live, note and all');
+  assert.equal(reblog.reblogCount, 1);
+  assert.equal((await social.get('c', open.id))?.reblogCount, 1, 'the count pools on the original');
+  await assert.rejects(social.reblog('b', { id: open.id }), code('conflict'), 'one reblog per original');
+  await assert.rejects(social.reblog('a', { id: open.id }), /your own post/);
+  await assert.rejects(social.reblog('d', { id: open.id }), code('failed_precondition'), 'reblogging needs a profile, like sharing');
+
+  await social.follow('b', 'alice');
+  const friends = await social.share('a', { ...link('friends'), audience: 'followers' });
+  await assert.rejects(social.reblog('b', { id: friends.id }), /followers only, so it can't be reblogged/);
+  assert.equal((await social.get('b', friends.id))?.canReblog, false);
+
+  const closed = await social.share('a', { ...link('closed'), reblogs: 'nobody' });
+  await assert.rejects(social.reblog('b', { id: closed.id }), code('forbidden'));
+  await social.shareSettings('a', closed.id, { reblogs: 'anyone' });
+  assert.equal((await social.get('b', closed.id))?.canReblog, true, 'the author can open it up later');
+  await social.reblog('b', { id: closed.id });
+
+  const followersOnly = await social.share('a', { ...link('fo'), reblogs: 'followers' });
+  await assert.rejects(social.reblog('c', { id: followersOnly.id }), /Only people who follow @alice/);
+  await social.follow('c', 'alice');
+  await social.reblog('c', { id: followersOnly.id });
+  await assert.rejects(social.shareSettings('b', open.id, { reblogs: 'nobody' }), code('not_found'), "only the author changes a post's rule");
+  await assert.rejects(social.shareSettings('b', reblog.id, { reblogs: 'nobody' }), /follows its original's rule/);
+});
+
+test('reblogs: one hop. Reblogging a reblog reblogs the original, crediting the one you saw it through', async () => {
+  const { social } = await world();
+  const original = await social.share('a', link('p'));
+  const bobs = await social.reblog('b', { id: original.id, audience: 'mcportal' });
+  await social.follow('c', 'bob');
+  const seen = (await social.feed('c'))[0]!;
+  assert.equal(seen.id, bobs.id, "bob's reblog reaches carol, who follows him");
+  assert.equal(seen.canReblog, true);
+  const carols = await social.reblog('c', { id: seen.id, note: 'for my friends' });   // followers only: alice doesn't follow carol
+  assert.deepEqual(carols.reblogOf, { root: original.id, via: bobs.id });
+  assert.equal(carols.via, 'bob');
+  assert.equal(carols.reblogCount, 2);
+  assert.equal((await social.get('c', original.id))?.myReblog, carols.id, 'the button knows what to undo');
+  assert.equal((await social.get('c', bobs.id))?.canReblog, false, 'already reblogged, through any reblog');
+  assert.deepEqual((await social.reblogsOf('a', original.id)).map((r) => r.handle), ['carol', 'bob'], 'who reblogged, newest first: the author sees all');
+  assert.equal((await social.reblogsOf('a', original.id))[0]!.note, undefined, "but not a note they can't see");
+  assert.deepEqual((await social.reblogsOf('a', carols.id)).map((r) => r.handle), ['carol', 'bob'], "a reblog's id finds its original's reblogs");
+  await social.unshare('c', carols.id);
+  assert.equal((await social.get('a', original.id))?.reblogCount, 1, 'undo is unshare');
+});
+
+test('reblogs: a removed or detached original leaves a tombstone; blocks and mutes hide reblogs', async () => {
+  const { social, suspended } = await world();
+  const gone = await social.share('a', { ...link('gone'), note: 'soon gone' });
+  const kept = await social.reblog('b', { id: gone.id, note: 'my note stays', audience: 'mcportal' });
+  await social.unshare('a', gone.id);
+  const tomb = await social.get('c', kept.id);
+  assert.deepEqual(tomb?.original, { removed: 'removed' });
+  assert.equal(tomb?.note, 'my note stays');
+  assert.equal(tomb?.url, 'https://example.com/gone', "the link stays: it's the web's, not alice's words");
+
+  const hidden = await social.share('a', link('hidden'));
+  const onHidden = await social.reblog('b', { id: hidden.id, audience: 'mcportal' });
+  await social.hideShare(hidden.id, true);
+  assert.deepEqual((await social.get('c', onHidden.id))?.original, { removed: 'removed' }, 'an admin hiding the original tombstones it');
+  await social.hideShare(hidden.id, false);
+  suspended.add('a');
+  assert.deepEqual((await social.get('c', onHidden.id))?.original, { removed: 'removed' }, 'so does a suspended author');
+  suspended.delete('a');
+
+  const detach = await social.share('a', link('detach'));
+  const r = await social.reblog('b', { id: detach.id, audience: 'mcportal' });
+  const other = await social.share('a', link('other'));
+  await assert.rejects(social.shareSettings('a', other.id, { detach: r.id }), code('not_found'), 'only from a reblog of that post');
+  await social.shareSettings('a', detach.id, { detach: r.id });
+  assert.deepEqual((await social.get('c', r.id))?.original, { removed: 'detached' });
+  assert.equal((await social.get('a', detach.id))?.reblogCount, 0, "a detached reblog doesn't count");
+  assert.deepEqual((await social.reblogsOf('a', detach.id)).map((x) => [x.handle, x.detached]), [['bob', true]], 'the author still sees it, marked');
+  assert.deepEqual(await social.reblogsOf('c', detach.id), [], 'others no longer do');
+  await assert.rejects(social.reblog('c', { id: r.id }), /removed the original from that reblog/);
+
+  // Blocks: a reblog of someone you blocked, or who blocked you, isn't shown at all.
+  const fresh = await social.share('a', link('fresh'));
+  const viaBob = await social.reblog('b', { id: fresh.id, audience: 'mcportal' });
+  await social.follow('c', 'bob');
+  assert.ok((await social.feed('c')).some((s) => s.id === viaBob.id));
+  await social.block('a', 'carol', true);
+  assert.equal(await social.get('c', viaBob.id), undefined);
+  assert.ok(!(await social.feed('c')).some((s) => s.id === viaBob.id));
+  await assert.rejects(social.reblog('c', { id: fresh.id }), code('not_found'));
+  await social.block('a', 'carol', false);
+  // Mutes: muting alice hides her posts in carol's feed, reblogged by bob too.
+  await social.mute('c', 'alice', true);
+  assert.ok(!(await social.feed('c')).some((s) => s.reblogOf?.root === fresh.id));
+  assert.ok((await social.feed('c')).length > 0, "bob's other reblogs (of tombstones) still show");
+});
+
 test('reports: need a reason and a visible target; admins resolve them; deleting the reporter anonymizes', async () => {
   const { social } = await world();
   const s = await social.share('a', { kind: 'link', title: 'spam', url: 'https://example.com/s', audience: 'mcportal' });

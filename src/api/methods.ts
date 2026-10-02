@@ -23,7 +23,7 @@ import { clean } from '../lib/text.ts';
 import { httpUrl, validateProfile, type Profile } from '../profile.ts';
 import { validateReadingUpdate, type ReadingUpdate } from '../reading.ts';
 import { tracksSeen } from '../seen.ts';
-import { AUDIENCES } from '../social.ts';
+import { AUDIENCES, REBLOG_RULES } from '../social.ts';
 import { SERVER_INFO } from '../mcp.ts';
 import { findTool } from '../tools/index.ts';
 import { need, type ToolContext } from '../tools/kit.ts';
@@ -205,20 +205,30 @@ export const API_METHODS: Record<string, ApiMethod> = {
   'social.resolve': params<{ handle: string }>({ type: 'object', required: ['handle'], additionalProperties: false, properties: { handle } },
     async (p, ctx) => publicRef(await socialOf(ctx).resolve(ctx.userId, p.handle), ctx)),
   /** A clip or saved item the server looks up itself, as the share tool does; never content from the request. */
-  'social.share': params<{ clipId?: string; savedUrl?: string; note?: string; audience?: string }>(
-    { type: 'object', additionalProperties: false, properties: { clipId: id, savedUrl: { type: 'string', maxLength: 2000 }, note: { type: 'string', maxLength: 500 }, audience: { type: 'string', enum: AUDIENCES } } },
+  'social.share': params<{ clipId?: string; savedUrl?: string; note?: string; audience?: string; reblogs?: string }>(
+    { type: 'object', additionalProperties: false, properties: { clipId: id, savedUrl: { type: 'string', maxLength: 2000 }, note: { type: 'string', maxLength: 500 }, audience: { type: 'string', enum: AUDIENCES }, reblogs: { type: 'string', enum: REBLOG_RULES } } },
     async (p, ctx) => {
       const social = socialOf(ctx);
       if (p.clipId) {
         const clip = await clipsOf(ctx).get(ctx.userId, p.clipId);
         if (!clip) throw new AppError('not_found', `No clip with id "${clean(p.clipId, 40)}".`);
-        return social.share(ctx.userId, { kind: 'clip', title: clip.title, url: clip.source.url, clip, note: p.note, audience: p.audience });
+        return social.share(ctx.userId, { kind: 'clip', title: clip.title, url: clip.source.url, clip, note: p.note, audience: p.audience, reblogs: p.reblogs });
       }
       const url = httpUrl(p.savedUrl);
       const saved = url ? (await ctx.store.get(ctx.userId)).saved.find((s) => s.url === url) : undefined;
       if (!saved) throw new AppError('invalid_argument', 'Share a saved item (savedUrl) or a clip (clipId).');
-      return social.share(ctx.userId, { kind: 'link', title: saved.title, url: saved.url, note: p.note, audience: p.audience });
+      return social.share(ctx.userId, { kind: 'link', title: saved.title, url: saved.url, note: p.note, audience: p.audience, reblogs: p.reblogs });
     }, 'write'),
+  /** A post the server looks up by id, as share does: nothing of the original comes from the request. */
+  'social.reblog': params<{ id: string; note?: string; audience?: string }>(
+    { type: 'object', required: ['id'], additionalProperties: false, properties: { id, note: { type: 'string', maxLength: 500 }, audience: { type: 'string', enum: AUDIENCES } } },
+    (p, ctx) => socialOf(ctx).reblog(ctx.userId, p), 'write'),
+  'social.shareSettings': params<{ id: string; reblogs?: string; detach?: string }>(
+    { type: 'object', required: ['id'], additionalProperties: false, properties: { id, reblogs: { type: 'string', enum: REBLOG_RULES }, detach: id } },
+    (p, ctx) => socialOf(ctx).shareSettings(ctx.userId, p.id, { reblogs: p.reblogs, detach: p.detach }), 'write'),
+  'social.reblogsOf': params<{ id: string; query?: { limit?: number; before?: string } }>(
+    { type: 'object', required: ['id'], additionalProperties: false, properties: { id, query: pageQuery } },
+    (p, ctx) => socialOf(ctx).reblogsOf(ctx.userId, p.id, p.query)),
   'social.unshare': params<{ id: string }>({ type: 'object', required: ['id'], additionalProperties: false, properties: { id } },
     (p, ctx) => socialOf(ctx).unshare(ctx.userId, p.id), 'write'),
   'social.get': params<{ id: string }>({ type: 'object', required: ['id'], additionalProperties: false, properties: { id } },

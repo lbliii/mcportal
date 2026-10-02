@@ -142,6 +142,12 @@ test('linked: sharing and following work from a local MCPortal, as the linked ac
     const feed = await other.call('list_shares', { handle: '@lawrence' });
     assert.deepEqual(feed.structuredContent.shares.map((s: { title: string }) => s.title).sort(), ['A clip', 'Worth reading']);
     assert.match((await mac.call('list_connections')).content[0]!.text, /Followers: 1\./);
+    // Reblogging goes through the hosted API too (the tools come in reblog phase 2).
+    const reblog = await other.ctx.social!.reblog(friend.accountId, { id: shared.structuredContent.share.id, note: 'passing it on' });
+    assert.deepEqual(reblog.reblogOf, { root: shared.structuredContent.share.id });
+    await mac.ctx.social!.shareSettings(lawrence.accountId, shared.structuredContent.share.id, { reblogs: 'nobody' });
+    assert.deepEqual((await mac.ctx.social!.reblogsOf(lawrence.accountId, shared.structuredContent.share.id)).map((r) => r.handle), ['friend']);
+    assert.equal((await mac.ctx.social!.get(lawrence.accountId, shared.structuredContent.share.id))?.reblogCount, 1);
     // The stores refuse to act as anyone else, whatever a caller passes.
     await assert.rejects(mac.ctx.social!.feed(friend.accountId), /only as its linked account/);
     await assert.rejects(mac.ctx.store.get(friend.accountId), /only its linked account/);

@@ -199,6 +199,25 @@ for (const b of BACKENDS) {
     assert.equal((await store.resolveReport(report.id, 'admin:x', 'dismissed', at(301)))?.status, 'resolved');
     assert.ok((await store.reports('resolved')).some((r) => r.id === report.id));
 
+    // Reblogs: found and counted by their original; one per account per original.
+    const reblog = (by: string, i: number, root: string): Share => ({ id: `${by}-rb${i}`, accountId: by, kind: 'link', title: 'r', audience: 'mcportal', createdAt: at(400 + i), reblogOf: { root } });
+    const root = `${alice}-s50`;
+    await store.addShare(reblog(bob, 1, root));
+    await store.addShare(reblog(alice, 2, root));
+    await assert.rejects(store.addShare(reblog(bob, 3, root)), (e: unknown) => (e as { code?: string }).code === 'conflict');
+    assert.deepEqual((await store.reblogsOf(root, {})).map((s) => s.id), [`${alice}-rb2`, `${bob}-rb1`], 'newest first');
+    assert.deepEqual([...(await store.countReblogs([root, `${alice}-s51`]))], [[root, 2]]);
+    assert.deepEqual([...(await store.reblogsBy(bob, [root]))], [[root, `${bob}-rb1`]]);
+    assert.equal(await store.updateShare(`${bob}-rb1`, { detachedAt: at(500) }), true);
+    assert.equal((await store.getShare(`${bob}-rb1`))?.detachedAt, at(500));
+    assert.deepEqual([...(await store.countReblogs([root]))], [[root, 1]], 'detached reblogs are not counted');
+    assert.equal((await store.reblogsOf(root, {})).length, 2, 'but are still found');
+    assert.equal(await store.updateShare(root, { reblogs: 'nobody' }), true);
+    assert.equal((await store.getShare(root))?.reblogs, 'nobody');
+    await store.updateShare(root, { reblogs: null });
+    assert.equal((await store.getShare(root))?.reblogs, undefined, 'null clears');
+    assert.equal(await store.updateShare('nope', { reblogs: 'nobody' }), false);
+
     await store.relate('follows', alice, bob);
     await store.forget(bob);
     assert.deepEqual(await store.incoming('follows', bob), [], "a forgotten account's relations go");

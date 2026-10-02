@@ -6,6 +6,7 @@
  */
 import { DOCUMENT_MAX_AGE_MS, memoryPersistence, SharedDocument } from './lib/document.ts';
 import type { AuthPersistence } from './auth/store.ts';
+import { AppError } from './lib/errors.ts';
 import type { PageQuery, Relation, Report, Share } from './social.ts';
 
 /** Storage only; no rules. */
@@ -17,6 +18,14 @@ export interface SocialStore {
   /** Newest first. */
   sharesBy(accountIds: string[], query: PageQuery & { includeHidden?: boolean }): Promise<Share[]>;
   countShares(accountId: string): Promise<number>;
+  /** Reblogs of one original, newest first, hidden ones left out (detached ones kept: Social decides). */
+  reblogsOf(rootId: string, query: PageQuery): Promise<Share[]>;
+  /** How many reblogs each original has, leaving out hidden and detached ones. Originals without any are absent. */
+  countReblogs(rootIds: string[]): Promise<Map<string, number>>;
+  /** The account's own reblog of each original it reblogged: original id -> reblog id. */
+  reblogsBy(accountId: string, rootIds: string[]): Promise<Map<string, string>>;
+  /** Set (or with null, clear) a post's reblog rule or detached time. False when there's no such post. */
+  updateShare(id: string, change: { reblogs?: Share['reblogs'] | null; detachedAt?: string | null }): Promise<boolean>;
   /** a follows/mutes/blocks b. */
   relate(relation: Relation, a: string, b: string): Promise<boolean>;
   unrelate(relation: Relation, a: string, b: string): Promise<boolean>;
@@ -62,7 +71,11 @@ export class DocumentSocialStore implements SocialStore {
   }
 
   async addShare(share: Share): Promise<void> {
-    await this.write((d) => { d.shares.unshift(structuredClone(share)); });
+    await this.write((d) => {
+      const root = share.reblogOf?.root;
+      if (root && d.shares.some((s) => s.accountId === share.accountId && s.reblogOf?.root === root)) throw new AppError('conflict', 'You already reblogged it');
+      d.shares.unshift(structuredClone(share));
+    });
   }
 
   async getShare(id: string): Promise<Share | undefined> {
@@ -97,6 +110,41 @@ export class DocumentSocialStore implements SocialStore {
 
   async countShares(accountId: string): Promise<number> {
     return (await this.load()).shares.filter((s) => s.accountId === accountId).length;
+  }
+
+  async reblogsOf(rootId: string, query: PageQuery): Promise<Share[]> {
+    return structuredClone((await this.load()).shares
+      .filter((s) => s.reblogOf?.root === rootId && !s.hiddenAt && (!query.before || s.createdAt < query.before))
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0))
+      .slice(0, limitOf(query)));
+  }
+
+  async countReblogs(rootIds: string[]): Promise<Map<string, number>> {
+    const ids = new Set(rootIds);
+    const counts = new Map<string, number>();
+    for (const s of (await this.load()).shares) {
+      const root = s.reblogOf?.root;
+      if (root && ids.has(root) && !s.hiddenAt && !s.detachedAt) counts.set(root, (counts.get(root) ?? 0) + 1);
+    }
+    return counts;
+  }
+
+  async reblogsBy(accountId: string, rootIds: string[]): Promise<Map<string, string>> {
+    const ids = new Set(rootIds);
+    return new Map((await this.load()).shares.filter((s) => s.accountId === accountId && s.reblogOf && ids.has(s.reblogOf.root)).map((s) => [s.reblogOf!.root, s.id]));
+  }
+
+  updateShare(id: string, change: { reblogs?: Share['reblogs'] | null; detachedAt?: string | null }): Promise<boolean> {
+    return this.write((d) => {
+      const share = d.shares.find((s) => s.id === id);
+      if (!share) return false;
+      for (const key of ['reblogs', 'detachedAt'] as const) {
+        const value = change[key];
+        if (value === null) delete share[key];
+        else if (value !== undefined) Object.assign(share, { [key]: value });
+      }
+      return true;
+    });
   }
 
   relate(relation: Relation, a: string, b: string): Promise<boolean> {

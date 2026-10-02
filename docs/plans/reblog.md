@@ -1,6 +1,6 @@
 # Plan: reblogging
 
-Status: proposed, 2026-10-02. Builds on the social layer (`src/social.ts`: shares,
+Status: phase 1 built, 2026-10-02. Builds on the social layer (`src/social.ts`: shares,
 follows, mute, block, report) and the river ([river.md](river.md), phases 1–3), and is
 the M2 social feature [local-hosted-hybrid.md](local-hosted-hybrid.md) opens to local
 installs. Research: [River and reblog design research](../../reports/River%20and%20reblog%20design%20research.md).
@@ -208,6 +208,19 @@ pooled counts, `reblogsOf`; the document store, Postgres schema 8 and the store 
 test; the API methods for linked local installs. Tests in `social.test.ts`: every row of
 the consent table, reblogging a reblog resolves to the root with `via`, one reblog per
 original, blocks and mutes hide, delete/hide/detach/forget make tombstones, counts pool.
+
+Done. `Social.reblog`, `shareSettings` and `reblogsOf`; `present()` adds `original` (or
+`{ removed: 'removed' | 'detached' }`), `via`, the pooled `reblogCount`, `myReblog` and
+`canReblog` to every post. `share` takes `reblogs` (stored only when it isn't `anyone`).
+Store: `reblogsOf`, `countReblogs`, `reblogsBy`, `updateShare`, and one reblog per
+account per original enforced by both stores (Postgres: the unique index, raced inserts
+become `conflict`). Postgres schema 8 adds `root_id` with its indexes. The API has
+`social.reblog`, `social.shareSettings` and `social.reblogsOf`, and linked installs call
+them. Decided while building: the original's author sees everyone who reblogged their post
+(the credit is theirs) but a reblog's note only when they may see that reblog; you can't
+reblog your own post; a refusal says why and uses `forbidden`. Tests: three in
+`social.test.ts`, reblog operations in the store contract (document and Postgres), and a
+linked round trip.
 
 ### 2. Tools
 
