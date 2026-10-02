@@ -168,3 +168,34 @@ test('token refresh: two processes refreshing at once spend the refresh token on
     await s.app.close();
   }
 });
+
+test('linked identity and nudges: the account menu learns it is offline, and a newer hosted MCPortal is mentioned once', async () => {
+  const s = await setUp();
+  try {
+    const { url } = (await s.call('link_account')).structuredContent;
+    await signInInBrowser(s.app.port, url);
+    let down = false;
+    const newer: typeof fetch = async (input, init) => {
+      if (down) throw new TypeError('fetch failed');
+      const res = await fetch(input, init);
+      const headers = new Headers(res.headers);
+      if (headers.has('mcportal-server')) headers.set('mcportal-server', '9.9.9');
+      return new Response(await res.arrayBuffer(), { status: res.status, headers });
+    };
+    let clock = Date.now();
+    const session = new LocalSession({ dataDir: s.dataDir, localUser: 'default', local: s.local, base: { fetcher: createFixtureFetcher(), cache: new TtlCache() }, hostedUrl: s.app.base, fetch: newer, now: () => clock });
+    const call = async (name: string) => (await handleMessage({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: {} } }, await session.context()))!.result as any;
+    await call('open_room');
+    const second = await call('open_room');
+    assert.match(second.structuredContent.notice, /MCPortal 9\.9\.9 is out/);
+    assert.doesNotMatch((await call('open_room')).structuredContent.notice ?? '', /is out/, 'once');
+    clock += 60_000;
+    down = true;
+    const offline = await call('open_room');
+    assert.equal(offline.structuredContent.identity.mode, 'linked');
+    assert.equal(offline.structuredContent.identity.offline, true);
+    assert.ok(offline.structuredContent.identity.syncedAt);
+  } finally {
+    await s.app.close();
+  }
+});

@@ -8,6 +8,7 @@
     $('grid').hidden = true; $('reader').hidden = true;
     $('roomName').textContent = rebuilding ? 'start over' : 'welcome';
     drawIdentity(data.identity);
+    if (data.notice) toast(data.notice);
     setStatus('');
     /** @type {Set<string>} */
     const chosen = new Set();

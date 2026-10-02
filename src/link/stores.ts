@@ -43,8 +43,14 @@ class Linked {
   }
 }
 
+const OFFLINE_NOTICE = "Offline: can't reach your hosted MCPortal, so this is your portal as last synced. Feeds still load; changes wait until you're back online.";
+
+/** Not reaching the hosted server at all (as opposed to it refusing something). */
+const unreachable = (error: unknown) => errorCode(error) === 'upstream_unreachable';
+
 export class RemoteProfileStore extends Linked implements ProfileStore {
   private cached: (Versioned & { at: number; tooNew: boolean }) | undefined;
+  private offline = false;
   private notice: string | undefined;
   private mutex = new KeyedMutex();
   private readonly now: () => number;
@@ -58,7 +64,17 @@ export class RemoteProfileStore extends Linked implements ProfileStore {
   private async room(revalidate = false): Promise<Versioned> {
     const c = this.cached;
     if (!revalidate && c && this.now() - c.at < ROOM_FRESH_MS) return { profile: structuredClone(c.profile), rev: c.rev };
-    const r = await this.client.call<{ unchanged?: boolean; rev: number; profile?: unknown; notice?: string }>('room.get', c ? { ifNoneMatch: c.rev } : {});
+    let r: { unchanged?: boolean; rev: number; profile?: unknown; notice?: string };
+    try {
+      r = await this.client.call('room.get', c ? { ifNoneMatch: c.rev } : {});
+    } catch (error) {
+      // Offline with a copy: read it (writes still fail clearly, since they need the server).
+      if (!unreachable(error) || !c || revalidate) throw error;
+      if (!this.offline) this.addNotice(OFFLINE_NOTICE);
+      this.offline = true;
+      return { profile: structuredClone(c.profile), rev: c.rev };
+    }
+    this.offline = false;
     if (r.notice) this.notice = r.notice;
     if (r.unchanged && c && c.rev === r.rev) {
       c.at = this.now();
@@ -132,6 +148,11 @@ export class RemoteProfileStore extends Linked implements ProfileStore {
       this.remember(valid, rev);
       return rev;
     });
+  }
+
+  /** Whether the last read reached the server, and when the room was last synced (ms), for the toolbar. */
+  health(): { offline: boolean; syncedAt?: number } {
+    return { offline: this.offline, ...(this.cached ? { syncedAt: this.cached.at } : {}) };
   }
 
   /** A one-time notice for the next open_room (e.g. what signing in added). */
@@ -214,22 +235,31 @@ export class RemoteReadingStore extends Linked implements ReadingStore {
   }
 }
 
+/**
+ * Seen sets are a convenience ("new" badges), so offline they're best effort: reads come
+ * back empty (nothing marked new) and marks are dropped, rather than failing the room.
+ */
 export class RemoteSeenStore extends Linked implements SeenStore {
   async get(userId: string, portalIds: string[]): Promise<Map<string, Set<string>>> {
     this.mine(userId);
-    const sets = await this.client.call<Record<string, string[]>>('seen.get', { portalIds });
-    return new Map(Object.entries(sets).map(([portal, items]) => [portal, new Set(items)]));
+    try {
+      const sets = await this.client.call<Record<string, string[]>>('seen.get', { portalIds });
+      return new Map(Object.entries(sets).map(([portal, items]) => [portal, new Set(items)]));
+    } catch (error) {
+      if (unreachable(error)) return new Map();
+      throw error;
+    }
   }
 
   async mark(userId: string, marks: Array<{ portalId: string; itemIds: string[] }>): Promise<void> {
     this.mine(userId);
-    if (marks.length) await this.client.call('seen.mark', { marks });
+    if (marks.length) await this.client.call('seen.mark', { marks }).catch((error: unknown) => { if (!unreachable(error)) throw error; });
   }
 
   /** The hosted server prunes against the room it holds, which is the room these ids came from. */
   async keepOnly(userId: string): Promise<void> {
     this.mine(userId);
-    await this.client.call('seen.prune');
+    await this.client.call('seen.prune').catch((error: unknown) => { if (!unreachable(error)) throw error; });
   }
 
   async deleteAll(): Promise<void> {

@@ -152,7 +152,7 @@ export type Identity =
   | { mode: 'ghost'; canSignIn?: boolean }
   | { mode: 'hosted'; login?: string | undefined; handle?: string | undefined; accountUrl?: string | undefined }
   /** A local MCPortal signed in to a hosted one: it runs here, the portal lives in the account. */
-  | { mode: 'linked'; server: string; login?: string | undefined; handle?: string | undefined; accountUrl?: string | undefined };
+  | { mode: 'linked'; server: string; login?: string | undefined; handle?: string | undefined; accountUrl?: string | undefined; offline?: boolean; syncedAt?: string | undefined };
 
 /** The caller's identity (one public-profile read on a hosted server). */
 export async function identityOf(ctx: ToolContext): Promise<Identity> {
@@ -162,7 +162,9 @@ export async function identityOf(ctx: ToolContext): Promise<Identity> {
   const handle = (await ctx.publicProfiles?.get(ctx.userId).catch(() => undefined))?.handle;
   const login = ctx.link?.login ?? ctx.actor?.login;
   const who = { ...(login ? { login } : {}), ...(handle ? { handle } : {}), ...(ctx.accountUrl ? { accountUrl: ctx.accountUrl } : {}) };
-  return ctx.link ? { mode: 'linked', server: ctx.link.server, ...who } : { mode: 'hosted', ...who };
+  if (!ctx.link) return { mode: 'hosted', ...who };
+  const health = ctx.link.health?.();
+  return { mode: 'linked', server: ctx.link.server, ...who, ...(health?.offline ? { offline: true } : {}), ...(health?.syncedAt ? { syncedAt: new Date(health.syncedAt).toISOString() } : {}) };
 }
 
 /** How the identity reads in a sentence, for the model to pass on. */

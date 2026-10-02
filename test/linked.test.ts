@@ -188,3 +188,32 @@ test('linked: one round trip for a tool\'s parallel reads; clear errors offline,
     await h.app.close();
   }
 });
+
+test('linked offline: the room as last synced, with a notice; seen marks are dropped quietly; changes fail clearly', async () => {
+  const h = await hosted();
+  try {
+    const { accountId, tokens } = await h.signIn(42, 'lawrence');
+    let clock = 0, down = false;
+    const flaky: typeof fetch = (input, init) => (down ? Promise.reject(new TypeError('fetch failed')) : fetch(input, init));
+    const mac = device(h.app, accountId, fixed(tokens.access_token), { now: () => clock, fetch: flaky });
+    await mac.call('build_room', { packs: ['developer'] });
+    const online = await mac.call('open_room');
+    clock += 60_000;
+    down = true;
+    const offline = await mac.call('open_room');
+    assert.equal(offline.isError, undefined, offline.content[0]!.text);
+    assert.equal(offline.structuredContent.portals.length, online.structuredContent.portals.length, 'the room as last synced, feeds still fetched');
+    assert.match(offline.structuredContent.notice ?? '', /^Offline:/);
+    assert.equal((mac.ctx.store as unknown as { health(): { offline: boolean } }).health().offline, true);
+    const hn = online.structuredContent.portals.find((p: { source: string }) => p.source === 'hn');
+    assert.equal((await mac.call('mark_seen', { portals: [{ portalId: hn.portalId, itemIds: ['1'] }] })).isError, undefined, 'seen marks are best effort');
+    const save = await mac.call('save_item', { url: 'https://example.com/offline', title: 'x' });
+    assert.equal(save.structuredContent.error.code, 'upstream_unreachable', 'changes need the server');
+    down = false;
+    clock += 60_000;
+    assert.equal((await mac.call('open_room')).structuredContent.notice, undefined, 'back online, nothing to say');
+    assert.equal((mac.ctx.store as unknown as { health(): { offline: boolean } }).health().offline, false);
+  } finally {
+    await h.app.close();
+  }
+});

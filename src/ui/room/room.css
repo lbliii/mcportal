@@ -49,6 +49,7 @@
   .who svg { flex: none; width: var(--mp-icon-small); height: var(--mp-icon-small); fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; }
   .who-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .who.ghost { border-style: dashed; }
+  .who.offline { border-style: dotted; color: var(--mp-text-secondary); opacity: 0.8; }
   .who-wrap { position: relative; display: inline-flex; }
   .who-menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: var(--mp-layer-sticky); width: min(300px, calc(100vw - 24px)); padding: var(--mp-space-12); background: var(--mp-surface-canvas); border: 1px solid var(--mp-border-divider); border-radius: var(--mp-radius-card); box-shadow: 0 8px 24px rgb(0 0 0 / 0.14); font-size: var(--mp-type-12); color: var(--mp-text-primary); }
   .who-menu p { margin: var(--mp-space-6) 0; line-height: 1.45; }

@@ -41,6 +41,8 @@ export class StateClient {
   private scheduled = false;
   private readonly fetch: typeof fetch;
   private readonly options: StateClientOptions;
+  /** The hosted server's version, from its last answer (for "a newer MCPortal is out"). */
+  serverVersion: string | undefined;
 
   constructor(options: StateClientOptions) {
     this.options = options;
@@ -112,6 +114,7 @@ export class StateClient {
       } catch (error) {
         throw new AppError('upstream_unreachable', UNREACHABLE, { cause: error });
       }
+      this.serverVersion = res.headers.get('mcportal-server') ?? this.serverVersion;
       if (res.status === 401 && attempt === 0) {
         const fresh = await this.options.auth.refresh(token);
         if (fresh) { token = fresh; continue; }

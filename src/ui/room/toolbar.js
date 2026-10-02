@@ -38,8 +38,10 @@
     const who = $('btnWho');
     const ghost = identity.mode === 'ghost';
     const name = ghost ? 'Ghost mode' : identity.handle ? `@${identity.handle}` : (identity.login ?? 'Signed in');
-    const title = ghost ? 'Ghost mode: not signed in' : `Signed in as ${name}`;
+    const offline = identity.mode === 'linked' && Boolean(identity.offline);
+    const title = ghost ? 'Ghost mode: not signed in' : offline ? `Signed in as ${name}, offline: showing your portal as last synced` : `Signed in as ${name}`;
     who.classList.toggle('ghost', ghost);
+    who.classList.toggle('offline', offline);
     who.title = title;
     who.setAttribute('aria-label', `${title}. Account menu`);
     who.setAttribute('aria-expanded', 'false');
@@ -76,6 +78,7 @@
     setWhoMenu(
       el('div', { class: 'who-head' }, icon('space'), el('b', null, name)),
       el('p', null, linked ? `This computer keeps your portal in your hosted MCPortal (${new URL(identity.server).host}), so it's the same wherever you sign in.` : 'Signed in to your hosted MCPortal.'),
+      linked && identity.offline ? el('p', { class: 'muted' }, `Offline: this is your portal as last synced${identity.syncedAt ? ` (${ago(identity.syncedAt)})` : ''}. Feeds still load; changes wait until you're back online.`) : null,
       el('div', { class: 'who-actions' },
         el('button', { class: 'btn', type: 'button', onclick: () => { showWhoMenu(false); loadSpace('', false); } }, identity.handle ? 'Your space' : 'Claim a handle'),
         identity.accountUrl ? el('button', { class: 'btn', type: 'button', onclick: () => openLink(identity.accountUrl ?? '') }, 'Account page') : null,

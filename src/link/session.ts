@@ -17,6 +17,8 @@ import type { HandoffStore } from '../handoffs.ts';
 import type { ReadingStore } from '../reading.ts';
 import type { SeenStore } from '../seen.ts';
 import type { ToolContext } from '../tools/kit.ts';
+import { versionAtLeast } from '../api/calls.ts';
+import { SERVER_INFO } from '../mcp.ts';
 import { StateClient } from './client.ts';
 import { FileLinkAuth, LinkFile, type LinkRecord } from './link-file.ts';
 import { startSignIn, type PendingSignIn } from './signin.ts';
@@ -35,6 +37,8 @@ export interface LinkControl {
   start(): Promise<{ url: string }>;
   /** Sign out: copy the portal back here, revoke, forget. Resolves to what happened, for the user. */
   unlink(): Promise<string>;
+  /** Linked: whether the hosted server answered last time, and when the room was last synced (ms). */
+  health?: (() => { offline: boolean; syncedAt?: number }) | undefined;
 }
 
 export interface LocalStores {
@@ -66,6 +70,7 @@ export class LocalSession {
   private pending: PendingSignIn | undefined;
   /** Said once on the next open_room after signing in (what the merge did). */
   private notice: string | undefined;
+  private nudged = false;
 
   constructor(options: LocalSessionOptions) {
     this.options = options;
@@ -85,6 +90,12 @@ export class LocalSession {
     const notice = this.notice;
     this.notice = undefined;
     if (notice) stores.store.addNotice(notice);
+    // Once per process: the hosted server runs a newer MCPortal than this computer.
+    if (!this.nudged && client.serverVersion && !versionAtLeast(SERVER_INFO.version, client.serverVersion)) {
+      this.nudged = true;
+      stores.store.addNotice(`MCPortal ${client.serverVersion} is out (this computer has ${SERVER_INFO.version}). Update to get what's new; this version keeps working until the hosted MCPortal stops supporting it.`);
+    }
+    control.health = () => stores.store.health();
     return {
       ...this.options.base,
       ...stores,
