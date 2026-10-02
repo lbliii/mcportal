@@ -247,7 +247,7 @@ to add **quiet** portals.
 - How many items should a stream fetch? Portals fetch 10 by default; a river of 12
   portals has ~120 items, more than 12 pages once folds count as one. Raise per-portal
   limits only if real use runs out.
-- Reblogging (its own plan) starts from the research: reference the original rather than
+- Reblogging ([reblog.md](reblog.md)) starts from the research: reference the original rather than
   copy it, keep a tombstone if it's deleted, record root, via and reblogger, pool the
   credit on the original sharer, one tap with an optional note, author consent controls
   (who can reblog, remove my post), and only one hop deep in the river.
