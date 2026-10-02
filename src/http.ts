@@ -66,9 +66,10 @@ export interface AppConfig {
    * The public pages: the contact address for support and security reports
    * (MCPORTAL_CONTACT_EMAIL), the support link (MCPORTAL_SUPPORT_URL, default: that
    * address), the operator's name (MCPORTAL_OPERATOR) and the law the terms are under
-   * (MCPORTAL_JURISDICTION, e.g. "the State of Oregon, USA").
+   * (MCPORTAL_JURISDICTION, e.g. "the State of Oregon, USA"). Links to the source code only
+   * with MCPORTAL_SOURCE_URL, since the repo isn't public yet.
    */
-  site?: Pick<SiteConfig, 'supportUrl' | 'operator' | 'contactEmail' | 'jurisdiction'> | undefined;
+  site?: Pick<SiteConfig, 'supportUrl' | 'operator' | 'contactEmail' | 'jurisdiction' | 'sourceUrl'> | undefined;
 }
 
 export interface AppDeps {
@@ -150,6 +151,7 @@ function siteFromEnv(env: NodeJS.ProcessEnv): NonNullable<AppConfig['site']> {
     ...(email ? { contactEmail: email } : {}),
     ...(env.MCPORTAL_OPERATOR ? { operator: env.MCPORTAL_OPERATOR } : {}),
     ...(env.MCPORTAL_JURISDICTION ? { jurisdiction: env.MCPORTAL_JURISDICTION } : {}),
+    ...(env.MCPORTAL_SOURCE_URL ? { sourceUrl: env.MCPORTAL_SOURCE_URL } : {}),
   };
 }
 

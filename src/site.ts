@@ -45,6 +45,8 @@ export interface SiteConfig {
   contactEmail?: string;
   /** The law the terms are under, e.g. "the State of Oregon, USA". Optional. */
   jurisdiction?: string;
+  /** The public source code. Unset, the pages don't link to it (the repo isn't public yet). */
+  sourceUrl?: string;
   /** Sign-up is invite-only (admins or an allowlist are set). */
   inviteOnly: boolean;
 }
@@ -137,7 +139,7 @@ function layout(title: string, head: string, body: string, site: SiteConfig, her
 ${head}${hero ? '\n<img class="art" src="/site/hero.svg" alt="" width="1500" height="640">' : ''}
 </header>
 <main class="wrap">${body}</main>
-<footer><div class="wrap"><span class="tag jost">${TAGLINE}</span>${by}<a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/security">Security</a><a href="/support">Support</a><a href="https://github.com/lbliii/mcportal">Source</a></div></footer>
+<footer><div class="wrap"><span class="tag jost">${TAGLINE}</span>${by}<a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/security">Security</a><a href="/support">Support</a>${site.sourceUrl ? `<a href="${escapeHtml(site.sourceUrl)}">Source</a>` : ''}</div></footer>
 </body></html>`;
 }
 
@@ -172,7 +174,7 @@ function landing(site: SiteConfig): string {
 <h2 id="get-it">Get it</h2>
 ${access}
 <div class="card"><p>Add MCPortal to your agent as a custom connector (MCP server) with this URL, and sign in with GitHub. Then ask <i>“open my room”</i>.</p><p><code>${mcp}</code></p><p class="muted">In Claude, that's <b>Settings → Connectors</b>. MCPortal works in any MCP agent; the visual room appears in agents that show MCP Apps, and elsewhere you read through the chat.</p></div>
-<p class="muted">Prefer to run it yourself? MCPortal also runs locally as a Claude Code plugin with no account. See the <a href="https://github.com/lbliii/mcportal">source</a>.</p>`, site, true);
+<p class="muted">Prefer to run it yourself? MCPortal also runs locally as a Claude Code plugin with no account.${site.sourceUrl ? ` See the <a href="${escapeHtml(site.sourceUrl)}">source</a>.` : ''}</p>`, site, true);
 }
 
 function privacy(site: SiteConfig): string {
@@ -335,7 +337,7 @@ function support(site: SiteConfig): string {
 <h3>A portal says it couldn't load.</h3>
 <p>Some sites block requests from cloud servers or stop publishing their feed. Try refreshing the portal. If it keeps failing, ask your agent to find another feed for that site.</p>
 <h3>Claude says my organization doesn't allow custom connectors.</h3>
-<p>Some work and school accounts block connectors that aren't in Claude's directory. You can run MCPortal on your own computer instead (see the <a href="https://github.com/lbliii/mcportal#readme">README</a>) and sign in from its room, so it's the same portal as everywhere else. Or use a personal Claude account, or ask your admin.</p>
+<p>Some work and school accounts block connectors that aren't in Claude's directory. You can run MCPortal on your own computer instead${site.sourceUrl ? ` (see the <a href="${escapeHtml(site.sourceUrl)}#readme">README</a>)` : ''} and sign in from its room, so it's the same portal as everywhere else. Or use a personal Claude account, or ask your admin.</p>
 ${site.inviteOnly ? `<h3>I got “sign-in isn't allowed for this account”.</h3>
 <p>MCPortal is invite-only right now. The invite is tied to one GitHub account, so sign in as the account that was invited.</p>` : ''}
 <h3>How do I bring my subscriptions from another reader?</h3>

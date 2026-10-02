@@ -161,6 +161,7 @@ test('public pages: landing, privacy and support render without scripts; images 
     }
     assert.match((await raw(app.port, { path: '/support' })).body, /mailto:help@example\.com/);
     assert.match((await raw(app.port, { path: '/' })).body, /<a href="\/terms">Terms<\/a>/, 'every page links the terms');
+    for (const path of ['/', '/support']) assert.doesNotMatch((await raw(app.port, { path })).body, /github\.com\/lbliii\/mcportal(?!\/issues)/, `${path}: no links to a repo the public can't open`);
     const terms = (await raw(app.port, { path: '/terms' })).body;
     assert.match(terms, /<h2>Acceptable use<\/h2>/);
     assert.match(terms, /at least 13/);
@@ -201,7 +202,7 @@ test('public pages: landing, privacy and support render without scripts; images 
 
 test('contact: one address for support and security, security.txt, and the law in the terms', async () => {
   assert.throws(() => configFromEnv({ MCPORTAL_CONTACT_EMAIL: 'not an email' }, '/tmp/x'), /isn't an email address/);
-  const site = configFromEnv({ MCPORTAL_CONTACT_EMAIL: 'hello@mcportal.example', MCPORTAL_JURISDICTION: 'the State of Oregon, USA', MCPORTAL_OPERATOR: 'Jane Doe' }, '/tmp/x').site!;
+  const site = configFromEnv({ MCPORTAL_CONTACT_EMAIL: 'hello@mcportal.example', MCPORTAL_JURISDICTION: 'the State of Oregon, USA', MCPORTAL_OPERATOR: 'Jane Doe', MCPORTAL_SOURCE_URL: 'https://github.com/example/mcportal' }, '/tmp/x').site!;
   assert.equal(site.supportUrl, 'mailto:hello@mcportal.example', 'support defaults to the contact address');
   const app = await startApp({ staticToken: 't', site });
   try {
@@ -218,6 +219,8 @@ test('contact: one address for support and security, security.txt, and the law i
     assert.match(security, /within 3 business days/);
     assert.match((await raw(app.port, { path: '/terms' })).body, /governed by the laws of the State of Oregon, USA/);
     assert.doesNotMatch((await raw(app.port, { path: '/support' })).body, /invite-only/, 'open sign-up: no invite-only answer');
+    assert.match((await raw(app.port, { path: '/' })).body, /<a href="https:\/\/github\.com\/example\/mcportal">Source<\/a>/, 'with MCPORTAL_SOURCE_URL, the footer links the source');
+    assert.match((await raw(app.port, { path: '/support' })).body, /github\.com\/example\/mcportal#readme/);
   } finally {
     await app.close();
   }

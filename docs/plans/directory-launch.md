@@ -60,7 +60,7 @@ Get MCPortal listed in Claude's directory first and OpenAI's (ChatGPT and Codex)
 - [ ] **License** per D2: a `LICENSE` file, `manifest.json` `license`, and the README.
 - [x] **Age:** the consent screen asks people to confirm they're 13 or older, as do the terms and the privacy policy.
 - [x] **Support:** the support page names the contact address and says we usually reply within a few days; its invite-only answer shows only while sign-up is invite-only.
-  - [ ] The support page and footer link to the GitHub repo (README, Source), which the public can't open while it's private.
+  - [x] The public pages link to the source only when `MCPORTAL_SOURCE_URL` is set; set it when the repo goes public.
 
 ## Phase 2b: data handling (before open sign-up)
 
