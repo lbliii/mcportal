@@ -391,7 +391,8 @@ export class OAuthServer {
 <input type="hidden" name="txn" value="${txnId}">
 <button class="primary" name="decision" value="approve" type="submit">Continue with GitHub</button>
 <button name="decision" value="deny" type="submit">Cancel</button>
-</form>`,
+</form>
+<p class="muted">By continuing, you agree to MCPortal's <a href="/terms">terms</a> and confirm you're at least 13. See the <a href="/privacy">privacy policy</a> for what's kept.</p>`,
       ),
       { 'set-cookie': cookie },
     );

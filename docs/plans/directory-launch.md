@@ -49,25 +49,18 @@ Get MCPortal listed in Claude's directory first and OpenAI's (ChatGPT and Codex)
 
 ## Phase 2: policies and trust (docs and site)
 
-- [ ] **Terms of service and acceptable use** at `/terms`, linked in the footer and on the consent screen. It covers:
-  - accounts and age (13+)
-  - content and conduct for shares and profiles
-  - moderation and removal
-  - the service "as is" and liability
-  - termination
-  - changes to the terms, with notice
-  - governing law
-  - Get a lawyer's read before launch if budget allows.
+- [x] **Terms of service and acceptable use** at `/terms`, linked in the footer and on the consent screen: accounts and age (13+), your content, acceptable use, moderation and limits, changes and availability (30 days' notice before a shutdown), ending, no warranty, limitation of liability, governing law (`MCPORTAL_JURISDICTION`), and changes to the terms (14 days' notice).
+  - [ ] Get a lawyer's read before launch if budget allows, especially the liability and governing-law sections.
 - [ ] **Privacy policy fixes** (the full list of mismatches is in Phase 2b):
   - add the subprocessors (Railway, GitHub, Automattic's image proxy, Stripe later)
   - add a "last updated" date and a change log
-- [ ] **Private security contact:**
-  - `SECURITY.md` and `/.well-known/security.txt` with a security mailbox, not GitHub issues
-  - turn on GitHub private vulnerability reporting
-  - state a response target (e.g. acknowledge within 3 business days)
+- [x] **Private security contact:** `MCPORTAL_CONTACT_EMAIL` on `/security` (what to send, acknowledged within 3 business days, 90-day disclosure, safe harbor), `/.well-known/security.txt` (RFC 9116) and `SECURITY.md`.
+  - [ ] Set `MCPORTAL_CONTACT_EMAIL`, `MCPORTAL_OPERATOR` and `MCPORTAL_JURISDICTION` in production.
+  - [ ] Turn on GitHub private vulnerability reporting once the repo is public (it isn't available for private repos).
 - [ ] **License** per D2: a `LICENSE` file, `manifest.json` `license`, and the README.
-- [ ] **Age:** state 13+ at sign-up (consent screen) as well as in the privacy policy.
-- [ ] **Support:** the support page names a real contact and expected response time, and drops "invite-only".
+- [x] **Age:** the consent screen asks people to confirm they're 13 or older, as do the terms and the privacy policy.
+- [x] **Support:** the support page names the contact address and says we usually reply within a few days; its invite-only answer shows only while sign-up is invite-only.
+  - [ ] The support page and footer link to the GitHub repo (README, Source), which the public can't open while it's private.
 
 ## Phase 2b: data handling (before open sign-up)
 

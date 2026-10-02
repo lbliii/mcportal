@@ -62,8 +62,13 @@ export interface AppConfig {
   dataDir: string;
   /** Per-user tool budget (MCPORTAL_LIMIT_PER_MINUTE / _PER_DAY / _GLOBAL_PER_DAY). */
   limits?: Partial<BudgetLimits> | undefined;
-  /** The public pages: support link (MCPORTAL_SUPPORT_URL) and operator name (MCPORTAL_OPERATOR). */
-  site?: Pick<SiteConfig, 'supportUrl' | 'operator'> | undefined;
+  /**
+   * The public pages: the contact address for support and security reports
+   * (MCPORTAL_CONTACT_EMAIL), the support link (MCPORTAL_SUPPORT_URL, default: that
+   * address), the operator's name (MCPORTAL_OPERATOR) and the law the terms are under
+   * (MCPORTAL_JURISDICTION, e.g. "the State of Oregon, USA").
+   */
+  site?: Pick<SiteConfig, 'supportUrl' | 'operator' | 'contactEmail' | 'jurisdiction'> | undefined;
 }
 
 export interface AppDeps {
@@ -127,7 +132,7 @@ export function configFromEnv(env: NodeJS.ProcessEnv, dataDir: string): AppConfi
     trustProxy: env.MCPORTAL_TRUST_PROXY === '1' || Boolean(env.RAILWAY_ENVIRONMENT),
     dataDir,
     limits: limitsFromEnv(env),
-    site: { supportUrl: env.MCPORTAL_SUPPORT_URL || DEFAULT_SUPPORT_URL, ...(env.MCPORTAL_OPERATOR ? { operator: env.MCPORTAL_OPERATOR } : {}) },
+    site: siteFromEnv(env),
   };
   if (!hasAuth && !isLoopbackHost(host) && env.MCPORTAL_ALLOW_UNAUTHENTICATED !== '1') {
     throw new Error(
@@ -135,6 +140,17 @@ export function configFromEnv(env: NodeJS.ProcessEnv, dataDir: string): AppConfi
     );
   }
   return config;
+}
+
+function siteFromEnv(env: NodeJS.ProcessEnv): NonNullable<AppConfig['site']> {
+  const email = env.MCPORTAL_CONTACT_EMAIL?.trim();
+  if (email && !/^[^\s@<>"'()]+@[^\s@<>"'()]+\.[a-z]{2,}$/i.test(email)) throw new Error(`MCPORTAL_CONTACT_EMAIL isn't an email address: ${email}`);
+  return {
+    supportUrl: env.MCPORTAL_SUPPORT_URL || (email ? `mailto:${email}` : DEFAULT_SUPPORT_URL),
+    ...(email ? { contactEmail: email } : {}),
+    ...(env.MCPORTAL_OPERATOR ? { operator: env.MCPORTAL_OPERATOR } : {}),
+    ...(env.MCPORTAL_JURISDICTION ? { jurisdiction: env.MCPORTAL_JURISDICTION } : {}),
+  };
 }
 
 function send(res: ServerResponse, status: number, body: string | Buffer, type = 'application/json', extra: Record<string, string> = {}): void {

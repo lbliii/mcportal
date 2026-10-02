@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Terms of service and a private security contact ([plan](docs/plans/directory-launch.md))
+- **Terms of service at `/terms`,** with acceptable use, linked from every page and from the sign-in consent screen, which now also asks you to confirm you're at least 13.
+- **A private way to report security problems:** the security page describes what to send, response times (acknowledged within 3 business days), a 90-day disclosure window and safe harbor for good-faith research. `/.well-known/security.txt` (RFC 9116) and `SECURITY.md` point to the same contact.
+- **One contact address:** `MCPORTAL_CONTACT_EMAIL` is where support requests and security reports go, and the support link defaults to it. `MCPORTAL_JURISDICTION` names the law the terms are under.
+- The support page says how soon we reply, and only mentions invite-only sign-up while sign-up is invite-only.
+
 ## v0.6.1 — 2026-10-02
 
 ### Deleting an account leaves nothing behind ([plan](docs/plans/directory-launch.md))

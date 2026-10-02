@@ -150,7 +150,7 @@ test('config: loopback by default; refuses a public bind without auth', () => {
 test('public pages: landing, privacy and support render without scripts; images and brand files only from the allowlist', async () => {
   const app = await startApp({ staticToken: 't', site: { supportUrl: 'mailto:help@example.com', operator: 'A <b>Person</b>' } });
   try {
-    for (const path of ['/', '/privacy', '/support', '/security']) {
+    for (const path of ['/', '/privacy', '/terms', '/support', '/security']) {
       const page = await raw(app.port, { path });
       assert.equal(page.status, 200, path);
       assert.match(page.headers['content-type'] as string, /text\/html/);
@@ -160,6 +160,11 @@ test('public pages: landing, privacy and support render without scripts; images 
       assert.match(page.body, /A &lt;b&gt;Person&lt;\/b&gt;/, 'operator is escaped');
     }
     assert.match((await raw(app.port, { path: '/support' })).body, /mailto:help@example\.com/);
+    assert.match((await raw(app.port, { path: '/' })).body, /<a href="\/terms">Terms<\/a>/, 'every page links the terms');
+    const terms = (await raw(app.port, { path: '/terms' })).body;
+    assert.match(terms, /<h2>Acceptable use<\/h2>/);
+    assert.match(terms, /at least 13/);
+    assert.match(terms, /run by A &lt;b&gt;Person&lt;\/b&gt;/);
     assert.match((await raw(app.port, { path: '/' })).body, /http:\/\/localhost\/mcp/);
     assert.equal((await raw(app.port, { path: '/site/columns.png' })).status, 200);
     const landing = (await raw(app.port, { path: '/' })).body;
@@ -169,7 +174,7 @@ test('public pages: landing, privacy and support render without scripts; images 
     assert.match(landing, /src:url\(\/site\/jost-bold\.ttf\)/);
     assert.match(landing, /<meta property="og:image" content="http:\/\/localhost\/site\/og\.png">/, 'link previews get an absolute image URL');
     assert.match(landing, /<link rel="icon" href="\/favicon\.svg" type="image\/svg\+xml">/);
-    for (const path of ['/', '/privacy', '/support', '/security']) {
+    for (const path of ['/', '/privacy', '/terms', '/support', '/security']) {
       assert.doesNotMatch((await raw(app.port, { path })).body, /inside Claude|[Aa]sk Claude|tell Claude/, `${path} talks about "your agent", not one host`);
     }
     const types: Record<string, RegExp> = {
@@ -189,6 +194,30 @@ test('public pages: landing, privacy and support render without scripts; images 
     assert.equal((await raw(app.port, { path: '/site/..%2Fhttp.ts' })).status, 404);
     assert.equal((await raw(app.port, { path: '/site/other.png' })).status, 404);
     assert.equal((await raw(app.port, { method: 'POST', path: '/privacy' })).status, 404);
+  } finally {
+    await app.close();
+  }
+});
+
+test('contact: one address for support and security, security.txt, and the law in the terms', async () => {
+  assert.throws(() => configFromEnv({ MCPORTAL_CONTACT_EMAIL: 'not an email' }, '/tmp/x'), /isn't an email address/);
+  const site = configFromEnv({ MCPORTAL_CONTACT_EMAIL: 'hello@mcportal.example', MCPORTAL_JURISDICTION: 'the State of Oregon, USA', MCPORTAL_OPERATOR: 'Jane Doe' }, '/tmp/x').site!;
+  assert.equal(site.supportUrl, 'mailto:hello@mcportal.example', 'support defaults to the contact address');
+  const app = await startApp({ staticToken: 't', site });
+  try {
+    const txt = await raw(app.port, { path: '/.well-known/security.txt' });
+    assert.equal(txt.status, 200);
+    assert.match(txt.headers['content-type'] as string, /^text\/plain/);
+    assert.match(txt.body, /^Contact: mailto:hello@mcportal\.example$/m);
+    const expires = Date.parse(/^Expires: (.+)$/m.exec(txt.body)![1]!);
+    assert.ok(expires > Date.now() && expires < Date.now() + 365 * 86_400_000, 'RFC 9116: expires within a year');
+    assert.match(txt.body, /^Canonical: http:\/\/localhost\/\.well-known\/security\.txt$/m);
+    assert.match(txt.body, /^Policy: http:\/\/localhost\/security$/m);
+    const security = (await raw(app.port, { path: '/security' })).body;
+    assert.match(security, /mailto:hello@mcportal\.example/);
+    assert.match(security, /within 3 business days/);
+    assert.match((await raw(app.port, { path: '/terms' })).body, /governed by the laws of the State of Oregon, USA/);
+    assert.doesNotMatch((await raw(app.port, { path: '/support' })).body, /invite-only/, 'open sign-up: no invite-only answer');
   } finally {
     await app.close();
   }

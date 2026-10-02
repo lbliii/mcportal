@@ -52,6 +52,7 @@ async function openConsent(app: Running, params: Record<string, string>): Promis
   const consent = await raw(app.port, { path: `/oauth/authorize?${new URLSearchParams(params)}` });
   assert.equal(consent.status, 200, consent.body);
   assert.equal(consent.headers['x-frame-options'], 'DENY');
+  assert.match(consent.body, /you agree to MCPortal's <a href="\/terms">terms<\/a> and confirm you're at least 13/, 'the terms and the minimum age, before signing in');
   const txn = consent.body.match(/name="txn" value="([^"]+)"/)?.[1];
   const setCookie = String(consent.headers['set-cookie'] ?? '');
   assert.match(setCookie, /HttpOnly; SameSite=Lax/);
