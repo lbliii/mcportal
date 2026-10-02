@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Terms of service and a private security contact ([plan](docs/plans/directory-launch.md))
+- **Terms of service at `/terms`,** with acceptable use, linked from every page and from the sign-in consent screen, which now also asks you to confirm you're at least 13.
+- **A private way to report security problems:** the security page describes what to send, response times (acknowledged within 3 business days), a 90-day disclosure window and safe harbor for good-faith research. `/.well-known/security.txt` (RFC 9116) and `SECURITY.md` point to the same contact.
+- **One contact address:** `MCPORTAL_CONTACT_EMAIL` is where support requests and security reports go, and the support link defaults to it. `MCPORTAL_JURISDICTION` names the law the terms are under.
+- The support page says how soon we reply, and only mentions invite-only sign-up while sign-up is invite-only.
+- The public pages no longer link to the source code, which isn't public yet; `MCPORTAL_SOURCE_URL` brings the links back.
+
 ## v0.7.0 — 2026-10-02
 
 ### The river (lab, `MCPORTAL_LABS=river`) ([plan](docs/plans/river.md), [research](reports/River%20and%20reblog%20design%20research.md))

@@ -85,7 +85,8 @@ args = ["/Users/llane/Developer/mcportal/bin/mcportal.mjs", "--stdio"]
    - Homepage URL: `https://<your-domain>`
    - Authorization callback URL: `https://<your-domain>/oauth/callback`
 4. Set variables: `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, and `MCPORTAL_ADMINS=<your-login>`. Setting admins makes the server invite-only; invite people with `mcportal admin invite <login>` (below).
-5. In Claude, add a custom connector with URL `https://<your-domain>/mcp`. Claude discovers the auth server, registers itself, and sends you through MCPortal's consent screen and GitHub sign-in.
+5. Set who runs it and how to reach them, for the public pages (terms, privacy, support, security and `/.well-known/security.txt`): `MCPORTAL_OPERATOR` (your name), `MCPORTAL_CONTACT_EMAIL` (where support requests and security reports go; the support link defaults to it) and `MCPORTAL_JURISDICTION` (the law the terms are under, e.g. `the State of Oregon, USA`). `MCPORTAL_SUPPORT_URL` overrides the support link, and `MCPORTAL_SOURCE_URL` adds links to the source code (left out while the repo is private).
+6. In Claude, add a custom connector with URL `https://<your-domain>/mcp`. Claude discovers the auth server, registers itself, and sends you through MCPortal's consent screen and GitHub sign-in.
 
 Each person gets an account (`github-<id>`, which survives GitHub renames) and their own profile. Tokens are opaque, stored hashed, and bound to this server's `/mcp` resource. Access tokens last 1 hour; refresh tokens rotate on use. Every tool call passes one access gate: suspended accounts can't act, and tools only ever act on the caller's own portal.
 
@@ -96,6 +97,7 @@ node bin/mcportal.mjs admin list                   # accounts and pending invite
 node bin/mcportal.mjs admin invite <github-login>   # account is created at first sign-in
 node bin/mcportal.mjs admin suspend <login> [why]  # cut off within 30 s; reinstate to undo
 node bin/mcportal.mjs admin audit                  # who did what, when
+node bin/mcportal.mjs admin delete <login> --confirm  # for someone who can't sign in to delete their account
 ```
 
 `MCPORTAL_ALLOWED_GITHUB_USERS` (logins or numeric ids) still works as an allowlist: people admitted that way lose access when removed from it. Invited people stay until suspended.
@@ -186,7 +188,7 @@ MCPortal is a **reading platform with light social**, driven by your agent. Anyt
 - [x] Admin page at `/admin`: invites, suspensions, audit log (phase 2)
 - [x] OPML import (bring subscriptions from another reader) and OPML export (phase 1b)
 - [x] Migrate `railway.toml` to Railway's infrastructure as code ([`.railway/railway.ts`](.railway/railway.ts))
-- [x] Landing page at `/`, privacy policy at `/privacy`, support at `/support`, with screenshots (`MCPORTAL_SUPPORT_URL`, `MCPORTAL_OPERATOR`)
+- [x] Landing page at `/`, privacy policy at `/privacy`, terms at `/terms`, support at `/support`, security at `/security` and `/.well-known/security.txt`, with screenshots (`MCPORTAL_OPERATOR`, `MCPORTAL_CONTACT_EMAIL`, `MCPORTAL_JURISDICTION`, `MCPORTAL_SUPPORT_URL`)
 - [ ] Submit to Claude's connector directory
 - [ ] Show HN
 

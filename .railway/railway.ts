@@ -30,6 +30,11 @@ export default defineRailway(() => {
       MCPORTAL_TOKEN: preserve(),
       MCPORTAL_ADMINS: preserve(),
       MCPORTAL_ALLOWED_GITHUB_USERS: preserve(),
+      MCPORTAL_LABS: preserve(),
+      // The public pages: who runs the service, where to reach them, the terms' law.
+      MCPORTAL_OPERATOR: preserve(),
+      MCPORTAL_CONTACT_EMAIL: preserve(),
+      MCPORTAL_JURISDICTION: preserve(),
     },
   });
 
