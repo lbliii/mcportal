@@ -1,6 +1,6 @@
 # Plan: one portal, run locally or hosted
 
-**Status:** revised 2026-10-02 (replaces the 2026-09-30 proposal, which predated Postgres, the 0.5 tool names, clips and the social layer). Nothing built yet. **Milestone:** finishes M1.5 ("come back tomorrow on any device") and opens M2's social layer, reblogging first, to people who run MCPortal locally.
+**Status:** revised 2026-10-02 (replaces the 2026-09-30 proposal, which predated Postgres, the 0.5 tool names, clips and the social layer). Phases 1 (modes in the open) and 2 (contracts) built 2026-10-02. **Milestone:** finishes M1.5 ("come back tomorrow on any device") and opens M2's social layer, reblogging first, to people who run MCPortal locally.
 
 ## The problem
 
@@ -114,7 +114,7 @@ A hosted relay (`POST /api/v1/fetch`) used only on network-level failures (DNS, 
 | # | Phase | Ships | Verifies |
 |---|---|---|---|
 | 1 | Modes in the open | `account_settings` names the mode; the room's account chip (local: "Local · not signed in", hosted: avatar) | "Am I signed in?" gets a correct answer in every mode |
-| 2 | Contracts | Social and public-profile services behind interfaces tools use; a shared contract test suite run against file and Postgres stores; `rev` on file profiles | No behavior change; existing tests pass |
+| 2 | Contracts | Tools see social and public profiles through `SocialService` and `ProfileDirectory` (moderation left out); every profile store has `versioned()` and `replaceIf()` with revisions (files keep `rev` beside the profile); the contract suite covers revisions on files, memory and Postgres | No behavior change; existing tests pass |
 | 3 | Hosted state API | `/api/v1/call` with batching, the method table, version header and 426, `room.get`/`room.put` with revisions, `POST /oauth/revoke`, linked devices on the account page | In-process: two clients, concurrent edits, conflicts retried, a stale schema refused, revocation, budget, no account id accepted |
 | 4 | Remote stores | `Remote*` implementations and the API client; the contract suite run against them through an in-process hosted app | The same contract tests pass on file, Postgres and remote |
 | 5 | Linking | Loopback OAuth client, `link.json` with locking, `link_account`/`unlink_account`, first-link merge, unlink copy-back, the room's chip and sign-in flow | End-to-end against an in-process hosted app with fixture GitHub; a refresh race between two processes doesn't revoke |

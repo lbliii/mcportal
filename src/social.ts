@@ -94,6 +94,15 @@ export interface SocialDeps {
   now?: () => number;
 }
 
+/**
+ * What tools ask of the social layer, always acting as the signed-in account (the
+ * first argument). The hosted server implements it with Social; a linked local
+ * MCPortal implements it over the hosted API. Moderation (reports, hiding,
+ * forgetting an account) is left out: it's for the admin page, never for tools.
+ */
+export type SocialService = Pick<Social,
+  'resolve' | 'share' | 'unshare' | 'get' | 'feed' | 'sharesOf' | 'follow' | 'unfollow' | 'mute' | 'block' | 'uses' | 'connections' | 'stats' | 'report'>;
+
 export class Social {
   private store: SocialStore;
   private profiles: PublicProfiles;

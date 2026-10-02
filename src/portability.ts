@@ -15,7 +15,7 @@ import { buildClip, ClipError, CLIP_KINDS, clipText, type Clip, type ClipStore }
 import { buildOpml } from './opml.ts';
 import { LIMITS, normalizePinnedItems, normalizeSaved, ProfileError, validateProfile, type PortalSpec, type Profile } from './profile.ts';
 import type { PublicProfile } from './public-profiles.ts';
-import type { SharedItem, Social } from './social.ts';
+import type { SharedItem, SocialService } from './social.ts';
 import type { ReadingStore, ReadingState } from './reading.ts';
 import type { ProfileStore } from './store.ts';
 import { addPortalTo } from './layout.ts';
@@ -52,7 +52,7 @@ export interface ExportSources {
   reading?: ReadingStore | undefined;
   clips?: ClipStore | undefined;
   publicProfile?: PublicProfile | undefined;
-  social?: Social | undefined;
+  social?: SocialService | undefined;
 }
 
 async function allClips(clips: ClipStore | undefined, userId: string): Promise<Clip[]> {
