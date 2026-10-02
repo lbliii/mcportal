@@ -1,6 +1,6 @@
 # Plan: reblogging
 
-Status: phase 1 built, 2026-10-02. Builds on the social layer (`src/social.ts`: shares,
+Status: phases 1 and 2 built, 2026-10-02. Builds on the social layer (`src/social.ts`: shares,
 follows, mute, block, report) and the river ([river.md](river.md), phases 1–3), and is
 the M2 social feature [local-hosted-hybrid.md](local-hosted-hybrid.md) opens to local
 installs. Research: [River and reblog design research](../../reports/River%20and%20reblog%20design%20research.md).
@@ -229,6 +229,18 @@ original and who reblogged; `share_settings`; `set_public_profile` default; Foll
 items' share fields. Token ceilings, footprint, eval cases ("reblog Ana's post about X",
 "stop people reblogging my last post", a refusal for a followers-only post, asking first
 for an unread one).
+
+Done. `share` takes `reblogOf` and `reblogs`; its result text says whose post you
+reblogged and how to undo. `shareLine` (every list and card) reads "@bob reblogged
+@alice's post (via @cy)", the pooled count, a post's rule when it isn't anyone, and the
+original's note beside the reblog's. `get_share` adds "Reblogged by …" (and
+`rebloggers` for the room); `share_settings` is new; `set_public_profile` takes the
+`reblogs` default, which new shares use. Following items carry `share.reblog` (original
+id, author, note, or why it's gone, via), `share.reblogs`, `share.mine` and
+`share.canReblog`, and read "@bob · reblogged @alice" in their meta. Footprint: hosted-active
+4979 → 5151 tokens (`share` 165, `share_settings` 90, `set_public_profile` 250).
+Seven frozen eval cases; they're checked offline against the schemas, and the live eval
+(Claude API) hasn't been run for them yet.
 
 ### 3. The room
 

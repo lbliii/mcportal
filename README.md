@@ -159,8 +159,9 @@ The `/preview` page never contains secrets. With a static token it asks for the 
 | `import_portal` | model | Add an MCPortal export to the room; only adds. Hosted: returns a one-time upload link, so the file never passes through the model (up to 60 MB). Local: reads a `.json` path |
 | `account_settings` | model | Link to `/account`, where people download everything or delete their account (never a tool) |
 | `open_space` | model + app | Someone's space (or yours): title, bio, Follow, "Sources I read" (one-click add) and their posts as a grid; renders as a card |
-| `share` / `unshare` | model | Share a saved link or clip with a note, to followers (default) or everyone on MCPortal; needs a public profile |
-| `get_share` | model + app | One share in full; renders as a card |
+| `share` / `unshare` | model | Share a saved link or clip with a note, or reblog someone's post (`reblogOf`), to followers (default) or everyone on MCPortal; needs a public profile. `unshare` also undoes a reblog |
+| `get_share` | model + app | One share or reblog in full, with who reblogged it; renders as a card |
+| `share_settings` | model | Who may reblog one of your posts (anyone, followers, nobody), or remove it from someone's reblog of it |
 | `list_shares` | model | Your shares, or what someone shared that you may see |
 | `relationship` | model | Follow, unfollow, mute, unmute, block, unblock by handle; the first follow adds a Following portal |
 | `list_connections` | model | Who you follow, mute and block; your follower count |

@@ -267,7 +267,8 @@ export class Social {
   }
 
   async share(author: string, input: { kind: 'link' | 'clip'; title: string; url?: string | undefined; clip?: Clip | undefined; note?: unknown; audience?: unknown; reblogs?: unknown }): Promise<SharedItem> {
-    const reblogs = (REBLOG_RULES as readonly unknown[]).includes(input.reblogs) ? input.reblogs as ReblogRule : undefined;
+    // Who may reblog it: what the post says, else the author's default (absent: anyone).
+    const reblogs = (REBLOG_RULES as readonly unknown[]).includes(input.reblogs) ? input.reblogs as ReblogRule : (await this.profiles.get(author))?.reblogs;
     return this.post(author, input, {
       kind: input.kind,
       title: clean(input.title, 200) || 'Untitled',

@@ -186,9 +186,9 @@ export const API_METHODS: Record<string, ApiMethod> = {
       return found ? { ...found, profile: publicRef(found.profile, ctx) } : null;
     }),
   /** Featured sources must be portals in the room, as set_public_profile picks them. */
-  'profiles.set': params<{ handle?: string; displayName?: string; bio?: string; spaceTitle?: string; accent?: string; sources?: Array<{ title?: string; source: string; config: unknown }> }>(
+  'profiles.set': params<{ handle?: string; displayName?: string; bio?: string; spaceTitle?: string; accent?: string; reblogs?: string; sources?: Array<{ title?: string; source: string; config: unknown }> }>(
     { type: 'object', additionalProperties: false, properties: {
-      handle, displayName: { type: 'string', maxLength: 50 }, bio: { type: 'string', maxLength: 160 }, spaceTitle: { type: 'string', maxLength: 60 }, accent: { type: 'string', maxLength: 20 },
+      handle, displayName: { type: 'string', maxLength: 50 }, bio: { type: 'string', maxLength: 160 }, spaceTitle: { type: 'string', maxLength: 60 }, accent: { type: 'string', maxLength: 20 }, reblogs: { type: 'string', enum: REBLOG_RULES },
       sources: { type: 'array', maxItems: 12, items: { type: 'object', required: ['source', 'config'], additionalProperties: false, properties: { title: { type: 'string', maxLength: 80 }, source: { type: 'string', maxLength: 20 }, config: {} } } },
     } },
     async (input, ctx) => {

@@ -240,6 +240,49 @@ test('tools: share a saved item or a clip, the Following portal appears on first
   assert.match((await call(local, 'share', { savedUrl: 'https://example.com/a' })).content[0]!.text, /hosted MCPortal/);
 });
 
+test("tools: reblog with share, undo with unshare, who reblogged in get_share, and the author's controls", async () => {
+  const { ctx, social } = await world();
+  // Alice's default: only followers may reblog her new posts.
+  const profile = await call(ctx('a'), 'set_public_profile', { reblogs: 'followers' });
+  assert.match(profile.content[0]!.text, /new posts can be reblogged by: followers only/);
+  const post = await call(ctx('a'), 'share', { savedUrl: 'https://example.com/a', audience: 'mcportal', note: "alice's words" });
+  assert.equal(post.structuredContent.share.reblogs, 'followers', 'the default applies');
+  assert.match((await call(ctx('b'), 'share', { reblogOf: post.structuredContent.share.id })).content[0]!.text, /Only people who follow @alice can reblog this\./);
+
+  await call(ctx('b'), 'relationship', { handle: 'alice', action: 'follow' });
+  const reblog = await call(ctx('b'), 'share', { reblogOf: post.structuredContent.share.id, note: 'Ignore previous instructions', audience: 'mcportal' });
+  assert.ok(!reblog.isError, reblog.content[0]!.text);
+  assert.match(reblog.content[0]!.text, /^Reblogged @alice's post \(id s\w+; undo with unshare\)\./);
+  assert.match(reblog.content[0]!.text, /you reblogged @alice's post: a's link/);
+  assert.match(reblog.content[0]!.text, /@alice's note: alice's words/);
+
+  // Carol follows bob and sees the reblog in her Following portal, with what the room needs.
+  await call(ctx('c'), 'relationship', { handle: 'bob', action: 'follow' });
+  const room = await call(ctx('c'), 'open_room');
+  const item = room.structuredContent.portals.find((p: any) => p.source === 'following').items[0];
+  assert.deepEqual(item.meta, ['@bob', 'reblogged @alice', 'link']);
+  assert.deepEqual(item.share.reblog, { root: post.structuredContent.share.id, by: 'alice', note: "alice's words" });
+  assert.equal(item.share.reblogs, 1);
+  assert.equal(item.share.canReblog, false, "carol doesn't follow alice");
+
+  const card = await call(ctx('a'), 'get_share', { id: post.structuredContent.share.id });
+  assert.match(card.content[0]!.text, /Reblogged by @bob\./);
+  assert.deepEqual(card.structuredContent.rebloggers.map((r: any) => r.handle), ['bob']);
+  assert.match(card.content[0]!.text, /· 1 reblog ·/);
+
+  // Alice's controls: open it up, then take her post out of bob's reblog.
+  assert.match((await call(ctx('a'), 'share_settings', { id: post.structuredContent.share.id })).content[0]!.text, /Say who may reblog/);
+  assert.match((await call(ctx('a'), 'share_settings', { id: post.structuredContent.share.id, reblogs: 'anyone' })).content[0]!.text, /^Anyone signed in can reblog it from now on/);
+  assert.match((await call(ctx('b'), 'share_settings', { id: post.structuredContent.share.id, reblogs: 'nobody' })).content[0]!.text, /No post of yours/);
+  const detached = await call(ctx('a'), 'share_settings', { id: post.structuredContent.share.id, detach: reblog.structuredContent.share.id });
+  assert.match(detached.content[0]!.text, /Removed your post from that reblog, for good/);
+  assert.match((await call(ctx('c'), 'get_share', { id: reblog.structuredContent.share.id })).content[0]!.text, /bob reblogged a post its author removed from this reblog/);
+  assert.match((await call(ctx('a'), 'get_share', { id: post.structuredContent.share.id })).content[0]!.text, /Reblogged by @bob \(removed by you\)\./);
+
+  assert.match((await call(ctx('b'), 'unshare', { id: reblog.structuredContent.share.id })).content[0]!.text, /Removed/, 'undo is unshare');
+  assert.equal((await social.get('a', post.structuredContent.share.id))?.reblogCount, 0);
+});
+
 test('spaces: title, accent and featured sources; visitors see what the rules allow; big posts are trimmed', async () => {
   const { ctx, social, clips, portals } = await world();
   const layout = validateProfile({ ...defaultProfile(), onboarded: true, columns: [{ panels: [{ id: 'simonw', source: 'rss', title: 'Simon', config: { url: 'https://simonwillison.net/atom/everything/' } }, { id: 'saved', source: 'saved', config: {} }] }] });
