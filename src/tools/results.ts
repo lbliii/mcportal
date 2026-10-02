@@ -13,6 +13,7 @@ import type { FeaturedSource, PublicProfile } from '../public-profiles.ts';
 import type { SharedItem } from '../social.ts';
 import type { Handoff } from '../handoffs.ts';
 import type { Candidate, HighlightPick, Lead, RoomEdition } from '../highlights.ts';
+import type { Lab } from '../labs.ts';
 import type { ReadingState } from '../reading.ts';
 import type { Article, Item, PortalResult, Provenance } from '../types.ts';
 
@@ -30,6 +31,8 @@ export type RoomResult = {
   edition?: RoomEdition;
   /** What the room leads with. */
   lead?: Lead;
+  /** Labs this server has on (src/labs.ts), so the room can offer them. */
+  labs?: Lab[];
 };
 
 /** After a save or unsave: the saved list, the room, and the Saved portal redrawn. */

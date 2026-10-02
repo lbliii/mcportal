@@ -134,10 +134,22 @@ Done.
 
 ### 4. Front page (labs)
 
-Top to bottom: edition header (date, N new), the lead, up to 3 picks with "why this",
-then each portal as a block with its top 2–3 items in its form, then "You're caught up".
-One column under 600px, a strict two-column grid above (portal blocks fill left to
-right in profile order). Ends at content height; no internal scroll.
+Done, behind `MCPORTAL_LABS=frontpage` (`src/labs.ts`). Top to bottom: the edition's
+kicker (date, N new), title and intro, or "The front page" and a button that asks the
+agent for highlights; the lead (`lead` item form: picture across, larger title, the
+portal it's from, "Why this"); up to two more picks; each portal as a block with its
+first 3 items, not repeating what's above, and "5 more of N" pages; then "You're caught
+up" or how many new stories wait inside the portals. One column under 600px, two
+columns of blocks above, three from 1100px; strict grid, no masonry. The page grows to
+its content; nothing scrolls inside it (browser test and preview report).
+
+- The lab hides the layout from tool schemas and the toolbar; a profile that chose
+  `frontpage` stays valid and keeps its button. `previousLayout` was dropped: switching
+  back is one click.
+- `inlineLayout` (a layout per display mode) moves to phase 7, where the default
+  changes; until then the front page is one more layout.
+- The design preview has a `frontpage` view (an agent's three picks; 135 cases).
+- Open: in fullscreen without a picture the lead card is short beside the picks.
 
 ### 5. Portal level and transitions
 

@@ -1,7 +1,7 @@
   // room/dom.js: shared state and DOM helpers: el(), ago(), status line, toast
   // ------------------------------------------------------------ state + rendering
   /** @type {RoomState} */
-  const state = { profile: null, portals: new Map(), saved: new Set(), art: new Map() };   // art: portal id -> fallback art style
+  const state = { profile: null, portals: new Map(), saved: new Set(), art: new Map(), edition: undefined, lead: undefined, labs: [] };   // art: portal id -> fallback art style
 
   /** @typedef {Node | string | number | null | undefined | false} Child */
   /**

@@ -125,7 +125,7 @@ function box(x: number, y: number, w: number, h: number, r = R): string {
 
 /**
  * The room's icons, on the Line mark's 24-unit grid and stroke. Where an icon has a frame,
- * it borrows the mark: columns are two doorways, the bookmark and the "open original" frame are
+ * it borrows the mark: columns are two doorways, the front page is a lead block over its lines, the bookmark and the "open original" frame are
  * arch-topped, a space is someone's doorway, refresh runs around a tilted orbit, and the feed
  * icon's dot is the moon's size. Everything else keeps the familiar shape with the house corner.
  */
@@ -136,6 +136,8 @@ function icons(): Record<string, Icon> {
   return {
     columns: { d: arch(7.25, 19.5, 6.5, 15) + arch(16.75, 19.5, 6.5, 15) },
     shelves: { d: shelf(4.5) + shelf(13.5) },
+    // The front page: the lead story's block over lines of type.
+    frontpage: { d: `${box(3.5, 4, 17, 8.5, 2.5)}M3.5 16h17M3.5 20h11` },
     chat: { d: 'M11.5 5H7a3 3 0 0 0-3 3v6.5a3 3 0 0 0 3 3h.5V20l3.5-2.5h4.5a3 3 0 0 0 3-3V12M14.5 4.5h5v5M19.5 4.5l-6 6' },
     sources: { d: 'M5 12.5a6.5 6.5 0 0 1 6.5 6.5M5 6a13 13 0 0 1 13 13', dot: [5.5, 18.5, 1.6] },
     refresh: { d: orbitArrow(12, 12, 8.5, 6.5, -18, 0, 290, 3) },

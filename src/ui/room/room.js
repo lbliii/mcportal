@@ -83,6 +83,7 @@
     state.profile = /** @type {Profile} */ ({ layout: 'columns', openIn: 'card', saved: [], .../** @type {Partial<Profile>} */ (data.profile) });
     state.saved = new Set(state.profile.saved.map((s) => s.url));
     state.portals = new Map(data.portals.map((p) => [p.portalId, p]));
+    state.edition = data.edition; state.lead = data.lead; state.labs = data.labs ?? [];
     $('roomName').textContent = data.profile.name;
     drawLayout();
     setUpdated(data.generatedAt);

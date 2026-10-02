@@ -6,9 +6,10 @@
 import { clean } from '../lib/text.ts';
 import { arrange, spreadColumns, withLayout, type Arrangement } from '../layout.ts';
 import { leadOf, resolveEdition, type RoomEdition } from '../highlights.ts';
+import { ACTIVE_LABS } from '../labs.ts';
 import { MAX_PACKS, packSummaries, STARTER_PACKS } from '../packs.ts';
 import { SEEN_BATCH, tracksSeen, withNews } from '../seen.ts';
-import { describeDiff, describeLayout, diffProfiles, findPortal, normalizeSourceConfig, LAYOUTS, type Layout, type PortalInput, type Profile, type ProfileDiff } from '../profile.ts';
+import { describeDiff, describeLayout, diffProfiles, findPortal, normalizeSourceConfig, offeredLayouts, type Layout, type PortalInput, type Profile, type ProfileDiff } from '../profile.ts';
 import { clipsPortal, clipsQuery, followingPortal, loadPortal, pinnedPortal, savedPortal } from '../sources.ts';
 import type { PortalResult } from '../types.ts';
 import { ok, toolError, toolFailure, untrusted, ROOM_URI, type CallToolResult, type ToolContext, type ToolDef } from './kit.ts';
@@ -30,6 +31,9 @@ export async function portalFor(spec: PortalInput, profile: Profile, ctx: ToolCo
 export function itemLine(item: PortalResult['items'][number]): string {
   return `- ${item.title}${item.meta.length ? ` (${item.meta.join(', ')})` : ''}${item.url ? ` <${item.url}>` : ''}`;
 }
+
+/** Layouts the tools accept: a lab's only while it's on. */
+const OFFERED_LAYOUTS = offeredLayouts(ACTIVE_LABS);
 
 /** Items per portal in open_room's text: enough to say what's new; the room card shows the rest. */
 const ROOM_ITEMS = 3;
@@ -106,7 +110,7 @@ export const ROOM_TOOLS: ToolDef[] = [
       const edition = resolveEdition(await ctx.editions?.get(ctx.userId), portals);
       const lead = leadOf(edition, portals);
       return ok(summarizePortals(profile, portals, notice, edition),
-        { profile, portals, notice, ...(edition ? { edition } : {}), ...(lead ? { lead } : {}), generatedAt: new Date().toISOString() } satisfies ToolResults['open_room']);
+        { profile, portals, notice, ...(edition ? { edition } : {}), ...(lead ? { lead } : {}), ...(ACTIVE_LABS.length ? { labs: [...ACTIVE_LABS] } : {}), generatedAt: new Date().toISOString() } satisfies ToolResults['open_room']);
     },
   },
   {
@@ -120,7 +124,7 @@ export const ROOM_TOOLS: ToolDef[] = [
       additionalProperties: false,
       properties: {
         packs: { type: 'array', maxItems: MAX_PACKS, items: { type: 'string', enum: STARTER_PACKS.map((p) => p.id) } },
-        layout: { type: 'string', enum: [...LAYOUTS], description: 'Default shelves (picture rows).' },
+        layout: { type: 'string', enum: OFFERED_LAYOUTS, description: 'Default shelves (picture rows).' },
       },
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
@@ -138,7 +142,7 @@ export const ROOM_TOOLS: ToolDef[] = [
       }
       // Sources in pack order, spread over at most 8 columns, packs kept together.
       const sources = ids.flatMap((id) => STARTER_PACKS.find((p) => p.id === id)!.portals);
-      const layout: Layout = LAYOUTS.find((l) => l === args.layout) ?? 'shelves';
+      const layout: Layout = OFFERED_LAYOUTS.find((l) => l === args.layout) ?? 'shelves';
       const profile = await ctx.store.update(ctx.userId, (before) => {
         const built = withLayout(before, { layout, columns: spreadColumns(sources), onboarded: true });
         return { profile: built, result: built };
@@ -161,7 +165,7 @@ export const ROOM_TOOLS: ToolDef[] = [
         retitle: { type: 'array', items: { type: 'object', required: ['portal', 'title'], additionalProperties: false, properties: { portal: { type: 'string' }, title: { type: 'string' } } } },
         configure: { type: 'array', items: { type: 'object', required: ['portal', 'config'], additionalProperties: false, properties: { portal: { type: 'string' }, config: { type: 'object', description: 'Settings to change (list_sources)' } } } },
         name: { type: 'string' },
-        layout: { type: 'string', enum: [...LAYOUTS], description: 'columns side by side, or one sideways row per portal' },
+        layout: { type: 'string', enum: OFFERED_LAYOUTS, description: `columns side by side, or one sideways row per portal${OFFERED_LAYOUTS.includes('frontpage') ? ", or frontpage: picks, then each portal's top items" : ''}` },
         openIn: { type: 'string', enum: ['card', 'chat'], description: 'stories open in the room, or as their own card in the chat' },
       },
     },
