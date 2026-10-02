@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Every page wears the paperback cover
+- **The sign-in, account and invite pages match the landing page:** the night band with the lockup, then one card on paper with a door at the top, lit with the moon in it for a welcome or good news and dark when a link has expired or something failed. Headings are Jost, buttons are mustard with an off-register shadow, and a short pulp line sits over the heading where the news is good ("It's alive!").
+- **The consent screen** shows the app and MCPortal joined by an orbit of dots, so you can see who's asking before you approve.
+- **The account page** leads with your portals, saved items and clips, lists signed-in apps and devices, offers each download as a card, and keeps deletion in its own marked-off box.
+- **Signing a computer in** finishes on the same branded page (served from the computer itself, with no requests to anywhere else), not a plain one.
+- **A dead link** opened in a browser gets a page that says so, with a way back; API clients still get the JSON error.
+- **The admin page** gets the night band and lockup.
+- Under the hood, the house style lives in one place (`src/house.ts`), and the lockup, mark and door plate are drawn by `scripts/brand.ts` into `src/brand-art.ts` and inlined.
+
 ## v0.6.1 — 2026-10-02
 
 ### Deleting an account leaves nothing behind ([plan](docs/plans/directory-launch.md))

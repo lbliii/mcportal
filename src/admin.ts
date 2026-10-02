@@ -29,6 +29,7 @@ import type { ToolMetrics } from './lib/metrics.ts';
 import { httpStatus, isAppError, type ErrorCode } from './lib/errors.ts';
 import { escapeHtml, readJson, redirect, sameOrigin, sendHtml, sendJson, sendJsonError } from './lib/web.ts';
 import { page } from './page.ts';
+import { LOCKUP_ON_DARK } from './brand-art.ts';
 import { PageSessions, type PageSession } from './page-sessions.ts';
 
 const SESSION_MS = 8 * 3600 * 1000;
@@ -118,24 +119,23 @@ export class AdminPanel {
     const headers = { 'x-robots-tag': 'noindex, nofollow' };
     const invite = await this.accounts.findInvite(code);
     if (!invite) {
-      return sendHtml(res, 404, page('Invite not valid', '<h1>This invite link isn\'t valid anymore</h1><p>It may have been revoked. Ask the person who invited you for a new one.</p>'), headers);
+      return sendHtml(res, 404, page('Invite not valid', '<p>It may have been revoked. Ask the person who invited you for a new one.</p>', { heading: 'This invite link isn\'t valid anymore', door: 'shut', kicker: 'This door has closed' }), headers);
     }
     const login = escapeHtml(invite.login);
     if (invite.acceptedAt) {
-      return sendHtml(res, 200, page('Already in', `<h1>@${login} is already in</h1><p>MCPortal is connected to that account. In Claude, ask <i>“open my room”</i>.</p>`), headers);
+      return sendHtml(res, 200, page('Already in', `<p>MCPortal is connected to that account. In your agent, ask <i>“open my room”</i>.</p>`, { heading: `@${invite.login} is already in`, kicker: 'Welcome back!' }), headers);
     }
     const inviter = invite.invitedBy.startsWith('admin:') ? `@${escapeHtml(invite.invitedBy.slice(6))}` : 'The admin';
     const mcp = escapeHtml(`${this.publicUrl}/mcp`);
     sendHtml(res, 200, page('You\'re invited to MCPortal', `
-<h1>You're invited to MCPortal</h1>
 <p>${inviter} invited <b>@${login}</b> to MCPortal, your liminal webspace: a reading portal that lives in your agent, with the sites, channels and feeds you follow one door away.</p>
-<ol>
-  <li>In Claude, open <b>Settings → Connectors</b> and choose <b>Add custom connector</b>.</li>
-  <li>Name it <b>MCPortal</b> and use this URL:<br><code>${mcp}</code></li>
-  <li>Click <b>Connect</b> and sign in with GitHub as <b>@${login}</b>.</li>
-  <li>In a new chat, ask: <i>“open my portal”</i>.</li>
+<ol class="steps">
+  <li><b>Add a connector.</b> In Claude, open Settings → Connectors and choose Add custom connector.</li>
+  <li><b>Point it here.</b> Name it MCPortal and use this URL:<br><code>${mcp}</code></li>
+  <li><b>Sign in.</b> Click Connect and sign in with GitHub as <b>@${login}</b>.</li>
+  <li><b>Open the door.</b> In a new chat, ask: <i>“open my portal”</i>.</li>
 </ol>
-<p class="muted">The invite is for @${login}, so signing in with another GitHub account won't work. If your organization's Claude doesn't allow custom connectors, hosted MCPortal isn't available to you yet.</p>`), headers);
+<p class="muted">The invite is for @${login}, so signing in with another GitHub account won't work. If your organization's Claude doesn't allow custom connectors, hosted MCPortal isn't available to you yet.</p>`, { kicker: 'A door has opened!' }), headers);
   }
 
   /** Returns true if it handled the request. */
@@ -150,11 +150,11 @@ export class AdminPanel {
 
     if (route === '/admin/login' && req.method === 'GET') {
       this.oauth.beginPageSignIn(req, res, async (who, out, clearCookie) => {
-        if ('error' in who) return sendHtml(out, 400, page('Sign-in failed', `<p>${escapeHtml(who.error)}.</p><p><a href="/admin">Try again</a></p>`), clearCookie);
+        if ('error' in who) return sendHtml(out, 400, page('Sign-in failed', `<p>${escapeHtml(who.error)}.</p><p><a class="button primary" href="/admin/login">Try again</a></p>`, { door: 'shut', kicker: 'Signal lost' }), clearCookie);
         const admission = await this.accounts.admit(who);
         const actor = admission.ok ? this.accounts.actor(admission.account.id) : undefined;
         if (!admission.ok || !actor || actor.role !== 'admin' || actor.status !== 'active') {
-          return sendHtml(out, 403, page('Admins only', `<p>@${escapeHtml(who.login)} isn't an admin of this MCPortal server.</p>`), clearCookie);
+          return sendHtml(out, 403, page('Admins only', `<p>@${escapeHtml(who.login)} isn't an admin of this MCPortal server.</p>`, { door: 'shut' }), clearCookie);
         }
         redirect(out, '/admin', { 'set-cookie': [clearCookie['set-cookie']!, this.sessions.start(admission.account.id, who.login)] });
       });
@@ -165,13 +165,13 @@ export class AdminPanel {
 
     if (route === '/admin' && req.method === 'GET') {
       if (!current) {
-        sendHtml(res, 200, page('MCPortal admin', '<h1>MCPortal admin</h1><p>Invites, suspensions and the audit log.</p><p><a href="/admin/login"><button class="primary">Sign in with GitHub</button></a></p><p class="muted">Admins only.</p>'));
+        sendHtml(res, 200, page('MCPortal admin', '<p>Invites, suspensions and the audit log.</p><p><a class="button primary" href="/admin/login">Sign in with GitHub</a></p><p class="muted">Admins only.</p>', { kicker: 'Mission control' }));
         return true;
       }
       const nonce = randomBytes(16).toString('base64');
-      const html = (await readFile(ADMIN_HTML, 'utf8')).replace('/*MCPORTAL_DESIGN*/', DESIGN_CSS + PRIMITIVES_CSS).replaceAll('__NONCE__', nonce);
+      const html = (await readFile(ADMIN_HTML, 'utf8')).replace('/*MCPORTAL_DESIGN*/', DESIGN_CSS + PRIMITIVES_CSS).replace('<!--MCPORTAL_LOCKUP-->', LOCKUP_ON_DARK).replaceAll('__NONCE__', nonce);
       sendHtml(res, 200, html, {
-        'content-security-policy': `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; form-action 'self'; frame-ancestors 'none'; base-uri 'none'`,
+        'content-security-policy': `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; font-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'`,
       });
       return true;
     }

@@ -85,7 +85,7 @@ test('browser forms: approving on the consent screen and signing out of the acco
     const ghState = new URL(toGithub?.location ?? 'https://invalid/').searchParams.get('state');
     assert.ok(ghState, 'the sign-in went to GitHub with a state');
     await page.goto(`${base}/oauth/callback?code=gh-code&state=${ghState}`);
-    await page.waitFor(`document.body.innerText.includes('Signed in as')`, 'the account page');
+    await page.waitFor(`document.body.textContent.includes('Signed in as')`, 'the account page');
     await page.click('form[action="/account/logout"] button');
     assert.equal((await answered('/account/logout'))?.status, 302, 'signing out is not refused as cross-site');
     await page.waitFor(`document.body.innerText.includes('Sign in with GitHub')`, 'signed out');

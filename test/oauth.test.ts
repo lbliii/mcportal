@@ -469,8 +469,9 @@ test('account page: download everything, one-time links, and delete the account 
     assert.equal(done.headers.location, '/account');
     const session = cookieOf(done, 'mcportal_account')!;
     const home = await raw(app.port, { path: '/account', headers: { cookie: session } });
-    assert.match(home.body, /Signed in as <b>@Lawrence<\/b>\. Public profile: <b>@lawrence<\/b>/);
-    assert.match(home.body, /1 clip\(s\)/);
+    assert.match(home.body, /Signed in as<\/p><h1>@Lawrence<\/h1>/);
+    assert.match(home.body, /Your public profile is <b>@lawrence<\/b>/);
+    assert.match(home.body, /<b>1<\/b><span>clip<\/span>/);
     assert.doesNotMatch(String(home.headers['content-security-policy']), /script-src/);
     const csrf = home.body.match(/name="csrf" value="([^"]+)"/)![1]!;
     const bookmarks = await raw(app.port, { path: '/account/export/bookmarks', headers: { cookie: session } });

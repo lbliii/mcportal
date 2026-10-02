@@ -24,7 +24,7 @@ import { safeEqual, secretToken, sha256Url } from '../lib/ids.ts';
 import { processLogger } from '../lib/log.ts';
 import { RateLimiter } from '../lib/rate-limit.ts';
 import { cookies, escapeHtml, readBody, redirect, sendHtml, sendJson } from '../lib/web.ts';
-import { page } from '../page.ts';
+import { handshake, page } from '../page.ts';
 import { clean } from '../lib/text.ts';
 import type { Fetcher } from '../types.ts';
 import { Accounts, makeBootstrap, memoryPersistence } from '../accounts.ts';
@@ -307,7 +307,7 @@ export class OAuthServer {
       const e = error instanceof OAuthError ? error : new OAuthError('server_error', 'Unexpected error', 500);
       if (!(error instanceof OAuthError)) processLogger().error('oauth.crashed', { route, error: errorStack(error) });
       if (route === '/oauth/authorize' || route === '/oauth/callback') {
-        sendHtml(res, e.status, page('Sign-in problem', `<h1>Sign-in problem</h1><p>${escapeHtml(e.message)}</p>`));
+        sendHtml(res, e.status, page('Sign-in problem', `<p>${escapeHtml(e.message)}</p>`, { door: 'shut', kicker: 'Signal lost' }));
       } else {
         sendJson(res, e.status, { error: e.error, error_description: e.message }, route === '/oauth/token' || route === '/oauth/register' ? CORS : {});
       }
@@ -384,7 +384,7 @@ export class OAuthServer {
       200,
       page(
         'Connect to MCPortal',
-        `<h1>Connect to MCPortal?</h1>
+        `${handshake(client.clientName)}
 <p><strong>${escapeHtml(client.clientName)}</strong> wants to open and change your MCPortal room.</p>
 <p class="muted">After you approve, you'll sign in with GitHub, then be sent back to <code>${escapeHtml(redirectHost)}</code>. Only continue if you started this from that app.</p>
 <form method="post" action="/oauth/authorize">
@@ -392,6 +392,7 @@ export class OAuthServer {
 <button class="primary" name="decision" value="approve" type="submit">Continue with GitHub</button>
 <button name="decision" value="deny" type="submit">Cancel</button>
 </form>`,
+        { heading: 'Connect to MCPortal?', kicker: 'A door is opening'},
       ),
       { 'set-cookie': cookie },
     );
@@ -437,8 +438,8 @@ export class OAuthServer {
    * callback started in someone else's browser is refused (login CSRF).
    */
   beginPageSignIn(req: IncomingMessage, res: ServerResponse, done: PageSignInHandler): void {
-    if (!this.config.github) return sendHtml(res, 404, page('Not available', '<p>GitHub sign-in is not configured.</p>'));
-    if (!this.limits.authorize.take(this.clientIp(req))) return sendHtml(res, 429, page('Slow down', '<p>Too many sign-in attempts. Try again in a few minutes.</p>'));
+    if (!this.config.github) return sendHtml(res, 404, page('Not available', '<p>GitHub sign-in is not configured.</p>', { door: 'shut' }));
+    if (!this.limits.authorize.take(this.clientIp(req))) return sendHtml(res, 429, page('Slow down', '<p>Too many sign-in attempts. Try again in a few minutes.</p>', { door: 'shut', kicker: 'Ion storm' }));
     const now = this.now();
     for (const [k, v] of this.pageSignIns) if (v.expiresAt <= now) this.pageSignIns.delete(k);
     const ghState = `pg_${secretToken(24)}`;
@@ -457,7 +458,7 @@ export class OAuthServer {
     const browser = cookies(req)[this.pageCookieName] ?? '';
     const clear = { 'set-cookie': `${this.pageCookieName}=; Path=/oauth/callback; HttpOnly; SameSite=Lax; Max-Age=0${this.secure ? '; Secure' : ''}` };
     if (!pending || pending.expiresAt <= this.now() || !browser || !safeEqual(sha256Url(browser), pending.browser)) {
-      return sendHtml(res, 400, page('Sign-in expired', '<p>This sign-in link expired or was started in another browser. Start again.</p>'), clear);
+      return sendHtml(res, 400, page('Sign-in expired', '<p>This sign-in link expired or was started in another browser. Start again.</p>', { door: 'shut', kicker: 'This door has closed' }), clear);
     }
     const ghCode = url.searchParams.get('code');
     const who = ghCode ? await this.githubIdentity(ghCode) : { error: 'GitHub sign-in was cancelled' };

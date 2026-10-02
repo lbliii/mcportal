@@ -1,4 +1,3 @@
-import { DESIGN_CSS, PRIMITIVES_CSS } from './design/generated.ts';
 /**
  * The public pages: the landing page at /, /privacy and /support, the screenshots
  * they show (/site/*.png), and the brand files browsers and link previews ask for
@@ -12,11 +11,11 @@ import { readFile } from 'node:fs/promises';
 import type { ServerResponse } from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { escapeHtml } from './lib/web.ts';
+import { HOUSE_CSS, houseFooter, houseNav, TAGLINE } from './house.ts';
 
 export const DEFAULT_SUPPORT_URL = 'https://github.com/lbliii/mcportal/issues';
 const POLICY_UPDATED = '2026-10-02';   // bump when what's stored changes
 const IMAGE_DIR = fileURLToPath(new URL('./site/', import.meta.url));
-const TAGLINE = 'Your liminal webspace.';
 const DESCRIPTION = 'MCPortal is a reading room that lives in your agent: the sites, feeds, channels and repos you follow, one door away.';
 
 /** Every file served from src/site, by URL path. Nothing else in that folder is reachable. */
@@ -51,30 +50,9 @@ const HEADERS = {
   'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; img-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
 };
 
-/**
- * The house style: a mid-century paperback. A night-sky band on top (dark in both schemes),
- * cream paper below (ink in dark mode), Jost for headings, halftone rules, and pictures
- * printed with an off-register block of colour behind them. Colours are brand/README.md's.
- */
-const STYLE = `
-@font-face{font-family:"MCPortal Jost";src:url(/site/jost-bold.ttf) format("truetype");font-weight:700;font-display:swap}
-${DESIGN_CSS}
-:root,:root[data-theme],:root:not([data-theme]){--mp-surface-canvas:var(--mp-web-canvas);--mp-surface-card:var(--mp-web-card);--mp-text-primary:var(--mp-web-text);--mp-text-secondary:var(--mp-web-secondary);--mp-text-link:var(--mp-web-link)}
-*{box-sizing:border-box}
-body{margin:0;background:var(--mp-surface-canvas);color:var(--mp-text-primary);font:1.0625rem/var(--mp-reader-line) var(--mp-font-ui)}
-a{color:var(--mp-text-link)}
-h1,h2,h3,.jost{font-family:var(--mp-font-heading);font-weight:700;letter-spacing:-.005em}
-h1{font-size:clamp(36px,5.2vw,54px);line-height:1.05;margin:0 0 16px}
-h2{font-size:30px;line-height:1.15;margin:64px 0 14px}
-h2::before{content:"";display:block;width:104px;height:10px;margin-bottom:20px;background:radial-gradient(circle,var(--mp-brand-teal) 1.5px,transparent 1.9px) 0 0/8px 8px}
-h3{font-size:var(--mp-type-19);margin:28px 0 4px}
-.wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+/** The landing and policy pages' own pieces, over the house style. */
+const STYLE = `${HOUSE_CSS}
 main.wrap{max-width:780px;padding-bottom:72px}
-.sky{background:var(--mp-web-night);color:var(--mp-brand-paper);position:relative;overflow:hidden}
-.sky a{color:var(--mp-brand-mustard)}
-nav{position:relative;z-index:1;display:flex;align-items:center;gap:22px;padding-top:22px;padding-bottom:22px;font-size:var(--mp-type-15)}
-nav a.to{color:#D4C8AF;text-decoration:none}nav a.to:hover{color:var(--mp-brand-paper)}
-nav .brand{margin-right:auto;display:flex}@media (max-width:520px){nav{gap:18px}}nav .brand img{height:30px;width:auto;display:block}
 .sky .title{max-width:780px;position:relative;padding-top:24px;padding-bottom:56px}
 .sky .title h1{margin:0}
 .hero .art{display:block;width:100%;height:320px;object-fit:cover;object-position:100% 100%}
@@ -83,33 +61,19 @@ nav .brand{margin-right:auto;display:flex}@media (max-width:520px){nav{gap:18px}
 .hero h1 span{color:var(--mp-brand-mustard)}
 .hero .lede{font-size:var(--mp-type-19);color:#DDD1B9;max-width:520px;margin:0 0 26px}
 .cta{display:flex;flex-wrap:wrap;align-items:center;gap:22px;font-size:16px}
-.sky .button{display:inline-block;background:var(--mp-brand-mustard);color:var(--mp-brand-ink);font-weight:600;text-decoration:none;padding:10px 20px;border-radius:var(--mp-radius-control);box-shadow:4px 4px 0 var(--mp-brand-brick)}
 @media (min-width:1100px){
   .hero{min-height:560px}
   .hero .art{position:absolute;right:0;bottom:0;width:auto;height:100%}
   .hero .pitch{padding-top:72px;padding-bottom:96px}
   .hero .pitch>*{max-width:40%}
 }
-.lede{font-size:var(--mp-type-19)}.muted{color:var(--mp-text-secondary);font-size:var(--mp-type-15)}
-code{background:var(--mp-surface-inset);padding:1px 6px;border-radius:4px;word-break:break-all;font-size:var(--mp-type-15)}
+.lede{font-size:var(--mp-type-19)}
 figure{margin:40px 0}
 figure img{display:block;width:100%;height:auto;border:2px solid var(--mp-web-frame);border-radius:var(--mp-radius-card);box-shadow:9px 9px 0 var(--mp-brand-teal)}
 figure.alt img{box-shadow:9px 9px 0 var(--mp-brand-mustard)}figure.alt2 img{box-shadow:9px 9px 0 var(--mp-brand-brick)}
 figcaption{color:var(--mp-text-secondary);font-size:var(--mp-type-15);margin-top:16px}
-ol.steps{list-style:none;padding:0;margin:24px 0;counter-reset:step}
-ol.steps li{counter-increment:step;position:relative;padding-left:58px;margin:0 0 22px;min-height:40px}
-ol.steps li::before{content:counter(step);position:absolute;left:0;top:2px;width:38px;height:38px;border-radius:50%;background:var(--mp-brand-mustard);color:var(--mp-brand-ink);display:flex;align-items:center;justify-content:center;font:700 19px/1 "MCPortal Jost",Jost,Futura,sans-serif}
-ol.steps b{font-family:"MCPortal Jost",Jost,Futura,sans-serif;font-size:var(--mp-type-19);display:block}
-.card{background:var(--mp-surface-card);border:2px solid var(--mp-text-primary);border-radius:var(--mp-radius-lg);padding:20px 24px;margin:28px 0;box-shadow:9px 9px 0 var(--mp-brand-mustard)}
-.card p{margin:0}.card p+p{margin-top:10px}
 table{border-collapse:collapse;font-size:var(--mp-type-15)}td,th{border-bottom:1px solid var(--mp-web-divider);padding:8px 14px 8px 0;text-align:left;vertical-align:top}
-th{font-family:"MCPortal Jost",Jost,Futura,sans-serif}
-footer{background:var(--mp-web-night);color:#D4C8AF;font-size:var(--mp-type-15)}
-footer .wrap{display:flex;flex-wrap:wrap;align-items:center;gap:8px 24px;padding-top:28px;padding-bottom:28px}
-footer .tag{margin-right:auto;color:var(--mp-brand-paper);font-size:17px}
-footer a{color:var(--mp-brand-paper)}
-${PRIMITIVES_CSS}
-body{background:var(--mp-web-canvas);color:var(--mp-web-text);line-height:var(--mp-reader-line)}
+th{font-family:var(--mp-font-heading)}
 `;
 
 /**
@@ -128,11 +92,11 @@ function layout(title: string, head: string, body: string, site: SiteConfig, her
 <meta name="twitter:card" content="summary_large_image"><meta name="theme-color" content="#1F2A36">
 <style>${STYLE}</style></head><body>
 <header class="sky${hero ? ' hero' : ''}">
-<nav class="wrap"><a class="brand" href="/"><picture><source media="(max-width:520px)" srcset="/favicon.svg" width="30" height="30"><img src="/site/lockup-on-dark.svg" alt="MCPortal" width="148" height="30"></picture></a><a class="to" href="/privacy">Privacy</a><a class="to" href="/support">Support</a><a class="to" href="/account">Account</a></nav>
+${houseNav('<picture><source media="(max-width:520px)" srcset="/favicon.svg" width="30" height="30"><img src="/site/lockup-on-dark.svg" alt="MCPortal" width="148" height="30"></picture>')}
 ${head}${hero ? '\n<img class="art" src="/site/hero.svg" alt="" width="1500" height="640">' : ''}
 </header>
 <main class="wrap">${body}</main>
-<footer><div class="wrap"><span class="tag jost">${TAGLINE}</span>${by}<a href="/privacy">Privacy</a><a href="/security">Security</a><a href="/support">Support</a><a href="https://github.com/lbliii/mcportal">Source</a></div></footer>
+${houseFooter(by)}
 </body></html>`;
 }
 

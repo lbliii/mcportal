@@ -189,6 +189,13 @@ test('public pages: landing, privacy and support render without scripts; images 
     assert.equal((await raw(app.port, { path: '/site/..%2Fhttp.ts' })).status, 404);
     assert.equal((await raw(app.port, { path: '/site/other.png' })).status, 404);
     assert.equal((await raw(app.port, { method: 'POST', path: '/privacy' })).status, 404);
+    // A browser that follows a dead link gets a page; anything else gets the JSON error.
+    const lost = await raw(app.port, { path: '/nowhere', headers: { accept: 'text/html,application/xhtml+xml' } });
+    assert.equal(lost.status, 404);
+    assert.match(lost.headers['content-type'] as string, /text\/html/);
+    assert.match(lost.body, /Nothing at this address/);
+    assert.doesNotMatch(lost.headers['content-security-policy'] as string, /script-src/);
+    assert.match((await raw(app.port, { path: '/nowhere' })).body, /"not_found"/);
   } finally {
     await app.close();
   }

@@ -26,7 +26,8 @@ import { errorCode, errorMessage, errorStack, isAppError } from './lib/errors.ts
 import { safeEqual } from './lib/ids.ts';
 import { createLogger, requestId, type Logger } from './lib/log.ts';
 import { ToolMetrics } from './lib/metrics.ts';
-import { readBody } from './lib/web.ts';
+import { readBody, sendHtml } from './lib/web.ts';
+import { page } from './page.ts';
 import { handleMessage, RPC, rpcError, SERVER_INFO, roomHtml, type JsonRpcResponse } from './mcp.ts';
 import { API_EXPORT_PATH, API_IMPORT_PATH, API_PATH, CLIENT_HEADER, handleCalls, MIN_CLIENT_VERSION, versionAtLeast } from './api/calls.ts';
 import { API_METHODS } from './api/methods.ts';
@@ -361,7 +362,13 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
     }
 
     if (url.pathname === API_PATH || url.pathname === API_EXPORT_PATH || url.pathname === API_IMPORT_PATH) return stateApi(req, res, url, reqLog);
-    if (url.pathname !== '/mcp') return sendError(res, 404, 'not_found', 'Not found');
+    if (url.pathname !== '/mcp') {
+      // Someone following a link gets a page; anything else gets the usual error.
+      if (req.method === 'GET' && /\btext\/html\b/.test(req.headers.accept ?? '')) {
+        return sendHtml(res, 404, page('Nothing here', '<p>The link may be old, or mistyped. Try the <a href="/">front door</a>, or your <a href="/account">account</a>.</p>', { heading: 'Nothing at this address', door: 'shut', kicker: 'Lost in the ether' }));
+      }
+      return sendError(res, 404, 'not_found', 'Not found');
+    }
     const userId = await authenticate(req);
     if (!userId) return unauthorized(res);
     if (req.method !== 'POST') {

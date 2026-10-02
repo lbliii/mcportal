@@ -80,10 +80,28 @@ async function readUpload(req: IncomingMessage): Promise<{ file?: Buffer; csrf?:
 function uploadForm(action: string, csrf?: string): string {
   return `<form method="post" action="${action}" enctype="multipart/form-data">
   ${csrf ? `<input type="hidden" name="csrf" value="${escapeHtml(csrf)}">` : ''}
-  <p><input type="file" name="file" accept=".json,application/json" required></p>
+  <p><input type="file" name="file" accept=".json,application/json" aria-label="MCPortal export file" required></p>
   <p><button class="primary">Import</button></p>
 </form>`;
 }
+
+/** The account page's own pieces, over the shared page style. */
+const ACCOUNT_STYLE = `
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:22px 0 8px}
+.stats div{border:2px solid var(--mp-web-text);border-radius:var(--mp-radius-card);background:var(--mp-web-canvas);padding:12px 14px 10px;box-shadow:5px 5px 0 var(--mp-brand-brick)}
+.stats div:nth-child(2){box-shadow:5px 5px 0 var(--mp-brand-mustard)}.stats div:nth-child(3){box-shadow:5px 5px 0 var(--mp-brand-teal)}
+.stats b{display:block;font:700 34px/1 var(--mp-font-heading);margin-bottom:4px}.stats span{display:block;line-height:1.3;color:var(--mp-web-secondary);font-size:var(--mp-type-14)}
+ul.rows{list-style:none;padding:0;margin:0 0 10px;border-top:1px solid var(--mp-web-divider)}
+ul.rows li{border-bottom:1px solid var(--mp-web-divider)}ul.rows .muted{white-space:nowrap}
+ul.rows form{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:10px 0;margin:0}
+.files{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin:0 0 8px}
+.files a{display:block;border:2px solid var(--mp-web-text);border-radius:var(--mp-radius-card);padding:10px 14px;text-decoration:none;color:var(--mp-web-text);background:var(--mp-web-canvas)}
+.files a:hover{box-shadow:4px 4px 0 var(--mp-brand-teal);transform:translate(-2px,-2px)}
+.files b{display:block;font-family:var(--mp-font-heading)}.files span{color:var(--mp-web-secondary);font-size:var(--mp-type-13)}
+.danger-zone{margin-top:40px;border:2px dashed var(--mp-brand-brick);border-radius:var(--mp-radius-card);padding:18px 20px}
+.danger-zone h2{margin-top:0}.danger-zone h2::before{background:radial-gradient(circle,var(--mp-brand-brick) 1.5px,transparent 1.9px) 0 0/8px 8px}
+@media (max-width:520px){.stats{gap:10px}.stats b{font-size:26px}.files{grid-template-columns:1fr}}
+`;
 
 function sendFile(res: ServerResponse, file: ExportFile): void {
   res.writeHead(200, {
@@ -163,15 +181,15 @@ export class AccountPage {
 
   /** Import an uploaded export and answer with what happened. */
   private async runImport(res: ServerResponse, userId: string, upload: { file?: Buffer }, back: string): Promise<void> {
-    if (!upload.file) return sendHtml(res, 400, page('No file', `<p>Pick your MCPortal export file (a .json). <a href="${back}">Go back</a>.</p>`));
+    if (!upload.file) return sendHtml(res, 400, page('No file', `<p>Pick your MCPortal export file (a .json). <a href="${back}">Go back</a>.</p>`, { door: 'shut' }));
     try {
       const result = await importExport(parseExport(upload.file.toString('utf8')), userId, this.deps);
       this.deps.log?.info('account.import', { portals: result.portalsAdded, saved: result.savedAdded, clips: result.clipsAdded });
       const lines = describeImport(result).split('\n').map((l) => `<p>${escapeHtml(l)}</p>`).join('');
-      sendHtml(res, 200, page('Imported', `<h1>Imported</h1>${lines}<p>In Claude, ask <i>“open my room”</i> to see it.</p>`));
+      sendHtml(res, 200, page('Imported', `${lines}<p>In your agent, ask <i>“open my room”</i> to see it.</p>`, { kicker: 'Materialized!' }));
     } catch (error) {
       if (!isAppError(error) || error.code === 'internal') throw error;
-      sendHtml(res, 400, page('Not imported', `<p>${escapeHtml(error.message)}</p><p><a href="${back}">Try another file</a>.</p>`));
+      sendHtml(res, 400, page('Not imported', `<p>${escapeHtml(error.message)}</p><p><a href="${back}">Try another file</a>.</p>`, { door: 'shut' }));
     }
   }
 
@@ -182,30 +200,38 @@ export class AccountPage {
     const grants = await this.deps.oauth.grantsOf(s.accountId);
     const portals = profile.columns.reduce((n, c) => n + c.panels.length, 0);
     const login = escapeHtml(s.login);
-    const labels: Record<ExportFormat, string> = { mcportal: 'Everything (MCPortal export, JSON)', bookmarks: 'Saved items (bookmarks file)', clips: 'Clips (Markdown, .tar.gz)', opml: 'Sources (OPML)' };
+    const labels: Record<ExportFormat, [string, string]> = {
+      mcportal: ['Everything', 'MCPortal export, JSON'],
+      bookmarks: ['Saved items', 'Bookmarks file, HTML'],
+      clips: ['Clips', 'Markdown, .tar.gz'],
+      opml: ['Sources', 'OPML'],
+    };
+    const csrf = `<input type="hidden" name="csrf" value="${escapeHtml(s.csrf)}">`;
+    const signOut = `<form method="post" action="/account/logout">${csrf}<button class="small">Sign out</button></form>`;
+    const stat = (n: number, one: string, many: string) => `<div><b>${n}</b><span>${n === 1 ? one : many}</span></div>`;
     sendHtml(res, 200, page('Your MCPortal account', `
-<h1>Your MCPortal account</h1>
-<p>Signed in as <b>@${login}</b>${pub ? `. Public profile: <b>@${escapeHtml(pub.handle)}</b>` : '. No public profile'}.</p>
-<p class="muted">${portals} portal(s), ${profile.saved.length} saved item(s), ${clips} clip(s).</p>
-<h2 style="font-size:16px">Signed-in apps and devices</h2>
-${grants.length ? `<ul>${grants.map((g) => `<li><form method="post" action="/account/devices/revoke" style="display:flex;gap:8px;align-items:center;margin:0 0 6px">
-  <input type="hidden" name="csrf" value="${escapeHtml(s.csrf)}"><input type="hidden" name="grant" value="${escapeHtml(g.grantId)}">
+<p>${pub ? `Your public profile is <b>@${escapeHtml(pub.handle)}</b>.` : 'You have no public profile. Ask your agent to set one up if you want one.'}</p>
+<div class="stats">${stat(portals, 'portal', 'portals')}${stat(profile.saved.length, 'saved item', 'saved items')}${stat(clips, 'clip', 'clips')}</div>
+<h2>Signed-in apps and devices</h2>
+${grants.length ? `<ul class="rows">${grants.map((g) => `<li><form method="post" action="/account/devices/revoke">
+  ${csrf}<input type="hidden" name="grant" value="${escapeHtml(g.grantId)}">
   <span><b>${escapeHtml(g.clientName)}</b> <span class="muted">${g.lastUsedAt ? `last used ${new Date(g.lastUsedAt).toISOString().slice(0, 10)}` : ''}</span></span>
-  <button>Revoke</button></form></li>`).join('')}</ul>
+  <button class="small">Revoke</button></form></li>`).join('')}</ul>
 <p class="muted">Revoking signs that app or device out at once; it can sign in again.</p>` : '<p class="muted">None right now.</p>'}
-<h2 style="font-size:16px">Download your data</h2>
-<ul>${EXPORT_FORMATS.map((f) => `<li><a href="/account/export/${f}">${labels[f]}</a></li>`).join('')}</ul>
-<h2 style="font-size:16px">Import</h2>
+<h2>Download your data</h2>
+<div class="files">${EXPORT_FORMATS.map((f) => `<a href="/account/export/${f}"><b>${labels[f][0]}</b><span>${labels[f][1]}</span></a>`).join('')}</div>
+<h2>Import</h2>
 <p>Add an MCPortal export from another server or your own machine. It only adds: nothing in your portal is removed or moved.</p>
 ${uploadForm('/account/import', s.csrf)}
-<h2 style="font-size:16px">Delete your account</h2>
+<div class="danger-zone">
+<h2>Delete your account</h2>
 <p>This deletes your room, saved items, clips, public profile, shares and follows, and signs you out everywhere. It can't be undone, so download your data first.</p>
 <form method="post" action="/account/delete">
-  <input type="hidden" name="csrf" value="${escapeHtml(s.csrf)}">
-  <p><label>Type <code>delete @${login}</code> to confirm:<br><input name="confirm" autocomplete="off" style="font:inherit;padding:6px 8px;width:100%;box-sizing:border-box;margin-top:6px"></label></p>
+  ${csrf}
+  <p><label>Type <code>delete @${login}</code> to confirm:<input name="confirm" autocomplete="off" spellcheck="false"></label></p>
   <p><button class="danger">Delete my account</button></p>
 </form>
-<form method="post" action="/account/logout"><input type="hidden" name="csrf" value="${escapeHtml(s.csrf)}"><button>Sign out</button></form>`));
+</div>`, { heading: `@${s.login}`, kicker: 'Signed in as', wide: true, aside: signOut, style: ACCOUNT_STYLE }));
   }
 
   /** Returns true if it handled the request. */
@@ -218,7 +244,7 @@ ${uploadForm('/account/import', s.csrf)}
       const entry = this.downloads.get(key);
       this.downloads.delete(key);   // one use
       if (!entry || entry.expiresAt <= this.now() || this.deps.accounts.actor(entry.userId).status !== 'active') {
-        sendHtml(res, 410, page('Link expired', '<p>This download link has expired or was already used. Ask for a new export, or download from your <a href="/account">account page</a>.</p>'));
+        sendHtml(res, 410, page('Link expired', '<p>This download link has expired or was already used. Ask for a new export, or download from your <a href="/account">account page</a>.</p>', { door: 'shut', kicker: 'This door has closed' }));
         return true;
       }
       sendFile(res, await buildExport(entry.format, entry.userId, await this.exportSources(entry.userId)));
@@ -230,21 +256,21 @@ ${uploadForm('/account/import', s.csrf)}
       const entry = this.uploads.get(key);
       if (!entry || entry.expiresAt <= this.now() || this.deps.accounts.actor(entry.userId).status !== 'active') {
         this.uploads.delete(key);
-        sendHtml(res, 410, page('Link expired', '<p>This upload link has expired or was already used. Ask Claude for a new one, or import from your <a href="/account">account page</a>.</p>'));
+        sendHtml(res, 410, page('Link expired', '<p>This upload link has expired or was already used. Ask your agent for a new one, or import from your <a href="/account">account page</a>.</p>', { door: 'shut', kicker: 'This door has closed' }));
         return true;
       }
       if (req.method === 'GET') {
-        sendHtml(res, 200, page('Import into MCPortal', `<h1>Import into MCPortal</h1><p>Pick your MCPortal export file. It only adds to your room: nothing is removed or moved.</p>${uploadForm(route)}<p class="muted">This link works once, for 15 minutes.</p>`));
+        sendHtml(res, 200, page('Import into MCPortal', `<p>Pick your MCPortal export file. It only adds to your room: nothing is removed or moved.</p>${uploadForm(route)}<p class="muted">This link works once, for 15 minutes.</p>`, { kicker: 'Incoming transmission' }));
         return true;
       }
-      if (!sameOrigin(req, this.deps.publicUrl)) return sendHtml(res, 403, page('Refused', '<p>That upload didn\'t come from the import page.</p>')), true;
+      if (!sameOrigin(req, this.deps.publicUrl)) return sendHtml(res, 403, page('Refused', '<p>That upload didn\'t come from the import page.</p>', { door: 'shut' })), true;
       this.uploads.delete(key);   // one use, whatever happens next
       let upload: { file?: Buffer };
       try {
         upload = await readUpload(req);
       } catch (error) {
         const big = errorCode(error) === 'limit_exceeded';
-        return sendHtml(res, big ? 413 : 400, page('Not imported', `<p>${big ? `That file is over ${MAX_UPLOAD / 1024 / 1024} MB.` : 'The upload was malformed.'} Ask Claude for a new link.</p>`), { connection: 'close' }), true;
+        return sendHtml(res, big ? 413 : 400, page('Not imported', `<p>${big ? `That file is over ${MAX_UPLOAD / 1024 / 1024} MB.` : 'The upload was malformed.'} Ask your agent for a new link.</p>`, { door: 'shut' }), { connection: 'close' }), true;
       }
       await this.runImport(res, entry.userId, upload, '/account');
       return true;
@@ -254,9 +280,9 @@ ${uploadForm('/account/import', s.csrf)}
 
     if (route === '/account/login' && req.method === 'GET') {
       this.deps.oauth.beginPageSignIn(req, res, async (who, out, clearCookie) => {
-        if ('error' in who) return sendHtml(out, 400, page('Sign-in failed', `<p>${escapeHtml(who.error)}.</p><p><a href="/account">Try again</a></p>`), clearCookie);
+        if ('error' in who) return sendHtml(out, 400, page('Sign-in failed', `<p>${escapeHtml(who.error)}.</p><p><a class="button primary" href="/account/login">Try again</a></p>`, { door: 'shut', kicker: 'Signal lost' }), clearCookie);
         const account = await this.deps.accounts.forIdentity(who);
-        if (!account) return sendHtml(out, 404, page('No account', `<p>@${escapeHtml(who.login)} has no account on this MCPortal server, so there's nothing stored for it.</p>`), clearCookie);
+        if (!account) return sendHtml(out, 404, page('No account', `<p>@${escapeHtml(who.login)} has no account on this MCPortal server, so there's nothing stored for it.</p>`, { door: 'shut' }), clearCookie);
         redirect(out, '/account', { 'set-cookie': [clearCookie['set-cookie']!, this.sessions.start(account.id, who.login)] });
       });
       return true;
@@ -265,7 +291,7 @@ ${uploadForm('/account/import', s.csrf)}
     const current = this.sessions.current(req);
     if (route === '/account' && req.method === 'GET') {
       if (!current) {
-        sendHtml(res, 200, page('Your MCPortal account', '<h1>Your MCPortal account</h1><p>Download your data or delete your account.</p><p><a href="/account/login"><button class="primary">Sign in with GitHub</button></a></p>'));
+        sendHtml(res, 200, page('Your MCPortal account', '<p>Sign in to see what MCPortal keeps for you, sign apps and devices out, download your data, or delete your account.</p><p><a class="button primary" href="/account/login">Sign in with GitHub</a></p><p class="muted">MCPortal only learns your GitHub user ID and login.</p>', { kicker: 'Account' }));
       } else await this.home(res, current.session);
       return true;
     }
@@ -276,21 +302,21 @@ ${uploadForm('/account/import', s.csrf)}
 
     const format = route.match(/^\/account\/export\/([a-z]+)$/)?.[1] as ExportFormat | undefined;
     if (format && req.method === 'GET') {
-      if (!EXPORT_FORMATS.includes(format)) return sendHtml(res, 404, page('Not found', '<p>No such export.</p>')), true;
+      if (!EXPORT_FORMATS.includes(format)) return sendHtml(res, 404, page('Not found', '<p>No such export. <a href="/account">Go back</a>.</p>', { door: 'shut' })), true;
       sendFile(res, await buildExport(format, current.session.accountId, await this.exportSources(current.session.accountId)));
       return true;
     }
 
     if (route === '/account/import' && req.method === 'POST') {
-      if (!sameOrigin(req, this.deps.publicUrl)) return sendHtml(res, 403, page('Refused', '<p>That request didn\'t come from your account page. <a href="/account">Go back</a>.</p>')), true;
+      if (!sameOrigin(req, this.deps.publicUrl)) return sendHtml(res, 403, page('Refused', '<p>That request didn\'t come from your account page. <a href="/account">Go back</a>.</p>', { door: 'shut' })), true;
       let upload: { file?: Buffer; csrf?: string };
       try {
         upload = await readUpload(req);
       } catch (error) {
         const big = errorCode(error) === 'limit_exceeded';
-        return sendHtml(res, big ? 413 : 400, page('Not imported', `<p>${big ? `That file is over ${MAX_UPLOAD / 1024 / 1024} MB.` : 'The upload was malformed.'} <a href="/account">Go back</a>.</p>`), { connection: 'close' }), true;
+        return sendHtml(res, big ? 413 : 400, page('Not imported', `<p>${big ? `That file is over ${MAX_UPLOAD / 1024 / 1024} MB.` : 'The upload was malformed.'} <a href="/account">Go back</a>.</p>`, { door: 'shut' }), { connection: 'close' }), true;
       }
-      if (!this.sessions.csrfMatches(current.session, upload.csrf)) return sendHtml(res, 403, page('Refused', '<p>That request didn\'t come from your account page. <a href="/account">Go back</a>.</p>')), true;
+      if (!this.sessions.csrfMatches(current.session, upload.csrf)) return sendHtml(res, 403, page('Refused', '<p>That request didn\'t come from your account page. <a href="/account">Go back</a>.</p>', { door: 'shut' })), true;
       await this.runImport(res, current.session.accountId, upload, '/account');
       return true;
     }
@@ -300,10 +326,10 @@ ${uploadForm('/account/import', s.csrf)}
       try {
         form = await readForm(req, MAX_FORM);
       } catch {
-        return sendHtml(res, 400, page('Bad request', '<p>Try again from the <a href="/account">account page</a>.</p>')), true;
+        return sendHtml(res, 400, page('Bad request', '<p>Try again from the <a href="/account">account page</a>.</p>', { door: 'shut' })), true;
       }
       if (!sameOrigin(req, this.deps.publicUrl) || !this.sessions.csrfMatches(current.session, form.get('csrf'))) {
-        return sendHtml(res, 403, page('Refused', '<p>That request didn\'t come from your account page. <a href="/account">Go back</a>.</p>')), true;
+        return sendHtml(res, 403, page('Refused', '<p>That request didn\'t come from your account page. <a href="/account">Go back</a>.</p>', { door: 'shut' })), true;
       }
       if (route === '/account/devices/revoke') {
         const revoked = await this.deps.oauth.revokeGrantOf(current.session.accountId, form.get('grant') ?? '');
@@ -318,7 +344,7 @@ ${uploadForm('/account/import', s.csrf)}
       }
       const expected = `delete @${current.session.login}`.toLowerCase();
       if ((form.get('confirm') ?? '').trim().toLowerCase() !== expected) {
-        return sendHtml(res, 400, page('Not deleted', `<p>Nothing was deleted: type <code>${escapeHtml(expected)}</code> exactly to confirm. <a href="/account">Go back</a>.</p>`)), true;
+        return sendHtml(res, 400, page('Not deleted', `<p>Nothing was deleted: type <code>${escapeHtml(expected)}</code> exactly to confirm. <a href="/account">Go back</a>.</p>`, { door: 'shut' })), true;
       }
       const { accountId } = current.session;
       const done = await deleteAccountData(accountId, this.deps);
@@ -326,12 +352,12 @@ ${uploadForm('/account/import', s.csrf)}
       for (const [k, d] of this.downloads) if (d.userId === accountId) this.downloads.delete(k);
       for (const [k, u] of this.uploads) if (u.userId === accountId) this.uploads.delete(k);
       this.deps.log?.info('account.deleted', { clips: done.clips, tokens: done.tokens });
-      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'set-cookie': this.sessions.cookie('', 0), 'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'" });
-      res.end(page('Account deleted', '<h1>Your account is deleted</h1><p>Your room, saved items, clips, public profile, shares and follows are gone, and you\'re signed out everywhere. Remove MCPortal from your Claude connectors too.</p>'));
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'set-cookie': this.sessions.cookie('', 0), 'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; font-src 'self'; img-src 'self'; frame-ancestors 'none'; base-uri 'none'" });
+      res.end(page('Account deleted', '<p>Your room, saved items, clips, public profile, shares and follows are gone, and you\'re signed out everywhere. Remove MCPortal from your agent\'s connectors too.</p>', { heading: 'Your account is deleted', door: 'shut' }));
       return true;
     }
 
-    sendHtml(res, 404, page('Not found', '<p><a href="/account">Your account</a></p>'));
+    sendHtml(res, 404, page('Not found', '<p>There\'s nothing at this address. Go to <a href="/account">your account</a>.</p>', { door: 'shut' }));
     return true;
   }
 }

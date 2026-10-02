@@ -6,14 +6,20 @@
 <title>MCPortal admin</title>
 <link rel="icon" href="/favicon.ico" sizes="48x48"><link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <style>
+  @font-face { font-family: "MCPortal Jost"; src: url(/site/jost-bold.ttf) format("truetype"); font-weight: 700; font-display: swap; }
   /*MCPORTAL_DESIGN*/
   * { box-sizing: border-box; }
   body { margin: 0; color: var(--mp-text-primary); font: var(--mp-type-14)/var(--mp-line-body) var(--mp-font-ui); }
   main { max-width: 900px; margin: 0 auto; padding: 22px 18px 40px; }
-  header { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
-  h1 { font-size: var(--mp-type-19); margin: 0; letter-spacing: -0.01em; }
-  h1 span { color: var(--mp-action-primary); }
-  h2 { font-size: var(--mp-type-15); margin: 26px 0 8px; }
+  header { background: var(--mp-web-night); color: var(--mp-brand-paper); }
+  header .bar { max-width: 900px; margin: 0 auto; padding: 16px 18px; display: flex; align-items: center; gap: 14px; }
+  header .lockup { height: 26px; width: auto; display: block; }
+  header h1 { font: 700 var(--mp-type-13)/1 var(--mp-font-heading); letter-spacing: .12em; text-transform: uppercase; color: var(--mp-brand-mustard); margin: 2px 0 0; }
+  header .muted { color: #D4C8AF; }
+  header button { color: var(--mp-brand-paper); border-color: #D4C8AF; }
+  header button:hover { background: rgba(242, 230, 207, .12); }
+  h2 { font: 700 var(--mp-type-18)/1.2 var(--mp-font-heading); margin: 30px 0 10px; }
+  h2::before { content: ""; display: block; width: 64px; height: 8px; margin-bottom: 10px; background: radial-gradient(circle, var(--mp-brand-teal) 1.5px, transparent 1.9px) 0 0/8px 8px; }
   .muted { color: var(--mp-text-secondary); font-size: var(--mp-type-12-5); }
   .spacer { flex: 1; }
   button { font: inherit; font-size: var(--mp-type-12-5); padding: 4px 10px; border-radius: var(--mp-radius-control); border: 1px solid var(--mp-border-control); background: transparent; color: var(--mp-text-primary); cursor: pointer; }
@@ -39,13 +45,16 @@
 </style>
 </head>
 <body>
-<main>
-  <header>
-    <h1>MC<span>Portal</span> admin</h1>
-    <span class="muted" id="me"></span>
+<header>
+  <div class="bar">
+    <a href="/"><!--MCPORTAL_LOCKUP--></a>
+    <h1>Admin</h1>
     <span class="spacer"></span>
+    <span class="muted" id="me"></span>
     <form method="post" action="/admin/logout"><button type="submit">Sign out</button></form>
-  </header>
+  </div>
+</header>
+<main>
 
   <h2>Invite someone</h2>
   <form class="row" id="inviteForm">

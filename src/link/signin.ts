@@ -17,6 +17,7 @@ import type { AddressInfo } from 'node:net';
 import { hostname } from 'node:os';
 import { AppError } from '../lib/errors.ts';
 import { escapeHtml } from '../lib/web.ts';
+import { page } from '../page.ts';
 import { clean } from '../lib/text.ts';
 import { StateClient } from './client.ts';
 import type { LinkFile, LinkRecord } from './link-file.ts';
@@ -45,11 +46,6 @@ export interface SignInOptions {
 const b64url = (buf: Buffer) => buf.toString('base64url');
 const same = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
 
-function resultPage(title: string, body: string): string {
-  return `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)}</title>
-<style>body{font:16px/1.5 system-ui,sans-serif;max-width:520px;margin:12vh auto;padding:0 20px;color:#1d2321}h1{font-size:22px}p{color:#4a524f}</style>
-<h1>${escapeHtml(title)}</h1>${body}`;
-}
 
 async function postForm(fetcher: typeof fetch, url: URL, form: Record<string, string>): Promise<Record<string, unknown>> {
   let res: Response;
@@ -114,12 +110,14 @@ export async function startSignIn(options: SignInOptions): Promise<PendingSignIn
 
   listener.on('request', (req, res) => {
     const url = new URL(req.url ?? '/', redirectUri);
+    // The hosted server's own page style; its links go to the hosted server, not this listener.
+    const resultPage = (title: string, body: string, ok = false) => page(title, body, ok ? { base: server, kicker: 'It\'s alive!' } : { base: server, door: 'shut', kicker: 'Signal lost' });
     const reply = (status: number, html: string) => {
       res.writeHead(status, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'", 'referrer-policy': 'no-referrer' });
       res.end(html);
     };
     if (req.method !== 'GET' || url.pathname !== '/callback' || handled) return reply(404, resultPage('Not here', '<p>This page only finishes an MCPortal sign-in.</p>'));
-    if (!same(url.searchParams.get('state') ?? '', state)) return reply(400, resultPage('Sign-in not finished', '<p>This link doesn\'t match the sign-in this computer started. Start it again from Claude.</p>'));
+    if (!same(url.searchParams.get('state') ?? '', state)) return reply(400, resultPage('Sign-in not finished', '<p>This link doesn\'t match the sign-in this computer started. Start it again from your agent.</p>'));
     handled = true;
     clearTimeout(timer);
     void (async () => {
@@ -141,11 +139,11 @@ export async function startSignIn(options: SignInOptions): Promise<PendingSignIn
         };
         await options.link.write(record);
         const note = await options.onLinked?.(record, client).catch(() => 'Signed in, but this computer\'s portal couldn\'t be copied to your account yet. Ask Claude to try again.');
-        reply(200, resultPage('This computer is signed in', `<p>MCPortal on this computer now keeps your portal in your hosted account${me.login ? `, as <b>${escapeHtml(me.login)}</b>` : ''}.</p>${note ? `<p>${escapeHtml(note)}</p>` : ''}<p>You can close this tab and go back to Claude.</p>`));
+        reply(200, resultPage('This computer is signed in', `<p>MCPortal on this computer now keeps your portal in your hosted account${me.login ? `, as <b>${escapeHtml(me.login)}</b>` : ''}.</p>${note ? `<p>${escapeHtml(note)}</p>` : ''}<p>You can close this tab and go back to your agent.</p>`, true));
         settle.resolve(record);
       } catch (error) {
         const message = error instanceof AppError ? error.message : 'Something went wrong while signing in.';
-        reply(400, resultPage('Sign-in not finished', `<p>${escapeHtml(message)}</p><p>Start it again from Claude.</p>`));
+        reply(400, resultPage('Sign-in not finished', `<p>${escapeHtml(message)}</p><p>Start it again from your agent.</p>`));
         settle.reject(error);
       } finally {
         close();
