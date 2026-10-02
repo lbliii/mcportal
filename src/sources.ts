@@ -4,10 +4,12 @@ import { fetchHn, hnEndpoint, type HnConfig } from './adapters/hn.ts';
 import { fetchArticle } from './adapters/reader.ts';
 import { fetchRss, type RssConfig } from './adapters/rss.ts';
 import type { TtlCache } from './lib/cache.ts';
+import { AppError, errorCode, errorStack, userMessage, type ErrorCode } from './lib/errors.ts';
+import type { Logger, LogFields } from './lib/log.ts';
 import { clean } from './lib/text.ts';
 import type { ClipSummary } from './clips.ts';
 import type { SharedItem } from './social.ts';
-import { normalizeSourceConfig, type ClipsConfig, type PortalSpec, type PinnedConfig, type PinnedData, type SavedItem } from './profile.ts';
+import { normalizeSourceConfig, type ClipsConfig, type PortalInput, type PinnedData, type SavedItem } from './profile.ts';
 import type { Article, Fetcher, Item, PortalResult, SourceKind } from './types.ts';
 
 /** Declared freshness per source, in seconds (Orrery-style freshness policy). */
@@ -26,17 +28,26 @@ export const FRESHNESS: Record<SourceKind | 'reader', number> = {
 export interface SourceDeps {
   fetcher: Fetcher;
   cache: TtlCache;
+  log?: Logger | undefined;
+}
+
+/** A source that failed to load becomes a portal error; a bug in our code is also logged with its stack. */
+function loadFailure(error: unknown, deps: SourceDeps, fields: LogFields): { error: string; errorCode: ErrorCode } {
+  const code = errorCode(error);
+  if (code === 'internal') deps.log?.error('source.failed', { ...fields, error: errorStack(error) });
+  else deps.log?.debug('source.failed', { ...fields, code });
+  return { error: clean(userMessage(error, 'Unexpected error loading this source'), 200), errorCode: code };
 }
 
 const DEFAULT_TITLES: Record<SourceKind, string> = { hn: 'Hacker News', rss: 'Feed', github: 'GitHub', docs: 'Docs', saved: 'Saved', pinned: 'Pinned', clips: 'Clips', following: 'Following' };
 
 /** Saved items come from the profile, not the network. */
-export function savedPortal(portal: PortalSpec, saved: SavedItem[]): PortalResult {
-  const { limit } = normalizeSourceConfig('saved', portal.config, portal.id) as { limit: number };
+export function savedPortal(portal: PortalInput, saved: SavedItem[]): PortalResult {
+  const { limit } = normalizeSourceConfig('saved', portal.config, portal.id);
   const items: Item[] = saved.slice(0, limit).map((s) => {
     let host = '';
     try { host = new URL(s.url).hostname.replace(/^www\./, ''); } catch { /* validated on save */ }
-    return { id: s.url, title: s.title, url: s.url, summary: s.note, meta: host ? [host] : [], publishedAt: s.savedAt };
+    return { id: s.url, title: s.title, url: s.url, ...(s.note !== undefined ? { summary: s.note } : {}), meta: host ? [host] : [], publishedAt: s.savedAt };
   });
   return {
     portalId: portal.id,
@@ -48,8 +59,8 @@ export function savedPortal(portal: PortalSpec, saved: SavedItem[]): PortalResul
 }
 
 /** Pinned items come from the profile too: the agent fetched them with another tool. */
-export function pinnedPortal(portal: PortalSpec, pins: Record<string, PinnedData>): PortalResult {
-  const { from, recipe, limit } = normalizeSourceConfig('pinned', portal.config, portal.id) as PinnedConfig;
+export function pinnedPortal(portal: PortalInput, pins: Record<string, PinnedData>): PortalResult {
+  const { from, recipe, limit } = normalizeSourceConfig('pinned', portal.config, portal.id);
   const pin = Object.hasOwn(pins, portal.id) ? pins[portal.id] : undefined;
   return {
     portalId: portal.id,
@@ -62,23 +73,26 @@ export function pinnedPortal(portal: PortalSpec, pins: Record<string, PinnedData
 }
 
 /** The query a clips portal runs against the clip store. */
-export function clipsQuery(portal: PortalSpec): ClipsConfig {
-  return normalizeSourceConfig('clips', portal.config, portal.id) as ClipsConfig;
+export function clipsQuery(portal: PortalInput): ClipsConfig {
+  return normalizeSourceConfig('clips', portal.config, portal.id);
 }
 
 /** Clips come from the clip store: the caller runs clipsQuery and passes the result. */
-export function clipsPortal(portal: PortalSpec, clips: ClipSummary[]): PortalResult {
+export function clipsPortal(portal: PortalInput, clips: ClipSummary[]): PortalResult {
   const { kind, tag } = clipsQuery(portal);
-  const items: Item[] = clips.map((c) => ({
-    id: c.id,
-    title: c.title,
+  const items: Item[] = clips.map((c) => {
     // A title taken from the first line would otherwise repeat at the start of the preview.
-    summary: c.note ? clean(c.note, 280) : c.preview.startsWith(c.title) ? c.preview.slice(c.title.length).trim() || undefined : c.preview,
-    meta: [c.kind, ...c.tags.slice(0, 3).map((t) => `#${t}`)],
-    publishedAt: c.createdAt,
-    ...(c.source.url ? { url: c.source.url } : {}),
-    clip: { id: c.id, kind: c.kind },
-  }));
+    const summary = c.note ? clean(c.note, 280) : c.preview.startsWith(c.title) ? c.preview.slice(c.title.length).trim() || undefined : c.preview;
+    return {
+      id: c.id,
+      title: c.title,
+      ...(summary !== undefined ? { summary } : {}),
+      meta: [c.kind, ...c.tags.slice(0, 3).map((t) => `#${t}`)],
+      publishedAt: c.createdAt,
+      ...(c.source.url ? { url: c.source.url } : {}),
+      clip: { id: c.id, kind: c.kind },
+    };
+  });
   return {
     portalId: portal.id,
     source: 'clips',
@@ -89,16 +103,25 @@ export function clipsPortal(portal: PortalSpec, clips: ClipSummary[]): PortalRes
 }
 
 /** Shares from people the user follows; the caller runs Social.feed and passes the result. */
-export function followingPortal(portal: PortalSpec, shares: SharedItem[]): PortalResult {
-  const items: Item[] = shares.map((s) => ({
-    id: s.id,
-    title: s.title,
-    ...(s.url ? { url: s.url } : {}),
-    ...(s.note ? { summary: clean(s.note, 280) } : {}),
-    meta: [`@${s.author.handle}`, s.kind === 'clip' ? (s.clip?.kind ?? 'clip') : 'link'],
-    publishedAt: s.createdAt,
-    share: { id: s.id, kind: s.kind },
-  }));
+export function followingPortal(portal: PortalInput, shares: SharedItem[]): PortalResult {
+  const items: Item[] = shares.map((s) => {
+    const original = s.original && 'author' in s.original ? s.original : undefined;
+    const reblog: NonNullable<Item['share']>['reblog'] = s.reblogOf ? {
+      root: s.reblogOf.root,
+      ...(original ? { by: original.author.handle, ...(original.note ? { note: clean(original.note, 280) } : {}) } : { removed: s.original && 'removed' in s.original ? s.original.removed : 'removed' as const }),
+      ...(s.via ? { via: s.via } : {}),
+    } : undefined;
+    const kind = s.kind === 'clip' ? (original?.clip?.kind ?? s.clip?.kind ?? 'clip') : 'link';
+    return {
+      id: s.id,
+      title: s.title,
+      ...(s.url ? { url: s.url } : {}),
+      ...(s.note ? { summary: clean(s.note, 280) } : {}),
+      meta: [`@${s.author.handle}`, ...(reblog ? [reblog.by ? `reblogged @${reblog.by}` : 'reblogged a removed post'] : []), kind],
+      publishedAt: s.createdAt,
+      share: { id: s.id, kind: s.kind, ...(reblog ? { reblog } : {}), ...(s.reblogCount ? { reblogs: s.reblogCount } : {}), ...(s.myReblog ? { mine: s.myReblog } : {}), canReblog: s.canReblog },
+    };
+  });
   return {
     portalId: portal.id,
     source: 'following',
@@ -140,7 +163,7 @@ export async function findDocs(query: string, deps: SourceDeps): Promise<{ confi
     await deps.cache.get(`docs:${site.toc.url}`, FRESHNESS.docs, async () => site);
     return { config: { url: docsInputUrl(input), toc: site.toc, limit: 30 }, title: site.title };
   } catch (error) {
-    return { error: clean((error as Error).message, 200) };
+    return { error: loadFailure(error, deps, { source: 'docs' }).error };
   }
 }
 
@@ -149,7 +172,7 @@ export function docsItems(site: DocSite, config: DocsConfig): Item[] {
   if (config.section) {
     const wanted = config.section.toLowerCase();
     const section = site.sections.find((s) => s.title.toLowerCase() === wanted);
-    if (!section) throw new Error(`${site.title} has no section "${config.section}"`);
+    if (!section) throw new AppError('not_found', `${site.title} has no section "${config.section}"`);
     return section.pages.slice(0, config.limit).map((p) => ({
       id: p.url,
       title: p.title,
@@ -170,8 +193,8 @@ export function docsItems(site: DocSite, config: DocsConfig): Item[] {
   });
 }
 
-export async function loadPortal(portal: PortalSpec, deps: SourceDeps, force = false): Promise<PortalResult> {
-  if (portal.source === 'saved' || portal.source === 'pinned' || portal.source === 'clips' || portal.source === 'following') throw new Error(`${portal.source} portals are built from the profile, not fetched`);
+export async function loadPortal(portal: PortalInput, deps: SourceDeps, force = false): Promise<PortalResult> {
+  if (portal.source === 'saved' || portal.source === 'pinned' || portal.source === 'clips' || portal.source === 'following') throw new AppError('invalid_argument', `${portal.source} portals are built from the profile, not fetched`);
   const config = normalizeSourceConfig(portal.source, portal.config, portal.id);
   let endpoint = '';
   let title = portal.title ?? DEFAULT_TITLES[portal.source];
@@ -219,7 +242,7 @@ export async function loadPortal(portal: PortalSpec, deps: SourceDeps, force = f
       source: portal.source,
       title,
       items: [],
-      error: clean((error as Error).message, 200) || 'Unknown error',
+      ...loadFailure(error, deps, { source: portal.source }),
       provenance: { source: portal.source, endpoint, fetchedAt: new Date().toISOString(), cached: false, ttlSeconds: FRESHNESS[portal.source] },
     };
   }

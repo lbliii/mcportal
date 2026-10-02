@@ -1,7 +1,7 @@
 /**
  * Per-user usage budget for the hosted server. Tools cost units roughly in
  * proportion to the outbound work they cause (find_source probes several URLs;
- * get_profile fetches nothing). Each user gets a per-minute burst allowance and a
+ * reading the profile fetches nothing); each tool declares its cost in its ToolDef. Each user gets a per-minute burst allowance and a
  * daily allowance, and all users share a global daily cap so one busy day can't
  * run up the hosting bill. Fixed windows, in memory: one instance, resets on deploy.
  */
@@ -16,19 +16,6 @@ export const DEFAULT_LIMITS: BudgetLimits = { perMinute: 120, perDay: 3000, glob
 
 const MINUTE = 60_000;
 const DAY = 86_400_000;
-
-/** Units for one call. Unknown tools cost 1. */
-export function toolCost(name: string, args: Record<string, unknown>): number {
-  switch (name) {
-    case 'import_opml': case 'import_portal': return 20;
-    case 'export_data': return 5;
-    case 'find_source': return 5;
-    case 'open_room': return 3;
-    case 'refresh_portal': case 'read_article': case 'read_source': case 'add_portal': case 'open_docs': case 'read_doc_page': return 2;
-    case 'get_thumbnails': return 1 + Math.ceil((Array.isArray(args.urls) ? Math.min(args.urls.length, 24) : 0) / 8);
-    default: return 1;
-  }
-}
 
 interface Window { used: number; resetAt: number }
 
@@ -57,6 +44,14 @@ export class UsageBudget {
     return w;
   }
 
+  /** Where usage stands now, for the admin page. */
+  snapshot(top = 20): BudgetSnapshot {
+    const now = this.now();
+    const global = this.global.resetAt > now ? this.global : { used: 0, resetAt: now + DAY };
+    const today = [...this.day].filter(([, w]) => w.resetAt > now).map(([userId, w]) => ({ userId, used: w.used })).sort((a, b) => b.used - a.used).slice(0, top);
+    return { limits: { ...this.limits }, global: { used: global.used, resetsAt: new Date(global.resetAt).toISOString() }, today };
+  }
+
   /** Charge `cost` to `userId`, or refuse without charging anything. */
   take(userId: string, cost: number): BudgetVerdict {
     const now = this.now();
@@ -72,6 +67,13 @@ export class UsageBudget {
     this.global.used += cost;
     return { ok: true };
   }
+}
+
+export interface BudgetSnapshot {
+  limits: BudgetLimits;
+  global: { used: number; resetsAt: string };
+  /** The heaviest users today, most first. */
+  today: Array<{ userId: string; used: number }>;
 }
 
 export function budgetMessage(v: Exclude<BudgetVerdict, { ok: true }>): string {

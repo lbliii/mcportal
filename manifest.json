@@ -1,0 +1,172 @@
+{
+  "manifest_version": "0.3",
+  "name": "mcportal",
+  "display_name": "MCPortal",
+  "version": "0.7.0",
+  "description": "Your personal, agent-composed reading room: portals onto Hacker News, GitHub and any RSS feed, arranged the way you ask, with reader view and no ads.",
+  "long_description": "MCPortal is your reading room inside your agent. Open it to see portals onto the sources you follow (any site with a feed, Hacker News, GitHub, documentation sites), arranged the way you ask. Read articles and docs without the clutter, save links, clip things from the conversation, and import or export your subscriptions. This bundle runs MCPortal on your computer: your room lives in ~/.mcportal and nothing is sent anywhere but the sites you follow.",
+  "author": {
+    "name": "Lawrence Lane",
+    "url": "https://github.com/lbliii/mcportal"
+  },
+  "homepage": "https://mcportal-production.up.railway.app",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lbliii/mcportal.git"
+  },
+  "icon": "src/site/icon-512.png",
+  "server": {
+    "type": "node",
+    "entry_point": "bin/mcportal.mjs",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/bin/mcportal.mjs",
+        "--stdio"
+      ],
+      "env": {}
+    }
+  },
+  "tools": [
+    {
+      "name": "open_room",
+      "description": "Open the user's MCPortal room: portals onto the sources they follow, in their layout, with what's new in each and each portal's id."
+    },
+    {
+      "name": "build_room",
+      "description": "Set up the user's room from up to 4 starter packs (ids from open_room's setup)."
+    },
+    {
+      "name": "arrange_room",
+      "description": "Change the room's layout: move portals (to a column, 1 = left; one past the last makes a new column), set column widths, retitle portals or change their settings, rename the room, or switch layout or how stories open."
+    },
+    {
+      "name": "remove_portal",
+      "description": "Remove portals from the user's room, only ones they asked to remove (by id or title; open_room lists them)."
+    },
+    {
+      "name": "list_new_items",
+      "description": "What the user hasn't seen yet across their room (or the portals named), each with a ref, plus what MCPortal knows of their taste."
+    },
+    {
+      "name": "show_highlights",
+      "description": "Show your picks from list_new_items, best first, as a highlights card: each item's ref and a one-line reason it's worth the user's time."
+    },
+    {
+      "name": "read_source",
+      "description": "Fetch the latest items from one source (Hacker News, a feed, GitHub) without changing the room: for 'what's new on…' or previewing a feed before adding it."
+    },
+    {
+      "name": "find_source",
+      "description": "Find what MCPortal can show for something the user wants to follow, test-load it and preview it; add a candidate with add_portal."
+    },
+    {
+      "name": "add_portal",
+      "description": "Add one portal to the user's room from a find_source candidate (its source and config)."
+    },
+    {
+      "name": "list_sources",
+      "description": "Describe the source types MCPortal can show in a portal and the settings each accepts."
+    },
+    {
+      "name": "import_opml",
+      "description": "Import the user's subscriptions from another feed reader: pass their OPML export's text."
+    },
+    {
+      "name": "read_article",
+      "description": "Open a web page in reader view: clean title, byline and text, shown as a card."
+    },
+    {
+      "name": "save_item",
+      "description": "Save a link for later (a bookmark), or change the title or note of one already saved."
+    },
+    {
+      "name": "remove_saved",
+      "description": "Remove one link from the user's saved items."
+    },
+    {
+      "name": "pin_portal",
+      "description": "Show results from another of the user's tools (Jira, Slack, Drive, a database, …) as a portal in their room: you fetch them with that tool and pass short items here; MCPortal never contacts it."
+    },
+    {
+      "name": "open_docs",
+      "description": "Open a docs site in the docs viewer (shown as a card) and get its contents: sections and pages, with links."
+    },
+    {
+      "name": "read_doc_page",
+      "description": "Read one page of a docs site as clean text (headings, code, tables, callouts), with its section and the previous and next pages."
+    },
+    {
+      "name": "search_docs",
+      "description": "Find pages of a docs site by title and section, and on Sphinx sites functions and classes by name ('str.split'); not full text."
+    },
+    {
+      "name": "open_handoff",
+      "description": "Open a page the user sent here from MCPortal's reader (they say \"Open MCPortal handoff k7q2xm\"): shows it as a card where they were reading, with any passage they selected, and gives you its text."
+    },
+    {
+      "name": "clip",
+      "description": "Keep something from this chat (or an article) in the user's clips, only when they ask to clip or keep it; a link to read later is save_item."
+    },
+    {
+      "name": "search_clips",
+      "description": "Find the user's clips by words, kind or tag, for things from earlier chats ('that table we made about…')."
+    },
+    {
+      "name": "get_clip",
+      "description": "Show one of the user's clips in full, as a card in the conversation (\"show me that table\")."
+    },
+    {
+      "name": "update_clip",
+      "description": "Change a clip's title, note or tags."
+    },
+    {
+      "name": "delete_clip",
+      "description": "Delete one of the user's clips."
+    },
+    {
+      "name": "export_data",
+      "description": "Give the user a copy of their data: everything (mcportal), saved items as bookmarks, clips as Markdown, or sources as OPML."
+    },
+    {
+      "name": "import_portal",
+      "description": "Add an MCPortal export to the user's room: portals they don't have, saved items and clips; nothing is removed or moved."
+    },
+    {
+      "name": "account_settings",
+      "description": "Whether the user is signed in (as whom) or in ghost mode, and the account page, where they download everything or delete their account (only there, never a tool)."
+    },
+    {
+      "name": "link_account",
+      "description": "Sign this local MCPortal in to the user's hosted account, so their portal is the same everywhere and they can share."
+    },
+    {
+      "name": "list_reading",
+      "description": "What the user was reading: pages they opened and haven't finished, most recent first ('what was I in the middle of?')."
+    }
+  ],
+  "tools_generated": false,
+  "keywords": [
+    "workspace",
+    "dashboard",
+    "rss",
+    "hacker-news",
+    "github",
+    "reader",
+    "mcp-apps"
+  ],
+  "license": "UNLICENSED",
+  "privacy_policies": [
+    "https://mcportal-production.up.railway.app/privacy"
+  ],
+  "compatibility": {
+    "platforms": [
+      "darwin",
+      "win32",
+      "linux"
+    ],
+    "runtimes": {
+      "node": ">=22.18"
+    }
+  }
+}

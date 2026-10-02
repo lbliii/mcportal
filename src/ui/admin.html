@@ -69,55 +69,80 @@
   <h2>Accounts</h2>
   <div class="wrap"><table><thead><tr><th>Account</th><th>GitHub</th><th>Status</th><th>Role</th><th>Joined via</th><th>Since</th><th></th></tr></thead><tbody id="accounts"></tbody></table></div>
 
+  <h2>Usage</h2>
+  <p class="muted" id="usageSummary">Usage on this server instance since it started.</p>
+  <div class="wrap"><table><thead><tr><th>Heaviest today</th><th>Units</th></tr></thead><tbody id="usageUsers"></tbody></table></div>
+  <p class="muted">Tool calls, busiest first:</p>
+  <div class="wrap"><table><thead><tr><th>Tool</th><th>Calls</th><th>Failed</th><th>Avg ms</th><th>Max ms</th><th>Errors</th></tr></thead><tbody id="usageTools"></tbody></table></div>
+
   <h2>Audit log</h2>
   <div class="wrap"><table><thead><tr><th>When</th><th>Action</th><th>Target</th><th>By</th><th>Detail</th></tr></thead><tbody id="audit"></tbody></table></div>
 </main>
 <script nonce="__NONCE__">
 (() => {
   'use strict';
-  const $ = (id) => document.getElementById(id);
+  /** @type {ById<AdminElements>} */
+  const $ = (id) => /** @type {any} */ (document.getElementById(id));
   let csrf = '';
   let me = { login: '', accountId: '' };
 
+  /**
+   * @param {string} tag
+   * @param {Record<string, string | boolean | null | undefined | EventListener> | null} attrs on… keys take listeners; true is a bare attribute; false/null/undefined are left off
+   * @param {...unknown} children nested arrays are flattened; null/undefined/false are skipped
+   */
   function el(tag, attrs, ...children) {
     const node = document.createElement(tag);
     for (const [k, v] of Object.entries(attrs || {})) {
       if (v === undefined || v === null || v === false) continue;
-      if (k.startsWith('on')) node.addEventListener(k.slice(2), v);
-      else node.setAttribute(k, v === true ? '' : v);
+      // The on… keys are only ever given functions, and the others only strings or true.
+      if (k.startsWith('on')) node.addEventListener(k.slice(2), /** @type {EventListener} */ (v));
+      else node.setAttribute(k, v === true ? '' : /** @type {string} */ (v));
     }
     for (const c of children.flat()) if (c !== null && c !== undefined && c !== false) node.append(c instanceof Node ? c : document.createTextNode(String(c)));
     return node;
   }
-  const when = (ms) => new Date(ms).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+  const when = (/** @type {number} */ ms) => new Date(ms).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+  /** @param {string} text @param {boolean} [bad] */
   function say(text, bad) { $('msg').textContent = text; $('msg').className = bad ? 'err' : ''; }
 
+  /**
+   * GET (no body) or POST JSON to the admin API; the caller names the reply's shape.
+   * @template T
+   * @param {string} path
+   * @param {unknown} [body]
+   * @returns {Promise<T>}
+   */
   async function api(path, body) {
     const res = await fetch(path, body === undefined
       ? { credentials: 'same-origin' }
       : { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json', 'x-csrf': csrf }, body: JSON.stringify(body) });
     const data = await res.json().catch(() => ({}));
     if (res.status === 401) { location.href = '/admin'; throw new Error('Signed out'); }
-    if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+    if (!res.ok) throw new Error(data.error_description || data.error || `Request failed (${res.status})`);
     return data;
   }
 
   // ---- invite links and ready-to-send messages
-  const linkFor = (i) => (i.code ? `${location.origin}/join/${i.code}` : '');
-  const messageFor = (i) => `Hi @${i.login}! I've invited you to MCPortal, your liminal webspace: a reading portal that lives in your agent. Set it up here (sign in with GitHub as @${i.login}): ${linkFor(i)}`;
+  const linkFor = (/** @type {Invite} */ i) => (i.code ? `${location.origin}/join/${i.code}` : '');
+  const messageFor = (/** @type {Invite} */ i) => `Hi @${i.login}! I've invited you to MCPortal, your liminal webspace: a reading portal that lives in your agent. Set it up here (sign in with GitHub as @${i.login}): ${linkFor(i)}`;
+  /** @param {string} text @param {string} what */
   async function copy(text, what) {
     try { await navigator.clipboard.writeText(text); say(`Copied the ${what}.`); }
     catch { showShare(null, text); say(`Couldn't use the clipboard; select the ${what} below and copy it.`, true); }
   }
+  /** With no invite, `text` is what to show. @param {Invite | null} invite @param {string} [text] */
   function showShare(invite, text) {
     $('share').classList.add('on');
     $('shareTitle').textContent = invite ? `Send this to @${invite.login} (Slack, email, a text…):` : 'Copy this:';
-    $('shareText').value = text || messageFor(invite);
+    // Only copy()'s fallback passes no invite, and it always passes the (non-empty) text.
+    $('shareText').value = text || messageFor(/** @type {Invite} */ (invite));
     $('copyShare').onclick = () => copy($('shareText').value, 'message');
     $('copyShareLink').hidden = !invite;
     $('copyShareLink').onclick = () => invite && copy(linkFor(invite), 'link');
   }
 
+  /** @param {AdminUpdate} data */
   function render(data) {
     $('invites').replaceChildren(...(data.invites.length ? data.invites.map((i) => el('tr', null,
       el('td', null, `@${i.login}`), el('td', null, i.invitedBy), el('td', null, when(i.createdAt)),
@@ -138,7 +163,7 @@
         el('td', null, a.via), el('td', null, when(a.createdAt)), el('td', null, action));
     }) : [el('tr', null, el('td', { colspan: '7', class: 'empty' }, 'No accounts yet. People get one when they first sign in.'))]));
 
-    const person = (p) => (p ? (p.handle ? `@${p.handle}` : p.login ? `@${p.login} (GitHub)` : p.accountId) : '?');
+    const person = (/** @type {AdminPerson | null} */ p) => (p ? (p.handle ? `@${p.handle}` : p.login ? `@${p.login} (GitHub)` : p.accountId) : '?');
     const reports = data.reports || [];
     $('reports').replaceChildren(...(reports.length ? reports.map((r) => {
       const t = r.target;
@@ -156,25 +181,49 @@
         el('td', null, el('span', { class: 'actions' }, actions)));
     }) : [el('tr', null, el('td', { colspan: '6', class: 'empty' }, 'No reports.'))]));
 
+    // Usage comes with the page state only; actions leave it as it was.
+    if (data.usage) renderUsage(data.usage);
+
     $('audit').replaceChildren(...(data.audit.length ? data.audit.map((e) => el('tr', null,
       el('td', null, when(e.at)), el('td', null, e.action), el('td', null, e.target), el('td', null, e.actor), el('td', { class: 'muted' }, e.detail || ''))) : [el('tr', null, el('td', { colspan: '5', class: 'empty' }, 'Nothing yet.'))]));
   }
 
+  /** @param {AdminUsage} usage */
+  function renderUsage(usage) {
+    const b = usage.budget;
+    $('usageSummary').textContent = b
+      ? `Today: ${b.global.used} of ${b.limits.globalPerDay} units for everyone (resets ${when(Date.parse(b.global.resetsAt))}); ${b.limits.perDay} per account, ${b.limits.perMinute} per minute. Counts are for this server instance since ${usage.tools ? when(Date.parse(usage.tools.since)) : 'it started'}.`
+      : 'No usage budget on this server.';
+    const users = b ? b.today : [];
+    $('usageUsers').replaceChildren(...(users.length ? users.map((u) => el('tr', null, el('td', null, u.login ? `@${u.login}` : el('code', null, u.userId)), el('td', null, String(u.used))))
+      : [el('tr', null, el('td', { colspan: '2', class: 'empty' }, 'No usage today.'))]));
+    const tools = usage.tools ? usage.tools.tools : [];
+    $('usageTools').replaceChildren(...(tools.length ? tools.map((t) => {
+      const failed = t.calls - (t.outcomes.ok || 0);
+      const codes = Object.entries(t.codes).sort((x, y) => y[1] - x[1]).map(([code, n]) => `${code} ×${n}`).join(', ');
+      return el('tr', null, el('td', null, el('code', null, t.tool)), el('td', null, String(t.calls)), el('td', null, String(failed)), el('td', null, String(t.avgMs)), el('td', null, String(t.maxMs)), el('td', { class: 'muted' }, codes));
+    }) : [el('tr', null, el('td', { colspan: '6', class: 'empty' }, 'No tool calls yet.'))]));
+  }
+
+  // The catches below cast to Error: api() throws Errors, and fetch/JSON/DOM failures are Errors (TypeError, SyntaxError) too.
+
+  /** @param {string} action @param {string} who @param {string} question @param {boolean} [askReason] */
   async function act(action, who, question, askReason) {
     if (!confirm(question)) return;
     const reason = askReason ? (prompt('Reason (optional, goes in the audit log):') || '') : undefined;
     try {
       render(await api(`/admin/api/${action}`, { who, reason }));
       say(`Done: ${action} ${who}.`);
-    } catch (error) { say(error.message, true); }
+    } catch (error) { say(error instanceof Error ? error.message : String(error), true); }
   }
 
+  /** @param {string} path @param {{ id: string, action?: string }} body @param {string} question */
   async function moderate(path, body, question) {
     if (!confirm(question)) return;
     try {
       render(await api(`/admin/api/${path}`, body));
       say('Done.');
-    } catch (error) { say(error.message, true); }
+    } catch (error) { say(error instanceof Error ? error.message : String(error), true); }
   }
 
   $('inviteForm').addEventListener('submit', async (e) => {
@@ -182,22 +231,24 @@
     const login = $('inviteLogin').value.trim();
     if (!login) return;
     try {
+      /** @type {AdminUpdate} */
       const data = await api('/admin/api/invite', { who: login });
       render(data);
       $('inviteLogin').value = '';
       const invite = data.invites.find((i) => i.login === login.replace(/^@/, '').toLowerCase());
       say(`Invited @${login.replace(/^@/, '')}. Send them the message below.`);
       if (invite) showShare(invite);
-    } catch (error) { say(error.message, true); }
+    } catch (error) { say(error instanceof Error ? error.message : String(error), true); }
   });
 
   (async () => {
     try {
+      /** @type {AdminState} */
       const data = await api('/admin/api/state');
       csrf = data.csrf; me = data.me;
       $('me').textContent = `signed in as @${me.login}`;
       render(data);
-    } catch (error) { say(error.message, true); }
+    } catch (error) { say(error instanceof Error ? error.message : String(error), true); }
   })();
 })();
 </script>

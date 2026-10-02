@@ -3,6 +3,7 @@
  * pass. Output is data only (no HTML), so the UI renders it without injection
  * risk and the agent can treat it as content, never as instructions.
  */
+import { AppError, upstreamStatus } from '../lib/errors.ts';
 import { parseAttrs, tokenize } from '../lib/html.ts';
 import { linkTarget, toneOf } from '../lib/markdown.ts';
 import { clean, decodeEntities, INLINE } from '../lib/text.ts';
@@ -224,11 +225,12 @@ export function extractArticle(html: string, baseUrl?: string, limits: { blocks:
         flush();
         const a = type === 'h' || type === 'pre' || type === 'p' || name === 'dt' ? parseAttrs(tok.attrs) : {};
         // A definition term with an id is an API signature (Sphinx: <dt id="os.path.join">); symbol links point at it.
-        const signature = name === 'dt' && !!a.id && ID.test(a.id);
+        const signatureId = name === 'dt' && a.id && ID.test(a.id) ? a.id : undefined;
         const callout = innerCallout();
         const isLabel = callout && type === 'p' && /\badmonition-title\b/.test(a.class ?? '');
-        current = { type: isLabel ? 'label' : signature ? 'h' : type === 'p' && quote > 0 ? 'quote' : type, zone: zone(), parts: [], ...(callout ? { callout } : {}), ...(name === 'li' && lists.length ? { list: lists.at(-1) } : {}) };
-        if (signature) { current.level = 4; current.id = a.id; }
+        const list = name === 'li' ? lists.at(-1) : undefined;
+        current = { type: isLabel ? 'label' : signatureId ? 'h' : type === 'p' && quote > 0 ? 'quote' : type, zone: zone(), parts: [], ...(callout ? { callout } : {}), ...(list !== undefined ? { list } : {}) };
+        if (signatureId) { current.level = 4; current.id = signatureId; }
         if (type === 'h') {
           current.level = Number(name[1]);
           const top = stack[stack.length - 1];
@@ -305,10 +307,11 @@ export function extractArticle(html: string, baseUrl?: string, limits: { blocks:
     blocks.push(b);
   }
   const wordCount = blocks.reduce((n, b) => n + words(b.text), 0);
+  const siteName = meta['og:site_name'], byline = meta.author || meta['article:author'];
   return {
     title,
-    siteName: meta['og:site_name'] || undefined,
-    byline: meta.author || meta['article:author'] || undefined,
+    ...(siteName ? { siteName } : {}),
+    ...(byline ? { byline } : {}),
     blocks,
     wordCount,
   };
@@ -320,9 +323,9 @@ export async function fetchArticle(url: string, fetcher: Fetcher): Promise<Extra
     maxBytes: READER_LIMITS.inputBytes,
     truncate: true,
   });
-  if (res.status < 200 || res.status >= 300) throw new Error(`Page responded ${res.status}`);
+  if (res.status < 200 || res.status >= 300) throw upstreamStatus('Page', res.status);
   if (res.contentType && !/html|xml|text\/plain/i.test(res.contentType)) {
-    throw new Error('Reader view only supports web pages');
+    throw new AppError('invalid_argument', 'Reader view only supports web pages');
   }
   return { ...extractArticle(res.text, res.url || url), finalUrl: res.url };
 }

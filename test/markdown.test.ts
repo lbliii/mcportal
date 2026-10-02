@@ -202,3 +202,11 @@ test('docs page on GitHub: book links to built .html pages point at the .md sour
   assert.deepEqual(page.blocks[0]!.spans!.filter((s) => s.href).map((s) => s.href), ['https://raw.githubusercontent.com/o/r/HEAD/src/ch02.md#top', 'https://example.com/a.html']);
   assert.equal(page.blocks.length, 1, 'the ## Chapter heading repeating the title is dropped');
 });
+
+test('textParts: splits between blocks, each part within the budget unless one block is bigger', async () => {
+  const { textParts } = await import('../src/lib/markdown.ts');
+  const p = (text: string) => ({ type: 'p' as const, text });
+  const parts = textParts([p('a'.repeat(40)), p('b'.repeat(40)), p('c'.repeat(40)), p('d'.repeat(200))], 100);
+  assert.deepEqual(parts.map((x) => x.length), [82, 40, 200]);
+  assert.deepEqual(textParts([], 100), ['']);
+});

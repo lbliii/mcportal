@@ -4,6 +4,7 @@
  * theirs anywhere. Parsing reuses the linear-time HTML tokenizer (OPML is flat
  * XML), so hostile files can't blow up.
  */
+import { escapeHtml } from './lib/web.ts';
 import { REPO_PATTERN } from './adapters/github.ts';
 import { parseAttrs, tokenize } from './lib/html.ts';
 import { clean, decodeEntities, safeHttpUrl } from './lib/text.ts';
@@ -48,18 +49,18 @@ export function parseOpml(xml: string): { title: string; feeds: OpmlFeed[] } {
   return { title, feeds };
 }
 
-const xmlAttr = (s: string) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+/** XML text and attribute values: the HTML escaper is valid XML. */
+const xmlAttr = escapeHtml;
 
 /** A feed URL for a portal, if the source has one that other readers can use. */
 export function feedUrlFor(portal: PortalSpec): string | undefined {
-  const c = portal.config as Record<string, unknown>;
-  if (portal.source === 'rss' && typeof c.url === 'string') return c.url;
+  if (portal.source === 'rss') return portal.config.url;
   if (portal.source === 'hn') {
-    const feed = String(c.feed ?? 'top');
+    const { feed } = portal.config;
     return feed === 'top' ? 'https://news.ycombinator.com/rss' : `https://hnrss.org/${feed === 'new' ? 'newest' : feed}`;
   }
-  if (portal.source === 'github' && c.mode === 'releases' && typeof c.repo === 'string' && REPO_PATTERN.test(c.repo)) {
-    return `https://github.com/${c.repo}/releases.atom`;
+  if (portal.source === 'github' && portal.config.mode === 'releases' && REPO_PATTERN.test(portal.config.repo)) {
+    return `https://github.com/${portal.config.repo}/releases.atom`;
   }
   return undefined;   // GitHub searches, saved items and pinned results have no feed
 }

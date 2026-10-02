@@ -70,7 +70,7 @@ The core: live content from sources you chose, laid out your way, read cleanly.
 | | Portal art: generated vintage sci-fi print scenes when an item has no picture, one style per source | ✅ |
 | **Provenance** | "Show your work": every portal says its source, endpoint, fetch time, cache state and freshness | ✅ |
 | **Freshness** | Refresh one portal or all; per-source cache (HN 2 min, GitHub 5 min, RSS 10 min, reader 1 h, pictures 1 day) | ✅ |
-| **Intelligence** | Standing intents: scheduled checks and digests | 🗺 |
+| **Intelligence** | Standing intents: scheduled checks and digests; first, watches (artists → concerts near you) ([plan](plans/watches.md)) | 🗺 |
 | | Views of your own reading (what you read and save, by topic and source) | 🗺 |
 
 ### 3.2 Collecting
@@ -122,8 +122,8 @@ How MCPortal is part of the agent, not only something displayed next to it.
 | Feature set | Features | Status |
 |---|---|---|
 | **Transports** | Stdio (plugin, Codex) and Streamable HTTP (`/mcp`) | ✅ |
+| | MCP 2026-07-28 (stateless, `server/discover`) alongside 2025-era clients ([plan](plans/mcp-2026-07-28.md)) | 🗺 |
 | **Identity & access** | OAuth 2.1 with GitHub sign-in; one `authorize()` gate for every tool; invites, suspension, allowlist; single-user static token | ✅ |
-| | More sign-in options (Google, email link, passkeys) | 🗺 |
 | **Storage** | Files locally; Postgres hosted (PITR on) | ✅ |
 | | Scheduled backups; row-level security | 🗺 |
 | **Fetch boundary** | Public-IP-only safe fetch, size/time/redirect caps, linear-time HTML tokenizer | ✅ |
@@ -253,7 +253,7 @@ There's no per-portal choice. The ideas from the brainstorm all fit once we add 
 | `cards` | Today's shelf cards | Anything |
 | `gallery` | Pictures first, mosaic | YouTube, art, design feeds |
 | `frontpage` | Lead story, secondaries, headlines | News, a Space |
-| `river` | Several sources merged into one timeline | A column you scan once |
+| `river` | Now a room layout: every portal merged into one stream ([plan](plans/river.md)) | Wandering, and reblogs later |
 | `deck` | One at a time: read, archive, snooze | Saved items |
 | `quotes` | Pull quotes | Clips |
 | `changelog` | Versions grouped by project | GitHub releases, changelog feeds |
@@ -267,10 +267,10 @@ Some views need new data (a `docs` source, stored read state for `deck` and `wat
 
 | Vertical | Tools |
 |---|---|
-| Reading | `open_room` · `get_profile` · `update_profile` · `find_source` · `add_portal` · `read_source` · `refresh_portal` (app) · `read_article` · `get_thumbnails` (app) · `list_sources` |
+| Reading | `open_room` · `arrange_room` · `remove_portal` · `find_source` · `add_portal` · `read_source` · `refresh_portal` (app) · `read_article` · `get_thumbnails` (app) · `list_sources` |
 | Collecting | `save_item` · `remove_saved` · `pin_portal` · `clip` · `search_clips` · `get_clip` · `update_clip` · `delete_clip` |
-| Social | `get_public_profile` · `set_public_profile` · `remove_public_profile` · `open_space` · `share` · `unshare` · `get_share` · `list_shares` · `relationship` · `list_connections` · `report` |
-| Onboarding & portability | `build_room` · `import_opml` · `export_opml` · `export_data` · `import_portal` · `account_settings` |
+| Social | `get_public_profile` · `set_public_profile` · `remove_public_profile` · `open_space` · `share` · `unshare` · `get_share` · `share_settings` · `list_shares` · `relationship` · `list_connections` · `report` |
+| Onboarding & portability | `build_room` · `import_opml` · `export_data` · `import_portal` · `account_settings` |
 
 ## 8. Vocabulary (decided 2026-09-30)
 
@@ -317,4 +317,4 @@ Renaming is cheapest now, while the beta is invite-only and before the connector
 2. ✅ **Model-facing text:** server instructions and tool descriptions use the new words and say that "my portal" means the room.
 3. ✅ **Tool names, once, before the directory submission:** `open_workspace` → `open_room`, `add_panel` → `add_portal`, `pin_panel` → `pin_portal`, `refresh_panel` → `refresh_portal`, `build_portal` → `build_room`. The rest already fit. Hosts will ask people to approve the renamed tools again, which is acceptable in a beta. Parameters and results changed with them: `panelId` → `portalId`, `removePanelIds` → `removePortalIds`, `featuredPanelIds` → `featuredPortalIds`, and results carry `portals`, `portal` and `portalId`. There are no aliases for the old names.
 4. ✅ **Code:** `PanelSpec` → `PortalSpec`, `PanelResult` → `PortalResult`, `workspace.html` → `room.html`, `WORKSPACE_URI` → `ROOM_URI` (`ui://mcportal/room.html`), CSS `.panel` → `.portal` and `data-panel` → `data-portal`. Done ahead of the view work, so views start in the new words.
-5. **Stored data:** keep the profile's JSON keys (`columns[].panels`) and read them as portals. Change them only with a versioned migration, if ever. `update_profile` takes the stored shape too, and `test/compat.test.ts` checks that a profile file and an export from before the rename still load.
+5. **Stored data:** keep the profile's JSON keys (`columns[].panels`) and read them as portals. Change them only with a versioned migration, if ever. `export_data` and `import_portal` carry the stored shape too, and `test/compat.test.ts` checks that a profile file and an export from before the rename still load.

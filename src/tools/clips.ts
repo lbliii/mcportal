@@ -3,39 +3,20 @@
  * Clips come only from explicit requests, and everything read back from them is
  * fenced as untrusted: a quote from an article can carry instructions.
  */
-import { buildClip, CLIP_KINDS, CLIP_LIMITS, ClipError, clampLimit, queryWords, summaryOf, type Clip, type ClipData, type ClipKind, type ClipSummary } from './clips.ts';
-import { clean } from './lib/text.ts';
-import { clipsPortal, clipsQuery } from './sources.ts';
-import { ensurePortal, toolError, untrusted, ROOM_URI, type CallToolResult, type ToolContext, type ToolDef } from './tools.ts';
+import { buildClip, fromContent, CLIP_KINDS, CLIP_LIMITS, clampLimit, clipText, queryWords, summaryOf, type Clip, type ClipKind, type ClipStore, type ClipSummary } from '../clips.ts';
+import type { Profile } from '../profile.ts';
+import { clean } from '../lib/text.ts';
+import { clipsPortal, clipsQuery } from '../sources.ts';
+import { ensurePortal } from '../layout.ts';
+import { ok, toolError, toolFailure, untrusted, ROOM_URI, type ToolContext, type ToolDef } from './kit.ts';
+import type { ToolResults } from './results.ts';
 
-const MODEL_TABLE_ROWS = 100;
 
-function ok(text: string, structuredContent: Record<string, unknown>): CallToolResult {
-  return { content: [{ type: 'text', text }], structuredContent };
-}
-
-const noStore = () => toolError('Clips are not available on this server.');
+const noStore = () => toolError('Clips are not available on this server.', 'unavailable');
 
 function summaryLine(c: ClipSummary): string {
   const tags = c.tags.length ? ` ${c.tags.map((t) => `#${t}`).join(' ')}` : '';
   return `- [${c.id}] ${c.kind} · ${c.title}${tags} · ${c.createdAt.slice(0, 10)}: ${c.preview}${c.note ? ` (note: ${clean(c.note, 120)})` : ''}`;
-}
-
-/** The clip's content as text for the model. */
-export function clipText(data: ClipData): string {
-  switch (data.kind) {
-    case 'quote': return `${data.text}${data.attribution ? `\n— ${data.attribution}` : ''}`;
-    case 'exchange': return data.turns.map((t) => `${t.speaker}: ${t.text}`).join('\n\n');
-    case 'note': return data.blocks.map((b) => (b.type === 'h' ? `## ${b.text}` : b.type === 'li' ? `- ${b.text}` : b.type === 'quote' ? `> ${b.text}` : b.type === 'pre' ? `\`\`\`\n${b.text}\n\`\`\`` : b.text)).join('\n\n');
-    case 'table': {
-      const row = (cells: string[]) => `| ${cells.map((c) => c.replace(/\|/g, '\\|')).join(' | ')} |`;
-      const lines = [row(data.columns), row(data.columns.map(() => '---')), ...data.rows.slice(0, MODEL_TABLE_ROWS).map(row)];
-      if (data.rows.length > MODEL_TABLE_ROWS) lines.push(`(${data.rows.length - MODEL_TABLE_ROWS} more rows; the clip card shows them all)`);
-      return lines.join('\n');
-    }
-    case 'image': return `[${data.mime} image, ${Math.ceil(Buffer.from(data.data, 'base64').length / 1000)} KB: shown in the clip card]`;
-    case 'link': return data.url;
-  }
 }
 
 function sourceLabel(clip: ClipSummary): string {
@@ -43,9 +24,9 @@ function sourceLabel(clip: ClipSummary): string {
 }
 
 /** The clips portals in the layout, rebuilt so the app can redraw them. */
-async function clipPortals(ctx: ToolContext, profile: Awaited<ReturnType<ToolContext['store']['get']>>) {
+async function clipPortals(ctx: ToolContext, clips: ClipStore, profile: Profile) {
   const specs = profile.columns.flatMap((c) => c.panels).filter((p) => p.source === 'clips');
-  return Promise.all(specs.map(async (spec) => clipsPortal(spec, await ctx.clips!.list(ctx.userId, clipsQuery(spec)))));
+  return Promise.all(specs.map(async (spec) => clipsPortal(spec, await clips.list(ctx.userId, clipsQuery(spec)))));
 }
 
 const kindProperty = { type: 'string', enum: CLIP_KINDS };
@@ -54,17 +35,11 @@ export const CLIP_TOOLS: ToolDef[] = [
   {
     name: 'clip',
     title: 'Clip to MCPortal',
+    access: 'write',
     description: [
-      "Save a snippet from this conversation (or an article) to the user's MCPortal clips. Only when the user asks to clip, save or keep something from the chat; for a link to read later, use save_item.",
-      'Pick the kind and fill only its fields:',
-      'quote: text (verbatim) and attribution;',
-      `exchange: turns [{ speaker: "user" | "assistant" | a name, text }], verbatim, at most ${CLIP_LIMITS.turns};`,
-      'note: markdown (headings, paragraphs, lists, code, quotes) for an explanation or summary;',
-      `table: a markdown table in table, or columns and rows (at most ${CLIP_LIMITS.columns} × ${CLIP_LIMITS.rows});`,
-      `image: svg (markup) or image (a data: URI of a PNG, JPEG or WebP, up to ${CLIP_LIMITS.image / 1000} KB), for a chart or diagram already made in the chat;`,
-      'link: url.',
-      'Give a short title, the user\'s own words as note if they said why, and tags if they named any. source says where it came from ({ kind: "article", url, title } for an article).',
-      'The first clip adds a "Clips" portal to the room if there isn\'t one; say so.',
+      "Keep something from this chat (or an article) in the user's clips, only when they ask to clip or keep it; a link to read later is save_item.",
+      'Copy the content verbatim. Give a short title, the user\'s own words as note, and tags if they named any.',
+      'The first clip adds a Clips portal to the room; say so.',
     ].join(' '),
     inputSchema: {
       type: 'object',
@@ -79,38 +54,31 @@ export const CLIP_TOOLS: ToolDef[] = [
           type: 'object',
           additionalProperties: false,
           properties: { kind: { type: 'string', enum: ['conversation', 'article', 'web'] }, url: { type: 'string' }, title: { type: 'string' } },
+          description: 'Where it came from, e.g. { kind: "article", url, title }',
         },
-        text: { type: 'string', description: 'quote' },
+        content: { type: 'string', description: 'Every kind but exchange: the quote; a note in markdown; a markdown table; the link url; an image as SVG markup or a PNG, JPEG or WebP data: URI' },
         attribution: { type: 'string', description: 'quote: who said it' },
         turns: {
           type: 'array',
           maxItems: CLIP_LIMITS.turns,
           items: { type: 'object', required: ['speaker', 'text'], additionalProperties: false, properties: { speaker: { type: 'string' }, text: { type: 'string' } } },
-          description: 'exchange',
+          description: 'exchange: speaker is "user", "assistant" or a name',
         },
-        markdown: { type: 'string', description: 'note' },
-        table: { type: 'string', description: 'table, as markdown' },
-        columns: { type: 'array', items: { type: 'string' }, description: 'table' },
-        rows: { type: 'array', items: { type: 'array', items: { type: 'string' } }, description: 'table' },
-        svg: { type: 'string', description: 'image, as SVG markup' },
-        image: { type: 'string', description: 'image, as a data: URI' },
-        url: { type: 'string', description: 'link' },
       },
     },
-    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     async handler(args, ctx) {
       if (!ctx.clips) return noStore();
       let clip: Clip;
       try {
-        clip = buildClip(args);
-        await ctx.clips.add(ctx.userId, clip);
+        clip = await ctx.clips.add(ctx.userId, buildClip(fromContent(args)));
       } catch (error) {
-        if (error instanceof ClipError) return toolError(`Not clipped: ${error.message}`);
-        throw error;
+        return toolFailure(error, 'Not clipped: ');
       }
-      const before = await ctx.store.get(ctx.userId);
-      const { profile, added } = ensurePortal(before, 'clips', 'Clips');
-      if (added) await ctx.store.put(ctx.userId, profile);
+      const { profile, added } = await ctx.store.update(ctx.userId, (before) => {
+        const placed = ensurePortal(before, 'clips', 'Clips');
+        return placed.added ? { profile: placed.profile, result: placed } : { result: placed };
+      });
       const { count } = await ctx.clips.usage(ctx.userId);
       const summary = summaryOf(clip);
       const text = [
@@ -118,16 +86,14 @@ export const CLIP_TOOLS: ToolDef[] = [
         added ? 'Added a "Clips" portal to the room.' : '',
         untrusted(sourceLabel(clip), summaryLine(summary)),
       ].filter(Boolean).join('\n');
-      return ok(text, { clip: summary, profile, layoutChanged: added, portals: await clipPortals(ctx, profile) });
+      return ok(text, { clip: summary, profile, layoutChanged: added, portals: await clipPortals(ctx, ctx.clips, profile) } satisfies ToolResults['clip']);
     },
   },
   {
     name: 'search_clips',
     title: 'Search clips',
-    description: [
-      "Find the user's clips by words, kind or tag, newest first. Returns summaries; use get_clip for the full content.",
-      'Use it when the user refers to something from an earlier chat ("that table we made about…", "what did we decide about…").',
-    ].join(' '),
+    access: 'read',
+    description: "Find the user's clips by words, kind or tag, for things from earlier chats ('that table we made about…'). Returns summaries; get_clip shows one in full.",
     inputSchema: {
       type: 'object',
       additionalProperties: false,
@@ -139,7 +105,7 @@ export const CLIP_TOOLS: ToolDef[] = [
         before: { type: 'string', description: 'createdAt of the last clip from the previous page' },
       },
     },
-    annotations: { readOnlyHint: true },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
     async handler(args, ctx) {
       if (!ctx.clips) return noStore();
       const kind = CLIP_KINDS.includes(args.kind as ClipKind) ? (args.kind as ClipKind) : undefined;
@@ -160,21 +126,23 @@ export const CLIP_TOOLS: ToolDef[] = [
   {
     name: 'get_clip',
     title: 'Show a clip',
+    access: 'read',
     description: "Show one of the user's clips in full, as a card in the conversation (\"show me that table\"). Get the id from search_clips or the Clips portal.",
     inputSchema: { type: 'object', required: ['id'], additionalProperties: false, properties: { id: { type: 'string' } } },
-    annotations: { readOnlyHint: true },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
     _meta: { ui: { resourceUri: ROOM_URI } },
     async handler(args, ctx) {
       if (!ctx.clips) return noStore();
       const clip = await ctx.clips.get(ctx.userId, String(args.id ?? ''));
-      if (!clip) return toolError(`No clip with id "${clean(args.id, 40)}". Use search_clips to find it.`);
+      if (!clip) return toolError(`No clip with id "${clean(args.id, 40)}". Use search_clips to find it.`, 'not_found');
       const head = [`${clip.kind} · ${clip.title}`, clip.tags.length ? `tags: ${clip.tags.join(', ')}` : '', clip.note ? `note: ${clip.note}` : '', `clipped ${clip.createdAt}`].filter(Boolean).join('\n');
-      return ok(`Showing clip ${clip.id} in a card.\n${untrusted(sourceLabel(clip), `${head}\n\n${clipText(clip.data)}`)}`, { clip });
+      return ok(`Showing clip ${clip.id} in a card.\n${untrusted(sourceLabel(clip), `${head}\n\n${clipText(clip.data)}`)}`, { clip } satisfies ToolResults['get_clip']);
     },
   },
   {
     name: 'update_clip',
     title: 'Edit a clip',
+    access: 'write',
     description: "Change a clip's title, note or tags. Its content can't change; clip it again instead. tags replaces the whole list.",
     inputSchema: {
       type: 'object',
@@ -187,7 +155,7 @@ export const CLIP_TOOLS: ToolDef[] = [
         tags: { type: 'array', maxItems: CLIP_LIMITS.tags, items: { type: 'string' } },
       },
     },
-    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     async handler(args, ctx) {
       if (!ctx.clips) return noStore();
       let clip: Clip | undefined;
@@ -198,27 +166,27 @@ export const CLIP_TOOLS: ToolDef[] = [
           tags: Array.isArray(args.tags) ? args.tags.map(String) : undefined,
         });
       } catch (error) {
-        if (error instanceof ClipError) return toolError(`Not changed: ${error.message}`);
-        throw error;
+        return toolFailure(error, 'Not changed: ');
       }
-      if (!clip) return toolError(`No clip with id "${clean(args.id, 40)}".`);
+      if (!clip) return toolError(`No clip with id "${clean(args.id, 40)}".`, 'not_found');
       const profile = await ctx.store.get(ctx.userId);
-      return ok(`Updated clip ${clip.id}.\n${untrusted(sourceLabel(clip), summaryLine(summaryOf(clip)))}`, { clip: summaryOf(clip), portals: await clipPortals(ctx, profile) });
+      return ok(`Updated clip ${clip.id}.\n${untrusted(sourceLabel(clip), summaryLine(summaryOf(clip)))}`, { clip: summaryOf(clip), portals: await clipPortals(ctx, ctx.clips, profile) });
     },
   },
   {
     name: 'delete_clip',
     title: 'Delete a clip',
+    access: 'write',
     description: "Delete one of the user's clips. Only when the user asks to delete or remove it.",
     inputSchema: { type: 'object', required: ['id'], additionalProperties: false, properties: { id: { type: 'string' } } },
-    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     async handler(args, ctx) {
       if (!ctx.clips) return noStore();
       const id = String(args.id ?? '');
       const deleted = await ctx.clips.delete(ctx.userId, id);
       const profile = await ctx.store.get(ctx.userId);
       const { count } = await ctx.clips.usage(ctx.userId);
-      return ok(deleted ? `Deleted. ${count} clip(s) left.` : `No clip with id "${clean(id, 40)}"; nothing changed.`, { deleted, id, portals: await clipPortals(ctx, profile) });
+      return ok(deleted ? `Deleted. ${count} clip(s) left.` : `No clip with id "${clean(id, 40)}"; nothing changed.`, { deleted, id, portals: await clipPortals(ctx, ctx.clips, profile) });
     },
   },
 ];

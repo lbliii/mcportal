@@ -12,9 +12,10 @@
  * it moves to tables when sharing needs joins. One server instance.
  */
 import type { AuthPersistence } from './auth/store.ts';
+import { DOCUMENT_MAX_AGE_MS, SharedDocument } from './lib/document.ts';
+import { AppError, type AppErrorOptions, type ErrorCode } from './lib/errors.ts';
 import { clean } from './lib/text.ts';
-import { normalizeSourceConfig, ProfileError } from './profile.ts';
-import { KeyedMutex } from './store.ts';
+import { normalizeSourceConfig, ProfileError, type SourceConfigs } from './profile.ts';
 
 export const HANDLE_HOLD_MS = 30 * 24 * 3600 * 1000;
 const HANDLE = /^[a-z0-9_]{2,30}$/;
@@ -32,7 +33,7 @@ export type Accent = (typeof ACCENTS)[number];
 export interface FeaturedSource {
   title: string;
   source: 'rss' | 'hn' | 'github';
-  config: Record<string, unknown>;
+  config: SourceConfigs['rss' | 'hn' | 'github'];
 }
 
 export const MAX_FEATURED = 12;
@@ -47,18 +48,22 @@ export interface PublicProfile {
   accent?: Accent;
   /** Sources from their portal they recommend. Copies: visitors never read anyone's portal. */
   sources?: FeaturedSource[];
+  /** Who may reblog their new posts, unless a post says otherwise. Absent: anyone. */
+  reblogs?: 'followers' | 'nobody';
   createdAt: string;
   updatedAt: string;
 }
 
 export interface PublicProfileInput {
-  handle?: string;
-  displayName?: string;
-  bio?: string;
-  spaceTitle?: string;
-  accent?: string;
+  handle?: string | undefined;
+  displayName?: string | undefined;
+  bio?: string | undefined;
+  spaceTitle?: string | undefined;
+  accent?: string | undefined;
   /** Replaces the featured list; [] clears it. */
-  sources?: Array<{ title?: string; source: string; config: unknown }>;
+  sources?: Array<{ title?: string; source: string; config: unknown }> | undefined;
+  /** Who may reblog new posts by default: anyone, followers or nobody. */
+  reblogs?: string | undefined;
 }
 
 /** Only sources MCPortal fetches itself can be featured; configs are re-validated. */
@@ -67,9 +72,9 @@ export function normalizeFeatured(raw: PublicProfileInput['sources']): FeaturedS
   const seen = new Set<string>();
   for (const entry of raw ?? []) {
     if (entry.source !== 'rss' && entry.source !== 'hn' && entry.source !== 'github') continue;
-    let config: Record<string, unknown>;
+    let config: FeaturedSource['config'];
     try {
-      config = normalizeSourceConfig(entry.source, entry.config, 'featured source') as unknown as Record<string, unknown>;
+      config = normalizeSourceConfig(entry.source, entry.config, 'featured source');
     } catch (error) {
       if (error instanceof ProfileError) continue;
       throw error;
@@ -88,8 +93,13 @@ interface Doc {
   held: Record<string, { accountId: string; until: number }>;  // released handle -> previous owner
 }
 
-export class HandleError extends Error {
+/** A handle that is invalid, reserved or taken. Defaults to invalid_argument; pass a code when it's something else. */
+export class HandleError extends AppError {
   override name = 'HandleError';
+
+  constructor(message: string, code: ErrorCode = 'invalid_argument', options?: AppErrorOptions) {
+    super(code, message, options);
+  }
 }
 
 /** The handle as stored, or an error message saying what's wrong with it. */
@@ -106,42 +116,42 @@ export function suggestHandle(login: string | undefined): string | undefined {
   return 'handle' in normalizeHandle(s) ? s : undefined;
 }
 
+/**
+ * What tools ask of public profiles: read anyone's, change only the caller's own (the
+ * tools pass the signed-in account). PublicProfiles implements it on the hosted
+ * server; a linked local MCPortal implements it over the hosted API.
+ */
+/** Who holds a deleted account's handles while they're held. */
+const DELETED_HOLDER = 'deleted';
+
+export type ProfileDirectory = Pick<PublicProfiles, 'get' | 'byHandle' | 'set' | 'remove'>;
+
 export class PublicProfiles {
-  private persistence: AuthPersistence;
-  private doc: Doc | null = null;
-  private mutex = new KeyedMutex();
+  private doc: SharedDocument<Doc>;
   private hidden: (accountId: string) => boolean;
   now: () => number;
 
   /** `hidden` says whose profiles others can't see (suspended accounts). */
   constructor(persistence: AuthPersistence, options: { hidden?: (accountId: string) => boolean; now?: () => number } = {}) {
-    this.persistence = persistence;
     this.hidden = options.hidden ?? (() => false);
     this.now = options.now ?? Date.now;
+    this.doc = new SharedDocument<Doc>(persistence, 'public profiles', (d) => ({ profiles: d.profiles ?? {}, held: d.held ?? {} }), {
+      maxAgeMs: DOCUMENT_MAX_AGE_MS,
+      now: () => this.now(),
+      // Released handles are held for a while; drop the holds that have run out.
+      beforeWrite: (doc) => {
+        const now = this.now();
+        for (const [h, hold] of Object.entries(doc.held)) if (hold.until <= now) delete doc.held[h];
+      },
+    });
   }
 
-  private async load(): Promise<Doc> {
-    if (this.doc) return this.doc;
-    try {
-      const raw = await this.persistence.read();
-      const parsed = (raw ? JSON.parse(raw) : {}) as Partial<Doc>;
-      this.doc = { profiles: parsed.profiles ?? {}, held: parsed.held ?? {} };
-    } catch (error) {
-      process.stderr.write(`[mcportal] public profiles unreadable, starting empty: ${(error as Error).message}\n`);
-      this.doc = { profiles: {}, held: {} };
-    }
-    return this.doc;
+  private load(): Promise<Doc> {
+    return this.doc.get();
   }
 
   private write<T>(change: (doc: Doc) => T): Promise<T> {
-    return this.mutex.run('public-profiles', async () => {
-      const doc = await this.load();
-      const result = change(doc);
-      const now = this.now();
-      for (const [h, hold] of Object.entries(doc.held)) if (hold.until <= now) delete doc.held[h];
-      await this.persistence.write(JSON.stringify(doc));
-      return result;
-    });
+    return this.doc.update(change);
   }
 
   private owner(doc: Doc, handle: string): string | undefined {
@@ -187,9 +197,9 @@ export class PublicProfiles {
         if ('error' in checked) throw new HandleError(checked.error);
         if (checked.handle !== current?.handle) {
           const owner = this.owner(doc, checked.handle);
-          if (owner && owner !== accountId) throw new HandleError(`@${checked.handle} is taken`);
+          if (owner && owner !== accountId) throw new HandleError(`@${checked.handle} is taken`, 'conflict');
           const hold = doc.held[checked.handle];
-          if (hold && hold.until > this.now() && hold.accountId !== accountId) throw new HandleError(`@${checked.handle} was in use recently; try another`);
+          if (hold && hold.until > this.now() && hold.accountId !== accountId) throw new HandleError(`@${checked.handle} was in use recently; try another`, 'conflict');
           delete doc.held[checked.handle];
           if (current) {
             released = current.handle;
@@ -206,13 +216,29 @@ export class PublicProfiles {
       if (input.accent !== undefined && input.accent !== '' && !(ACCENTS as readonly string[]).includes(input.accent)) throw new HandleError(`accent must be one of ${ACCENTS.join(', ')}`);
       const accent = input.accent !== undefined ? ((input.accent || undefined) as Accent | undefined) : current?.accent;
       const sources = input.sources !== undefined ? normalizeFeatured(input.sources) : current?.sources;
+      if (input.reblogs !== undefined && !['anyone', 'followers', 'nobody'].includes(input.reblogs)) throw new HandleError('reblogs must be one of anyone, followers, nobody');
+      const reblogs = input.reblogs !== undefined ? (input.reblogs === 'anyone' ? undefined : input.reblogs as 'followers' | 'nobody') : current?.reblogs;
       if (displayName) profile.displayName = displayName;
       if (bio) profile.bio = bio;
       if (spaceTitle) profile.spaceTitle = spaceTitle;
       if (accent) profile.accent = accent;
       if (sources?.length) profile.sources = sources;
+      if (reblogs) profile.reblogs = reblogs;
       doc.profiles[accountId] = profile;
       return { profile: { ...profile }, created: !current, ...(released ? { released } : {}) };
+    });
+  }
+
+  /**
+   * Account deletion: the profile goes, and its handles (current and recently given up)
+   * stay held for their 30 days, so nobody can pose as them, but no longer say whose.
+   */
+  forget(accountId: string): Promise<void> {
+    return this.write((doc) => {
+      const profile = doc.profiles[accountId];
+      delete doc.profiles[accountId];
+      if (profile) doc.held[profile.handle] = { accountId: DELETED_HOLDER, until: this.now() + HANDLE_HOLD_MS };
+      for (const hold of Object.values(doc.held)) if (hold.accountId === accountId) hold.accountId = DELETED_HOLDER;
     });
   }
 

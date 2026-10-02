@@ -37,52 +37,6 @@ export function authorize(actor: Actor, action: Action, resource: Resource = {})
   return { ok: true };
 }
 
-/**
- * What each tool does, for the gate. Every tool acts on the caller's own room
- * (no tool takes a user id). Unknown tools are treated as writes.
- */
-export const TOOL_ACTIONS: Record<string, Action> = {
-  get_profile: 'read',
-  list_sources: 'read',
-  open_room: 'fetch',
-  read_source: 'fetch',
-  refresh_portal: 'fetch',
-  read_article: 'fetch',
-  get_thumbnails: 'fetch',
-  find_source: 'fetch',
-  export_opml: 'read',
-  import_opml: 'write',
-  build_room: 'write',
-  update_profile: 'write',
-  add_portal: 'write',
-  pin_portal: 'write',
-  save_item: 'write',
-  remove_saved: 'write',
-  clip: 'write',
-  search_clips: 'read',
-  get_clip: 'read',
-  update_clip: 'write',
-  delete_clip: 'write',
-  get_public_profile: 'read',
-  set_public_profile: 'write',
-  remove_public_profile: 'write',
-  export_data: 'read',
-  import_portal: 'write',
-  account_settings: 'read',
-  open_space: 'read',
-  share: 'write',
-  unshare: 'write',
-  get_share: 'read',
-  list_shares: 'read',
-  relationship: 'write',
-  list_connections: 'read',
-  report: 'write',
-};
-
-export function toolAction(name: string): Action {
-  return TOOL_ACTIONS[name] ?? 'write';
-}
-
 /** The single user of a local (stdio) MCPortal owns everything on the machine. */
 export function localActor(accountId: string): Actor {
   return { accountId, role: 'user', status: 'active' };

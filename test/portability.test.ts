@@ -13,7 +13,7 @@ import { buildExport, importExport, parseExport, type PortalExport } from '../sr
 import { defaultProfile, validateProfile } from '../src/profile.ts';
 import { HANDLE_HOLD_MS, normalizeHandle, PublicProfiles, suggestHandle } from '../src/public-profiles.ts';
 import { MemoryProfileStore } from '../src/store.ts';
-import type { ToolContext } from '../src/tools.ts';
+import type { ToolContext } from '../src/tools/kit.ts';
 
 const PNG_1PX = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
 
@@ -159,7 +159,9 @@ test('export_data writes a file locally; import_portal works through the tool', 
   const imported = await call(other, 'import_portal', { data: exported });
   assert.match(imported.content[0]!.text, /Imported:/);
   assert.ok((await call(other, 'import_portal', { data: 'not json' })).isError);
-  assert.match((await call(portal(), 'account_settings')).content[0]!.text, /runs on your machine/);
+  const settings = await call(portal(), 'account_settings');
+  assert.match(settings.content[0]!.text, /^Ghost mode: not signed in/);
+  assert.deepEqual(settings.structuredContent!.identity, { mode: 'ghost' });
 });
 
 test('multipart: fields and a file, binary-safe; malformed bodies throw', async () => {

@@ -6,12 +6,13 @@
  * Everything in a clip is untrusted plain text or checked image bytes. Text keeps
  * its line breaks (unlike portal items); markdown-lite is parsed into blocks and
  * never interpreted as HTML. SVG is only ever shown as an <img>, so nothing in it runs.
+ *
+ * Stores (ClipStore, MemoryClipStore, FileClipStore) live in clip-stores.ts and are
+ * re-exported from here.
  */
 import { randomBytes } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
-import path from 'node:path';
 import { httpUrl } from './profile.ts';
-import { atomicWrite, defaultDataDir, KeyedMutex, safeFileId } from './store.ts';
+import { AppError, type AppErrorOptions, type ErrorCode } from './lib/errors.ts';
 import { parseMarkdownLite } from './lib/markdown.ts';
 import { clean } from './lib/text.ts';
 import { CLIP_KINDS, type ArticleBlock, type ClipKind } from './types.ts';
@@ -19,6 +20,8 @@ import { CLIP_KINDS, type ArticleBlock, type ClipKind } from './types.ts';
 export { parseMarkdownLite };
 
 export { CLIP_KINDS, type ClipKind };
+
+export { FileClipStore, filterClips, MemoryClipStore, type ClipStore } from './clip-stores.ts';
 
 export const CLIP_LIMITS = {
   /** Bytes of text per clip (all its text together). */
@@ -73,23 +76,28 @@ export interface Clip extends ClipSummary {
 }
 
 export interface ClipQuery {
-  kind?: ClipKind;
-  tag?: string;
+  kind?: ClipKind | undefined;
+  tag?: string | undefined;
   /** Words that must all appear (title, note, tags, text). */
-  query?: string;
-  limit?: number;
+  query?: string | undefined;
+  limit?: number | undefined;
   /** Only clips created before this ISO time (paging). */
-  before?: string;
+  before?: string | undefined;
 }
 
 export interface ClipPatch {
-  title?: string;
-  note?: string;
-  tags?: string[];
+  title?: string | undefined;
+  note?: string | undefined;
+  tags?: string[] | undefined;
 }
 
-export class ClipError extends Error {
+/** A clip that fails validation, or a clip limit reached. Defaults to invalid_argument; pass a code when it's something else. */
+export class ClipError extends AppError {
   override name = 'ClipError';
+
+  constructor(message: string, code: ErrorCode = 'invalid_argument', options?: AppErrorOptions) {
+    super(code, message, options);
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -172,7 +180,7 @@ export function normalizeImage(image: unknown, svg: unknown): { mime: ImageMime;
     base64 = Buffer.from(svg.trim(), 'utf8').toString('base64');
   } else if (typeof image === 'string') {
     const m = image.trim().match(/^data:([a-z+/.-]+);base64,([A-Za-z0-9+/=\s]+)$/i);
-    if (!m) throw new ClipError('image must be a data: URI (data:image/png;base64,…), { mime, data }, or pass svg as markup.');
+    if (!m) throw new ClipError('image must be a data: URI (data:image/png;base64,…), { mime, data }, or SVG markup.');
     mime = m[1]!.toLowerCase();
     base64 = m[2]!;
   } else if (isRecord(image)) {
@@ -290,6 +298,26 @@ export function newClipId(): string {
 }
 
 /** Validate what the agent sent and build a clip. Throws ClipError with a readable message. */
+/**
+ * The clip tool's input as buildClip takes it: one `content` text for every kind but an
+ * exchange (turns), read by kind: a quote's text, a note's markdown, a markdown table, a
+ * link's url, or an image as SVG markup or a data: URI.
+ */
+export function fromContent(input: Record<string, unknown>): Record<string, unknown> {
+  const { content, ...rest } = input;
+  if (rest.kind === 'exchange') return rest;
+  if (!CLIP_KINDS.includes(rest.kind as ClipKind)) return rest;   // buildClip says which kinds there are
+  if (typeof content !== 'string' || !content.trim()) throw new ClipError(`A ${rest.kind as string} clip needs content.`);
+  switch (rest.kind) {
+    case 'quote': return { ...rest, text: content };
+    case 'note': return { ...rest, markdown: content };
+    case 'table': return { ...rest, table: content };
+    case 'link': return { ...rest, url: content.trim() };
+    case 'image': return content.trimStart().startsWith('<') ? { ...rest, svg: content } : { ...rest, image: content.trim() };
+  }
+  return rest;
+}
+
 export function buildClip(input: Record<string, unknown>, now = new Date(), id = newClipId()): Clip {
   const kind = input.kind as ClipKind;
   if (!CLIP_KINDS.includes(kind)) throw new ClipError(`kind must be one of ${CLIP_KINDS.join(', ')}`);
@@ -330,146 +358,27 @@ export function summaryOf(clip: Clip): ClipSummary {
   return summary;
 }
 
+/** Table rows the model gets as text; the clip card shows them all. */
+const MODEL_TABLE_ROWS = 100;
+
+/** The clip's content as text for the model. */
+export function clipText(data: ClipData): string {
+  switch (data.kind) {
+    case 'quote': return `${data.text}${data.attribution ? `\n— ${data.attribution}` : ''}`;
+    case 'exchange': return data.turns.map((t) => `${t.speaker}: ${t.text}`).join('\n\n');
+    case 'note': return data.blocks.map((b) => (b.type === 'h' ? `## ${b.text}` : b.type === 'li' ? `- ${b.text}` : b.type === 'quote' ? `> ${b.text}` : b.type === 'pre' ? `\`\`\`\n${b.text}\n\`\`\`` : b.text)).join('\n\n');
+    case 'table': {
+      const row = (cells: string[]) => `| ${cells.map((c) => c.replace(/\|/g, '\\|')).join(' | ')} |`;
+      const lines = [row(data.columns), row(data.columns.map(() => '---')), ...data.rows.slice(0, MODEL_TABLE_ROWS).map(row)];
+      if (data.rows.length > MODEL_TABLE_ROWS) lines.push(`(${data.rows.length - MODEL_TABLE_ROWS} more rows; the clip card shows them all)`);
+      return lines.join('\n');
+    }
+    case 'image': return `[${data.mime} image, ${Math.ceil(Buffer.from(data.data, 'base64').length / 1000)} KB: shown in the clip card]`;
+    case 'link': return data.url;
+  }
+}
+
 export function clampLimit(limit: unknown, fallback = 20, max = 50): number {
   const n = typeof limit === 'number' ? limit : Number(limit);
   return Number.isFinite(n) ? Math.min(max, Math.max(1, Math.round(n))) : fallback;
-}
-
-function overLimit(existing: ClipSummary[], adding: Clip): string | undefined {
-  if (existing.length >= CLIP_LIMITS.perUser) return `You have ${CLIP_LIMITS.perUser} clips, the most MCPortal keeps. Delete some first.`;
-  const bytes = existing.reduce((sum, c) => sum + c.bytes, 0);
-  if (bytes + adding.bytes > CLIP_LIMITS.bytesPerUser) return `Your clips use ${Math.round(bytes / 1e6)} MB of the ${CLIP_LIMITS.bytesPerUser / 1e6} MB allowed. Delete some (large images first).`;
-  return undefined;
-}
-
-// ---- stores -----------------------------------------------------------------
-
-export interface ClipStore {
-  /** Throws ClipError when the user is at a limit. */
-  add(userId: string, clip: Clip): Promise<void>;
-  get(userId: string, id: string): Promise<Clip | undefined>;
-  /** Newest first, without content. */
-  list(userId: string, query?: ClipQuery): Promise<ClipSummary[]>;
-  update(userId: string, id: string, patch: ClipPatch): Promise<Clip | undefined>;
-  delete(userId: string, id: string): Promise<boolean>;
-  /** Every clip of the user (account deletion). Returns how many. */
-  deleteAll(userId: string): Promise<number>;
-  usage(userId: string): Promise<{ count: number; bytes: number }>;
-}
-
-/** Filtering shared by the in-process stores. */
-export function filterClips(clips: Clip[], query: ClipQuery = {}): ClipSummary[] {
-  const words = queryWords(query.query);
-  const tag = query.tag ? normalizeTags([query.tag])[0] : undefined;
-  return clips
-    .filter((c) => (!query.kind || c.kind === query.kind)
-      && (!tag || c.tags.includes(tag))
-      && (!query.before || c.createdAt < query.before)
-      && (!words.length || words.every((w) => searchTextOf(c).includes(w))))
-    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0))
-    .slice(0, clampLimit(query.limit, 20, CLIP_LIMITS.perUser))
-    .map(summaryOf);
-}
-
-/** A whole user's clips in one place (memory or one file), behind the store interface. */
-abstract class DocumentClipStore implements ClipStore {
-  private mutex = new KeyedMutex();
-  protected abstract load(userId: string): Promise<Clip[]>;
-  protected abstract save(userId: string, clips: Clip[]): Promise<void>;
-  protected now: () => Date = () => new Date();
-
-  private edit<T>(userId: string, change: (clips: Clip[]) => { clips?: Clip[]; result: T }): Promise<T> {
-    return this.mutex.run(userId, async () => {
-      const { clips, result } = change(await this.load(userId));
-      if (clips) await this.save(userId, clips);
-      return result;
-    });
-  }
-
-  add(userId: string, clip: Clip): Promise<void> {
-    return this.edit(userId, (clips) => {
-      const refused = overLimit(clips, clip);
-      if (refused) throw new ClipError(refused);
-      return { clips: [clip, ...clips.filter((c) => c.id !== clip.id)], result: undefined };
-    });
-  }
-
-  async get(userId: string, id: string): Promise<Clip | undefined> {
-    const clips = await this.mutex.run(userId, () => this.load(userId));
-    return structuredClone(clips.find((c) => c.id === id));
-  }
-
-  async list(userId: string, query?: ClipQuery): Promise<ClipSummary[]> {
-    return filterClips(await this.mutex.run(userId, () => this.load(userId)), query);
-  }
-
-  update(userId: string, id: string, patch: ClipPatch): Promise<Clip | undefined> {
-    return this.edit(userId, (clips) => {
-      const at = clips.findIndex((c) => c.id === id);
-      if (at === -1) return { result: undefined };
-      const next = patchClip(clips[at]!, patch, this.now());
-      return { clips: clips.map((c, i) => (i === at ? next : c)), result: structuredClone(next) };
-    });
-  }
-
-  delete(userId: string, id: string): Promise<boolean> {
-    return this.edit(userId, (clips) => {
-      const rest = clips.filter((c) => c.id !== id);
-      return rest.length === clips.length ? { result: false } : { clips: rest, result: true };
-    });
-  }
-
-  deleteAll(userId: string): Promise<number> {
-    return this.edit(userId, (clips) => ({ clips: [], result: clips.length }));
-  }
-
-  async usage(userId: string): Promise<{ count: number; bytes: number }> {
-    const clips = await this.mutex.run(userId, () => this.load(userId));
-    return { count: clips.length, bytes: clips.reduce((sum, c) => sum + c.bytes, 0) };
-  }
-}
-
-export class MemoryClipStore extends DocumentClipStore {
-  private data = new Map<string, Clip[]>();
-
-  protected async load(userId: string): Promise<Clip[]> {
-    return structuredClone(this.data.get(userId) ?? []);
-  }
-
-  protected async save(userId: string, clips: Clip[]): Promise<void> {
-    this.data.set(userId, structuredClone(clips));
-  }
-}
-
-/**
- * `<dataDir>/clips/<user>.json`, written atomically. A subdirectory, so the
- * Postgres import (top-level *.json only) never mistakes it for a profile.
- */
-export class FileClipStore extends DocumentClipStore {
-  dir: string;
-
-  constructor(dataDir = defaultDataDir()) {
-    super();
-    this.dir = path.join(dataDir, 'clips');
-  }
-
-  private file(userId: string): string {
-    return path.join(this.dir, `${safeFileId(userId)}.json`);
-  }
-
-  protected async load(userId: string): Promise<Clip[]> {
-    let raw: string;
-    try {
-      raw = await readFile(this.file(userId), 'utf8');
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
-      throw error;
-    }
-    const parsed = JSON.parse(raw) as { clips?: unknown };
-    return Array.isArray(parsed.clips) ? (parsed.clips as Clip[]) : [];
-  }
-
-  protected async save(userId: string, clips: Clip[]): Promise<void> {
-    await atomicWrite(this.file(userId), `${JSON.stringify({ version: 1, clips })}\n`);
-  }
 }

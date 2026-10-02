@@ -1,0 +1,283 @@
+/**
+ * Contracts the rest of the code leans on: every tool declares what it does, arguments
+ * are checked against schemas, failures carry stable codes, logs are structured, and a
+ * document that can't be read is never mistaken for an empty one.
+ */
+import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { test } from 'node:test';
+import { Accounts, makeBootstrap } from '../src/accounts.ts';
+import { TtlCache } from '../src/lib/cache.ts';
+import { memoryPersistence, readDocument } from '../src/lib/document.ts';
+import { AppError, ERROR_CODES, errorCode, httpStatus, upstreamStatus, userMessage } from '../src/lib/errors.ts';
+import { createFixtureFetcher } from '../src/lib/fixture-fetch.ts';
+import { createLogger, userRef } from '../src/lib/log.ts';
+import { assertPublicUrl } from '../src/lib/safe-fetch.ts';
+import { schemaProblem } from '../src/lib/schema.ts';
+import { UsageBudget } from '../src/lib/budget.ts';
+import { handleMessage } from '../src/mcp.ts';
+import { defaultProfile, type Profile } from '../src/profile.ts';
+import { MemoryProfileStore, type ProfileStore } from '../src/store.ts';
+import { TOOLS } from '../src/tools/index.ts';
+import { toolError, toolFailure, type CallToolResult, type ToolContext } from '../src/tools/kit.ts';
+
+function ctx(overrides: Partial<ToolContext> = {}): ToolContext {
+  return { store: new MemoryProfileStore({ u: { ...defaultProfile(), onboarded: true } }), fetcher: createFixtureFetcher(), cache: new TtlCache(), userId: 'u', ...overrides };
+}
+
+async function call(c: ToolContext, name: string, args: unknown = {}): Promise<CallToolResult> {
+  const res = await handleMessage({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }, c);
+  return (res as { result: CallToolResult }).result;
+}
+
+const errorOf = (r: CallToolResult) => r.structuredContent?.error as { code: string; message: string; retryable: boolean; details?: Record<string, unknown> };
+
+test('tools: every tool declares its access and a sane cost, and its hints agree', () => {
+  const names = TOOLS.map((t) => t.name);
+  assert.equal(new Set(names).size, names.length, 'tool names are unique');
+  for (const tool of TOOLS) {
+    assert.ok(['read', 'write', 'fetch'].includes(tool.access), `${tool.name} declares access`);
+    assert.equal(tool.inputSchema.type, 'object', `${tool.name} takes an object`);
+    // Reads with a side effect outside the room: export_data writes a file (local) or makes a download link (hosted).
+    const sideEffect = ['export_data'].includes(tool.name);
+    assert.equal(tool.annotations.readOnlyHint, tool.access !== 'write' && !sideEffect, `${tool.name}: readOnlyHint matches access "${tool.access}"`);
+    const cost = typeof tool.cost === 'function' ? tool.cost({}) : (tool.cost ?? 1);
+    assert.ok(Number.isInteger(cost) && cost >= 1 && cost <= 20, `${tool.name} costs 1-20 units`);
+  }
+});
+
+test('schema: arguments are checked before the handler, in words the model can act on', () => {
+  const schema = {
+    type: 'object',
+    required: ['url'],
+    additionalProperties: false,
+    properties: {
+      url: { type: 'string', maxLength: 10 },
+      column: { type: 'integer', minimum: 1, maximum: 8 },
+      kind: { enum: ['a', 'b'] },
+      tags: { type: 'array', maxItems: 2, items: { type: 'string' } },
+      anchor: { type: ['object', 'null'], additionalProperties: false, properties: { block: { type: 'integer', minimum: 0 } } },
+    },
+  };
+  assert.equal(schemaProblem(schema, { url: 'x', column: 2, kind: 'a', tags: ['t'], anchor: null }), undefined);
+  assert.equal(schemaProblem(schema, {}), 'url is required');
+  assert.equal(schemaProblem(schema, { url: 'x', extra: 1 }), "extra isn't a known argument (expected url, column, kind, tags, anchor)");
+  assert.equal(schemaProblem(schema, { url: 'x', column: '2' }), 'column must be a whole number');
+  assert.equal(schemaProblem(schema, { url: 'x', column: 2.5 }), 'column must be a whole number');
+  assert.equal(schemaProblem(schema, { url: 'x', column: 9 }), 'column must be at most 8');
+  assert.equal(schemaProblem(schema, { url: 'x'.repeat(11) }), 'url must be at most 10 characters');
+  assert.equal(schemaProblem(schema, { url: 'x', kind: 'c' }), 'kind must be one of "a", "b"');
+  assert.equal(schemaProblem(schema, { url: 'x', tags: ['a', 'b', 'c'] }), 'tags can have at most 2 entries');
+  assert.equal(schemaProblem(schema, { url: 'x', tags: [1] }), 'tags[0] must be a string');
+  assert.equal(schemaProblem(schema, { url: 'x', anchor: { block: -1 } }), 'anchor.block must be at least 0');
+  assert.equal(schemaProblem(schema, ['url']), 'arguments must be an object');
+});
+
+test('dispatcher: bad arguments, refusals and limits come back as coded tool errors', async () => {
+  const invalid = await call(ctx(), 'add_portal', { source: 'rss', config: {}, column: '2' });
+  assert.equal(invalid.isError, true);
+  assert.deepEqual(errorOf(invalid), { code: 'invalid_argument', message: "add_portal wasn't called: column must be a whole number.", retryable: false });
+
+  const denied = await call(ctx({ actor: { accountId: 'u', role: 'user', status: 'suspended' } }), 'list_sources');
+  assert.equal(errorOf(denied).code, 'forbidden');
+
+  const budget = new UsageBudget({ perMinute: 1, perDay: 100, globalPerDay: 100 });
+  const c = ctx({ budget });
+  assert.equal((await call(c, 'list_sources')).isError, undefined);
+  const limited = await call(c, 'list_sources');
+  assert.equal(errorOf(limited).code, 'rate_limited');
+  assert.equal(errorOf(limited).retryable, true);
+  assert.equal(errorOf(limited).details?.scope, 'minute');
+
+  const missing = await call(ctx(), 'refresh_portal', { portalId: 'nope' });
+  assert.equal(errorOf(missing).code, 'not_found');
+  const unavailable = await call(ctx(), 'share', { savedUrl: 'https://example.com/' });
+  assert.equal(errorOf(unavailable).code, 'unavailable');
+});
+
+test('dispatcher: a bug is logged with its stack and reported by reference, never by its message', async () => {
+  const lines: string[] = [];
+  const broken: ProfileStore = {
+    get: async () => { throw new TypeError('secret internal detail'); },
+    put: async () => {},
+    update: async () => { throw new TypeError('secret internal detail'); },
+    versioned: async () => { throw new TypeError('secret internal detail'); },
+    replaceIf: async () => { throw new TypeError('secret internal detail'); },
+    delete: async () => {},
+  };
+  const result = await call(ctx({ store: broken, log: createLogger({ format: 'json', write: (l) => lines.push(l) }) }), 'open_room');
+  const error = errorOf(result);
+  assert.equal(error.code, 'internal');
+  assert.doesNotMatch(result.content[0]!.text, /secret/);
+  assert.match(result.content[0]!.text, new RegExp(`reference ${error.details?.ref}`));
+  const crash = lines.map((l) => JSON.parse(l)).find((l) => l.event === 'tool.crashed');
+  assert.equal(crash.ref, error.details?.ref);
+  assert.equal(crash.tool, 'open_room');
+  assert.match(crash.error, /TypeError: secret internal detail/);
+  const done = lines.map((l) => JSON.parse(l)).find((l) => l.event === 'tool.call');
+  assert.equal(done.outcome, 'crashed');
+  assert.equal(done.user, userRef('u'), 'users appear only as a hash');
+  assert.ok(!lines.some((l) => l.includes('"u"')), 'the raw user id is never logged');
+  // Keyed: the ref isn't a plain hash of the id, which anyone could recompute.
+  assert.notEqual(userRef('github-42'), createHash('sha256').update('mcportal-log:github-42').digest('hex').slice(0, 10));
+  assert.notEqual(userRef('github-42'), createHash('sha256').update('github-42').digest('hex').slice(0, 10));
+});
+
+test('errors: codes map to statuses, failures keep their reason, and only AppErrors are shown', () => {
+  for (const [code, { status }] of Object.entries(ERROR_CODES)) assert.ok(status >= 400 && status < 600, code);
+  assert.equal(httpStatus('not_found'), 404);
+  const upstream = upstreamStatus('Feed', 503);
+  assert.equal(upstream.code, 'upstream_error');
+  assert.equal(upstream.status, 503);
+  assert.equal(upstream.message, 'Feed responded 503');
+  assert.throws(() => assertPublicUrl('http://127.0.0.1/'), (e: unknown) => errorCode(e) === 'fetch_blocked');
+  assert.equal(userMessage(new AppError('conflict', 'Taken')), 'Taken');
+  assert.equal(userMessage(new Error('stack trace soup')), 'Something went wrong on our side.');
+  assert.equal(errorCode(new Error('x')), 'internal');
+
+  assert.deepEqual(toolError('Nope', 'not_found').structuredContent, { error: { code: 'not_found', message: 'Nope', retryable: false } });
+  assert.equal(toolFailure(new AppError('limit_exceeded', 'Too many.'), 'Not saved: ', '!').content[0]!.text, 'Not saved: Too many!');
+  assert.throws(() => toolFailure(new RangeError('bug')), RangeError, 'bugs are rethrown for the dispatcher');
+});
+
+test('log: leveled, structured, with child fields; stacks go on their own lines', () => {
+  const lines: string[] = [];
+  const now = () => new Date('2026-10-01T00:00:00Z');
+  const json = createLogger({ format: 'json', level: 'info', write: (l) => lines.push(l), now }).child({ req: 'r1' });
+  json.debug('hidden');
+  json.info('tool.call', { tool: 'open_room', ms: 4, skipped: undefined });
+  assert.deepEqual(lines.map((l) => JSON.parse(l)), [{ t: '2026-10-01T00:00:00.000Z', level: 'info', event: 'tool.call', req: 'r1', tool: 'open_room', ms: 4 }]);
+
+  const text: string[] = [];
+  createLogger({ write: (l) => text.push(l) }).warn('source.failed', { source: 'rss', note: 'two words', error: 'Error: x\n    at y' });
+  assert.equal(text[0], '[mcportal] warn source.failed source=rss note="two words"\n  error: Error: x\n      at y');
+});
+
+test('documents: a failed or corrupt read is never mistaken for an empty document', async () => {
+  const silent = createLogger({ write: () => {} });
+  assert.deepEqual(await readDocument(memoryPersistence(), 'x', silent), {});
+  await assert.rejects(readDocument(memoryPersistence('{not json'), 'x', silent), (e: unknown) => errorCode(e) === 'internal');
+  await assert.rejects(readDocument(memoryPersistence('[1]'), 'x', silent), /not an object/);
+
+  // Accounts: a read that fails during a write must not replace everyone with the one change.
+  const stored = memoryPersistence();
+  const accounts = new Accounts(stored, makeBootstrap([], []));
+  await accounts.load();
+  await accounts.invite('alice', 'test');
+  const before = await stored.read();
+  let failing = false;
+  const flaky = { read: async () => { if (failing) throw new Error('connection reset'); return stored.read(); }, write: (json: string) => stored.write(json) };
+  const again = new Accounts(flaky, makeBootstrap([], []));
+  await again.load();
+  failing = true;
+  await assert.rejects(again.invite('bob', 'test'), /connection reset/);
+  assert.equal(await stored.read(), before, 'the stored document is untouched');
+});
+
+test('layout: withLayout keeps saved items exactly, whatever validation does to the rest', async () => {
+  const { withLayout } = await import('../src/layout.ts');
+  const saved = [{ url: 'https://example.com/', title: 'Example', savedAt: '2026-01-01T00:00:00.000Z' }];
+  const profile: Profile = { ...defaultProfile(), saved };
+  const next = withLayout(profile, { layout: 'shelves' });
+  assert.equal(next.layout, 'shelves');
+  assert.equal(next.saved, saved, 'the same array, untouched');
+});
+
+test('page sessions: cookie carries an opaque token, sessions expire, CSRF is per session', async () => {
+  const { PageSessions } = await import('../src/page-sessions.ts');
+  let now = 0;
+  const sessions = new PageSessions('account', { publicUrl: 'https://mcportal.example', ttlMs: 1000, max: 2, now: () => now });
+  const setCookie = sessions.start('acct-1', 'alice');
+  assert.match(setCookie, /^__Host-mcportal_account=[A-Za-z0-9_-]{43}; Path=\/; HttpOnly; SameSite=Lax; Max-Age=1; Secure$/);
+  const req = { headers: { cookie: setCookie.split(';')[0] } } as never;
+  const current = sessions.current(req)!;
+  assert.equal(current.session.accountId, 'acct-1');
+  assert.equal(sessions.csrfMatches(current.session, current.session.csrf), true);
+  assert.equal(sessions.csrfMatches(current.session, ''), false);
+  assert.equal(sessions.csrfMatches(current.session, null), false);
+  sessions.endAll('acct-1');
+  assert.equal(sessions.current(req), undefined, 'signed out everywhere');
+  const again = { headers: { cookie: sessions.start('acct-1', 'alice').split(';')[0] } } as never;
+  now = 1000;
+  assert.equal(sessions.current(again), undefined, 'expired');
+});
+
+test('profiles: concurrent changes all land (update is atomic per user)', async () => {
+  const { mkdtemp } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const path = await import('node:path');
+  const { FileProfileStore } = await import('../src/store.ts');
+  const stores: ProfileStore[] = [new MemoryProfileStore({ u: { ...defaultProfile(), onboarded: true } }), new FileProfileStore(await mkdtemp(path.join(tmpdir(), 'mcportal-update-')))];
+  for (const store of stores) {
+    const c = ctx({ store });
+    const urls = Array.from({ length: 12 }, (_, i) => `https://example.com/${i}`);
+    const results = await Promise.all(urls.map((url) => call(c, 'save_item', { url, title: url })));
+    assert.ok(results.every((r) => !r.isError));
+    const saved = (await store.get('u')).saved.map((s) => s.url).sort();
+    assert.deepEqual(saved, [...urls].sort(), `${store.constructor.name}: no save was lost`);
+  }
+});
+
+test('portal configs: every stored portal has its source\'s full, typed settings', async () => {
+  const { normalizeSourceConfig, validateProfile } = await import('../src/profile.ts');
+  assert.deepEqual(normalizeSourceConfig('github', {}, 'x'), { mode: 'search', query: 'topic:mcp', sort: 'stars', limit: 10 });
+  assert.deepEqual(normalizeSourceConfig('github', { mode: 'releases', repo: 'a/b' }, 'x'), { mode: 'releases', repo: 'a/b', limit: 10 });
+  assert.deepEqual(normalizeSourceConfig('saved', { limit: 999 }, 'x'), { limit: 30 });
+  assert.throws(() => normalizeSourceConfig('pinned', {}, 'here'), /here: pinned needs/);
+  const profile = validateProfile({ columns: [{ panels: [{ source: 'hn', config: {} }, { source: 'github', config: { query: 'x' } }] }] });
+  const [hn, gh] = profile.columns[0]!.panels;
+  assert.ok(hn?.source === 'hn' && hn.config.feed === 'top');
+  assert.ok(gh?.source === 'github' && gh.config.mode === 'search' && gh.config.sort === 'stars');
+});
+
+test('shared documents: cached reads, fresh atomic changes, and two instances keep each other\'s changes', async () => {
+  const { SharedDocument } = await import('../src/lib/document.ts');
+  let now = 0;
+  const silent = createLogger({ write: () => {} });
+  const stored = memoryPersistence();
+  const open = () => new SharedDocument<{ n: number[] }>(stored, 'test', (d) => ({ n: d.n ?? [] }), { maxAgeMs: 1000, now: () => now, log: silent });
+  const [a, b] = [open(), open()];
+  await Promise.all(Array.from({ length: 10 }, (_, i) => (i % 2 ? a : b).update((d) => { d.n.push(i); })));
+  assert.deepEqual((await a.get(0)).n.sort((x, y) => x - y), [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], 'no change lost between instances');
+
+  await b.get(0);
+  await a.update((d) => { d.n.push(10); });
+  assert.equal((await b.get()).n.length, 10, 'b serves its cache within maxAgeMs');
+  now = 1000;
+  assert.equal((await b.get()).n.length, 11, 'and reloads after');
+
+  const flaky = { read: async () => { throw new Error('connection reset'); }, write: async () => {} };
+  const c = new SharedDocument<{ n: number[] }>(flaky, 'test', (d) => ({ n: d.n ?? [] }), { maxAgeMs: 1000, now: () => now, log: silent });
+  await assert.rejects(c.get(), /connection reset/, 'no cache yet: the failure shows');
+  await assert.rejects(c.update(() => {}), /connection reset/, 'a change never starts from nothing');
+});
+
+test('metrics and budget: per-tool counters from the dispatcher, and a budget snapshot', async () => {
+  const { ToolMetrics } = await import('../src/lib/metrics.ts');
+  const metrics = new ToolMetrics(() => 0);
+  const budget = new UsageBudget({ perMinute: 100, perDay: 100, globalPerDay: 1000 });
+  const c = ctx({ metrics, budget });
+  await call(c, 'list_sources');
+  await call(c, 'list_sources');
+  await call(c, 'refresh_portal', { portalId: 'nope' });
+  const stats = metrics.snapshot().tools;
+  assert.equal(stats[0]!.tool, 'list_sources');
+  assert.equal(stats[0]!.calls, 2);
+  assert.deepEqual(stats.find((t) => t.tool === 'refresh_portal')!.codes, { not_found: 1 });
+  const snap = budget.snapshot();
+  assert.deepEqual(snap.today, [{ userId: 'u', used: 4 }], 'list_sources 1 + 1, refresh_portal 2');
+  assert.equal(snap.global.used, 4);
+});
+
+test('github sign-in: an unreachable or failing GitHub is a failed sign-in, never a crash or upstream text', async () => {
+  const { githubIdentity, githubAuthorizeUrl } = await import('../src/auth/github.ts');
+  const { UpstreamError } = await import('../src/lib/errors.ts');
+  const app = { clientId: 'cid', clientSecret: 'secret' };
+  const down = async () => { throw new UpstreamError('upstream_unreachable', 'Could not reach github.com: ECONNRESET'); };
+  assert.deepEqual(await githubIdentity(down, app, 'code', 'https://x/cb'), { error: 'GitHub sign-in failed; try again in a moment' });
+  const refused = async (url: string) => ({ status: 401, url, contentType: 'application/json', text: '{"error":"<script>"}', truncated: false });
+  assert.deepEqual(await githubIdentity(refused, app, 'code', 'https://x/cb'), { error: 'GitHub sign-in failed' });
+  const url = new URL(githubAuthorizeUrl(app, 'https://x/cb', 'st8'));
+  assert.equal(url.searchParams.get('scope'), 'read:user');
+  assert.equal(url.searchParams.get('allow_signup'), null);
+});

@@ -19,8 +19,11 @@
  * memory; it's reloaded periodically so changes made by the admin CLI (another
  * process) take effect. One server instance.
  */
-import { randomBytes } from 'node:crypto';
 import type { AuthPersistence } from './auth/store.ts';
+import { memoryPersistence, SharedDocument } from './lib/document.ts';
+import { AppError, errorMessage } from './lib/errors.ts';
+import { secretToken } from './lib/ids.ts';
+import { processLogger } from './lib/log.ts';
 import { clean } from './lib/text.ts';
 
 export type AccountStatus = 'active' | 'suspended';
@@ -83,6 +86,19 @@ export interface GithubIdentity {
 export type Admission = { ok: true; account: Account } | { ok: false; reason: 'not_invited' | 'suspended' };
 
 const AUDIT_MAX = 2000;
+/** The audit log keeps a year at most, and an invite nobody used lapses after 90 days. */
+export const AUDIT_DAYS = 365;
+export const PENDING_INVITE_DAYS = 90;
+const DAY_MS = 86_400_000;
+/** What a deleted account is called in the records that outlast it. */
+export const DELETED = 'deleted account';
+
+/** Does the text name this login or id as a whole word? */
+function mentions(text: string, name: string): boolean {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(^|[^a-z0-9_-])${escaped}($|[^a-z0-9_-])`, 'i').test(text);
+}
+
 const RELOAD_MS = 30_000;
 const LOGIN = /^[a-z0-9](?:[a-z0-9-]{0,38})$/;
 
@@ -103,54 +119,50 @@ export function bootstrapFromEnv(env: NodeJS.ProcessEnv, allowOverride?: string[
 }
 
 /** In-memory persistence, for tests and for OAuth setups without an accounts store. */
-export function memoryPersistence(): AuthPersistence {
-  let value: string | undefined;
-  return { read: async () => value, write: async (json) => { value = json; } };
-}
+export { memoryPersistence };
 
 export function accountIdFor(githubId: number): string {
   return `github-${githubId}`;
 }
 
 export class Accounts {
-  private persistence: AuthPersistence;
+  private store: SharedDocument<Doc>;
   private bootstrap: Bootstrap;
   private now: () => number;
-  private doc: Doc | null = null;
-  private loadedAt = 0;
-  private chain: Promise<unknown> = Promise.resolve();
 
   constructor(persistence: AuthPersistence, bootstrap: Bootstrap, now: () => number = Date.now) {
-    this.persistence = persistence;
     this.bootstrap = bootstrap;
     this.now = now;
-  }
-
-  /** Load (or reload, if stale) from persistence. Call before the sync checks are trusted. */
-  async load(force = false): Promise<void> {
-    if (!force && this.doc && this.now() - this.loadedAt < RELOAD_MS) return;
-    const raw = await this.persistence.read().catch(() => undefined);
-    let parsed: Partial<Doc> = {};
-    try {
-      parsed = raw ? (JSON.parse(raw) as Partial<Doc>) : {};
-    } catch {
-      process.stderr.write('[mcportal] accounts document unreadable; starting from bootstrap config only\n');
-    }
-    this.doc = { accounts: parsed.accounts ?? {}, identities: parsed.identities ?? {}, invites: parsed.invites ?? {}, audit: parsed.audit ?? [] };
-    this.loadedAt = this.now();
-  }
-
-  /** Serialized read-modify-write against the freshest document. */
-  private write<T>(mutate: (doc: Doc) => T): Promise<T> {
-    const run = this.chain.then(async () => {
-      await this.load(true);
-      const result = mutate(this.doc!);
-      if (this.doc!.audit.length > AUDIT_MAX) this.doc!.audit.splice(0, this.doc!.audit.length - AUDIT_MAX);
-      await this.persistence.write(JSON.stringify(this.doc));
-      return result;
+    this.store = new SharedDocument<Doc>(persistence, 'accounts', (d) => ({ accounts: d.accounts ?? {}, identities: d.identities ?? {}, invites: d.invites ?? {}, audit: d.audit ?? [] }), {
+      maxAgeMs: RELOAD_MS,
+      now: () => this.now(),
+      beforeWrite: (doc) => {
+        const now = this.now();
+        doc.audit = doc.audit.filter((e) => e.at > now - AUDIT_DAYS * DAY_MS);
+        if (doc.audit.length > AUDIT_MAX) doc.audit.splice(0, doc.audit.length - AUDIT_MAX);
+        for (const [login, invite] of Object.entries(doc.invites)) if (!invite.acceptedAt && invite.createdAt <= now - PENDING_INVITE_DAYS * DAY_MS) delete doc.invites[login];
+      },
     });
-    this.chain = run.catch(() => {});
-    return run;
+  }
+
+  /** The cached document, for the synchronous checks (null before the first load). */
+  private get doc(): Doc | null {
+    return this.store.peek() ?? null;
+  }
+
+  /** Load (or reload, if stale; always, with force) from persistence. Call before the sync checks are trusted. */
+  async load(force = false): Promise<void> {
+    await this.store.get(force ? 0 : RELOAD_MS);
+  }
+
+  /** Refresh in the background when stale; a failure is logged by the document and the cached copy stays. */
+  private refresh(): void {
+    this.load().catch((error: unknown) => processLogger().warn('accounts.reload_failed', { error: errorMessage(error) }));
+  }
+
+  /** Atomic read-modify-write against the stored document (never the cache). */
+  private write<T>(mutate: (doc: Doc) => T): Promise<T> {
+    return this.store.update(mutate);
   }
 
   /** Anyone with a GitHub account can sign in (no invite needed). */
@@ -173,7 +185,7 @@ export class Accounts {
 
   /** Sync check used on every request and token refresh (from the cached document). */
   isActive(id: GithubIdentity): boolean {
-    void this.load();   // refresh in the background when stale
+    this.refresh();
     const account = this.doc?.accounts[this.doc.identities[`github:${id.githubId}`] ?? ''];
     if (account && account.status !== 'active') return false;
     if (account?.via === 'invite') return true;
@@ -223,7 +235,7 @@ export class Accounts {
 
   /** Role and status for the access gate. Unknown accounts are plain active users (bootstrap/legacy). */
   actor(accountId: string): { accountId: string; role: Role; status: AccountStatus; login?: string } {
-    void this.load();
+    this.refresh();
     const account = this.doc?.accounts[accountId];
     if (account) return { accountId, role: account.role, status: account.status, ...(account.login ? { login: account.login } : {}) };
     const githubId = Number(accountId.replace(/^github-/, ''));
@@ -240,7 +252,8 @@ export class Accounts {
   /**
    * Remove an account, its sign-in identities and its (used) invite. The caller has
    * already deleted the account's data. Signing in again later is a new account, if
-   * config or a new invite lets them in.
+   * config or a new invite lets them in. The audit log keeps that things happened, but
+   * no longer says to whom: the account id (which is their GitHub id) and login go.
    */
   deleteAccount(accountId: string, by: string): Promise<boolean> {
     return this.write((doc) => {
@@ -249,9 +262,22 @@ export class Accounts {
       delete doc.accounts[accountId];
       for (const [key, id] of Object.entries(doc.identities)) if (id === accountId) delete doc.identities[key];
       for (const [login, invite] of Object.entries(doc.invites)) if (invite.accountId === accountId) delete doc.invites[login];
-      doc.audit.push({ at: this.now(), actor: by, action: 'account.deleted', target: accountId, detail: account.login ? `@${account.login}` : undefined });
+      const names = [accountId, ...(account.login ? [account.login] : [])];
+      const theirs = (s: string) => names.includes(s.replace(/^@/, ''));
+      for (const invite of Object.values(doc.invites)) if (theirs(invite.invitedBy)) invite.invitedBy = DELETED;
+      for (const e of doc.audit) {
+        if (theirs(e.actor)) e.actor = DELETED;
+        if (theirs(e.target)) e.target = DELETED;
+        if (e.detail && names.some((n) => mentions(e.detail!, n))) delete e.detail;
+      }
+      doc.audit.push({ at: this.now(), actor: by === accountId ? DELETED : by, action: 'account.deleted', target: DELETED });
       return true;
     });
+  }
+
+  /** Retention: the audit log's age limit and lapsed invites apply on every write; this is a write with no change. */
+  prune(): Promise<void> {
+    return this.write(() => undefined);
   }
 
   // ---------------------------------------------------------------- admin (CLI / admin page only; never MCP tools)
@@ -263,12 +289,12 @@ export class Accounts {
 
   invite(login: string, by: string): Promise<Invite> {
     const l = login.trim().toLowerCase().replace(/^@/, '');
-    if (!LOGIN.test(l)) return Promise.reject(new Error(`"${login}" isn't a valid GitHub login`));
+    if (!LOGIN.test(l)) return Promise.reject(new AppError('invalid_argument', `"${login}" isn't a valid GitHub login`));
     return this.write((doc) => {
       const existing = doc.invites[l];
       if (existing && !existing.acceptedAt && existing.code) return existing;   // inviting again keeps the same link
-      if (Object.values(doc.accounts).some((a) => a.login === l)) throw new Error(`@${l} already has an account`);
-      const invite: Invite = { login: l, invitedBy: by, createdAt: this.now(), code: randomBytes(18).toString('base64url') };
+      if (Object.values(doc.accounts).some((a) => a.login === l)) throw new AppError('conflict', `@${l} already has an account`);
+      const invite: Invite = { login: l, invitedBy: by, createdAt: this.now(), code: secretToken(18) };
       doc.invites[l] = invite;
       doc.audit.push({ at: invite.createdAt, actor: by, action: 'invite.created', target: l });
       return invite;
@@ -288,10 +314,11 @@ export class Accounts {
   setStatus(who: string, status: AccountStatus, by: string, reason?: string): Promise<Account> {
     return this.write((doc) => {
       const account = this.find(doc, who);
-      if (!account) throw new Error(`No account for "${who}"`);
+      if (!account) throw new AppError('not_found', `No account for "${who}"`);
       account.status = status;
       account.updatedAt = this.now();
-      doc.audit.push({ at: account.updatedAt, actor: by, action: status === 'suspended' ? 'account.suspended' : 'account.reinstated', target: account.id, detail: clean(reason, 200) || undefined });
+      const detail = clean(reason, 200);
+      doc.audit.push({ at: account.updatedAt, actor: by, action: status === 'suspended' ? 'account.suspended' : 'account.reinstated', target: account.id, ...(detail ? { detail } : {}) });
       return account;
     });
   }
@@ -314,7 +341,8 @@ export class Accounts {
   /** Record an admin action taken elsewhere (moderation) in the audit log. */
   record(actor: string, action: string, target: string, detail?: string): Promise<void> {
     return this.write((doc) => {
-      doc.audit.push({ at: this.now(), actor, action, target, detail: clean(detail, 200) || undefined });
+      const cleaned = clean(detail, 200);
+      doc.audit.push({ at: this.now(), actor, action, target, ...(cleaned ? { detail: cleaned } : {}) });
     });
   }
 

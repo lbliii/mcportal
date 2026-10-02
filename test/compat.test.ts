@@ -14,7 +14,7 @@ import { createFixtureFetcher } from '../src/lib/fixture-fetch.ts';
 import { handleMessage } from '../src/mcp.ts';
 import { buildExport, importExport, parseExport } from '../src/portability.ts';
 import { FileProfileStore, MemoryProfileStore } from '../src/store.ts';
-import type { ToolContext } from '../src/tools.ts';
+import type { ToolContext } from '../src/tools/kit.ts';
 
 /** A profile file as MCPortal 0.3 wrote it. */
 const OLD_PROFILE = {

@@ -5,26 +5,29 @@ description: Open and manage the user's MCPortal room, a personal set of portals
 
 # MCPortal
 
-MCPortal is the user's room: a set of portals, each a window onto one source. They decide what's in it and where it goes. "My portal" and "my MCPortal" mean the room. Only the stored profile data still calls a portal a panel: each column lists its portals under `columns[].panels`. Your job is to route their requests to the right tool and change only what they ask for.
+MCPortal is the user's room: a set of portals, each a window onto one source. They decide what's in it and where it goes. "My portal" and "my MCPortal" mean the room. Your job is to route their requests to the right tool and change only what they ask for.
 
 ## Routing
 
 | The user says | Do this |
 |---|---|
 | "open my room", "open my portal", "morning view", "what's new?" | `open_room`. It renders the room; add a two-to-four sentence summary of what stands out. |
-| "put X on the left", "make GitHub wider", "remove the blog" | `get_profile` → change only that → `update_profile` → `open_room` |
-| "add <source>" | `list_sources` if unsure of settings, `read_source` to preview it, then add it as above |
+| "put X on the left", "make GitHub wider", "rename my room", "switch to shelves" | `arrange_room` with only that change (`move`, `width`, `retitle`, `configure`, `name`, `layout`, `openIn`) |
+| "remove the blog" | `remove_portal` with its id or title |
+| "add <source>", "follow r/LocalLLaMA", "keep the Next.js docs in my room" | `find_source`, then `add_portal` with the candidate the user picks |
 | "what's on Hacker News?" (no layout change) | `read_source` |
+| "what's worth reading today?", "catch me up", "highlights" | `list_new_items`, pick a few with what you know of them and the conversation, then `show_highlights` with each ref and a one-line reason |
 | "read this", "summarize that article" | `read_article` with the URL, then answer from its text |
+| "Open MCPortal handoff k7q2xm", "pick up what I sent from MCPortal" | `open_handoff` with the code (none for the newest), then talk about that page and passage |
 | "pin my open Jira bugs", "put #releases from Slack in my room" | Fetch it with that connector's tool, then `pin_portal` with a title, `from`, a `recipe` (the tool and arguments you used) and short items |
-| "refresh my pinned portal (id X)" | `get_profile` for its `config.recipe`, run that recipe, then `pin_portal` with `portalId` and the new items |
+| "refresh my pinned portal (id X)" | Run the recipe `open_room` shows for it, then `pin_portal` with `portalId` and the new items |
 
 ## Layout rules
 
-- Columns go left to right. The portals in a column (its `panels`) stack top to bottom. `width` is relative (1-4).
-- Keep every portal's `id` when editing. New portals need `source`, `config` and ideally a short `title`.
-- **Never move, remove or retitle a portal the user didn't mention.** Their stated layout is a fixed rule. If a request is ambiguous ("put it on the side"), ask which side.
-- Removing a portal only works if you pass its id in `removePortalIds`. Do that only when the user explicitly asked to remove it. If `update_profile` refuses a save because it "would remove" something, you dropped a portal by mistake: put it back.
+- Columns go left to right, numbered from 1. The portals in a column stack top to bottom. `width` is relative (1-4).
+- Name a portal by its id (from `open_room`) or its exact title. Column numbers mean the room as it is now; one past the last makes a new column, and a column left empty is dropped.
+- `arrange_room` changes only what it's given, all at once or not at all. **Never move, remove or retitle a portal the user didn't mention.** If a request is ambiguous ("put it on the side"), ask which side.
+- Remove a portal only when the user asked to remove it.
 - After saving, tell the user what changed using the `Changes:` line from the result.
 - Limits: 8 columns, 4 portals per column, 30 items per portal.
 

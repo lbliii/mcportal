@@ -37,26 +37,61 @@ test('pg profiles: default for new users, round-trip, rev increments, schema is 
   await ensureSchema(db);   // second run is a no-op
   const store = new PgProfileStore(db);
   assert.deepEqual((await store.get('nobody')).columns, defaultProfile().columns);
-  assert.equal(await store.rev('nobody'), 0);
+  assert.equal((await store.versioned('nobody')).rev, 0);
 
   const p = validateProfile({ ...defaultProfile(), name: 'Mine', onboarded: true, saved: [{ url: 'https://example.com/a', title: 'A' }] });
   await store.put('u1', p);
-  assert.equal(await store.rev('u1'), 1);
+  assert.equal((await store.versioned('u1')).rev, 1);
   const back = await store.get('u1');
   assert.equal(back.name, 'Mine');
   assert.equal(back.saved[0]!.url, 'https://example.com/a');
   assert.equal(back.onboarded, true);
 
   await store.put('u1', { ...back, layout: 'shelves' });
-  assert.equal(await store.rev('u1'), 2);
+  assert.equal((await store.versioned('u1')).rev, 2);
   assert.equal((await store.get('u1')).layout, 'shelves');
 });
 
 test('pg profiles: concurrent writes all land, last one wins, rev counts every write', { skip }, async () => {
   const store = new PgProfileStore(db);
   await Promise.all(Array.from({ length: 20 }, (_, i) => store.put('busy', { ...defaultProfile(), name: `v${i}` })));
-  assert.equal(await store.rev('busy'), 20);
+  assert.equal((await store.versioned('busy')).rev, 20);
   assert.match((await store.get('busy')).name, /^v\d+$/);
+});
+
+test('pg profiles: concurrent updates from two instances all land (per-user lock)', { skip }, async () => {
+  const a = new PgProfileStore(db);
+  const b = new PgProfileStore(db);
+  const urls = Array.from({ length: 6 }, (_, i) => `https://example.com/${i}`);
+  await Promise.all(urls.map((url, i) => (i % 2 ? a : b).update('racy', (p) => {
+    const profile = validateProfile({ ...p, saved: [{ url, title: url }, ...p.saved] });
+    return { profile, result: undefined };
+  })));
+  assert.deepEqual((await a.get('racy')).saved.map((s) => s.url).sort(), urls);
+  assert.equal((await a.versioned('racy')).rev, urls.length, 'one revision per change, none lost');
+  // A change that decides not to write leaves the row alone.
+  assert.equal(await a.update('racy', () => ({ result: 'kept' })), 'kept');
+  assert.equal((await a.versioned('racy')).rev, urls.length);
+});
+
+test('pg documents: two instances share OAuth and accounts without losing or missing changes', { skip }, async () => {
+  const { Accounts, makeBootstrap } = await import('../src/accounts.ts');
+  let now = Date.parse('2026-10-01T00:00:00Z');
+  const clock = () => now;
+  const [a, b] = [new AuthStore(pgAuthPersistence(db, 'auth-multi'), clock), new AuthStore(pgAuthPersistence(db, 'auth-multi'), clock)];
+  const client = await a.registerClient({ redirect_uris: ['https://app.example/cb'] });
+  assert.ok(await b.getClient(client.client_id), 'a client registered on one instance is found on the other at once');
+  const who = { userId: 'multi', login: 'multi' };
+  const issued = await a.issueTokens(who as never, client.client_id, 'https://mcp.example/mcp', 'mcportal');
+  assert.ok(await b.verifyAccess(issued.access_token, 'https://mcp.example/mcp'), 'so is a token');
+  await a.revokeUser('multi');
+  now += 5_000;
+  assert.equal(await b.verifyAccess(issued.access_token, 'https://mcp.example/mcp'), undefined, 'a revocation reaches the other instance within its cache age');
+
+  const [x, y] = [new Accounts(pgAuthPersistence(db, 'accounts-multi'), makeBootstrap([], [])), new Accounts(pgAuthPersistence(db, 'accounts-multi'), makeBootstrap([], []))];
+  await Promise.all(['ann', 'ben', 'cat', 'dan'].map((login, i) => (i % 2 ? x : y).invite(login, 'test')));
+  await x.load(true);
+  assert.deepEqual((await x.list()).invites.map((i) => i.login).sort(), ['ann', 'ben', 'cat', 'dan'], 'concurrent invites from two instances all land');
 });
 
 test('pg profiles: an unreadable row is kept aside and the user gets the default plus a notice', { skip }, async () => {
@@ -110,7 +145,7 @@ test('pg clips: round-trip, search, tags, paging, isolation, limits; v1 upgrades
   await db.query(`UPDATE mcportal_meta SET value = '1' WHERE key = 'schema_version'`);
   await ensureSchema(db);
   const version = await db.query<{ value: string }>(`SELECT value FROM mcportal_meta WHERE key = 'schema_version'`);
-  assert.equal(version.rows[0]!.value, '3');
+  assert.equal(version.rows[0]!.value, '8');
 
   const t0 = new Date('2026-09-01T00:00:00Z');
   const a = buildClip({ kind: 'quote', text: 'Point-in-time recovery, 100% of the time', tags: ['infra'] }, t0);
@@ -160,20 +195,21 @@ test('pg deletion: a profile (and its kept corrupt copies) and all clips of one 
   await clips.add('keep', buildClip({ kind: 'quote', text: 'c' }));
   await profiles.delete('del_1');
   assert.equal(await clips.deleteAll('del_1'), 2);
-  assert.equal(await profiles.rev('del_1'), 0);
+  assert.equal((await profiles.versioned('del_1')).rev, 0);
   assert.equal((await profiles.get('keep')).name, 'Kept');
   assert.equal((await clips.list('keep')).length, 1);
   const kv = await db.query<{ key: string }>(`SELECT key FROM mcportal_kv WHERE key LIKE 'corrupt-profile:del%' ORDER BY key`);
   assert.deepEqual(kv.rows.map((r) => r.key), ['corrupt-profile:del%1:1'], 'the LIKE pattern is escaped: only del_1\'s copies go');
 });
 
-test('pg social: shares, feed rules, relations, hiding, reports, forget; schema v3', { skip }, async () => {
+test('pg social: shares, feed rules, relations, hiding, reports, forget; schema version recorded', { skip }, async () => {
   const { PgSocialStore } = await import('../src/db.ts');
   const { Social } = await import('../src/social.ts');
   const { PublicProfiles } = await import('../src/public-profiles.ts');
   const { memoryPersistence } = await import('../src/accounts.ts');
+  const { SCHEMA_VERSION } = await import('../src/db/schema.ts');
   const version = await db.query<{ value: string }>(`SELECT value FROM mcportal_meta WHERE key = 'schema_version'`);
-  assert.equal(version.rows[0]!.value, '3');
+  assert.equal(version.rows[0]!.value, SCHEMA_VERSION, 'ensureSchema records the current version');
   let now = Date.parse('2026-10-01T00:00:00Z');
   const profiles = new PublicProfiles(memoryPersistence());
   for (const [id, handle] of [['pa', 'pg_alice'], ['pb', 'pg_bob'], ['pc', 'pg_carol']]) await profiles.set(id!, { handle });
@@ -203,4 +239,26 @@ test('pg social: shares, feed rules, relations, hiding, reports, forget; schema 
   await social.forget('pa');
   assert.equal(await store.countShares('pa'), 0);
   assert.deepEqual(await store.outgoing('blocks', 'pa'), []);
+});
+
+
+test('pg reading: concurrent incremental events, restart, isolation, import and deletion', { skip }, async () => {
+  const { PgReadingStore } = await import('../src/db.ts');
+  const store = new PgReadingStore(db);
+  const url = 'https://example.com/docs';
+  await store.record('reader', { url, status: 'opened', anchor: { heading: 'Install', block: 2 }, progress: 0.3 });
+  await Promise.all(Array.from({ length: 10 }, () => new PgReadingStore(db).record('reader', { url: url + '#heading', status: 'seen' })));
+  const restarted = new PgReadingStore(db);
+  assert.equal((await restarted.get('reader', url))?.progress, 0.3);
+  assert.equal((await restarted.get('reader', url))?.status, 'opened');
+  await store.record('reader', { url, status: 'read' });
+  assert.deepEqual(await restarted.list('reader', { unfinished: true }), []);
+  await store.record('reader', { url, status: 'opened', anchor: null });
+  assert.equal((await restarted.get('reader', url))?.readAt, undefined);
+  assert.equal((await restarted.get('reader', url))?.anchor, undefined);
+  assert.equal(await store.import('reader2', await store.list('reader')), 1);
+  assert.equal(await store.import('reader2', await store.list('reader')), 0);
+  await store.deleteAll('reader');
+  assert.deepEqual(await store.list('reader'), []);
+  assert.equal((await store.list('reader2')).length, 1);
 });

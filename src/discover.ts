@@ -7,15 +7,19 @@
  * feed paths. Callers test-load every candidate before offering it, so nothing
  * that doesn't load gets added. All fetches go through the caller's guarded fetcher.
  */
+import { isAppError } from './lib/errors.ts';
 import { REPO_PATTERN } from './adapters/github.ts';
 import { HN_FEEDS } from './adapters/hn.ts';
 import { parseFeed } from './adapters/rss.ts';
 import { parseAttrs, tokenize } from './lib/html.ts';
 import { clean, decodeEntities, safeHttpUrl } from './lib/text.ts';
-import type { Fetcher, SourceKind } from './types.ts';
+import type { Fetcher } from './types.ts';
+
+/** The sources MCPortal fetches itself, which find_source can offer. */
+export type FetchedSource = 'hn' | 'rss' | 'github' | 'docs';
 
 export interface SourceCandidate {
-  source: Exclude<SourceKind, 'saved'>;
+  source: FetchedSource;
   config: Record<string, unknown>;
   title: string;
   /** How it was found: native integration, known-site recipe, the page's own feed link, or a probed path. */
@@ -150,7 +154,8 @@ async function probe(fetcher: Fetcher, url: string): Promise<{ title: string } |
     if (res.status < 200 || res.status >= 300 || !looksLikeFeed(res.text)) return null;
     const feed = parseFeed(res.text, 1, res.url);
     return feed.items.length ? { title: feed.title } : null;
-  } catch {
+  } catch (error) {
+    if (!isAppError(error)) throw error;   // a failed fetch means no feed there; a bug isn't that
     return null;
   }
 }

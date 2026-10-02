@@ -8,15 +8,49 @@
  *   mcportal admin suspend <login|account-id> [reason…]
  *   mcportal admin reinstate <login|account-id>
  *   mcportal admin audit [n]
+ *   mcportal admin delete <login|account-id> --confirm
+ *       Delete an account and everything it owns, as the account page does, for someone
+ *       who can't sign in to do it (lost GitHub access). Check who's asking first.
  *
  * On Railway: railway ssh --service mcportal -- node bin/mcportal.mjs admin list
  * Uses the same storage as the server (Postgres when DATABASE_URL is set, else
  * files). The running server picks changes up within 30 seconds.
  */
+import { deleteAccountData } from './account.ts';
 import { Accounts, bootstrapFromEnv } from './accounts.ts';
-import { fileAuthPersistence, type AuthPersistence } from './auth/store.ts';
+import { AuthStore, fileAuthPersistence, type AuthPersistence } from './auth/store.ts';
+import { silentLogger } from './lib/log.ts';
+import { PublicProfiles } from './public-profiles.ts';
+import { Social } from './social.ts';
+import { openStorage } from './storage.ts';
 
-const USAGE = `usage: mcportal admin <list | invite <login> | uninvite <login> | suspend <who> [reason] | reinstate <who> | audit [n]>`;
+const USAGE = `usage: mcportal admin <list | invite <login> | uninvite <login> | suspend <who> [reason] | reinstate <who> | audit [n] | delete <who> --confirm>`;
+
+/** Delete an account with every store the server uses (the same ones, opened the same way). */
+async function deleteAccount(who: string, confirmed: boolean, actor: string, dataDir: string, accounts: Accounts, out: (line: string) => void): Promise<number> {
+  const q = who.trim().toLowerCase().replace(/^@/, '');
+  const account = (await accounts.list()).accounts.find((a) => a.id === q || a.login === q || String(a.githubId) === q);
+  if (!account) { out(`No account for ${who}.`); return 1; }
+  const name = `${account.id}${account.login ? ` (@${account.login})` : ''}`;
+  if (!confirmed) {
+    out(`This deletes ${name} and everything it owns: room, saved items, clips, reading, public profile, shares, follows and sign-ins. It can't be undone.`);
+    out(`Check who's asking first, then run: mcportal admin delete ${who} --confirm`);
+    return 2;
+  }
+  const storage = await openStorage(dataDir, silentLogger);
+  try {
+    const publicProfiles = new PublicProfiles(storage.profilesPersistence);
+    const done = await deleteAccountData(account.id, {
+      accounts, store: storage.store, reading: storage.reading, handoffs: storage.handoffs, seen: storage.seen, editions: storage.editions, clips: storage.clips,
+      publicProfiles, social: new Social({ store: storage.social, profiles: publicProfiles }),
+      oauth: new AuthStore(storage.authPersistence ?? dataDir),
+    }, actor);
+    out(`Deleted ${name}: ${done.clips} clip(s), ${done.tokens} sign-in record(s), and the rest of its data. The server applies this within 30 seconds.`);
+    return 0;
+  } finally {
+    await storage.close();
+  }
+}
 
 async function persistence(dataDir: string): Promise<{ p: AuthPersistence; close: () => Promise<void> }> {
   const url = process.env.DATABASE_URL;
@@ -64,6 +98,9 @@ export async function runAdmin(args: string[], dataDir: string, out: (line: stri
         out(`${a.id} (@${a.login}) is now ${a.status}. The server applies this within 30 seconds.`);
         return 0;
       }
+      case 'delete':
+        if (!target) { out(USAGE); return 2; }
+        return await deleteAccount(target, rest.includes('--confirm'), actor, dataDir, accounts, out);
       case 'audit': {
         const entries = await accounts.auditLog(Number(target) || 50);
         for (const e of entries) out(`  ${when(e.at)}  ${e.action.padEnd(19)} ${e.target.padEnd(22)} by ${e.actor}${e.detail ? `  (${e.detail})` : ''}`);

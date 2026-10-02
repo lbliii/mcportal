@@ -10,16 +10,17 @@ import { createFixtureFetcher } from '../src/lib/fixture-fetch.ts';
 import { isPublicAddress, parseV6 } from '../src/lib/ip.ts';
 import { assertPublicUrl, BoundaryError, guardedLookup } from '../src/lib/safe-fetch.ts';
 import { clean } from '../src/lib/text.ts';
-import { handleMessage, MCP_APP_MIME, scriptJson, SERVER_INFO } from '../src/mcp.ts';
+import { handleMessage, MCP_APP_MIME, roomHtml, scriptJson, SERVER_INFO, UI_INCLUDES } from '../src/mcp.ts';
 import { buildBrand } from '../scripts/brand.ts';
 import { defaultProfile, ProfileError, validateProfile } from '../src/profile.ts';
 import { FileProfileStore, MemoryProfileStore } from '../src/store.ts';
-import { ROOM_URI, type ToolContext } from '../src/tools.ts';
+import { ROOM_URI, type ToolContext } from '../src/tools/kit.ts';
 import { pageFeeds, recipesFor } from '../src/discover.ts';
 import { parseFeed } from '../src/adapters/rss.ts';
 import { STARTER_PACKS } from '../src/packs.ts';
 import { buildOpml, parseOpml } from '../src/opml.ts';
-import { toolCost, UsageBudget } from '../src/lib/budget.ts';
+import { UsageBudget } from '../src/lib/budget.ts';
+import { toolCost } from '../src/tools/index.ts';
 import type { Fetcher } from '../src/types.ts';
 
 /** A user who has already set up their portal (the sample layout). Use newUser() for onboarding. */
@@ -60,6 +61,11 @@ test('initialize negotiates version and advertises the MCP Apps extension', asyn
   assert.equal(svg!.mimeType, 'image/svg+xml');
   assert.doesNotMatch(Buffer.from(svg!.src.split(',')[1]!, 'base64').toString(), /<script|href=/i);
   assert.equal('icons' in SERVER_INFO, false, '/health reports SERVER_INFO and stays small');
+
+  // Tool-list changes are announced only where the transport can send them (stdio).
+  assert.equal(result.capabilities.tools.listChanged, false);
+  const stdio = await rpc({ ...ctx(), toolsChanged: () => {} }, 'initialize', { protocolVersion: '2025-06-18' });
+  assert.equal((stdio.result as any).capabilities.tools.listChanged, true);
 });
 
 test('notifications get no response; unknown methods get -32601', async () => {
@@ -71,9 +77,18 @@ test('notifications get no response; unknown methods get -32601', async () => {
 });
 
 test('tools/list links open_room to the UI and hides app-only tools from the model', async () => {
-  const res = await rpc(ctx(), 'tools/list');
+  // An account that takes part in sharing lists every tool; a new one only the ways in; a local server none of them.
+  const social = (active: boolean) => ({ social: { uses: async () => active } as never, publicProfiles: { get: async () => (active ? { handle: 'me' } : undefined) } as never });
+  const res = await rpc(ctx(social(true)), 'tools/list');
   const tools = (res.result as any).tools as any[];
-  assert.deepEqual(tools.map((t) => t.name), ['open_room', 'build_room', 'get_profile', 'update_profile', 'read_source', 'refresh_portal', 'read_article', 'get_thumbnails', 'import_opml', 'export_opml', 'find_source', 'add_portal', 'pin_portal', 'save_item', 'remove_saved', 'list_sources', 'open_docs', 'read_doc_page', 'search_docs', 'clip', 'search_clips', 'get_clip', 'update_clip', 'delete_clip', 'get_public_profile', 'set_public_profile', 'remove_public_profile', 'export_data', 'import_portal', 'account_settings', 'open_space', 'share', 'unshare', 'get_share', 'list_shares', 'relationship', 'list_connections', 'report']);
+  const names = async (c: ToolContext) => ((await rpc(c, 'tools/list')).result as any).tools.map((t: any) => t.name) as string[];
+  const local = await names(ctx());
+  assert.ok(!local.includes('share') && !local.includes('open_space') && !local.includes('set_public_profile'), 'no sharing or profiles locally');
+  assert.equal(local.length, tools.length - 11);
+  const fresh = await names(ctx(social(false)));
+  assert.deepEqual(tools.map((t) => t.name).filter((n) => !fresh.includes(n)).sort(), ['get_public_profile', 'get_share', 'list_connections', 'list_shares', 'remove_public_profile', 'share', 'unshare']);
+  assert.deepEqual(tools.map((t) => t.name), ['open_room', 'build_room', 'arrange_room', 'remove_portal', 'refresh_portal', 'mark_seen', 'list_new_items', 'show_highlights', 'read_source', 'find_source', 'add_portal', 'list_sources', 'import_opml', 'read_article', 'get_thumbnails', 'save_item', 'remove_saved', 'pin_portal', 'open_docs', 'read_doc_page', 'search_docs', 'open_handoff', 'create_handoff', 'clip', 'search_clips', 'get_clip', 'update_clip', 'delete_clip', 'get_public_profile', 'set_public_profile', 'remove_public_profile', 'export_data', 'import_portal', 'account_settings', 'open_space', 'share', 'unshare', 'get_share', 'list_shares', 'relationship', 'list_connections', 'report', 'record_reading', 'get_reading', 'list_reading']);
+  assert.ok((await names({ ...ctx(social(true)), labs: ['reblog'] })).includes('share_settings'), "a lab's tools are listed while it's on");
   assert.equal(tools.find((t) => t.name === 'open_room')._meta.ui.resourceUri, ROOM_URI);
   assert.deepEqual(tools.find((t) => t.name === 'refresh_portal')._meta.ui.visibility, ['app']);
   assert.equal(tools.find((t) => t.name === 'read_article')._meta.ui.resourceUri, ROOM_URI, 'reader renders as its own card');
@@ -92,6 +107,28 @@ test('resources/read serves the self-contained room app', async () => {
   for (const [, script] of content.text.matchAll(/<script>([\s\S]*?)<\/script>/g)) new vm.Script(script); // throws on a syntax error
   const missing = await rpc(ctx(), 'resources/read', { uri: 'ui://nope' });
   assert.equal(missing.error?.code, -32602);
+
+  // The same CSP (no external origins) on the listing, so hosts can review it when they connect.
+  const listed = ((await rpc(ctx(), 'resources/list')).result as any).resources[0];
+  assert.deepEqual(listed._meta.ui.csp, { connectDomains: [], resourceDomains: [] });
+  assert.deepEqual(listed._meta.ui, content._meta.ui);
+});
+
+test('room fragments: every src/ui/room file is included, in order, and no include marker is left', async () => {
+  const fragments = (await readdir(new URL('../src/ui/room/', import.meta.url))).map((f) => `room/${f}`);
+  assert.ok(fragments.length >= 10, `found the room fragments (${fragments.length})`);
+  const page = await readFile(new URL('../src/ui/room.html', import.meta.url), 'utf8');
+  const html = await roomHtml();
+  assert.ok(!/include:/.test(html), 'no leftover include markers');
+  for (const name of fragments) {
+    assert.ok(UI_INCLUDES.includes(name), `${name} is listed in UI_INCLUDES`);
+    assert.ok(page.includes(`include:${name}*/`) || page.includes(`include:${name}-->`), `room.html includes ${name}`);
+    const text = (await readFile(new URL(`../src/ui/${name}`, import.meta.url), 'utf8')).trim();
+    assert.ok(html.includes(text), `${name} appears in the assembled page`);
+  }
+  // The script fragments share one closure; their order is evaluation order.
+  const order = [...page.matchAll(/\/\*include:(room\/[\w.]+\.js)\*\//g)].map((m) => m[1]);
+  assert.deepEqual(order, ['bridge', 'dom', 'room', 'items', 'layouts', 'river', 'levels', 'seen', 'reader', 'reading', 'passage', 'handoff', 'highlights', 'docs', 'social', 'reblog', 'add', 'toolbar', 'boot'].map((n) => `room/${n}.js`));
 });
 
 // ---------------------------------------------------------------- tools
@@ -134,42 +171,36 @@ test('a failing source degrades to an error portal, not a failed room', async ()
   assert.equal(result.structuredContent.portals.filter((p: any) => !p.error).length, 3);
 });
 
-test('update_profile moves portals, reports the diff, and refuses silent removals', async () => {
+test('arrange_room moves portals and reports the diff; remove_portal removes only what it names', async () => {
   const c = ctx();
-  const { profile } = (await call(c, 'get_profile')).structuredContent;
   // "Put GitHub on the left"
-  profile.columns = [profile.columns[1], profile.columns[0], profile.columns[2]];
-  const saved = await call(c, 'update_profile', { profile });
+  const saved = await call(c, 'arrange_room', { move: [{ portal: 'gh-mcp', column: 1, position: 1 }] });
   assert.equal(saved.isError, undefined);
-  assert.match(saved.content[0]!.text, /moved: hn-top \(column 1 → 2\), gh-mcp \(column 2 → 1\)/);
+  assert.match(saved.content[0]!.text, /moved: .*gh-mcp \(column 2 → 1\)/);
   assert.equal((await call(c, 'open_room')).structuredContent.portals[0].portalId, 'gh-mcp');
+  assert.deepEqual(saved.structuredContent.profile.columns.map((col: any) => col.panels.map((p: any) => p.id)), [['gh-mcp', 'hn-top'], ['simonw']], 'the emptied column is dropped; nothing else changes');
 
-  // An agent that "tidies up" by dropping a portal is stopped.
-  const trimmed = structuredClone(profile);
-  trimmed.columns.pop();
-  const refused = await call(c, 'update_profile', { profile: trimmed });
-  assert.equal(refused.isError, true);
-  assert.match(refused.content[0]!.text, /would remove simonw/);
-  assert.equal((await call(c, 'get_profile')).structuredContent.profile.columns.length, 3, 'nothing saved');
-
-  // Explicit, user-requested removal goes through.
-  const removed = await call(c, 'update_profile', { profile: trimmed, removePortalIds: ['simonw'] });
+  // A removal is its own call, by id or title, and touches nothing else.
+  const removed = await call(c, 'remove_portal', { portals: ["Simon Willison's Weblog"] });
   assert.equal(removed.isError, undefined);
   assert.match(removed.content[0]!.text, /removed: simonw/);
+  assert.doesNotMatch(removed.content[0]!.text, /\bmoved/);
 
-  const bad = await call(c, 'update_profile', { profile: { columns: [{ panels: [{ source: 'rss', config: { url: 'ftp://x' } }] }] } });
+  const missing = await call(c, 'remove_portal', { portals: ['nope'] });
+  assert.equal(missing.isError, true);
+  assert.equal(missing.structuredContent.error.code, 'not_found');
+  const bad = await call(c, 'arrange_room', { configure: [{ portal: 'gh-mcp', config: { mode: 'releases', repo: 'not a repo' } }] });
   assert.equal(bad.isError, true);
-  assert.match(bad.content[0]!.text, /Profile not saved/);
+  assert.match(bad.content[0]!.text, /Nothing changed: .*owner\/name/);
 });
 
-test('update_profile saves layout and openIn, reports them, and keeps portals put', async () => {
+test('arrange_room saves layout, openIn and the name, reports them, and keeps portals put', async () => {
   const c = ctx();
-  const { profile } = (await call(c, 'get_profile')).structuredContent;
-  assert.equal(profile.layout, 'columns');
-  assert.equal(profile.openIn, 'card');
-  const saved = await call(c, 'update_profile', { profile: { ...profile, layout: 'shelves', openIn: 'chat' } });
+  const before = (await call(c, 'open_room')).structuredContent.profile;
+  assert.equal(before.layout, 'columns');
+  const saved = await call(c, 'arrange_room', { layout: 'shelves', openIn: 'chat', name: 'mornings' });
   assert.equal(saved.isError, undefined);
-  assert.match(saved.content[0]!.text, /settings: layout columns → shelves, openIn card → chat/);
+  assert.match(saved.content[0]!.text, /settings: layout columns → shelves, openIn card → chat, name "morning" → "mornings"/);
   assert.doesNotMatch(saved.content[0]!.text, /moved|removed|added/);
   const after = (await call(c, 'open_room')).structuredContent.profile;
   assert.equal(after.layout, 'shelves');
@@ -199,10 +230,9 @@ test('saving: save_item adds a Saved portal once, dedupes, fences titles; layout
   assert.deepEqual(portal.items.map((i: any) => i.url), ['https://example.com/b', 'https://example.com/a']);
   assert.equal(portal.items[0].title, 'example.com', 'title defaults to the host');
 
-  // update_profile can't touch bookmarks, even if the model sends saved: [].
-  const { profile } = (await call(c, 'get_profile')).structuredContent;
-  await call(c, 'update_profile', { profile: { ...profile, saved: [] } });
-  assert.equal((await call(c, 'get_profile')).structuredContent.profile.saved.length, 2);
+  // Arranging the room can't touch bookmarks.
+  await call(c, 'arrange_room', { layout: 'shelves' });
+  assert.equal((await call(c, 'open_room')).structuredContent.profile.saved.length, 2);
 
   const removed = await call(c, 'remove_saved', { url: 'https://example.com/a' });
   assert.deepEqual(removed.structuredContent.saved.map((s: any) => s.url), ['https://example.com/b']);
@@ -245,18 +275,16 @@ test('pinning: pin_portal adds a portal from another tool, refreshes it by id, a
   assert.equal((await call(c, 'pin_portal', { title: 'x', items: [] })).isError, true, 'new portals need from and recipe');
   assert.equal((await call(c, 'add_portal', { source: 'pinned', config: { from: 'Jira', recipe } })).isError, true);
 
-  // get_profile leaves the items out of its text; update_profile can't drop or rewrite them.
-  const got = await call(c, 'get_profile');
-  assert.ok(!got.content[0]!.text.includes('Only one left'));
-  const { profile } = got.structuredContent;
-  const moved = await call(c, 'update_profile', { profile: { ...profile, pins: {}, columns: [...profile.columns].reverse() } });
+  // open_room shows its recipe; arranging the room can't drop or rewrite its items, and configure refuses pinned portals.
+  assert.match((await call(c, 'open_room')).content[0]!.text, /To refresh: jira_search/);
+  const moved = await call(c, 'arrange_room', { move: [{ portal: 'my-open-bugs', column: 1, position: 1 }] });
   assert.equal(moved.isError, undefined);
-  assert.equal((await call(c, 'get_profile')).structuredContent.profile.pins['my-open-bugs'].items[0].title, 'Only one left');
+  assert.equal(moved.structuredContent.profile.pins['my-open-bugs'].items[0].title, 'Only one left');
+  assert.equal((await call(c, 'arrange_room', { configure: [{ portal: 'my-open-bugs', config: { recipe: 'x' } }] })).isError, true);
 
   // Removing the portal removes its items.
-  const without = profile.columns.filter((col: any) => !col.panels.some((p: any) => p.id === 'my-open-bugs'));
-  await call(c, 'update_profile', { profile: { ...profile, columns: without }, removePortalIds: ['my-open-bugs'] });
-  assert.deepEqual((await call(c, 'get_profile')).structuredContent.profile.pins, {});
+  const removed = await call(c, 'remove_portal', { portals: ['my-open-bugs'] });
+  assert.deepEqual(removed.structuredContent.profile.pins, {});
 });
 
 test('discovery: recipes map known sites to their feeds', () => {
@@ -368,10 +396,10 @@ test('get_thumbnails: oversized WordPress uploads go through Photon; timeouts ar
   const fetcher: Fetcher = async (target, options = {}) => {
     calls.push(target);
     const u = new URL(target);
-    if (u.hostname === 'www.thisiscolossal.com') throw new BoundaryError(`Response exceeded ${options.maxBytes} bytes`);   // ignores ?w=
+    if (u.hostname === 'www.thisiscolossal.com') throw new BoundaryError(`Response exceeded ${options.maxBytes} bytes`, 'fetch_too_large');   // ignores ?w=
     if (u.hostname === 'i0.wp.com') return { status: 200, url: target, contentType: 'image/png', text: png.toString('base64'), truncated: false };
     if (u.hostname === 'slow.example.org') {
-      if (down) throw new BoundaryError('Timed out fetching slow.example.org');
+      if (down) throw new BoundaryError('Timed out fetching slow.example.org', 'fetch_timeout');
       return { status: 200, url: target, contentType: 'image/png', text: png.toString('base64'), truncated: false };
     }
     return { status: 404, url: target, contentType: 'text/plain', text: '', truncated: false };
@@ -450,9 +478,9 @@ test('brand: every icon the room asks for is in the generated set, drawn on the 
   const { ICONS, ICON_STROKE } = vm.runInNewContext(`${text['src/ui/brand/icons.js']}; ({ ICONS, ICON_STROKE })`);
   assert.equal(ICON_STROKE, 1.75);
   assert.match(text['brand/mark-line.svg']!, /stroke-width="1\.75"/, 'the Line mark shares the icon stroke');
-  const page = await readFile(new URL('../src/ui/room.html', import.meta.url), 'utf8');
+  const page = await roomHtml();
   const used = new Set([...page.matchAll(/(?:icon|iconButton)\('(\w+)'|data-icon="(\w+)"|icon\(full \? '(\w+)' : '(\w+)'\)/g)].flatMap((m) => m.slice(1).filter(Boolean)));
-  assert.ok(used.size >= 19, `found the icon names in room.html (${used.size})`);
+  assert.ok(used.size >= 19, `found the icon names in the assembled room (${used.size})`);
   for (const name of used) assert.ok(Object.hasOwn(ICONS, name), `icon "${name}" is missing from scripts/brand.ts`);
   for (const [name, { d, dot }] of Object.entries(ICONS) as [string, { d: string; dot?: number[] }][]) {
     const numbers = d.match(/-?\d*\.?\d+/g)!.map(Number);
@@ -526,7 +554,7 @@ test('budget: per-minute burst, daily and global caps; refusals charge nothing',
 
   assert.equal(toolCost('find_source', {}), 5);
   assert.equal(toolCost('get_thumbnails', { urls: new Array(24).fill('x') }), 4);
-  assert.equal(toolCost('get_profile', {}), 1);
+  assert.equal(toolCost('list_sources', {}), 1);
 
   // Wired into tool calls: a limited call returns a friendly tool error and doesn't run.
   const c = ctx({ budget: new UsageBudget({ perMinute: 5 }) });
@@ -649,7 +677,7 @@ test('FileProfileStore: round-trips, recovers from corruption, serializes concur
     assert.ok((await readdir(dir)).some((f) => f.startsWith('lawrence.corrupt-')));
     // ...and the agent can save again immediately.
     const c = ctx({ store, userId: 'lawrence' });
-    assert.equal((await call(c, 'update_profile', { profile: defaultProfile() })).isError, undefined);
+    assert.equal((await call(c, 'arrange_room', { name: 'again' })).isError, undefined);
 
     // 25 concurrent writes all succeed and leave valid JSON.
     await Promise.all(Array.from({ length: 25 }, (_, i) => store.put('race', validateProfile({ name: `n${i}`, columns: [{ panels: [{ source: 'hn', config: {} }] }] }))));

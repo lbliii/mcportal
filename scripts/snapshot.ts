@@ -18,7 +18,7 @@ import { safeFetch } from '../src/lib/safe-fetch.ts';
 import { handleMessage, roomHtml } from '../src/mcp.ts';
 import { MemoryClipStore } from '../src/clips.ts';
 import { MemoryProfileStore } from '../src/store.ts';
-import type { ToolContext } from '../src/tools.ts';
+import type { ToolContext } from '../src/tools/kit.ts';
 
 const out = process.argv.slice(2).find((a) => !a.startsWith('--')) ?? 'snapshot.html';
 const openReader = process.argv.includes('--reader');
@@ -39,8 +39,7 @@ const call = (name: string, args: Record<string, unknown> = {}) =>
 
 if (packs) await call('build_room', { packs, layout: layout ?? 'columns' });
 else if (layout) {
-  const profile = (((await call('get_profile'))?.result as any)?.structuredContent?.profile ?? {}) as Record<string, unknown>;
-  await call('update_profile', { profile: { ...profile, layout } });
+  await call('arrange_room', { layout });
 }
 const room = await call('open_room');
 const portals = ((room?.result as any)?.structuredContent?.portals ?? []) as Array<{ items: Array<{ url?: string }>; source: string }>;

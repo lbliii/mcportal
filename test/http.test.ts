@@ -122,6 +122,18 @@ test('batches are capped and notifications return 202', async () => {
   }
 });
 
+test('an oversized /mcp body is refused and its connection closed, so the next request on it is not misread', async () => {
+  const app = await startApp({ allowUnauthenticated: true });
+  try {
+    const big = await raw(app.port, { method: 'POST', path: '/mcp', headers: { 'content-type': 'application/json', 'content-length': String(2_000_000) } });
+    assert.equal(big.status, 413);
+    assert.equal(big.headers.connection, 'close');
+    assert.equal((await raw(app.port, { method: 'POST', path: '/mcp', headers: { 'content-type': 'application/json' }, body: RPC_PING })).status, 200);
+  } finally {
+    await app.close();
+  }
+});
+
 test('config: loopback by default; refuses a public bind without auth', () => {
   const local = configFromEnv({}, '/tmp/x');
   assert.equal(local.host, '127.0.0.1');
@@ -138,7 +150,7 @@ test('config: loopback by default; refuses a public bind without auth', () => {
 test('public pages: landing, privacy and support render without scripts; images and brand files only from the allowlist', async () => {
   const app = await startApp({ staticToken: 't', site: { supportUrl: 'mailto:help@example.com', operator: 'A <b>Person</b>' } });
   try {
-    for (const path of ['/', '/privacy', '/support']) {
+    for (const path of ['/', '/privacy', '/terms', '/support', '/security']) {
       const page = await raw(app.port, { path });
       assert.equal(page.status, 200, path);
       assert.match(page.headers['content-type'] as string, /text\/html/);
@@ -148,6 +160,12 @@ test('public pages: landing, privacy and support render without scripts; images 
       assert.match(page.body, /A &lt;b&gt;Person&lt;\/b&gt;/, 'operator is escaped');
     }
     assert.match((await raw(app.port, { path: '/support' })).body, /mailto:help@example\.com/);
+    assert.match((await raw(app.port, { path: '/' })).body, /<a href="\/terms">Terms<\/a>/, 'every page links the terms');
+    for (const path of ['/', '/support']) assert.doesNotMatch((await raw(app.port, { path })).body, /github\.com\/lbliii\/mcportal(?!\/issues)/, `${path}: no links to a repo the public can't open`);
+    const terms = (await raw(app.port, { path: '/terms' })).body;
+    assert.match(terms, /<h2>Acceptable use<\/h2>/);
+    assert.match(terms, /at least 13/);
+    assert.match(terms, /run by A &lt;b&gt;Person&lt;\/b&gt;/);
     assert.match((await raw(app.port, { path: '/' })).body, /http:\/\/localhost\/mcp/);
     assert.equal((await raw(app.port, { path: '/site/columns.png' })).status, 200);
     const landing = (await raw(app.port, { path: '/' })).body;
@@ -157,7 +175,7 @@ test('public pages: landing, privacy and support render without scripts; images 
     assert.match(landing, /src:url\(\/site\/jost-bold\.ttf\)/);
     assert.match(landing, /<meta property="og:image" content="http:\/\/localhost\/site\/og\.png">/, 'link previews get an absolute image URL');
     assert.match(landing, /<link rel="icon" href="\/favicon\.svg" type="image\/svg\+xml">/);
-    for (const path of ['/', '/privacy', '/support']) {
+    for (const path of ['/', '/privacy', '/terms', '/support', '/security']) {
       assert.doesNotMatch((await raw(app.port, { path })).body, /inside Claude|[Aa]sk Claude|tell Claude/, `${path} talks about "your agent", not one host`);
     }
     const types: Record<string, RegExp> = {
@@ -177,6 +195,55 @@ test('public pages: landing, privacy and support render without scripts; images 
     assert.equal((await raw(app.port, { path: '/site/..%2Fhttp.ts' })).status, 404);
     assert.equal((await raw(app.port, { path: '/site/other.png' })).status, 404);
     assert.equal((await raw(app.port, { method: 'POST', path: '/privacy' })).status, 404);
+  } finally {
+    await app.close();
+  }
+});
+
+test('contact: one address for support and security, security.txt, and the law in the terms', async () => {
+  assert.throws(() => configFromEnv({ MCPORTAL_CONTACT_EMAIL: 'not an email' }, '/tmp/x'), /isn't an email address/);
+  const site = configFromEnv({ MCPORTAL_CONTACT_EMAIL: 'hello@mcportal.example', MCPORTAL_JURISDICTION: 'the State of Oregon, USA', MCPORTAL_OPERATOR: 'Jane Doe', MCPORTAL_SOURCE_URL: 'https://github.com/example/mcportal' }, '/tmp/x').site!;
+  assert.equal(site.supportUrl, 'mailto:hello@mcportal.example', 'support defaults to the contact address');
+  const app = await startApp({ staticToken: 't', site });
+  try {
+    const txt = await raw(app.port, { path: '/.well-known/security.txt' });
+    assert.equal(txt.status, 200);
+    assert.match(txt.headers['content-type'] as string, /^text\/plain/);
+    assert.match(txt.body, /^Contact: mailto:hello@mcportal\.example$/m);
+    const expires = Date.parse(/^Expires: (.+)$/m.exec(txt.body)![1]!);
+    assert.ok(expires > Date.now() && expires < Date.now() + 365 * 86_400_000, 'RFC 9116: expires within a year');
+    assert.match(txt.body, /^Canonical: http:\/\/localhost\/\.well-known\/security\.txt$/m);
+    assert.match(txt.body, /^Policy: http:\/\/localhost\/security$/m);
+    const security = (await raw(app.port, { path: '/security' })).body;
+    assert.match(security, /mailto:hello@mcportal\.example/);
+    assert.match(security, /within 3 business days/);
+    assert.match((await raw(app.port, { path: '/terms' })).body, /governed by the laws of the State of Oregon, USA/);
+    assert.doesNotMatch((await raw(app.port, { path: '/support' })).body, /invite-only/, 'open sign-up: no invite-only answer');
+    assert.match((await raw(app.port, { path: '/' })).body, /<a href="https:\/\/github\.com\/example\/mcportal">Source<\/a>/, 'with MCPORTAL_SOURCE_URL, the footer links the source');
+    assert.match((await raw(app.port, { path: '/support' })).body, /github\.com\/example\/mcportal#readme/);
+  } finally {
+    await app.close();
+  }
+});
+
+test('/health checks storage: 503 when it fails, answered from a short cache', async () => {
+  let down = false;
+  let checks = 0;
+  const checkStorage = async () => { checks++; if (down) throw new Error('connection refused'); };
+  let now = 0;
+  const app = await startApp({ allowUnauthenticated: true }, undefined, { checkStorage, now: () => now });
+  try {
+    const ok = await raw(app.port, { path: '/health' });
+    assert.equal(ok.status, 200);
+    assert.deepEqual(JSON.parse(ok.body).checks, { storage: 'ok' });
+    down = true;
+    assert.equal((await raw(app.port, { path: '/health' })).status, 200, 'cached for a few seconds');
+    assert.equal(checks, 1);
+    now = 5_000;
+    const failing = await raw(app.port, { path: '/health' });
+    assert.equal(failing.status, 503);
+    assert.equal(JSON.parse(failing.body).ok, false);
+    assert.ok(failing.headers['x-request-id'], 'every response carries a request id');
   } finally {
     await app.close();
   }

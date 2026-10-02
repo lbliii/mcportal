@@ -1,4 +1,3 @@
-import { DESIGN_CSS, PRIMITIVES_CSS } from '../design/generated.ts';
 /**
  * OAuth 2.1 for the hosted MCP server, following the MCP authorization spec:
  *
@@ -19,12 +18,17 @@ import { DESIGN_CSS, PRIMITIVES_CSS } from '../design/generated.ts';
  *
  * The GitHub token is used once to learn who the user is and then discarded.
  */
-import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { fetchJson } from '../lib/safe-fetch.ts';
+import { AppError, errorCode, errorStack, type ErrorCode } from '../lib/errors.ts';
+import { safeEqual, secretToken, sha256Url } from '../lib/ids.ts';
+import { processLogger } from '../lib/log.ts';
+import { RateLimiter } from '../lib/rate-limit.ts';
+import { cookies, escapeHtml, readBody, redirect, sendHtml, sendJson } from '../lib/web.ts';
+import { page } from '../page.ts';
 import { clean } from '../lib/text.ts';
 import type { Fetcher } from '../types.ts';
 import { Accounts, makeBootstrap, memoryPersistence } from '../accounts.ts';
+import { githubAuthorizeUrl, githubIdentity, type GithubApp, type GithubIdentity } from './github.ts';
 import { CLIENT_LIMITS, type AuthStore, type Identity, type TokenRecord } from './store.ts';
 
 export const SCOPE = 'mcportal';
@@ -36,7 +40,7 @@ const MAX_CIMD = 200;
 
 export interface OAuthConfig {
   publicUrl: string;
-  github: { clientId: string; clientSecret: string };
+  github: GithubApp;
   /** GitHub logins (lowercase) or numeric ids allowed to sign in. Empty means anyone. */
   allowedGithubUsers: string[];
   /** Trust the last X-Forwarded-For hop for per-IP limits (true behind Railway's proxy). */
@@ -69,29 +73,25 @@ interface ClientInfo {
   redirectUris: string[];
 }
 
-export class OAuthError extends Error {
-  code: string;
-  status: number;
-  constructor(code: string, description: string, status = 400) {
-    super(description);
-    this.code = code;
+/** RFC 6749 error codes, and the AppError code each one is. */
+const OAUTH_CODES: Record<string, ErrorCode> = {
+  access_denied: 'forbidden',
+  slow_down: 'rate_limited',
+  invalid_target: 'not_found',
+  server_error: 'internal',
+};
+
+/** An OAuth endpoint's refusal: `error` is the RFC 6749 code the client sees, with its HTTP status. */
+export class OAuthError extends AppError {
+  override name = 'OAuthError';
+  readonly error: string;
+  readonly status: number;
+
+  constructor(error: string, description: string, status = 400) {
+    super(OAUTH_CODES[error] ?? 'invalid_argument', description);
+    this.error = error;
     this.status = status;
   }
-}
-
-export function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
-}
-
-export function page(title: string, body: string): string {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)}</title>
-<style>${DESIGN_CSS}
-body{font:var(--mp-type-15)/var(--mp-line-body) var(--mp-font-ui);max-width:460px;margin:12vh auto;padding:0 var(--mp-space-20);background:var(--mp-surface-canvas);color:var(--mp-text-primary)}h1{font-size:var(--mp-type-20)}
-.card{border:1px solid var(--mp-border-divider);border-radius:var(--mp-radius-lg);padding:var(--mp-space-20)}.muted{color:var(--mp-text-secondary);font-size:var(--mp-type-13)}code{background:var(--mp-surface-inset);padding:1px 5px;border-radius:var(--mp-radius-xs);word-break:break-all}
-button{font:inherit;padding:var(--mp-space-8) var(--mp-space-16);border-radius:var(--mp-radius-control);border:1px solid var(--mp-border-control);background:var(--mp-surface-input);cursor:pointer;margin-right:var(--mp-space-8)}button.primary{background:var(--mp-action-primary);color:var(--mp-action-on-primary);border-color:var(--mp-action-primary)}
-button.danger{background:var(--mp-action-danger);color:var(--mp-action-on-danger);border-color:var(--mp-action-danger)}
-${PRIMITIVES_CSS}</style>
-</head><body><div class="card">${body}</div></body></html>`;
 }
 
 export function isAllowedRedirectUri(value: string): boolean {
@@ -107,54 +107,19 @@ export function isAllowedRedirectUri(value: string): boolean {
   }
 }
 
-const sha256 = (value: string) => createHash('sha256').update(value).digest('base64url');
-
-export function safeEqual(a: string, b: string): boolean {
-  const x = Buffer.from(a);
-  const y = Buffer.from(b);
-  return x.length === y.length && timingSafeEqual(x, y);
-}
-
-/** Fixed-window counters per key, bounded in size. */
-export class RateLimiter {
-  private windows = new Map<string, { count: number; resetAt: number }>();
-  private limit: number;
-  private windowMs: number;
-  private now: () => number;
-
-  constructor(limit: number, windowMs: number, now: () => number = Date.now) {
-    this.limit = limit;
-    this.windowMs = windowMs;
-    this.now = now;
-  }
-
-  take(key: string): boolean {
-    const now = this.now();
-    let w = this.windows.get(key);
-    if (!w || w.resetAt <= now) {
-      if (this.windows.size > 10_000) this.windows.clear();
-      w = { count: 0, resetAt: now + this.windowMs };
-      this.windows.set(key, w);
-    }
-    w.count++;
-    return w.count <= this.limit;
-  }
-}
-
 function setLimited<K, V>(map: Map<K, V>, key: K, value: V, max: number): void {
   map.set(key, value);
   while (map.size > max) map.delete(map.keys().next().value as K);
 }
 
+/** A token or registration request body: url-encoded, or JSON with every value as a string. */
 async function readForm(req: IncomingMessage, limit = 32 * 1024): Promise<Record<string, string>> {
-  let size = 0;
-  const chunks: Buffer[] = [];
-  for await (const chunk of req) {
-    size += (chunk as Buffer).length;
-    if (size > limit) throw new OAuthError('invalid_request', 'Request body too large', 413);
-    chunks.push(chunk as Buffer);
+  let raw: string;
+  try {
+    raw = (await readBody(req, limit)).toString('utf8');
+  } catch (error) {
+    throw errorCode(error) === 'limit_exceeded' ? new OAuthError('invalid_request', 'Request body too large', 413) : error;
   }
-  const raw = Buffer.concat(chunks).toString('utf8');
   const type = String(req.headers['content-type'] ?? '');
   if (type.includes('application/json')) {
     try {
@@ -165,38 +130,6 @@ async function readForm(req: IncomingMessage, limit = 32 * 1024): Promise<Record
     }
   }
   return Object.fromEntries(new URLSearchParams(raw));
-}
-
-export function cookies(req: IncomingMessage): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const part of String(req.headers.cookie ?? '').split(';')) {
-    const i = part.indexOf('=');
-    if (i > 0) out[part.slice(0, i).trim()] = part.slice(i + 1).trim();
-  }
-  return out;
-}
-
-export function sendJson(res: ServerResponse, status: number, body: unknown, extra: Record<string, string> = {}): void {
-  res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store', pragma: 'no-cache', ...extra });
-  res.end(JSON.stringify(body));
-}
-
-export function sendHtml(res: ServerResponse, status: number, html: string, extra: Record<string, string> = {}): void {
-  res.writeHead(status, {
-    'content-type': 'text/html; charset=utf-8',
-    'cache-control': 'no-store',
-    'x-frame-options': 'DENY',
-    // No form-action: Chrome applies it to the post-submit redirect (to GitHub or back to the client).
-    'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'",
-    'referrer-policy': 'no-referrer',
-    ...extra,
-  });
-  res.end(html);
-}
-
-export function redirect(res: ServerResponse, location: string, extra: Record<string, string> = {}): void {
-  res.writeHead(302, { location, 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', ...extra });
-  res.end();
 }
 
 /** Called with the GitHub identity (or an error) when a page sign-in completes; must send the response. */
@@ -265,6 +198,7 @@ export class OAuthServer {
       issuer: base,
       authorization_endpoint: `${base}/oauth/authorize`,
       token_endpoint: `${base}/oauth/token`,
+      revocation_endpoint: `${base}/oauth/revoke`,
       registration_endpoint: `${base}/oauth/register`,
       response_types_supported: ['code'],
       grant_types_supported: ['authorization_code', 'refresh_token'],
@@ -282,6 +216,11 @@ export class OAuthServer {
   }
 
   /** Sign a user out everywhere (account deletion). */
+  /** Retention: drop expired tokens and clients nobody has used in 180 days. */
+  pruneStored(): Promise<void> {
+    return this.store.prune();
+  }
+
   revokeUser(userId: string): Promise<number> {
     return this.store.revokeUser(userId);
   }
@@ -361,15 +300,16 @@ export class OAuthServer {
       if (route === '/oauth/authorize' && req.method === 'POST') return await this.authorizeDecision(req, res), true;
       if (route === '/oauth/callback' && req.method === 'GET') return await this.githubCallback(req, res, url), true;
       if (route === '/oauth/token' && req.method === 'POST') return await this.token(req, res), true;
+      if (route === '/oauth/revoke' && req.method === 'POST') return await this.revoke(req, res), true;
       sendJson(res, 404, { error: 'not_found' });
       return true;
     } catch (error) {
       const e = error instanceof OAuthError ? error : new OAuthError('server_error', 'Unexpected error', 500);
-      if (!(error instanceof OAuthError)) process.stderr.write(`[mcportal] oauth error: ${(error as Error).stack ?? error}\n`);
+      if (!(error instanceof OAuthError)) processLogger().error('oauth.crashed', { route, error: errorStack(error) });
       if (route === '/oauth/authorize' || route === '/oauth/callback') {
         sendHtml(res, e.status, page('Sign-in problem', `<h1>Sign-in problem</h1><p>${escapeHtml(e.message)}</p>`));
       } else {
-        sendJson(res, e.status, { error: e.code, error_description: e.message }, route === '/oauth/token' || route === '/oauth/register' ? CORS : {});
+        sendJson(res, e.status, { error: e.error, error_description: e.message }, route === '/oauth/token' || route === '/oauth/register' ? CORS : {});
       }
       return true;
     }
@@ -429,12 +369,12 @@ export class OAuthServer {
     const state = q.get('state') ?? undefined;
     if (state && state.length > 512) throw new OAuthError('invalid_request', 'state is too long');
 
-    const txnId = randomBytes(24).toString('base64url');
-    const browserSecret = randomBytes(24).toString('base64url');
+    const txnId = secretToken(24);
+    const browserSecret = secretToken(24);
     setLimited(
       this.txns,
       txnId,
-      { clientId: client.clientId, clientName: client.clientName, redirectUri, state, codeChallenge: challenge, resource, browserKey: sha256(browserSecret), decided: false, expiresAt: this.now() + TXN_TTL_MS },
+      { clientId: client.clientId, clientName: client.clientName, redirectUri, ...(state !== undefined ? { state } : {}), codeChallenge: challenge, resource, browserKey: sha256Url(browserSecret), decided: false, expiresAt: this.now() + TXN_TTL_MS },
       MAX_TXNS,
     );
     const cookie = `${this.cookieName}=${browserSecret}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${TXN_TTL_MS / 1000}${this.secure ? '; Secure' : ''}`;
@@ -451,7 +391,8 @@ export class OAuthServer {
 <input type="hidden" name="txn" value="${txnId}">
 <button class="primary" name="decision" value="approve" type="submit">Continue with GitHub</button>
 <button name="decision" value="deny" type="submit">Cancel</button>
-</form>`,
+</form>
+<p class="muted">By continuing, you agree to MCPortal's <a href="/terms">terms</a> and confirm you're at least 13. See the <a href="/privacy">privacy policy</a> for what's kept.</p>`,
       ),
       { 'set-cookie': cookie },
     );
@@ -466,7 +407,7 @@ export class OAuthServer {
       if (origin && origin !== new URL(this.config.publicUrl).origin) throw new OAuthError('access_denied', 'Cross-site request refused', 403);
     }
     const secret = cookies(req)[this.cookieName] ?? '';
-    if (!secret || !safeEqual(sha256(secret), txn.browserKey)) {
+    if (!secret || !safeEqual(sha256Url(secret), txn.browserKey)) {
       throw new OAuthError('access_denied', 'This sign-in was started in a different browser. Start again from your app.', 403);
     }
   }
@@ -486,15 +427,9 @@ export class OAuthServer {
       target.searchParams.set('iss', this.config.publicUrl);
       return redirect(res, target.href);
     }
-    const ghState = randomBytes(24).toString('base64url');
+    const ghState = secretToken(24);
     this.githubStates.set(ghState, txnId);
-    const gh = new URL('https://github.com/login/oauth/authorize');
-    gh.searchParams.set('client_id', this.config.github.clientId);
-    gh.searchParams.set('redirect_uri', `${this.config.publicUrl}/oauth/callback`);
-    gh.searchParams.set('state', ghState);
-    gh.searchParams.set('scope', 'read:user');
-    gh.searchParams.set('allow_signup', 'true');
-    redirect(res, gh.href);
+    redirect(res, githubAuthorizeUrl(this.config.github, `${this.config.publicUrl}/oauth/callback`, ghState, { allowSignup: true }));
   }
 
   /**
@@ -507,15 +442,10 @@ export class OAuthServer {
     if (!this.limits.authorize.take(this.clientIp(req))) return sendHtml(res, 429, page('Slow down', '<p>Too many sign-in attempts. Try again in a few minutes.</p>'));
     const now = this.now();
     for (const [k, v] of this.pageSignIns) if (v.expiresAt <= now) this.pageSignIns.delete(k);
-    const ghState = `pg_${randomBytes(24).toString('base64url')}`;
-    const browser = randomBytes(24).toString('base64url');
-    setLimited(this.pageSignIns, ghState, { browser: sha256(browser), expiresAt: now + TXN_TTL_MS, done }, MAX_TXNS);
-    const gh = new URL('https://github.com/login/oauth/authorize');
-    gh.searchParams.set('client_id', this.config.github.clientId);
-    gh.searchParams.set('redirect_uri', `${this.config.publicUrl}/oauth/callback`);
-    gh.searchParams.set('state', ghState);
-    gh.searchParams.set('scope', 'read:user');
-    redirect(res, gh.href, { 'set-cookie': `${this.pageCookieName}=${browser}; Path=/oauth/callback; HttpOnly; SameSite=Lax; Max-Age=${TXN_TTL_MS / 1000}${this.secure ? '; Secure' : ''}` });
+    const ghState = `pg_${secretToken(24)}`;
+    const browser = secretToken(24);
+    setLimited(this.pageSignIns, ghState, { browser: sha256Url(browser), expiresAt: now + TXN_TTL_MS, done }, MAX_TXNS);
+    redirect(res, githubAuthorizeUrl(this.config.github, `${this.config.publicUrl}/oauth/callback`, ghState), { 'set-cookie': `${this.pageCookieName}=${browser}; Path=/oauth/callback; HttpOnly; SameSite=Lax; Max-Age=${TXN_TTL_MS / 1000}${this.secure ? '; Secure' : ''}` });
   }
 
   private get pageCookieName(): string {
@@ -527,7 +457,7 @@ export class OAuthServer {
     this.pageSignIns.delete(ghState);
     const browser = cookies(req)[this.pageCookieName] ?? '';
     const clear = { 'set-cookie': `${this.pageCookieName}=; Path=/oauth/callback; HttpOnly; SameSite=Lax; Max-Age=0${this.secure ? '; Secure' : ''}` };
-    if (!pending || pending.expiresAt <= this.now() || !browser || !safeEqual(sha256(browser), pending.browser)) {
+    if (!pending || pending.expiresAt <= this.now() || !browser || !safeEqual(sha256Url(browser), pending.browser)) {
       return sendHtml(res, 400, page('Sign-in expired', '<p>This sign-in link expired or was started in another browser. Start again.</p>'), clear);
     }
     const ghCode = url.searchParams.get('code');
@@ -563,7 +493,7 @@ export class OAuthServer {
       const why = admission.reason === 'suspended' ? 'This account is suspended' : 'This MCPortal server is invite-only. Ask its owner for an invite.';
       return toClient({ error: 'access_denied', error_description: why });
     }
-    const code = randomBytes(32).toString('base64url');
+    const code = secretToken(32);
     setLimited(
       this.codes,
       code,
@@ -573,35 +503,30 @@ export class OAuthServer {
     toClient({ code });
   }
 
-  /** Exchange a GitHub OAuth code for the user's numeric id and login. Never echoes upstream content. */
-  private async githubIdentity(ghCode: string): Promise<{ githubId: number; login: string } | { error: string }> {
+  /** The GitHub identity behind a sign-in code, or why there isn't one. */
+  private async githubIdentity(ghCode: string): Promise<GithubIdentity | { error: string }> {
     if (!this.config.github) return { error: 'GitHub sign-in is not configured' };
-    const exchange = await this.fetcher('https://github.com/login/oauth/access_token', {
-      method: 'POST',
-      headers: { accept: 'application/json', 'content-type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        client_id: this.config.github.clientId,
-        client_secret: this.config.github.clientSecret,
-        code: ghCode,
-        redirect_uri: `${this.config.publicUrl}/oauth/callback`,
-      }).toString(),
-      maxBytes: 16 * 1024,
-      maxRedirects: 0,
-    });
-    let ghToken: string | undefined;
-    try {
-      ghToken = (JSON.parse(exchange.text) as { access_token?: string }).access_token;
-    } catch {
-      ghToken = undefined;
-    }
-    if (exchange.status !== 200 || !ghToken) return { error: 'GitHub sign-in failed' };
-    const user = await fetchJson<{ id?: number; login?: string }>(this.fetcher, 'https://api.github.com/user', {
-      headers: { authorization: `Bearer ${ghToken}`, accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28' },
-      maxBytes: 64 * 1024,
-      maxRedirects: 0,
-    });
-    if (typeof user.id !== 'number' || typeof user.login !== 'string') return { error: 'Could not read GitHub profile' };
-    return { githubId: user.id, login: user.login };
+    return githubIdentity(this.fetcher, this.config.github, ghCode, `${this.config.publicUrl}/oauth/callback`);
+  }
+
+  /**
+   * Token revocation (RFC 7009), for public clients: the token's whole grant goes, if
+   * it was issued to client_id. Always 200, so it can't be used to test tokens.
+   */
+  private async revoke(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    if (!this.limits.token.take(this.clientIp(req))) throw new OAuthError('slow_down', 'Too many token requests', 429);
+    const body = await readForm(req);
+    if (body.token && body.client_id) await this.store.revokeToken(body.token, body.client_id);
+    sendJson(res, 200, {}, CORS);
+  }
+
+  /** The user's signed-in apps and devices (the account page). */
+  grantsOf(userId: string): ReturnType<AuthStore['grantsOf']> {
+    return this.store.grantsOf(userId);
+  }
+
+  revokeGrantOf(userId: string, grantId: string): Promise<boolean> {
+    return this.store.revokeGrantOf(userId, grantId);
   }
 
   private async token(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -615,7 +540,7 @@ export class OAuthServer {
       if (code.clientId !== clientId) throw new OAuthError('invalid_grant', 'Code was issued to a different client');
       if (code.redirectUri !== (body.redirect_uri ?? '')) throw new OAuthError('invalid_grant', 'redirect_uri does not match');
       const verifier = body.code_verifier ?? '';
-      if (!/^[A-Za-z0-9._~-]{43,128}$/.test(verifier) || !safeEqual(sha256(verifier), code.codeChallenge)) {
+      if (!/^[A-Za-z0-9._~-]{43,128}$/.test(verifier) || !safeEqual(sha256Url(verifier), code.codeChallenge)) {
         throw new OAuthError('invalid_grant', 'PKCE verification failed');
       }
       if (body.resource && this.canonicalResource(body.resource) !== code.resource) throw new OAuthError('invalid_target', 'resource does not match');

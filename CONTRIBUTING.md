@@ -38,7 +38,7 @@ Your profile lives in `~/.mcportal/default.json`.
 `mcportal-dev.mjs` keeps Claude's connection open and runs the real server behind it. When a `.ts` file under `src/` changes, it restarts the server and replays the connection handshake, so Claude doesn't notice. What that means for your edits:
 
 - **Server code** (`src/**/*.ts`): live on the next tool call. No Claude restart needed.
-- **Room UI** (`src/ui/room.html`): read fresh each time a card opens. Ask Claude to open the room again to see changes. A card that's already in the chat is frozen, because it's sandboxed and can't reload itself.
+- **Room UI** (`src/ui/room.html`, with its styles and script split into fragments under `src/ui/room/*`, inlined by `roomHtml()` in `src/mcp.ts`; new fragments must be added to `UI_INCLUDES`): read fresh each time a card opens. Ask Claude to open the room again to see changes. A card that's already in the chat is frozen, because it's sandboxed and can't reload itself.
 - **Tool names, descriptions or schemas**: Claude may cache the tool list per session. Start a new chat, or restart Claude if a change doesn't show.
 
 Reload messages go to stderr, which shows up in Claude desktop's MCP logs. To run without hot reload, use `bin/mcportal.mjs` with `--stdio`.
@@ -58,10 +58,48 @@ Install the repo as a local plugin, which includes the `/portal` command and ski
 /plugin install mcportal@mcportal
 ```
 
+## How the server code fits together
+
+- **Tools** live in `src/tools/`, one module per area. Each `ToolDef` declares its `access` (`read`, `write` or `fetch`, for the access gate) and its budget `cost`; `test/foundations.test.ts` checks every tool does, and that `readOnlyHint` agrees. Arguments are checked against `inputSchema` before the handler runs, so keep the schema exactly as strict as the handler: if the handler trims or normalizes something, the schema shouldn't refuse it.
+- **Errors**: throw an `AppError` (`src/lib/errors.ts`) or one of its subclasses with a code from `ERROR_CODES` for anything expected. Branch on `error.code`, never on message text. In a handler, `toolFailure(error, 'Not added: ')` turns an expected error into a tool error and rethrows bugs. Anything that isn't an `AppError` is treated as a bug: logged with its stack, shown to the user only as a reference.
+- **Logs**: use the `Logger` you're given (`ctx.log` in tools, `deps.log` elsewhere), with an event name and flat fields: `log.warn('source.failed', { source, code })`. Never log tokens, profile contents, third-party text or raw user ids (`userRef()` hashes one).
+- **The room UI** (`src/ui/room.html`, `src/ui/room/*.js`, `src/ui/admin.html`) is plain JavaScript checked as strictly as the server: `npm run typecheck` runs `scripts/check-ui.ts`, which type-checks the assembled page with JSDoc types and points errors at the fragment files. Type every function with JSDoc; use `$('id')` (typed per id in `src/ui/ui.d.ts`; add new ids there), `$$`/`$first` for selectors, and `errorText(error)` in catch blocks. A JSDoc cast needs a comment saying why it holds.
+- **What tools return to the UI** is one contract, `src/tools/results.ts`: handlers check their `structuredContent` with `satisfies ToolResults['tool']`, and the UI's `callTool()` is typed by it. A tool the UI starts calling gets an entry there.
+- **Browser tests** (`test/ui-browser.test.ts`) drive the real room in headless Chrome against fixture data and fail on any page error. They skip without Chrome (`CHROME_PATH` points at one). A new view or flow gets a test there.
+- **Linked mode** (`src/link/`): a local MCPortal signed in to a hosted one runs the same tools against remote stores that call the hosted state API (`/api/v1/call`, `src/api/`). A store method the tools start using needs a state API method and a remote version; `test/linked.test.ts` runs the real tools against an in-process hosted app, and `test/link-signin.test.ts` covers signing in and out with a fake GitHub. To try signing in by hand, use a scratch `MCPORTAL_DATA_DIR` so your own `~/.mcportal/link.json` isn't touched, and `MCPORTAL_HOSTED_URL` for a hosted MCPortal other than the public one.
+- **Layout changes** go through `src/layout.ts` (`withLayout`, `addPortalTo`, `ensurePortal`), which never move or drop the user's other portals or saved items.
+
+## Versions and the tool interface
+
+Hosts cache tool lists and agents learn tool names, so the tool interface (names, arguments, results in `src/tools/results.ts`) is versioned with the package: a change that breaks it (a renamed or removed tool or argument, a stricter schema, a different result shape) raises the minor version while we're below 1.0 and gets a line under "For hosts and agents" in the changelog. `package.json` holds the version; `npm test` checks that the lockfile, `src/mcp.ts`, the plugin, `server.json` and `manifest.json` agree, and `node scripts/distribution.ts` regenerates the last two. Don't change the version by hand: the release script does it.
+
+Once MCPortal is listed in a directory, tool names are a public contract:
+- **A renamed tool keeps its old name for one release,** as an alias that isn't listed and says where the tool moved. A removed tool says what replaces it for one release.
+- **`MIN_CLIENT_VERSION`** (`src/api/calls.ts`, the oldest local MCPortal the hosted state API accepts) only rises in a release whose notes say so, never in passing.
+- **Renaming a listed tool or the connector** also needs an edit to the directory listing, which is reviewed again.
+
+## Cutting a release
+
+Plugin users only get a release when the version changes, so changes reach them in releases, not merges. From an up-to-date `main` with nothing uncommitted:
+
+```bash
+npm run release -- prepare minor
+```
+
+`prepare` takes a version (`0.6.0`) or `patch`, `minor` or `major`. It sets the version everywhere it's stated, moves the changelog's "Unreleased" section under it, runs `npm run check`, and opens a `release/v<version>` PR whose description is the release notes. Add `--dry-run` to see the version and notes without changing anything.
+
+After the release PR is merged, from the merged `main`:
+
+```bash
+npm run release -- publish
+```
+
+That tags the merge commit `v<version>` and creates the GitHub release with that version's notes. Then deploy the hosted service from the same commit; `/health` reports the new version.
+
 ## Before opening a PR
 
-- `npm test` passes, and `npm run typecheck` passes if you touched types.
-- If you touched storage (`src/db.ts`, `src/store.ts`, `src/auth/store.ts`), run the Postgres tests too. They're skipped unless `TEST_DATABASE_URL` is set, and each run uses its own schema:
+- `npm run check` passes: typecheck (server and UI), design outputs, and every test. There's no hosted CI yet, so this is the gate. To run it before every push: `git config core.hooksPath .githooks`.
+- If you touched storage (`src/db.ts` and `src/db/`, `src/store.ts`, `src/auth/store.ts`), run the Postgres tests too. They're skipped unless `TEST_DATABASE_URL` is set, and each run uses its own schema:
 
   ```bash
   TEST_DATABASE_URL=postgres://localhost:5432/postgres node --test test/db.test.ts

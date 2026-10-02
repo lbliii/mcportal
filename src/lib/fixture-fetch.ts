@@ -28,8 +28,14 @@ export function createFixtureFetcher(calls: string[] = []): Fetcher {
     calls.push(target);
     const url = new URL(target);
     const match = fixtureFor(url);
-    if (!match) return { status: 404, url: target, contentType: 'text/plain', text: 'not found', truncated: false };
-    const text = await readFile(DIR + match.file, options.binary ? 'base64' : 'utf8');
+    const notFound = { status: 404, url: target, contentType: 'text/plain', text: 'not found', truncated: false };
+    if (!match) return notFound;
+    // A fixture that isn't on disk is a missing page, as a real server would say.
+    const text = await readFile(DIR + match.file, options.binary ? 'base64' : 'utf8').catch((error: NodeJS.ErrnoException) => {
+      if (error.code === 'ENOENT') return undefined;
+      throw error;
+    });
+    if (text === undefined) return notFound;
     return { status: 200, url: target, contentType: match.type, text, truncated: false };
   };
 }

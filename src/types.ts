@@ -1,3 +1,5 @@
+import type { ErrorCode } from './lib/errors.ts';
+
 /**
  * 'saved' is the user's own bookmarks and 'pinned' is data the agent brought from
  * another tool (Jira, Slack, …): both live in the profile and are never fetched.
@@ -30,7 +32,20 @@ export interface Item {
   /** Items of a clips portal: open with get_clip. */
   clip?: { id: string; kind: ClipKind };
   /** Items of a following portal: open with get_share. */
-  share?: { id: string; kind: 'link' | 'clip' };
+  share?: {
+    id: string;
+    kind: 'link' | 'clip';
+    /** A reblog: its original's id, the original's author and note (absent once it's gone, then why), and whose reblog it came through. */
+    reblog?: { root: string; by?: string; note?: string; removed?: 'removed' | 'detached'; via?: string };
+    /** Reblogs of the original, pooled. */
+    reblogs?: number;
+    /** The viewer's own reblog of it, to undo. */
+    mine?: string;
+    /** Whether the viewer may reblog it now. */
+    canReblog?: boolean;
+  };
+  /** Not yet seen by this user (src/seen.ts). */
+  new?: true;
 }
 
 /** "Show your work": where a block's data came from and how fresh it is. */
@@ -49,8 +64,12 @@ export interface PortalResult {
   items: Item[];
   provenance: Provenance;
   error?: string;
+  /** Why it failed, when it did (see src/lib/errors.ts). */
+  errorCode?: ErrorCode;
   /** Pinned portals: where the items came from and how the agent fetches them again. */
   pin?: { from: string; recipe: string };
+  /** How many of its items are new to this user (portals that track it; src/seen.ts). */
+  newCount?: number;
 }
 
 /** A run of inline text: plain, a link (http(s), or "#anchor" within the page), code, or strong. */
