@@ -223,8 +223,8 @@ function blocksToMarkdown(blocks: unknown): string {
   }).join('\n\n');
 }
 
-/** An exported clip as `clip` tool input, so it's validated exactly like a new one. */
-function clipInput(raw: Record<string, unknown>): Record<string, unknown> {
+/** An exported (or sent) clip as `clip` tool input, so it's validated exactly like a new one. */
+export function clipInput(raw: Record<string, unknown>): Record<string, unknown> {
   const data = isRecord(raw.data) ? raw.data : {};
   const base = { kind: raw.kind, title: raw.title, note: raw.note, tags: raw.tags, source: raw.source };
   switch (raw.kind) {

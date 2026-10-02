@@ -1,6 +1,6 @@
 # Plan: one portal, run locally or hosted
 
-**Status:** revised 2026-10-02 (replaces the 2026-09-30 proposal, which predated Postgres, the 0.5 tool names, clips and the social layer). Phases 1 (modes in the open) and 2 (contracts) built 2026-10-02. **Milestone:** finishes M1.5 ("come back tomorrow on any device") and opens M2's social layer, reblogging first, to people who run MCPortal locally.
+**Status:** revised 2026-10-02 (replaces the 2026-09-30 proposal, which predated Postgres, the 0.5 tool names, clips and the social layer). Phases 1 (modes in the open), 2 (contracts) and 3 (hosted state API) built 2026-10-02. **Milestone:** finishes M1.5 ("come back tomorrow on any device") and opens M2's social layer, reblogging first, to people who run MCPortal locally.
 
 ## The problem
 
