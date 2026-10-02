@@ -172,6 +172,14 @@ test('browser: a docs portal opens the docs viewer with its contents and a page'
   await page.waitFor(`document.querySelector('.docs-toc') && document.querySelectorAll('.docs-toc a').length >= 3`, 'the docs contents');
   const heading = await page.waitFor<string>(`document.querySelector('.docs-page h1, .docs-page h2')?.textContent`, 'a docs page');
   assert.match(heading, /Install|Getting started/);
+  // Selecting text on a docs page offers the passage bar (no host here, so Clip and Copy).
+  await page.waitFor(`document.querySelector('.docs-page [data-passage-url] p')`, 'the page text');
+  await page.eval(`(() => { const p = document.querySelector('.docs-page [data-passage-url] p'); const r = document.createRange(); r.selectNodeContents(p); getSelection().removeAllRanges(); getSelection().addRange(r); })()`);
+  const bar = await page.waitFor<string[]>(`document.querySelector('.passage-bar') && [...document.querySelectorAll('.passage-bar button')].map((b) => b.textContent)`, 'the passage bar');
+  assert.deepEqual(bar, ['Clip quote', 'Copy quote']);
+  assert.match(await page.eval<string>(`document.querySelector('.docs-page [data-passage-url]').dataset.passageHint`), /read_doc_page with that url and portalId "docs"/);
+  await page.eval(`getSelection().removeAllRanges()`);
+  await page.waitFor(`!document.querySelector('.passage-bar')`, 'the bar to go when the selection does');
   assert.deepEqual(page.problems, []);
 });
 

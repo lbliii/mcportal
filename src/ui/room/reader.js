@@ -99,7 +99,7 @@
 
   /** @param {Article} a @param {string | null} via @param {boolean} withBack @param {LinkHandler} [onLink] */
   function articleNodes(a, via, withBack, onLink) {
-    const body = blockNodes(a.blocks, onLink);
+    const body = passageSource(blockNodes(a.blocks, onLink), a.url, a.title, 'Use read_article on that URL for the rest of the page.');
     const site = a.siteName && a.siteName !== a.byline ? a.siteName : null;
     const by = [a.byline, site, `${Math.max(1, Math.round(a.wordCount / 230))} min read`].filter(Boolean).join(' · ');
     const p = a.provenance;
