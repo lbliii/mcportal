@@ -381,6 +381,7 @@ test("browser: in the river, follows' shares and reblogs join their stories with
         const now = new Date().toISOString();
         const share = (id, extra) => ({ id, kind: 'link', canReblog: true, ...extra });
         room.identity = { mode: 'hosted', handle: 'reader' };
+        if (!location.search.includes('nolab')) room.labs = ['river', 'reblog'];   // ?nolab: the reblog lab off
         room.profile.columns.push({ width: 1, panels: [{ id: 'following', source: 'following', title: 'Following', config: {} }] });
         room.portals.push({ portalId: 'following', source: 'following', title: 'Following', provenance: { source: 'following', endpoint: 'shares from people you follow', fetchedAt: now, cached: false, ttlSeconds: 0 }, items: [
           { id: 's_ana', title: hn.items[0].title, url: hn.items[0].url, summary: 'Read the comments.', meta: ['@ana', 'link'], publishedAt: now, share: share('s_ana') },
@@ -448,6 +449,11 @@ test("browser: in the river, follows' shares and reblogs join their stories with
     await page.waitFor(`!document.getElementById('reader').hidden && document.querySelector('#reader .composer')`, 'the composer');
     assert.match(await page.eval<string>(`document.querySelector('#reader .composer').textContent`), new RegExp(`Reblog “${plain.replace(/^New/, '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}” to your space`));
     assert.ok((await tool('open_room', {})).profile.saved.length > 1, 'saved first');
+    // The reblog lab off: no reblog buttons; stories keep phase 3's share button.
+    await page.goto(`${app.base}/preview?nolab`);
+    await page.waitFor(`document.querySelector('#grid.river .river-feed article') && !document.querySelector('.skeleton')`, 'the river, lab off');
+    assert.equal(await page.eval(`document.querySelectorAll('.mi.reblog').length`), 0);
+    assert.ok(await page.eval<number>(`document.querySelectorAll('.story [aria-label="Share to your space"]').length`) > 0);
     assert.deepEqual(page.problems, []);
   } finally {
     await page.send('Page.removeScriptToEvaluateOnNewDocument', { identifier });

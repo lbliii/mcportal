@@ -309,7 +309,8 @@
   async function loadShareCard(id) {
     setStatus('Stand by…');
     try {
-      const { share, rebloggers } = (await callTool('get_share', { id })).structuredContent;
+      const { share, rebloggers, labs } = (await callTool('get_share', { id })).structuredContent;
+      if (labs) state.labs = labs;
       showShareCard(share, rebloggers);
     } catch (error) {
       setStatus('');
@@ -329,7 +330,8 @@
     reader.replaceChildren(el('div', { class: 'reader-top' }, iconButton('back', 'Back', back ? () => back(scroll) : closeReader, 'ib')), el('h1', null, item.title), el('div', { class: 'byline' }, 'Stand by…'));
     try {
       // Only shares come here: openItem checks item.share, and space posts always carry one.
-      const { share, rebloggers } = (await callTool('get_share', { id: /** @type {NonNullable<ShareRef['share']>} */ (item.share).id })).structuredContent;
+      const { share, rebloggers, labs } = (await callTool('get_share', { id: /** @type {NonNullable<ShareRef['share']>} */ (item.share).id })).structuredContent;
+      if (labs) state.labs = labs;
       const nodes = shareNodes(share, true, rebloggers);
       if (back) nodes[0].replaceChildren(iconButton('back', 'Back to the space', () => back(scroll), 'ib'), ...[...nodes[0].children].slice(1));
       reader.replaceChildren(...nodes);

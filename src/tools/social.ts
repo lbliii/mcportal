@@ -10,7 +10,7 @@ import { clipText, type ClipData } from '../clips.ts';
 import { AUDIENCES, REBLOG_RULES, type Reblogger, type SharedItem } from '../social.ts';
 import { isAppError } from '../lib/errors.ts';
 import { ensurePortal } from '../layout.ts';
-import { HOSTED_ONLY, socialActive, socialEntry, ok, toolError, untrusted, ROOM_URI, type CallToolResult, type ToolContext, type ToolDef } from './kit.ts';
+import { HOSTED_ONLY, labOn, labsOf, socialActive, socialEntry, ok, toolError, untrusted, ROOM_URI, type CallToolResult, type ToolContext, type ToolDef } from './kit.ts';
 import type { ToolResults } from './results.ts';
 
 export function shareLine(s: SharedItem): string {
@@ -100,18 +100,22 @@ export const SOCIAL_TOOLS: ToolDef[] = [
     title: 'Share with followers',
     access: 'write',
     available: socialActive,
-    description: "Share one of the user's saved links (savedUrl) or clips (clipId), or reblog a post (reblogOf), with a note, to their followers or everyone on MCPortal. Only when they ask; ask first if they haven't read it; if you write the note, share only after they approve its exact words.",
+    description: "Share one of the user's saved links (savedUrl) or clips (clipId) with a note, to their followers or everyone on MCPortal. Only when they ask; if you write the note, share only after they approve its exact words.",
     inputSchema: {
       type: 'object',
       additionalProperties: false,
       properties: {
         savedUrl: { type: 'string', description: 'URL of a saved item' },
         clipId: { type: 'string' },
-        reblogOf: { type: 'string', description: 'post id' },
         note: { type: 'string', maxLength: 500 },
         audience: { type: 'string', enum: AUDIENCES },
-        reblogs: { type: 'string', enum: REBLOG_RULES },
       },
+    },
+    // Reblogging (docs/plans/reblog.md) is a lab until it's had real use.
+    lab: {
+      name: 'reblog',
+      properties: { reblogOf: { type: 'string', description: 'post id' }, reblogs: { type: 'string', enum: REBLOG_RULES } },
+      description: "Share one of the user's saved links (savedUrl) or clips (clipId), or reblog a post (reblogOf), with a note, to their followers or everyone on MCPortal. Only when they ask; ask first if they haven't read it; if you write the note, share only after they approve its exact words.",
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     async handler(args, ctx) {
@@ -174,14 +178,14 @@ export const SOCIAL_TOOLS: ToolDef[] = [
       const rebloggers = share.reblogCount || share.mine ? await ctx.social.reblogsOf(ctx.userId, share.id, { limit: 50 }).catch(() => []) : [];
       const by = rebloggedBy(rebloggers);
       return ok(`Showing share ${share.id} in a card.${by ? ` ${by}` : ''}\n${untrusted(share.mine ? 'your share' : `a share by @${share.author.handle}`, `${shareLine(share)}${body}`)}`,
-        { share, ...(rebloggers.length ? { rebloggers } : {}) } satisfies ToolResults['get_share']);
+        { share, ...(rebloggers.length ? { rebloggers } : {}), ...(labsOf(ctx).length ? { labs: [...labsOf(ctx)] } : {}) } satisfies ToolResults['get_share']);
     },
   },
   {
     name: 'share_settings',
     title: 'Change who can reblog a post',
     access: 'write',
-    available: socialActive,
+    available: (reach) => socialActive(reach) && reach.labs.includes('reblog'),
     description: "Change who may reblog one of the user's posts, or remove it from someone's reblog of it (detach: the reblog's id; permanent). Only when they ask.",
     inputSchema: {
       type: 'object',
@@ -192,6 +196,7 @@ export const SOCIAL_TOOLS: ToolDef[] = [
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
     async handler(args, ctx) {
       if (!ctx.social) return toolError(HOSTED_ONLY.sharing, 'unavailable');
+      if (!labOn(ctx, 'reblog')) return toolError("Reblogging isn't on for this MCPortal yet.", 'unavailable');
       if (args.reblogs === undefined && args.detach === undefined) return toolError('Say who may reblog it (reblogs) or which reblog to remove it from (detach).');
       try {
         const share = await ctx.social.shareSettings(ctx.userId, String(args.id ?? ''), { reblogs: args.reblogs, detach: args.detach });

@@ -1,9 +1,10 @@
 {
   "totals": {
     "local": 4019,
-    "linked": 5214,
-    "hosted-new": 4528,
-    "hosted-active": 5151
+    "linked": 5051,
+    "hosted-new": 4501,
+    "hosted-active": 4988,
+    "hosted-labs": 5151
   },
   "tools": {
     "account_settings": 64,

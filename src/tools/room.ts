@@ -12,7 +12,7 @@ import { SEEN_BATCH, tracksSeen, withNews } from '../seen.ts';
 import { describeDiff, describeLayout, diffProfiles, findPortal, normalizeSourceConfig, offeredLayouts, type Layout, type PortalInput, type Profile, type ProfileDiff } from '../profile.ts';
 import { clipsPortal, clipsQuery, followingPortal, loadPortal, pinnedPortal, savedPortal } from '../sources.ts';
 import type { PortalResult } from '../types.ts';
-import { identityOf, ok, toolError, toolFailure, untrusted, ROOM_URI, type CallToolResult, type ToolContext, type ToolDef } from './kit.ts';
+import { identityOf, labsOf, ok, toolError, toolFailure, untrusted, ROOM_URI, type CallToolResult, type ToolContext, type ToolDef } from './kit.ts';
 import type { ToolResults } from './results.ts';
 
 /** Any portal's current items: profile-backed ones from the profile and stores, the rest fetched (cached unless `force`). */
@@ -112,7 +112,7 @@ export const ROOM_TOOLS: ToolDef[] = [
       const edition = resolveEdition(await ctx.editions?.get(ctx.userId), portals);
       const lead = leadOf(edition, portals);
       return ok(summarizePortals(profile, portals, notice, edition),
-        { profile, portals, notice, identity, ...(edition ? { edition } : {}), ...(lead ? { lead } : {}), ...(ACTIVE_LABS.length ? { labs: [...ACTIVE_LABS] } : {}), generatedAt: new Date().toISOString() } satisfies ToolResults['open_room']);
+        { profile, portals, notice, identity, ...(edition ? { edition } : {}), ...(lead ? { lead } : {}), ...(labsOf(ctx).length ? { labs: [...labsOf(ctx)] } : {}), generatedAt: new Date().toISOString() } satisfies ToolResults['open_room']);
     },
   },
   {

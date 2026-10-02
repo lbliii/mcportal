@@ -1,6 +1,6 @@
 # Plan: reblogging
 
-Status: phases 1–3 built, 2026-10-02. Builds on the social layer (`src/social.ts`: shares,
+Status: phases 1–3 built and gated (phase 4 begun), 2026-10-02. Builds on the social layer (`src/social.ts`: shares,
 follows, mute, block, report) and the river ([river.md](river.md), phases 1–3), and is
 the M2 social feature [local-hosted-hybrid.md](local-hosted-hybrid.md) opens to local
 installs. Research: [River and reblog design research](../../reports/River%20and%20reblog%20design%20research.md).
@@ -280,6 +280,26 @@ phase 1 and 2 tests.
 Behind `MCPORTAL_LABS=reblog` on the hosted server and for linked installs, with the
 river. Use it for two weeks with a handful of accounts, then turn it on, with a changelog
 entry saying how credit works.
+
+Begun. The gate: `reblog` is in `LABS`; labs now travel in the tool context
+(`ToolContext.labs`, default `MCPORTAL_LABS`; `AppDeps.labs` for embedders and tests)
+and in `Reach`, so a tool can declare the arguments a lab adds (`ToolDef.lab`): listed
+and accepted only while it's on. With it off, `share` takes no `reblogOf`/`reblogs` and
+doesn't mention reblogging, `set_public_profile` takes no `reblogs`, `share_settings`
+isn't listed (and refuses), and the API's `social.reblog`, `shareSettings` and
+`reblogsOf` refuse. The room offers the reblog button only when `labs` (from `open_room`,
+and now from `get_share` for cards) includes it; otherwise stories keep phase 3's share
+button. Footprint: lab off, an active account is back to 4988 tokens; a new
+`hosted-labs` profile budgets every lab (5151). The reblog eval cases run against it
+(`where: 'labs'`). A linked local MCPortal needs the lab on locally (its tool list) and
+on the hosted server (the rules).
+
+The hosted end-to-end test (`test/linked.test.ts`): three real accounts over `/mcp`
+with OAuth tokens: share, follow, reblog, see it through a follow, who reblogged,
+detach, undo.
+
+Left: turning it on in production (`MCPORTAL_LABS` on Railway), two weeks of use, then
+removing the gate.
 
 ## Open questions
 

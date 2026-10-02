@@ -55,7 +55,7 @@
     if (item.url) out.push(el('button', { class: 'mi go', title: 'Open the original', 'aria-label': 'Open the original', onclick: () => openLink(item.url ?? '') }, icon('external')));   // checked just before
     out.push(saveButton(item, portal.source));
     if (portal.source === 'saved' && item.url) out.push(el('button', { class: 'mi go', title: 'Share to your space', 'aria-label': 'Share to your space', onclick: () => openComposer(item) }, icon('share')));
-    if (reblog && portal.source === 'following' && item.share) out.push(reblogButton(reblogTarget(item, portal, item.share)));
+    if (reblog && reblogLab() && portal.source === 'following' && item.share) out.push(reblogButton(reblogTarget(item, portal, item.share)));
     return { out, byline };
   }
 

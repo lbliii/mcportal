@@ -20,7 +20,8 @@ export async function world(store: SocialStore = new DocumentSocialStore()) {
   for (const [id, handle] of [['a', 'alice'], ['b', 'bob'], ['c', 'carol']]) await profiles.set(id!, { handle });
   const portals = new MemoryProfileStore(Object.fromEntries(['a', 'b', 'c', 'd'].map((id) => [id, validateProfile({ ...defaultProfile(), onboarded: true, saved: [{ url: `https://example.com/${id}`, title: `${id}'s link` }] })])));
   const clips = new MemoryClipStore();
-  const ctx = (userId: string): ToolContext => ({ store: portals, clips, publicProfiles: profiles, social, fetcher: createFixtureFetcher(), cache: new TtlCache(), userId });
+  // Reblogging is a lab: these accounts' server has it on (the lab test turns it off).
+  const ctx = (userId: string): ToolContext => ({ store: portals, clips, publicProfiles: profiles, social, fetcher: createFixtureFetcher(), cache: new TtlCache(), userId, labs: ['reblog'] });
   return { social, profiles, suspended, ctx, clips, portals };
 }
 
@@ -281,6 +282,23 @@ test("tools: reblog with share, undo with unshare, who reblogged in get_share, a
 
   assert.match((await call(ctx('b'), 'unshare', { id: reblog.structuredContent.share.id })).content[0]!.text, /Removed/, 'undo is unshare');
   assert.equal((await social.get('a', post.structuredContent.share.id))?.reblogCount, 0);
+});
+
+test('reblog lab: off, the tools neither list nor accept reblogging', async () => {
+  const { ctx } = await world();
+  const off = (id: string): ToolContext => ({ ...ctx(id), labs: [] });
+  const post = await call(off('a'), 'share', { savedUrl: 'https://example.com/a', audience: 'mcportal' });
+  assert.ok(!post.isError, 'sharing works as before');
+  const names = async (c: ToolContext) => ((await handleMessage({ jsonrpc: '2.0', id: 1, method: 'tools/list' }, c))!.result as any).tools as Array<{ name: string; description: string; inputSchema: { properties: Record<string, unknown> } }>;
+  const listed = await names(off('a'));
+  assert.ok(!listed.some((t) => t.name === 'share_settings'));
+  const share = listed.find((t) => t.name === 'share')!;
+  assert.ok(!('reblogOf' in share.inputSchema.properties) && !/reblog/.test(share.description), "share doesn't mention reblogging");
+  assert.ok(!('reblogs' in listed.find((t) => t.name === 'set_public_profile')!.inputSchema.properties));
+  assert.match((await call(off('b'), 'share', { reblogOf: post.structuredContent.share.id })).content[0]!.text, /share wasn't called: .*reblogOf/);
+  assert.match((await call(off('a'), 'share_settings', { id: post.structuredContent.share.id, reblogs: 'nobody' })).content[0]!.text, /Reblogging isn't on/);
+  const on = await names(ctx('a'));
+  assert.ok(on.some((t) => t.name === 'share_settings') && 'reblogOf' in on.find((t) => t.name === 'share')!.inputSchema.properties, 'on, they are offered');
 });
 
 test('spaces: title, accent and featured sources; visitors see what the rules allow; big posts are trimmed', async () => {

@@ -13,7 +13,7 @@ import { requestId, silentLogger, userRef } from './lib/log.ts';
 import { schemaProblem } from './lib/schema.ts';
 import { clean } from './lib/text.ts';
 import { findTool, toolAction, toolCost, TOOLS } from './tools/index.ts';
-import { hasSocial, publicToolList, reachOf, toolError, ROOM_URI, type CallToolResult, type ToolContext } from './tools/kit.ts';
+import { hasSocial, labsOf, publicToolList, reachOf, schemaFor, toolError, ROOM_URI, type CallToolResult, type ToolContext } from './tools/kit.ts';
 
 export { TOOLS };
 
@@ -119,7 +119,7 @@ async function callTool(params: Record<string, unknown>, ctx: ToolContext): Prom
   };
 
   const args = params.arguments ?? {};
-  const problem = schemaProblem(tool.inputSchema, args);
+  const problem = schemaProblem(schemaFor(tool, labsOf(ctx)), args);   // a lab's arguments only while it's on
   if (problem) return done(toolError(`${name} wasn't called: ${problem}.`, 'invalid_argument'), 'invalid');
   const input = args as Record<string, unknown>;
 

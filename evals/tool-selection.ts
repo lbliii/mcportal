@@ -17,8 +17,8 @@ export interface ToolCase {
   tool: string | string[] | null;
   /** Arguments that must be present with these values (strings match case-insensitively, as substrings). */
   args?: Record<string, unknown>;
-  /** Which server the user is on: sharing and profiles exist only hosted. Default hosted. */
-  where?: 'hosted' | 'local';
+  /** Which server the user is on: sharing and profiles exist only hosted; 'labs' is hosted with every lab on. Default hosted. */
+  where?: 'hosted' | 'local' | 'labs';
 }
 
 export const TOOL_CASES: ToolCase[] = [
@@ -83,14 +83,14 @@ export const TOOL_CASES: ToolCase[] = [
   { prompt: "what's actually worth reading in my feeds today?", tool: 'list_new_items' },
   { prompt: 'catch me up on my sources, just the highlights', tool: 'list_new_items' },
 
-  // Added 2026-10-02 (frozen from here): reblogging
-  { prompt: 'reblog s_3f9a2c1b4d5e with the note "this is the one"', tool: 'share', args: { reblogOf: 's_3f9a2c1b4d5e', note: 'this is the one' } },
-  { prompt: "reblog @ana's latest post", tool: ['list_shares', 'open_space'], args: { handle: 'ana' } },
-  { prompt: 'undo my reblog s_1a2b3c4d5e6f', tool: 'unshare', args: { id: 's_1a2b3c4d5e6f' } },
-  { prompt: 'nobody should be able to reblog my post s_7e8f9a0b1c2d', tool: 'share_settings', args: { id: 's_7e8f9a0b1c2d', reblogs: 'nobody' } },
-  { prompt: 'take my post s_7e8f9a0b1c2d out of the reblog s_5d6e7f8a9b0c', tool: 'share_settings', args: { id: 's_7e8f9a0b1c2d', detach: 's_5d6e7f8a9b0c' } },
-  { prompt: 'from now on only my followers can reblog what I post', tool: 'set_public_profile', args: { reblogs: 'followers' } },
-  { prompt: 'who reblogged my post s_7e8f9a0b1c2d?', tool: 'get_share', args: { id: 's_7e8f9a0b1c2d' } },
+  // Added 2026-10-02 (frozen from here): reblogging, a lab until it ships
+  { prompt: 'reblog s_3f9a2c1b4d5e with the note "this is the one"', tool: 'share', args: { reblogOf: 's_3f9a2c1b4d5e', note: 'this is the one' }, where: 'labs' },
+  { prompt: "reblog @ana's latest post", tool: ['list_shares', 'open_space'], args: { handle: 'ana' }, where: 'labs' },
+  { prompt: 'undo my reblog s_1a2b3c4d5e6f', tool: 'unshare', args: { id: 's_1a2b3c4d5e6f' }, where: 'labs' },
+  { prompt: 'nobody should be able to reblog my post s_7e8f9a0b1c2d', tool: 'share_settings', args: { id: 's_7e8f9a0b1c2d', reblogs: 'nobody' }, where: 'labs' },
+  { prompt: 'take my post s_7e8f9a0b1c2d out of the reblog s_5d6e7f8a9b0c', tool: 'share_settings', args: { id: 's_7e8f9a0b1c2d', detach: 's_5d6e7f8a9b0c' }, where: 'labs' },
+  { prompt: 'from now on only my followers can reblog what I post', tool: 'set_public_profile', args: { reblogs: 'followers' }, where: 'labs' },
+  { prompt: 'who reblogged my post s_7e8f9a0b1c2d?', tool: 'get_share', args: { id: 's_7e8f9a0b1c2d' }, where: 'labs' },
 
   // Not for MCPortal
   { prompt: "what's 17 times 23?", tool: null },

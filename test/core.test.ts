@@ -84,10 +84,11 @@ test('tools/list links open_room to the UI and hides app-only tools from the mod
   const names = async (c: ToolContext) => ((await rpc(c, 'tools/list')).result as any).tools.map((t: any) => t.name) as string[];
   const local = await names(ctx());
   assert.ok(!local.includes('share') && !local.includes('open_space') && !local.includes('set_public_profile'), 'no sharing or profiles locally');
-  assert.equal(local.length, tools.length - 12);
+  assert.equal(local.length, tools.length - 11);
   const fresh = await names(ctx(social(false)));
-  assert.deepEqual(tools.map((t) => t.name).filter((n) => !fresh.includes(n)).sort(), ['get_public_profile', 'get_share', 'list_connections', 'list_shares', 'remove_public_profile', 'share', 'share_settings', 'unshare']);
-  assert.deepEqual(tools.map((t) => t.name), ['open_room', 'build_room', 'arrange_room', 'remove_portal', 'refresh_portal', 'mark_seen', 'list_new_items', 'show_highlights', 'read_source', 'find_source', 'add_portal', 'list_sources', 'import_opml', 'read_article', 'get_thumbnails', 'save_item', 'remove_saved', 'pin_portal', 'open_docs', 'read_doc_page', 'search_docs', 'open_handoff', 'create_handoff', 'clip', 'search_clips', 'get_clip', 'update_clip', 'delete_clip', 'get_public_profile', 'set_public_profile', 'remove_public_profile', 'export_data', 'import_portal', 'account_settings', 'open_space', 'share', 'unshare', 'get_share', 'share_settings', 'list_shares', 'relationship', 'list_connections', 'report', 'record_reading', 'get_reading', 'list_reading']);
+  assert.deepEqual(tools.map((t) => t.name).filter((n) => !fresh.includes(n)).sort(), ['get_public_profile', 'get_share', 'list_connections', 'list_shares', 'remove_public_profile', 'share', 'unshare']);
+  assert.deepEqual(tools.map((t) => t.name), ['open_room', 'build_room', 'arrange_room', 'remove_portal', 'refresh_portal', 'mark_seen', 'list_new_items', 'show_highlights', 'read_source', 'find_source', 'add_portal', 'list_sources', 'import_opml', 'read_article', 'get_thumbnails', 'save_item', 'remove_saved', 'pin_portal', 'open_docs', 'read_doc_page', 'search_docs', 'open_handoff', 'create_handoff', 'clip', 'search_clips', 'get_clip', 'update_clip', 'delete_clip', 'get_public_profile', 'set_public_profile', 'remove_public_profile', 'export_data', 'import_portal', 'account_settings', 'open_space', 'share', 'unshare', 'get_share', 'list_shares', 'relationship', 'list_connections', 'report', 'record_reading', 'get_reading', 'list_reading']);
+  assert.ok((await names({ ...ctx(social(true)), labs: ['reblog'] })).includes('share_settings'), "a lab's tools are listed while it's on");
   assert.equal(tools.find((t) => t.name === 'open_room')._meta.ui.resourceUri, ROOM_URI);
   assert.deepEqual(tools.find((t) => t.name === 'refresh_portal')._meta.ui.visibility, ['app']);
   assert.equal(tools.find((t) => t.name === 'read_article')._meta.ui.resourceUri, ROOM_URI, 'reader renders as its own card');

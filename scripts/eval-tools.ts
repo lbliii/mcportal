@@ -100,7 +100,7 @@ async function selection(client: Anthropic, model: string, effort: Effort, runs:
   const cases = TOOL_CASES.filter((c) => !only || c.prompt.includes(only) || String(c.tool).includes(only));
   const scores: Scores = {};
   for (const frozen of cases) {
-    const surface = surfaces[frozen.where === 'local' ? 'local' : 'hosted-active'];
+    const surface = surfaces[frozen.where === 'local' ? 'local' : frozen.where === 'labs' ? 'hosted-labs' : 'hosted-active'];
     const c = forInterface(frozen, new Set(surface.tools.map((t) => t.name)));
     const score = (scores[frozen.prompt] = { passed: 0, runs: 0 });
     for (let i = 0; i < runs; i++) {
@@ -162,7 +162,7 @@ async function run(): Promise<void> {
   const runs = Number(flag('runs') ?? 1);
   const suite = flag('suite');
   const client = new Anthropic();
-  const surfaces = { local: await serverSurface('local'), linked: await serverSurface('linked'), 'hosted-new': await serverSurface('hosted-new'), 'hosted-active': await serverSurface('hosted-active') };
+  const surfaces = { local: await serverSurface('local'), linked: await serverSurface('linked'), 'hosted-new': await serverSurface('hosted-new'), 'hosted-active': await serverSurface('hosted-active'), 'hosted-labs': await serverSurface('hosted-labs') };
   const scores: Scores = {
     ...(!suite || suite === 'selection' ? await selection(client, model, effort, runs, flag('only'), surfaces) : {}),
     ...(!suite || suite === 'injection' ? await injection(client, model, effort, runs, surfaces['hosted-active']) : {}),
