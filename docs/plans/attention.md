@@ -1,6 +1,6 @@
 # Plan: reading with your agent
 
-Status: phases 1–3 built (2026-10-02); phase 4 proposed. Four features, in build order: ask about a passage, send
+Status: built (2026-10-02). Open questions below remain open. Four features, in build order: ask about a passage, send
 something to another chat, know what's new, and highlights picked by your agent.
 
 ## Goal

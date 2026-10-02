@@ -79,6 +79,10 @@ export const TOOL_CASES: ToolCase[] = [
   { prompt: 'Open MCPortal handoff k7q2xm', tool: 'open_handoff', args: { code: 'k7q2xm' } },
   { prompt: 'pick up the page I just sent from MCPortal', tool: 'open_handoff' },
 
+  // Added 2026-10-02 (frozen from here): highlights
+  { prompt: "what's actually worth reading in my feeds today?", tool: 'list_new_items' },
+  { prompt: 'catch me up on my sources, just the highlights', tool: 'list_new_items' },
+
   // Not for MCPortal
   { prompt: "what's 17 times 23?", tool: null },
   { prompt: 'write me a haiku about autumn', tool: null },

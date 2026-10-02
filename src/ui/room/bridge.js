@@ -97,6 +97,7 @@
       else if (data && data.space && data.space.handle) { gotInitialResult = true; showSpaceCard(data.space); }
       else if (data && data.share && data.share.id) { gotInitialResult = true; showShareCard(data.share); }
       else if (data && data.clip && data.clip.data) { gotInitialResult = true; showClipCard(data.clip); }
+      else if (data && data.highlights && Array.isArray(data.highlights.picks)) { gotInitialResult = true; showHighlightsCard(data.highlights); }
       else if (data && data.article) { gotInitialResult = true; showArticleCard(data.article, data.saved); }
       else if (data && data.profile && data.portals) { gotInitialResult = true; renderRoom(data); }
       else {

@@ -141,6 +141,8 @@ The `/preview` page never contains secrets. With a static token it asks for the 
 | `create_handoff` | app only | Store the page, place and passage under a short code for a new chat (kept 7 days, 50 per account) |
 | `list_sources` | model | Source types and their settings |
 | `refresh_portal` | app only | Reload one portal, bypassing cache |
+| `list_new_items` | model | What the user hasn't seen across the room, with refs, plus taste signals (saved, finished, clip tags, sites) for the agent to rank |
+| `show_highlights` | model + app | The agent's picks (refs and a reason each) as a highlights card with the sources' own titles and links |
 | `mark_seen` | app only | Record the items the user had on screen or opened, so `open_room` can say what's new to them |
 | `get_thumbnails` | app only | Fetch item pictures through the guarded fetcher as data URIs |
 | `import_opml` | model + app | Bring subscriptions from another reader: test-load each feed, build a new user's room from their folders or add to an existing one |

@@ -167,6 +167,12 @@
   .handoff-note { flex-direction: column; align-items: flex-start; }
   .handoff-note .handoff-label { font-weight: var(--mp-weight-strong); }
   .handoff-note blockquote { margin: 0; padding-left: 12px; border-left: 3px solid var(--mp-border-selected); white-space: pre-wrap; }
+  .highlights { list-style: none; margin: var(--mp-space-16) 0 0; padding: 0; display: grid; gap: var(--mp-space-12); }
+  .highlight { border: 1px solid var(--mp-border-divider); border-top: 3px solid var(--mp-source-color, var(--mp-border-divider)); border-radius: var(--mp-radius-card); padding: var(--mp-space-8) var(--mp-space-8) var(--mp-space-10); }
+  .highlight-from { color: var(--mp-text-secondary); font-size: var(--mp-type-12); padding: 0 var(--mp-space-8); }
+  .highlight-why { margin: var(--mp-space-4) var(--mp-space-8) var(--mp-space-8); padding-left: var(--mp-space-10); border-left: 3px solid var(--mp-border-selected); }
+  .highlight-label { display: block; color: var(--mp-text-secondary); font-size: var(--mp-type-11); font-weight: var(--mp-weight-strong); text-transform: uppercase; letter-spacing: 0.04em; }
+  .highlight .not-for-me { margin-left: var(--mp-space-8); }
   .reader .read-end { display: flex; justify-content: center; margin: var(--mp-space-20) 0 var(--mp-space-10); }
   .reader .body p, .reader .body li { font-size: var(--mp-type-15); line-height: 1.65; margin: 0 0 14px; }
   .reader .body h2 { font-size: 17px; margin: 22px 0 8px; }
