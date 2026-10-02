@@ -1,9 +1,10 @@
 {
   "totals": {
     "local": 4019,
-    "linked": 5039,
-    "hosted-new": 4504,
-    "hosted-active": 4979
+    "linked": 5051,
+    "hosted-new": 4501,
+    "hosted-active": 4988,
+    "hosted-labs": 5151
   },
   "tools": {
     "account_settings": 64,
@@ -16,7 +17,7 @@
     "find_source": 139,
     "get_clip": 64,
     "get_public_profile": 62,
-    "get_share": 65,
+    "get_share": 69,
     "import_opml": 105,
     "import_portal": 145,
     "link_account": 66,
@@ -41,11 +42,12 @@
     "save_item": 132,
     "search_clips": 144,
     "search_docs": 133,
-    "set_public_profile": 223,
-    "share": 119,
+    "set_public_profile": 250,
+    "share": 165,
+    "share_settings": 90,
     "show_highlights": 143,
     "unlink_account": 63,
-    "unshare": 41,
+    "unshare": 49,
     "update_clip": 102
   }
 }

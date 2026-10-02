@@ -246,11 +246,7 @@
         state.profile = { ...state.profile, ...data.profile };
         if (data.portal) state.portals.set(data.portal.portalId, data.portal);
         if (data.layoutChanged) { drawLayout(); toast('Saved! A Saved portal has materialized in your room.'); }
-        else if (data.portal) {
-          const node = $first(`[data-portal="${CSS.escape(data.portal.portalId)}"]`);
-          if (node) node.replaceWith(renderPortal(data.portal.portalId));
-          portalChanged(data.portal.portalId);
-        }
+        else if (data.portal) redrawPortal(data.portal.portalId);
       }
       if (!was && !data.layoutChanged) toast('Saved!');
     } catch (error) {
@@ -293,9 +289,7 @@
     } catch (error) {
       toast(errorText(error));
     }
-    const current = $first(`[data-portal="${CSS.escape(portalId)}"]`);
-    if (current) current.replaceWith(renderPortal(portalId));
-    portalChanged(portalId);
+    redrawPortal(portalId);
   }
 
   function loadRoom() {

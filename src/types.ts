@@ -32,7 +32,18 @@ export interface Item {
   /** Items of a clips portal: open with get_clip. */
   clip?: { id: string; kind: ClipKind };
   /** Items of a following portal: open with get_share. */
-  share?: { id: string; kind: 'link' | 'clip' };
+  share?: {
+    id: string;
+    kind: 'link' | 'clip';
+    /** A reblog: its original's id, the original's author and note (absent once it's gone, then why), and whose reblog it came through. */
+    reblog?: { root: string; by?: string; note?: string; removed?: 'removed' | 'detached'; via?: string };
+    /** Reblogs of the original, pooled. */
+    reblogs?: number;
+    /** The viewer's own reblog of it, to undo. */
+    mine?: string;
+    /** Whether the viewer may reblog it now. */
+    canReblog?: boolean;
+  };
   /** Not yet seen by this user (src/seen.ts). */
   new?: true;
 }

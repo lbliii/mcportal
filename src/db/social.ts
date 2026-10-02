@@ -1,4 +1,5 @@
 /** Shares, follows, mutes, blocks and reports in their own tables. */
+import { AppError } from '../lib/errors.ts';
 import type { PageQuery, Relation, Report, Share, SocialStore } from '../social.ts';
 import { DELETED_ID, DELETED_RESOLUTION, limitOf } from '../social-store.ts';
 import type { Queryable } from './schema.ts';
@@ -14,8 +15,14 @@ export class PgSocialStore implements SocialStore {
   }
 
   async addShare(share: Share): Promise<void> {
-    await this.db.query(`INSERT INTO mcportal_shares (id, account_id, data, created_at, hidden_at) VALUES ($1, $2, $3, $4, $5)`,
-      [share.id, share.accountId, JSON.stringify(share), share.createdAt, share.hiddenAt ?? null]);
+    try {
+      await this.db.query(`INSERT INTO mcportal_shares (id, account_id, data, created_at, hidden_at, root_id) VALUES ($1, $2, $3, $4, $5, $6)`,
+        [share.id, share.accountId, JSON.stringify(share), share.createdAt, share.hiddenAt ?? null, share.reblogOf?.root ?? null]);
+    } catch (error) {
+      // mcportal_shares_one_reblog: one reblog per account per original, even when two race.
+      if ((error as { code?: string }).code === '23505' && share.reblogOf) throw new AppError('conflict', 'You already reblogged it', { cause: error });
+      throw error;
+    }
   }
 
   private row(r: { data: Share; hidden_at: Date | string | null }): Share {
@@ -56,6 +63,44 @@ export class PgSocialStore implements SocialStore {
   async countShares(accountId: string): Promise<number> {
     const { rows } = await this.db.query<{ n: string }>(`SELECT count(*) AS n FROM mcportal_shares WHERE account_id = $1`, [accountId]);
     return Number(rows[0]?.n ?? 0);
+  }
+
+  async reblogsOf(rootId: string, query: PageQuery): Promise<Share[]> {
+    const values: unknown[] = [rootId];
+    const where = ['root_id = $1', 'hidden_at IS NULL'];
+    if (query.before && !Number.isNaN(Date.parse(query.before))) {
+      values.push(query.before);
+      where.push(`created_at < $${values.length}`);
+    }
+    values.push(limitOf(query));
+    const { rows } = await this.db.query<{ data: Share; hidden_at: Date | null }>(
+      `SELECT data, hidden_at FROM mcportal_shares WHERE ${where.join(' AND ')} ORDER BY created_at DESC LIMIT $${values.length}`, values);
+    return rows.map((r) => this.row(r));
+  }
+
+  async countReblogs(rootIds: string[]): Promise<Map<string, number>> {
+    if (!rootIds.length) return new Map();
+    const { rows } = await this.db.query<{ root_id: string; n: string }>(
+      `SELECT root_id, count(*) AS n FROM mcportal_shares WHERE root_id = ANY($1::text[]) AND hidden_at IS NULL AND data->>'detachedAt' IS NULL GROUP BY root_id`, [rootIds]);
+    return new Map(rows.map((r) => [r.root_id, Number(r.n)]));
+  }
+
+  async reblogsBy(accountId: string, rootIds: string[]): Promise<Map<string, string>> {
+    if (!rootIds.length) return new Map();
+    const { rows } = await this.db.query<{ root_id: string; id: string }>(
+      `SELECT root_id, id FROM mcportal_shares WHERE account_id = $1 AND root_id = ANY($2::text[])`, [accountId, rootIds]);
+    return new Map(rows.map((r) => [r.root_id, r.id]));
+  }
+
+  async updateShare(id: string, change: { reblogs?: Share['reblogs'] | null; detachedAt?: string | null }): Promise<boolean> {
+    const set: Record<string, string> = {};
+    const unset: string[] = [];
+    for (const key of ['reblogs', 'detachedAt'] as const) {
+      const value = change[key];
+      if (value === null) unset.push(key);
+      else if (value !== undefined) set[key] = value;
+    }
+    return ((await this.db.query(`UPDATE mcportal_shares SET data = (data - $3::text[]) || $2::jsonb WHERE id = $1`, [id, JSON.stringify(set), unset])).rowCount ?? 0) > 0;
   }
 
   async relate(relation: Relation, a: string, b: string): Promise<boolean> {

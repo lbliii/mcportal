@@ -11,7 +11,7 @@ import { RENAMES } from '../evals/renames.ts';
 import { surface } from '../scripts/footprint.ts';
 
 test('eval cases: each names tools the server offers there, with arguments their schemas accept', async () => {
-  const surfaces = { hosted: await surface('hosted-active'), local: await surface('local') };
+  const surfaces = { hosted: await surface('hosted-active'), local: await surface('local'), labs: await surface('hosted-labs') };
   for (const frozen of TOOL_CASES) {
     const { tools } = surfaces[frozen.where ?? 'hosted'];
     // Judged as the current interface would be: through evals/renames.ts.

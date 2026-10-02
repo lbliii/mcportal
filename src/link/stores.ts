@@ -340,8 +340,17 @@ export function remoteSocial(client: StateClient, accountId: string): SocialServ
     async share(author, input) {
       as(author);
       const target = input.kind === 'clip' ? { clipId: input.clip?.id } : { savedUrl: input.url };
-      return client.call('social.share', dropUndefined({ ...target, note: typeof input.note === 'string' ? input.note : undefined, audience: typeof input.audience === 'string' ? input.audience : undefined }));
+      return client.call('social.share', dropUndefined({ ...target, note: typeof input.note === 'string' ? input.note : undefined, audience: typeof input.audience === 'string' ? input.audience : undefined, reblogs: typeof input.reblogs === 'string' ? input.reblogs : undefined }));
     },
+    async reblog(author, input) {
+      as(author);
+      return client.call('social.reblog', dropUndefined({ id: input.id, note: typeof input.note === 'string' ? input.note : undefined, audience: typeof input.audience === 'string' ? input.audience : undefined }));
+    },
+    async shareSettings(author, id, change) {
+      as(author);
+      return client.call('social.shareSettings', dropUndefined({ id, reblogs: typeof change.reblogs === 'string' ? change.reblogs : undefined, detach: typeof change.detach === 'string' ? change.detach : undefined }));
+    },
+    async reblogsOf(viewer, id, query = {}) { as(viewer); return client.call('social.reblogsOf', { id, query: dropUndefined({ ...query }) }); },
     async unshare(author, id) { as(author); return client.call('social.unshare', { id }); },
     async get(viewer, id) { as(viewer); return (await client.call<Awaited<ReturnType<SocialService['get']>> | null>('social.get', { id })) ?? undefined; },
     async feed(viewer, query = {}) { as(viewer); return client.call('social.feed', { query: dropUndefined({ ...query }) }); },

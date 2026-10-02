@@ -18,10 +18,11 @@ import { MemoryProfileStore } from '../src/store.ts';
 import { TtlCache } from '../src/lib/cache.ts';
 import { createFixtureFetcher } from '../src/lib/fixture-fetch.ts';
 import type { ToolContext } from '../src/tools/kit.ts';
+import { LABS } from '../src/labs.ts';
 
 export const tokens = (text: string) => Math.ceil(text.length / 4);
 
-export const PROFILES = ['local', 'linked', 'hosted-new', 'hosted-active'] as const;
+export const PROFILES = ['local', 'linked', 'hosted-new', 'hosted-active', 'hosted-labs'] as const;
 export type Profile = (typeof PROFILES)[number];
 
 /** A tool as hosts pass it to a model. */
@@ -40,6 +41,8 @@ function contextFor(profile: Profile): ToolContext {
   // A local MCPortal (stdio) can sign in; once it has, it's social like a hosted one.
   const link = (linked: boolean) => ({ linked, server: 'https://mcportal.example', start: async () => ({ url: '' }), unlink: async () => '' });
   if (profile === 'local') return { ...base, link: link(false) };
+  // hosted-labs: an active account on a server with every lab on, so a lab's tools have ceilings too.
+  if (profile === 'hosted-labs') return { ...contextFor('hosted-active'), labs: [...LABS] };
   const active = profile === 'hosted-active' || profile === 'linked';
   if (profile === 'linked') return { ...base, link: link(true), publicProfiles: { get: async () => ({ handle: 'someone' }) } as never, social: { uses: async () => true } as never };
   return {
@@ -82,7 +85,7 @@ async function exact(profile: Profile, model: string): Promise<number> {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const results = Object.fromEntries(await Promise.all(PROFILES.map(async (p) => [p, await footprint(p)] as const))) as Record<Profile, Footprint>;
-  const active = results['hosted-active'];
+  const active = results['hosted-labs'];
   for (const t of active.tools) {
     const where = results.local.tools.some((l) => l.name === t.name) ? '' : results['hosted-new'].tools.some((l) => l.name === t.name) ? '  (hosted)' : '  (hosted, once social is used)';
     console.log(`${String(t.tokens).padStart(5)}  ${t.name}${where}`);

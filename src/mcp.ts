@@ -13,7 +13,7 @@ import { requestId, silentLogger, userRef } from './lib/log.ts';
 import { schemaProblem } from './lib/schema.ts';
 import { clean } from './lib/text.ts';
 import { findTool, toolAction, toolCost, TOOLS } from './tools/index.ts';
-import { hasSocial, publicToolList, reachOf, toolError, ROOM_URI, type CallToolResult, type ToolContext } from './tools/kit.ts';
+import { hasSocial, labsOf, publicToolList, reachOf, schemaFor, toolError, ROOM_URI, type CallToolResult, type ToolContext } from './tools/kit.ts';
 
 export { TOOLS };
 
@@ -41,7 +41,7 @@ const UI_DIR = new URL('./ui/', import.meta.url);
 /** Files inlined into the room where it says <!--include:name--> or /*include:name*\/, so the page stays self-contained. */
 export const UI_INCLUDES = [
   'design/tokens.css', 'design/primitives.css', 'design/palettes.js', 'design/theme.js', 'art.js', 'brand/icons.js', 'brand/mark-line.svg', 'brand/badge.svg', 'brand/wordmark.svg',
-  'room/room.css', 'room/bridge.js', 'room/dom.js', 'room/room.js', 'room/items.js', 'room/layouts.js', 'room/levels.js', 'room/seen.js', 'room/reader.js', 'room/reading.js', 'room/passage.js', 'room/handoff.js', 'room/highlights.js', 'room/docs.js', 'room/social.js', 'room/add.js', 'room/toolbar.js', 'room/boot.js',
+  'room/room.css', 'room/bridge.js', 'room/dom.js', 'room/room.js', 'room/items.js', 'room/layouts.js', 'room/river.js', 'room/levels.js', 'room/seen.js', 'room/reader.js', 'room/reading.js', 'room/passage.js', 'room/handoff.js', 'room/highlights.js', 'room/docs.js', 'room/social.js', 'room/reblog.js', 'room/add.js', 'room/toolbar.js', 'room/boot.js',
 ];
 
 /** JSON that is safe to embed inside a <script> element. */
@@ -119,7 +119,7 @@ async function callTool(params: Record<string, unknown>, ctx: ToolContext): Prom
   };
 
   const args = params.arguments ?? {};
-  const problem = schemaProblem(tool.inputSchema, args);
+  const problem = schemaProblem(schemaFor(tool, labsOf(ctx)), args);   // a lab's arguments only while it's on
   if (problem) return done(toolError(`${name} wasn't called: ${problem}.`, 'invalid_argument'), 'invalid');
   const input = args as Record<string, unknown>;
 

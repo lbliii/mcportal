@@ -12,7 +12,7 @@ import { SEEN_BATCH, tracksSeen, withNews } from '../seen.ts';
 import { describeDiff, describeLayout, diffProfiles, findPortal, normalizeSourceConfig, offeredLayouts, type Layout, type PortalInput, type Profile, type ProfileDiff } from '../profile.ts';
 import { clipsPortal, clipsQuery, followingPortal, loadPortal, pinnedPortal, savedPortal } from '../sources.ts';
 import type { PortalResult } from '../types.ts';
-import { identityOf, ok, toolError, toolFailure, untrusted, ROOM_URI, type CallToolResult, type ToolContext, type ToolDef } from './kit.ts';
+import { identityOf, labsOf, ok, toolError, toolFailure, untrusted, ROOM_URI, type CallToolResult, type ToolContext, type ToolDef } from './kit.ts';
 import type { ToolResults } from './results.ts';
 
 /** Any portal's current items: profile-backed ones from the profile and stores, the rest fetched (cached unless `force`). */
@@ -112,7 +112,7 @@ export const ROOM_TOOLS: ToolDef[] = [
       const edition = resolveEdition(await ctx.editions?.get(ctx.userId), portals);
       const lead = leadOf(edition, portals);
       return ok(summarizePortals(profile, portals, notice, edition),
-        { profile, portals, notice, identity, ...(edition ? { edition } : {}), ...(lead ? { lead } : {}), ...(ACTIVE_LABS.length ? { labs: [...ACTIVE_LABS] } : {}), generatedAt: new Date().toISOString() } satisfies ToolResults['open_room']);
+        { profile, portals, notice, identity, ...(edition ? { edition } : {}), ...(lead ? { lead } : {}), ...(labsOf(ctx).length ? { labs: [...labsOf(ctx)] } : {}), generatedAt: new Date().toISOString() } satisfies ToolResults['open_room']);
     },
   },
   {
@@ -167,7 +167,7 @@ export const ROOM_TOOLS: ToolDef[] = [
         retitle: { type: 'array', items: { type: 'object', required: ['portal', 'title'], additionalProperties: false, properties: { portal: { type: 'string' }, title: { type: 'string' } } } },
         configure: { type: 'array', items: { type: 'object', required: ['portal', 'config'], additionalProperties: false, properties: { portal: { type: 'string' }, config: { type: 'object', description: 'Settings to change (list_sources)' } } } },
         name: { type: 'string' },
-        layout: { type: 'string', enum: OFFERED_LAYOUTS, description: `columns side by side, or one sideways row per portal${OFFERED_LAYOUTS.includes('frontpage') ? ", or frontpage: picks, then each portal's top items" : ''}` },
+        layout: { type: 'string', enum: OFFERED_LAYOUTS, description: `columns side by side, or one sideways row per portal${OFFERED_LAYOUTS.includes('frontpage') ? ", or frontpage: picks, then each portal's top items" : ''}${OFFERED_LAYOUTS.includes('river') ? ', or river: every portal merged into one stream, newest first' : ''}` },
         openIn: { type: 'string', enum: ['card', 'chat'], description: 'stories open in the room, or as their own card in the chat' },
       },
     },

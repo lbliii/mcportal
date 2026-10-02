@@ -104,15 +104,24 @@ export function clipsPortal(portal: PortalInput, clips: ClipSummary[]): PortalRe
 
 /** Shares from people the user follows; the caller runs Social.feed and passes the result. */
 export function followingPortal(portal: PortalInput, shares: SharedItem[]): PortalResult {
-  const items: Item[] = shares.map((s) => ({
-    id: s.id,
-    title: s.title,
-    ...(s.url ? { url: s.url } : {}),
-    ...(s.note ? { summary: clean(s.note, 280) } : {}),
-    meta: [`@${s.author.handle}`, s.kind === 'clip' ? (s.clip?.kind ?? 'clip') : 'link'],
-    publishedAt: s.createdAt,
-    share: { id: s.id, kind: s.kind },
-  }));
+  const items: Item[] = shares.map((s) => {
+    const original = s.original && 'author' in s.original ? s.original : undefined;
+    const reblog: NonNullable<Item['share']>['reblog'] = s.reblogOf ? {
+      root: s.reblogOf.root,
+      ...(original ? { by: original.author.handle, ...(original.note ? { note: clean(original.note, 280) } : {}) } : { removed: s.original && 'removed' in s.original ? s.original.removed : 'removed' as const }),
+      ...(s.via ? { via: s.via } : {}),
+    } : undefined;
+    const kind = s.kind === 'clip' ? (original?.clip?.kind ?? s.clip?.kind ?? 'clip') : 'link';
+    return {
+      id: s.id,
+      title: s.title,
+      ...(s.url ? { url: s.url } : {}),
+      ...(s.note ? { summary: clean(s.note, 280) } : {}),
+      meta: [`@${s.author.handle}`, ...(reblog ? [reblog.by ? `reblogged @${reblog.by}` : 'reblogged a removed post'] : []), kind],
+      publishedAt: s.createdAt,
+      share: { id: s.id, kind: s.kind, ...(reblog ? { reblog } : {}), ...(s.reblogCount ? { reblogs: s.reblogCount } : {}), ...(s.myReblog ? { mine: s.myReblog } : {}), canReblog: s.canReblog },
+    };
+  });
   return {
     portalId: portal.id,
     source: 'following',

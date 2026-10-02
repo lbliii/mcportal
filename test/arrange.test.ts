@@ -91,15 +91,20 @@ test('arrange: a title that names two portals is refused with their ids', () => 
   assert.throws(() => arrange(twins, { remove: ['github'] }), /names 2 portals \(gh, blog\); use an id/);
 });
 
-test('labs: the front page is offered only while its lab is on, and a room that chose it stays valid', async () => {
+test('labs: the front page and the river are offered only while their labs are on, and a room that chose one stays valid', async () => {
   assert.deepEqual(labsFrom(' FrontPage , nonsense'), ['frontpage']);
   assert.deepEqual(labsFrom(undefined), []);
   assert.deepEqual(offeredLayouts([]), ['columns', 'shelves']);
   assert.deepEqual(offeredLayouts(['frontpage']), ['columns', 'shelves', 'frontpage']);
+  assert.deepEqual(offeredLayouts(['river']), ['columns', 'shelves', 'river']);
+  assert.deepEqual(labsFrom('frontpage,river'), ['frontpage', 'river']);
   assert.equal(validateProfile({ ...defaultProfile(), layout: 'frontpage' }).layout, 'frontpage');
+  assert.equal(validateProfile({ ...defaultProfile(), layout: 'river' }).layout, 'river');
   // These tests run without MCPORTAL_LABS: the model can't pick it.
   const ctx = { store: new MemoryProfileStore({ default: { ...defaultProfile(), onboarded: true } }), fetcher: createFixtureFetcher(), cache: new TtlCache(), userId: 'default' };
-  const res = await handleMessage({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'arrange_room', arguments: { layout: 'frontpage' } } }, ctx) as { result: { structuredContent: { error?: { code: string } } } };
-  assert.equal(res.result.structuredContent.error?.code, 'invalid_argument');
+  for (const layout of ['frontpage', 'river']) {
+    const res = await handleMessage({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'arrange_room', arguments: { layout } } }, ctx) as { result: { structuredContent: { error?: { code: string } } } };
+    assert.equal(res.result.structuredContent.error?.code, 'invalid_argument', layout);
+  }
   assert.equal((await ctx.store.get('default')).layout, 'columns');
 });

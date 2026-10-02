@@ -43,6 +43,7 @@ async function hosted() {
     seen: new FileSeenStore(null),
     handoffs: new MemoryHandoffStore(),
     editions: new MemoryEditionStore(),
+    labs: ['reblog'],
   });
   const auth = new AuthStore(authPersistence);
   const signIn = async (githubId: number, login: string) => {
@@ -142,6 +143,12 @@ test('linked: sharing and following work from a local MCPortal, as the linked ac
     const feed = await other.call('list_shares', { handle: '@lawrence' });
     assert.deepEqual(feed.structuredContent.shares.map((s: { title: string }) => s.title).sort(), ['A clip', 'Worth reading']);
     assert.match((await mac.call('list_connections')).content[0]!.text, /Followers: 1\./);
+    // Reblogging goes through the hosted API too (the tools come in reblog phase 2).
+    const reblog = await other.ctx.social!.reblog(friend.accountId, { id: shared.structuredContent.share.id, note: 'passing it on' });
+    assert.deepEqual(reblog.reblogOf, { root: shared.structuredContent.share.id });
+    await mac.ctx.social!.shareSettings(lawrence.accountId, shared.structuredContent.share.id, { reblogs: 'nobody' });
+    assert.deepEqual((await mac.ctx.social!.reblogsOf(lawrence.accountId, shared.structuredContent.share.id)).map((r) => r.handle), ['friend']);
+    assert.equal((await mac.ctx.social!.get(lawrence.accountId, shared.structuredContent.share.id))?.reblogCount, 1);
     // The stores refuse to act as anyone else, whatever a caller passes.
     await assert.rejects(mac.ctx.social!.feed(friend.accountId), /only as its linked account/);
     await assert.rejects(mac.ctx.store.get(friend.accountId), /only its linked account/);
@@ -233,6 +240,52 @@ test('linked: highlights picked on one device lead the room on another', async (
     const room = await office.call('open_room');
     assert.deepEqual(room.structuredContent.edition.picks.map((p: any) => p.ref), [second.ref, first.ref]);
     assert.deepEqual(room.structuredContent.lead, { ref: second.ref, portalId: second.portalId, itemId: second.item.id, by: 'agent', why: 'Yours.' });
+  } finally {
+    await h.app.close();
+  }
+});
+
+test('hosted end to end: three accounts over /mcp share, follow, reblog, see it through a follow, detach and undo', async () => {
+  const h = await hosted();
+  try {
+    /** A signed-in account calling the hosted server's tools over HTTP, as a host would. */
+    const account = async (githubId: number, login: string) => {
+      const { tokens } = await h.signIn(githubId, login);
+      let id = 0;
+      const rpc = async (method: string, params: Record<string, unknown> = {}) => {
+        const res = await fetch(`${h.app.base}/mcp`, { method: 'POST', headers: { authorization: `Bearer ${tokens.access_token}`, 'content-type': 'application/json', accept: 'application/json, text/event-stream' }, body: JSON.stringify({ jsonrpc: '2.0', id: ++id, method, params }) });
+        assert.equal(res.status, 200, `${method}: HTTP ${res.status}`);
+        return (await res.json()).result;
+      };
+      const call = async (name: string, args: Record<string, unknown> = {}) => rpc('tools/call', { name, arguments: args }) as Promise<{ content: Array<{ text: string }>; structuredContent?: any; isError?: boolean }>;
+      await call('set_public_profile', { handle: login });
+      await call('build_room', { packs: ['developer'] });
+      return { rpc, call };
+    };
+    const alice = await account(1, 'alice');
+    const bob = await account(2, 'bob');
+    const carol = await account(3, 'carol');
+    assert.ok((await bob.rpc('tools/list')).tools.some((t: { name: string }) => t.name === 'share_settings'), 'the lab is on: its tools are listed');
+
+    await alice.call('save_item', { url: 'https://example.com/found', title: 'A find' });
+    const post = (await alice.call('share', { savedUrl: 'https://example.com/found', note: 'Look at this.', audience: 'mcportal' })).structuredContent.share;
+    await bob.call('relationship', { handle: 'alice', action: 'follow' });
+    const seenByBob = (await bob.call('open_room')).structuredContent.portals.find((p: any) => p.source === 'following').items[0];
+    assert.equal(seenByBob.share.canReblog, true);
+    const reblog = await bob.call('share', { reblogOf: seenByBob.share.id, note: 'Agreed.', audience: 'mcportal' });
+    assert.ok(!reblog.isError, reblog.content[0]!.text);
+
+    await carol.call('relationship', { handle: 'bob', action: 'follow' });
+    const seenByCarol = (await carol.call('open_room')).structuredContent.portals.find((p: any) => p.source === 'following').items[0];
+    assert.deepEqual(seenByCarol.meta, ['@bob', 'reblogged @alice', 'link']);
+    assert.deepEqual(seenByCarol.share.reblog, { root: post.id, by: 'alice', note: 'Look at this.' });
+    assert.equal(seenByCarol.share.reblogs, 1);
+    assert.match((await alice.call('get_share', { id: post.id })).content[0]!.text, /Reblogged by @bob\./);
+
+    await alice.call('share_settings', { id: post.id, detach: reblog.structuredContent.share.id });
+    assert.deepEqual((await carol.call('get_share', { id: reblog.structuredContent.share.id })).structuredContent.share.original, { removed: 'detached' });
+    assert.match((await bob.call('unshare', { id: reblog.structuredContent.share.id })).content[0]!.text, /Removed/);
+    assert.equal((await alice.call('get_share', { id: post.id })).structuredContent.share.reblogCount, 0);
   } finally {
     await h.app.close();
   }

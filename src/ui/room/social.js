@@ -88,18 +88,22 @@
 
   // ------------------------------------------------------------ sharing into your space
   // The user writes the note here themselves, so nothing is posted in their name without them.
-  /** @param {Record<string, string | undefined>} target what to share: { clipId } or { savedUrl } @param {string} title */
-  function composer(target, title) {
-    const note = el('textarea', { placeholder: 'Add a note (optional): why it\'s worth a look', 'aria-label': 'Share note (optional)', maxlength: '500' });
-    const audience = el('select', { class: 'btn', 'aria-label': 'Who sees this share' }, el('option', { value: 'followers' }, 'Followers'), el('option', { value: 'mcportal' }, 'Everyone on MCPortal'));
-    const go = el('button', { class: 'btn', style: 'font-weight:600' }, 'Share');
-    const box = el('div', { class: 'composer' }, el('div', { class: 'byline', style: 'margin:0 0 6px' }, `Share “${title}” to your space`), note,
+  /**
+   * @param {Record<string, string | undefined>} target what to post: { clipId }, { savedUrl } or { reblogOf } @param {string} title
+   * @param {{ verb?: string, onDone?: (share: SharedItem) => void }} [options] the button's word, and what to do once it's posted
+   */
+  function composer(target, title, { verb = 'Share', onDone } = {}) {
+    const note = el('textarea', { placeholder: 'Add a note (optional): why it\'s worth a look', 'aria-label': `${verb} note (optional)`, maxlength: '500' });
+    const audience = el('select', { class: 'btn', 'aria-label': `Who sees this ${verb.toLowerCase()}` }, el('option', { value: 'followers' }, 'Followers'), el('option', { value: 'mcportal' }, 'Everyone on MCPortal'));
+    const go = el('button', { class: 'btn', style: 'font-weight:600' }, verb);
+    const box = el('div', { class: 'composer' }, el('div', { class: 'byline', style: 'margin:0 0 6px' }, `${verb} “${title}” to your space`), note,
       el('div', { class: 'row' }, el('span', null, 'Who sees it:'), audience, el('span', { class: 'spacer' }), go));
     go.addEventListener('click', async () => {
       go.disabled = true;
       try {
-        await callTool('share', { ...target, note: note.value, audience: audience.value });
+        const result = await callTool('share', { ...target, note: note.value, audience: audience.value });
         box.replaceChildren(el('div', null, `Transmitted! ${audience.value === 'mcportal' ? 'Everyone on MCPortal' : 'Your followers'} will find it in your space.`));
+        onDone?.(result.structuredContent.share);
       } catch (error) {
         toast(errorText(error));
         go.disabled = false;
@@ -108,13 +112,20 @@
     return box;
   }
 
-  /** @param {Item} item */
-  function openComposer(item) {
+  /**
+   * The composer as its own view: share a saved item, or (with options) reblog a post, its
+   * original's author and note quoted above, in their voice.
+   * @param {{ title: string, url?: string | undefined }} item
+   * @param {{ target?: Record<string, string | undefined>, verb?: string, quote?: { by: string, note?: string | undefined } | undefined, onDone?: (share: SharedItem) => void }} [options]
+   */
+  function openComposer(item, { target = { savedUrl: item.url }, verb = 'Share', quote, onDone } = {}) {
     const reader = $('reader');
     rememberRoomNavigation();
     $('grid').hidden = true; reader.hidden = false; reader.scrollTop = 0; window.scrollTo(0, 0);
-    reader.replaceChildren(el('div', { class: 'reader-top' }, iconButton('back', 'Back to your room', closeReader, 'ib')),
-      el('h1', null, item.title), el('div', { class: 'byline' }, item.url), composer({ savedUrl: item.url }, item.title));
+    reader.replaceChildren(...present([el('div', { class: 'reader-top' }, iconButton('back', 'Back to your room', closeReader, 'ib')),
+      el('h1', null, item.title), el('div', { class: 'byline' }, [item.url, quote ? `reblogging @${quote.by}` : ''].filter(Boolean).join(' · ')),
+      quote && quote.note ? el('p', { class: 'story-note' }, el('span', { class: 'story-note-by' }, `@${quote.by}`), quote.note) : null,
+      composer(target, item.title, { verb, onDone })]));
   }
 
   // ------------------------------------------------------------ spaces
@@ -134,8 +145,11 @@
     else if (c && c.kind === 'exchange') body.push(el('div', { class: 'pt' }, post.title), el('div', { class: 'body-lines' }, c.turns.slice(0, 2).map((t) => el('p', null, el('b', null, `${t.speaker}: `), t.text.slice(0, 160)))));
     else if (c && c.kind === 'image') body.push(el('div', { class: 'pt' }, post.title));
     else body.push(el('div', { class: 'pt' }, post.title), hostName ? el('div', { class: 'pm', style: 'margin-top:0' }, hostName) : null);
-    const meta = [ago(post.createdAt), post.mine && post.audience === 'followers' ? 'followers only' : null, post.hiddenAt ? 'hidden by an admin' : null].filter(Boolean);
-    return [top, el('div', { class: 'pc' }, body, post.note ? el('p', { class: 'pn' }, post.note) : null, el('div', { class: 'pm' }, meta.join(' · ')))];
+    const original = post.original && 'author' in post.original ? post.original : undefined;
+    const meta = [ago(post.createdAt), post.mine && post.audience === 'followers' ? 'followers only' : null, post.hiddenAt ? 'hidden by an admin' : null,
+      post.reblogCount ? `${post.reblogCount} reblog${post.reblogCount === 1 ? '' : 's'}` : null].filter(Boolean);
+    const reblogged = post.reblogOf ? el('div', { class: 'pr' }, icon('reblog'), original ? `reblogged @${original.author.handle}${post.via ? ` via @${post.via}` : ''}` : 'reblogged a removed post') : null;
+    return [top, el('div', { class: 'pc' }, reblogged, body, post.note ? el('p', { class: 'pn' }, post.note) : null, el('div', { class: 'pm' }, meta.join(' · ')))];
   }
 
   /** @param {Space} space @param {boolean} withBack @param {(e: MouseEvent) => void} [back] */
@@ -217,30 +231,77 @@
 
   // ------------------------------------------------------------ shares
   // Other people's words: built as text like everything else, and labeled with who wrote them.
-  /** @param {SharedItem} share @param {boolean} withBack */
-  function shareNodes(share, withBack) {
+  // A reblog shows its original live (author, note, clip) above the reblogger's note: two
+  // voices at most. Your own post shows who reblogged it and your controls over that.
+  /** @param {SharedItem} share @param {boolean} withBack @param {Reblogger[]} [rebloggers] */
+  function shareNodes(share, withBack, rebloggers = []) {
     const who = share.mine ? 'You' : `@${share.author.handle}`;
     const to = share.audience === 'mcportal' ? 'everyone on MCPortal' : 'followers';
+    const original = share.original && 'author' in share.original ? share.original : undefined;
     const top = el('div', { class: 'reader-top' },
       iconButton('back', withBack ? 'Back to your room' : 'Open your room', closeReader, 'ib'),
       share.url && isHttpUrl(share.url) ? iconButton('external', 'Open the original', () => openLink(share.url ?? ''), 'ib') : null);  // checked just before
-    const body = share.clip ? clipBody(share.clip.data)
+    const clip = original?.clip ?? share.clip;
+    const body = clip ? clipBody(clip.data)
       : share.url && isHttpUrl(share.url) ? [el('p', null, el('button', { class: 'btn', onclick: () => openLink(share.url ?? '') }, share.url))] : [];  // checked just before
+    const did = share.reblogOf
+      ? `${who} reblogged ${original ? `@${original.author.handle}'s ${share.kind === 'clip' ? (clip ? clip.kind : 'clip') : 'link'}` : 'a post'}${share.via ? ` via @${share.via}` : ''}`
+      : `${who} shared ${share.kind === 'clip' ? `a ${share.clip ? share.clip.kind : 'clip'}` : 'a link'}`;
+    const removed = share.original && 'removed' in share.original
+      ? (share.original.removed === 'detached' ? 'Its author removed the original post from this reblog.' : 'The original post was removed.') : '';
+    const reblog = share.mine && !share.reblogOf ? null : reblogButton(shareTarget(share));
     return present([top, el('h1', null, share.title),
-      el('div', { class: 'byline' }, [`${who} shared ${share.kind === 'clip' ? `a ${share.clip ? share.clip.kind : 'clip'}` : 'a link'}`, `with ${to}`, ago(share.createdAt)].join(' · ')),
-      share.note ? el('p', { class: 'share-note' }, share.note) : null,
+      el('div', { class: 'byline' }, [did, `with ${to}`, ago(share.createdAt)].join(' · ')),
+      removed ? el('p', { class: 'story-removed' }, removed) : null,
+      original?.note ? el('p', { class: 'story-note' }, el('span', { class: 'story-note-by' }, `@${original.author.handle}`), original.note) : null,
+      share.note ? el('p', { class: share.reblogOf ? 'story-note' : 'share-note' }, share.reblogOf ? el('span', { class: 'story-note-by' }, share.mine ? 'You' : `@${share.author.handle}`) : null, share.note) : null,
       el('div', { class: 'body' }, body),
+      reblog ? el('div', { class: 'share-actions' }, reblog) : null,
+      share.mine && !share.reblogOf ? reblogControls(share, rebloggers) : null,
       el('div', { class: 'prov' }, share.hiddenAt ? 'An admin hid this share; only you can see it.' : `Shared on MCPortal. ${share.mine ? '' : 'Written by another user.'}`)]);
   }
 
-  /** @param {SharedItem} share */
-  function showShareCard(share) {
+  /**
+   * Your post's reblogs: who passed it on (each one can be cut loose from your post, for good)
+   * and who may reblog it from now on.
+   * @param {SharedItem} share @param {Reblogger[]} rebloggers
+   */
+  function reblogControls(share, rebloggers) {
+    const rule = el('select', { class: 'btn', 'aria-label': 'Who can reblog this post' },
+      ['anyone', 'followers', 'nobody'].map((r) => el('option', { value: r, selected: (share.reblogs ?? 'anyone') === r }, r === 'anyone' ? 'Anyone' : r === 'followers' ? 'Your followers' : 'Nobody')));
+    rule.addEventListener('change', async () => {
+      rule.disabled = true;
+      try {
+        await callTool('share_settings', { id: share.id, reblogs: rule.value });
+        toast(rule.value === 'nobody' ? 'Sealed: nobody can reblog it now. Reblogs made before stay.' : 'Saved. Reblogs made before stay.');
+      } catch (error) { toast(errorText(error)); }
+      rule.disabled = false;
+    });
+    const list = rebloggers.map((r) => {
+      const cut = r.detached ? el('span', { class: 'pm' }, 'removed from this reblog') : el('button', { class: 'link-btn', type: 'button' }, 'Remove my post from this reblog');
+      if (!r.detached) cut.addEventListener('click', async () => {
+        if (cut.dataset.sure !== 'yes') { cut.dataset.sure = 'yes'; cut.textContent = "Sure? This can't be undone"; return; }
+        try {
+          await callTool('share_settings', { id: share.id, detach: r.reblogId });
+          cut.replaceWith(el('span', { class: 'pm' }, 'removed from this reblog'));
+        } catch (error) { toast(errorText(error)); }
+      });
+      return el('li', null, el('button', { class: 'link-btn', type: 'button', onclick: () => loadSpace(r.handle, false) }, `@${r.handle}`), ' · ', cut);
+    });
+    return el('section', { class: 'share-reblogs', 'aria-label': 'Reblogs' },
+      el('h2', null, share.reblogCount ? `${share.reblogCount} reblog${share.reblogCount === 1 ? '' : 's'}` : 'No reblogs yet'),
+      list.length ? el('ul', null, list) : null,
+      el('div', { class: 'row' }, el('span', null, 'Who can reblog it:'), rule));
+  }
+
+  /** @param {SharedItem} share @param {Reblogger[]} [rebloggers] */
+  function showShareCard(share, rebloggers) {
     root.classList.add('article-view');
     $('roomName').textContent = 'shared';
     $('grid').hidden = true;
     const reader = $('reader');
     reader.hidden = false; reader.scrollTop = 0;
-    reader.replaceChildren(...shareNodes(share, false));
+    reader.replaceChildren(...shareNodes(share, false, rebloggers));
     setStatus('');
   }
 
@@ -248,7 +309,9 @@
   async function loadShareCard(id) {
     setStatus('Stand by…');
     try {
-      showShareCard((await callTool('get_share', { id })).structuredContent.share);
+      const { share, rebloggers, labs } = (await callTool('get_share', { id })).structuredContent;
+      if (labs) state.labs = labs;
+      showShareCard(share, rebloggers);
     } catch (error) {
       setStatus('');
       $('grid').hidden = true;
@@ -267,7 +330,9 @@
     reader.replaceChildren(el('div', { class: 'reader-top' }, iconButton('back', 'Back', back ? () => back(scroll) : closeReader, 'ib')), el('h1', null, item.title), el('div', { class: 'byline' }, 'Stand by…'));
     try {
       // Only shares come here: openItem checks item.share, and space posts always carry one.
-      const nodes = shareNodes((await callTool('get_share', { id: /** @type {NonNullable<ShareRef['share']>} */ (item.share).id })).structuredContent.share, true);
+      const { share, rebloggers, labs } = (await callTool('get_share', { id: /** @type {NonNullable<ShareRef['share']>} */ (item.share).id })).structuredContent;
+      if (labs) state.labs = labs;
+      const nodes = shareNodes(share, true, rebloggers);
       if (back) nodes[0].replaceChildren(iconButton('back', 'Back to the space', () => back(scroll), 'ib'), ...[...nodes[0].children].slice(1));
       reader.replaceChildren(...nodes);
     } catch (error) {
