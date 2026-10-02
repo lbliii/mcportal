@@ -108,6 +108,21 @@
     return box;
   }
 
+  /**
+   * Share any story with a link: a share is of something saved, so it's saved first, then
+   * the composer opens. Offered when signed in (ghost mode shares nothing); a Saved portal's
+   * rows keep their own share button.
+   * @param {Item} item @param {PortalResult} portal
+   */
+  function shareStoryButton(item, portal) {
+    if (!item.url || portal.source === 'saved' || !state.identity || state.identity.mode === 'ghost') return null;
+    return el('button', { class: 'mi go', title: 'Share to your space', 'aria-label': 'Share to your space', onclick: async (/** @type {MouseEvent} */ e) => {
+      e.stopPropagation();
+      if (!state.saved.has(item.url ?? '')) await toggleSaved(item, portal.source);
+      if (state.saved.has(item.url ?? '')) openComposer(item);   // saving can fail; toggleSaved says why
+    } }, icon('share'));
+  }
+
   /** @param {Item} item */
   function openComposer(item) {
     const reader = $('reader');

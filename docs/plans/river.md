@@ -1,6 +1,6 @@
 # Plan: the river, one stream across the room
 
-Status: phases 1 and 2 built, 2026-10-02. Builds on [room-layouts.md](room-layouts.md) (layout
+Status: phases 1–3 built, 2026-10-02. Builds on [room-layouts.md](room-layouts.md) (layout
 registry, item forms, editions, portal level) and comes before reblogging. Research:
 [Feed and grid design lessons](../../reports/Feed%20and%20grid%20design%20lessons.md),
 [River and reblog design research](../../reports/River%20and%20reblog%20design%20research.md).
@@ -210,6 +210,16 @@ Following items already carry `publishedAt` and `share`; give them the "@handle 
 from line and the share's note. Share from any card. This is the hand-off point for the
 reblog plan, which adds reblog chains, the reblog button and "reblogged from" lines to
 this form.
+
+Done. A story carries its sharers (`shared`: handle and note, read from a Following
+item's "@handle" meta and its summary). A follow's share of a link that's also in a feed
+is the feed's story: the feed's copy takes it over at the share's place, so a fresh share
+lifts it (as a reblog will), and the context row says "@ana shared" ("@a and @b",
+"@a, @b and 2 more") instead of "also on Following". The first sharer's note shows under
+the title, set apart in Following's colour with their handle; a Following story's
+summary (its note) isn't repeated, nor its "link" kind. Signed in, every story with a
+link has a share button: it saves the story if it isn't saved, then opens the composer;
+ghost mode shows none. The design preview's `river` view includes two follows' shares.
 
 The reblog icon is already in the set (`reblog` in `scripts/brand.ts`): the repost loop
 drawn as a doorway, one arrow along the sill and up the left jamb, the other over the arch

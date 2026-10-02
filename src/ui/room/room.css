@@ -157,6 +157,9 @@
   .story-portal:hover { text-decoration: underline; text-underline-offset: 2px; }
   .story-also::before, .story-when::before { content: '·'; margin-right: var(--mp-space-6); }
   .story-context { color: var(--mp-text-secondary); font-size: var(--mp-type-11-5); padding-bottom: var(--mp-space-4); }
+  /* a sharer's note: their words, set apart from the source's */
+  .story-note { max-width: 34em; margin: var(--mp-space-8) 0 0; padding-left: var(--mp-space-10); border-left: 3px solid var(--mp-source-following); font-size: var(--mp-type-13-5); white-space: pre-wrap; }
+  .story-note-by { display: block; color: var(--mp-text-secondary); font-size: var(--mp-type-11-5); font-weight: var(--mp-weight-strong); white-space: normal; }
   .story .thumb { width: 100%; height: auto; aspect-ratio: 1.91 / 1; margin-bottom: var(--mp-space-8); }
   .story .item-title { display: block; font-size: var(--mp-type-18); font-weight: var(--mp-weight-heading); line-height: var(--mp-line-heading); }
   .story .item-summary { max-width: 34em; font-size: var(--mp-type-13-5); -webkit-line-clamp: 4; margin-top: var(--mp-space-4); }

@@ -288,6 +288,7 @@ test('browser: the river merges the room into one stream: picks, new, a divider,
     assert.equal(await page.eval(`document.querySelector('.river-feed').getAttribute('role')`), 'feed');
     assert.equal(await page.eval(`document.querySelector('.river-feed > article').getAttribute('aria-posinset')`), '2', 'numbered after the pick');
     assert.match(await page.eval<string>(`document.querySelector('.river-aside').textContent`), /Also in your room: Example Docs/, 'docs are named, not merged');
+    assert.equal(await page.eval(`document.querySelectorAll('.story:not([data-story^="saved"]) [aria-label="Share to your space"]').length`), 0, 'ghost mode shares nothing');
     // A page is ten units; the next page brings the fold, which opens in place.
     assert.equal(await units(), 10);
     assert.match(await page.eval<string>(`document.querySelector('.river-more .fp-more').textContent`), /^2 more of 2$/);
@@ -351,6 +352,61 @@ test('browser: river pages end on a separator that takes focus, and a refresh wa
     await page.eval(`document.documentElement.classList.remove('fullscreen')`);
     assert.deepEqual(page.problems, []);
   } finally {
+    await profiles.put('default', room());
+  }
+});
+
+test('browser: in the river, a follow\'s share joins the story it shares, notes read in their own voice, and any story can be shared', { skip }, async () => {
+  // The test server has no social layer, so the page's open_room result gets a Following
+  // portal and a signed-in identity on the way in: @ana shares HN's top story, @ben a new link.
+  const { identifier } = await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => {
+    const real = window.fetch;
+    window.fetch = async (url, init) => {
+      const res = await real(url, init);
+      if (url !== '/mcp' || !init || !String(init.body).includes('"name":"open_room"')) return res;
+      const json = await res.json();
+      const room = json.result && json.result.structuredContent;
+      const hn = room && room.portals && room.portals.find((p) => p.portalId === 'hn-top');
+      if (hn) {
+        const now = new Date().toISOString();
+        room.identity = { mode: 'hosted', handle: 'reader' };
+        room.profile.columns.push({ width: 1, panels: [{ id: 'following', source: 'following', title: 'Following', config: {} }] });
+        room.portals.push({ portalId: 'following', source: 'following', title: 'Following', provenance: { source: 'following', endpoint: 'shares from people you follow', fetchedAt: now, cached: false, ttlSeconds: 0 }, items: [
+          { id: 's_ana', title: hn.items[0].title, url: hn.items[0].url, summary: 'Read the comments.', meta: ['@ana', 'link'], publishedAt: now, share: { id: 's_ana', kind: 'link' } },
+          { id: 's_ben', title: 'A quiet blog post', url: 'https://example.com/quiet', summary: 'This one is lovely.', meta: ['@ben', 'link'], publishedAt: now, share: { id: 's_ben', kind: 'link' } },
+        ] });
+      }
+      return new Response(JSON.stringify(json), { status: res.status, headers: { 'content-type': 'application/json' } });
+    };
+  })();` });
+  await profiles.put('default', validateProfile({ ...room(), layout: 'river' }));
+  const hnTitle = (await tool('open_room', {})).portals.find((p: any) => p.portalId === 'hn-top').items[0].title;
+  /** The story with this title: its context line, note, from line, whether it has a summary, its meta. */
+  const read = (title: string) => page.eval<{ context: string | null; note: string | null; from: string; summary: boolean; meta: string } | null>(`(() => {
+    const node = [...document.querySelectorAll('.river-feed > article')].find((n) => n.querySelector('.item-title').textContent.endsWith(${JSON.stringify(title)}));
+    return node ? { context: node.querySelector('.story-context')?.textContent ?? null, note: node.querySelector('.story-note')?.textContent ?? null, from: node.querySelector('.item-from').textContent, summary: Boolean(node.querySelector('.item-summary')), meta: node.querySelector('.item-meta')?.textContent ?? '' } : null;
+  })()`);
+  try {
+    page.problems.length = 0;
+    await page.goto(`${app.base}/preview`);
+    await page.waitFor(`document.querySelector('#grid.river .river-feed article') && !document.querySelector('.skeleton')`, 'the river');
+    const joined = await read(hnTitle);
+    assert.equal(joined?.context, '@ana shared', "the share joins HN's story");
+    assert.equal(joined?.note, '@anaRead the comments.');
+    assert.doesNotMatch(joined?.from ?? '', /Following/, 'no "also on Following": the context line says it');
+    const own = await read('A quiet blog post');
+    assert.equal(own?.context, '@ben shared');
+    assert.equal(own?.note, '@benThis one is lovely.');
+    assert.equal(own?.summary, false, 'the note is not repeated as a summary');
+    assert.doesNotMatch(own?.meta ?? '', /link/);
+    // Sharing any story saves it first, then opens the composer.
+    await page.eval(`[...document.querySelectorAll('.river-feed > article')].find((n) => n.querySelector('.item-title').textContent === 'A quiet blog post').querySelector('[aria-label="Share to your space"]').click()`);
+    await page.waitFor(`!document.getElementById('reader').hidden && document.querySelector('#reader .composer')`, 'the composer');
+    assert.match(await page.eval<string>(`document.querySelector('#reader .composer').textContent`), /Share “A quiet blog post” to your space/);
+    assert.ok((await tool('open_room', {})).profile.saved.some((s: any) => s.url === 'https://example.com/quiet'), 'saved first');
+    assert.deepEqual(page.problems, []);
+  } finally {
+    await page.send('Page.removeScriptToEvaluateOnNewDocument', { identifier });
     await profiles.put('default', room());
   }
 });

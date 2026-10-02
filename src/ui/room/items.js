@@ -7,9 +7,9 @@
   /** @typedef {'row' | 'tile' | 'lead' | 'story'} ItemForm */
   /**
    * How an item looks: its portal's colour, whether its shelf shows pictures, whether it
-   * names its portal (outside one), the agent's reason for picking it (its own words), and
-   * the other portals that have the same story.
-   * @typedef {{ color?: string, media?: boolean, from?: boolean, why?: string, also?: string[] }} ItemLook
+   * names its portal (outside one), the agent's reason for picking it (its own words), the
+   * other portals that have the same story, and the people you follow who shared it.
+   * @typedef {{ color?: string, media?: boolean, from?: boolean, why?: string, also?: string[], shared?: Array<{ handle: string, note?: string | undefined }> }} ItemLook
    */
 
   /** @param {Item} item @param {PortalResult} portal @param {ItemForm} [form] @param {ItemLook} [look] */
@@ -54,6 +54,13 @@
     return { out, byline };
   }
 
+  /** "@a shared", "@a and @b", "@a, @b and 2 more". @param {string[]} handles */
+  function sharerNames(handles) {
+    const names = handles.map((h) => `@${h}`);
+    if (names.length <= 2) return names.join(' and ');
+    return `${names.slice(0, 2).join(', ')} and ${names.length - 2} more`;
+  }
+
   /** Which portal an item is from, outside it: the portal's dot and title. @param {PortalResult} portal @param {string} color */
   const itemFrom = (portal, color) => el('div', { class: 'item-from' }, el('span', { class: 'dot', style: `background:${color}` }), portal.title);
   /** The agent's reason, set apart from the source's words. @param {string} why */
@@ -85,22 +92,30 @@
     },
 
     /**
-     * A story in the river: who shared it (Following), the portal it's from and its age, its
-     * picture across, a larger title, every action. The portal's name opens the portal.
+     * A story in the river: who you follow shared it, the portal it's from and its age, its
+     * picture across, a larger title, a sharer's note in their own voice, every action. The
+     * portal's name opens the portal.
      */
-    story(item, portal, { color = '', why = '', also = [] }) {
-      const shared = portal.source === 'following' && /^@/.test(item.meta[0] ?? '') ? item.meta[0] : '';
-      const { out, byline } = itemActions(shared ? { ...item, meta: item.meta.slice(1) } : item, portal, false);
+    story(item, portal, { color = '', why = '', also = [], shared = [] }) {
+      // A Following item's meta is "@handle" and its kind, and its summary is the note: shown above, not twice.
+      const following = portal.source === 'following';
+      const meta = following ? item.meta.filter((m) => !m.startsWith('@') && m !== 'link') : item.meta;
+      const { out, byline } = itemActions({ ...item, meta }, portal, false);
+      const share = shareStoryButton(item, portal);
+      if (share) out.push(share);
+      const noted = shared.find((s) => s.note);
       const main = el('button', { class: 'item-main', type: 'button', title: byline, onclick: (/** @type {MouseEvent} */ e) => openFrom(e, item, portal) },
         item.image && item.image.kind === 'thumb' ? thumbBox(item, portal) : null,
-        itemTitle(item), item.summary ? el('span', { class: 'item-summary' }, item.summary) : null);
+        itemTitle(item), item.summary && !following ? el('span', { class: 'item-summary' }, item.summary) : null);
       return el('article', { class: 'item story', style: `--mp-source-color:${color}`, onclick: openOnClick(item, portal) },
-        shared ? el('div', { class: 'story-context' }, `${shared} shared`) : null,
+        shared.length ? el('div', { class: 'story-context' }, `${sharerNames(shared.map((s) => s.handle))} shared`) : null,
         el('div', { class: 'item-from' }, el('span', { class: 'dot', style: `background:${color}` }),
           el('button', { class: 'story-portal', type: 'button', title: `Open ${portal.title}`, onclick: () => openPortal(portal.portalId) }, portal.title),
           also.length ? el('span', { class: 'story-also' }, `also on ${also.join(', ')}`) : null,
           item.publishedAt ? el('span', { class: 'story-when' }, ago(item.publishedAt)) : null),
-        main, out.length ? el('div', { class: 'item-meta' }, out) : null, why ? itemWhy(why) : null);
+        main,
+        noted ? el('p', { class: 'story-note' }, el('span', { class: 'story-note-by' }, `@${noted.handle}`), noted.note) : null,
+        out.length ? el('div', { class: 'item-meta' }, out) : null, why ? itemWhy(why) : null);
     },
 
     /** A card in a shelf. In a media shelf every card gets a picture area, so the row stays even. */

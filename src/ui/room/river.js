@@ -2,7 +2,8 @@
   // ------------------------------------------------------------ river
   // The agent's picks, then what's new, then what you've seen. Each portal keeps its own
   // order and the portals merge by time; the same link from two portals is one story
-  // naming both. A run from one portal folds after RIVER.run, and a page counts what the
+  // naming both. A follow's share of a link in your feeds is the feed's story, with
+  // "@handle shared" and their note; a fresh share lifts it, as a reblog would. A run from one portal folds after RIVER.run, and a page counts what the
   // reader sees: a story or a fold row is one unit. A refresh never moves what's on screen:
   // stories that arrive wait behind a "N new since you started" button.
   //
@@ -16,7 +17,8 @@
   /** Portals that aren't streams of stories (tables of contents, the agent's data): named at the end instead. */
   const OFF_RIVER = new Set(['docs', 'pinned']);
 
-  /** @typedef {{ key: string, portal: PortalResult, item: Item, also: PortalResult[], why?: string | undefined }} Story */
+  /** Someone you follow who shared a story, with their note. @typedef {{ handle: string, note?: string | undefined }} Sharer */
+  /** @typedef {{ key: string, portal: PortalResult, item: Item, also: PortalResult[], shared: Sharer[], why?: string | undefined }} Story */
   /** @typedef {{ picks: Story[], fresh: Story[], seen: Story[] }} RiverStories */
   /** @typedef {{ story: Story } | { fold: Story[], key: string } | { divider: true }} RiverUnit */
 
@@ -47,6 +49,11 @@
   }
   /** @param {Story} story */
   const storyId = (story) => `${story.portal.portalId}\n${story.item.id}`;
+  /** Who shared an item of a Following portal (its first meta is "@handle"), with their note (its summary). @param {PortalResult} portal @param {Item} item @returns {Sharer | null} */
+  function sharerOf(portal, item) {
+    const handle = item.meta[0] ?? '';
+    return portal.source === 'following' && handle.startsWith('@') ? { handle: handle.slice(1), note: item.summary } : null;
+  }
 
   /**
    * The river's stories: the picks, then the new and the seen, each merged by time.
@@ -64,12 +71,16 @@
     const take = (portal, item, why) => {
       const key = item.url ? storyKey(item.url) : `${portal.portalId}\n${item.id}`;
       const known = byKey.get(key);
+      const sharer = sharerOf(portal, item);
       if (known) {
-        if (known.portal.portalId !== portal.portalId && !known.also.some((p) => p.portalId === portal.portalId)) known.also.push(portal);
+        if (sharer) { if (!known.shared.some((s) => s.handle === sharer.handle)) known.shared.push(sharer); }
+        // A shared story belongs to its source: the feed's copy takes it over where the share put it.
+        else if (known.portal.source === 'following') Object.assign(known, { portal, item });
+        else if (known.portal.portalId !== portal.portalId && !known.also.some((p) => p.portalId === portal.portalId)) known.also.push(portal);
         return null;
       }
       /** @type {Story} */
-      const story = { key, portal, item, also: [], why };
+      const story = { key, portal, item, also: [], shared: sharer ? [sharer] : [], why };
       byKey.set(key, story);
       return story;
     };
@@ -211,7 +222,7 @@
     let pos = 0;
     /** @param {Story} story */
     const article = (story) => {
-      const node = watchNew(renderItem(story.item, story.portal, 'story', { color: portalColor(story.portal), why: story.why ?? '', also: story.also.map((p) => p.title) }), story.item, story.portal);
+      const node = watchNew(renderItem(story.item, story.portal, 'story', { color: portalColor(story.portal), why: story.why ?? '', also: story.also.map((p) => p.title), shared: story.shared }), story.item, story.portal);
       node.dataset.story = storyId(story);
       node.setAttribute('aria-posinset', String(++pos));
       node.setAttribute('aria-setsize', '-1');
