@@ -27,6 +27,8 @@ import { createLogger, requestId, type Logger } from './lib/log.ts';
 import { ToolMetrics } from './lib/metrics.ts';
 import { readBody } from './lib/web.ts';
 import { handleMessage, RPC, rpcError, SERVER_INFO, roomHtml, type JsonRpcResponse } from './mcp.ts';
+import { API_PATH, CLIENT_HEADER, handleCalls, MIN_CLIENT_VERSION, versionAtLeast } from './api/calls.ts';
+import { API_METHODS } from './api/methods.ts';
 import { FileClipStore, type ClipStore } from './clips.ts';
 import { FileHandoffStore, type HandoffStore } from './handoffs.ts';
 import { FileReadingStore, type ReadingStore } from './reading.ts';
@@ -37,6 +39,8 @@ import type { Fetcher } from './types.ts';
 
 export const MAX_BODY_BYTES = 1_000_000;
 export const MAX_BATCH = 20;
+/** A state API request: room for one clip image (500 KB, base64) plus a full batch of small calls. */
+export const MAX_API_BODY_BYTES = 2_000_000;
 
 export interface AppConfig {
   host: string;
@@ -241,6 +245,34 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
     return handleMessage(payload, ctx);
   }
 
+  /**
+   * The state API a linked local MCPortal uses (src/api/calls.ts): same tokens, Host
+   * and Origin rules as /mcp; the client names its version and old ones are told to update.
+   */
+  async function stateApi(req: IncomingMessage, res: ServerResponse, reqLog: Logger): Promise<void> {
+    const server = { 'mcportal-server': SERVER_INFO.version };
+    if (req.method !== 'POST') return send(res, 405, JSON.stringify({ error: 'method_not_allowed', error_description: 'Use POST' }), 'application/json', { allow: 'POST', ...server });
+    const userId = await authenticate(req);
+    if (!userId) {
+      const challenge = oauth ? `Bearer resource_metadata="${oauth.resourceMetadataUrl}", scope="mcportal"` : 'Bearer';
+      return send(res, 401, JSON.stringify({ error: 'unauthorized', error_description: 'Sign in again: this device is not linked, or its link was revoked.' }), 'application/json', { 'www-authenticate': challenge, ...server });
+    }
+    const client = String(req.headers[CLIENT_HEADER] ?? '');
+    if (!versionAtLeast(client, MIN_CLIENT_VERSION)) {
+      return send(res, 426, JSON.stringify({ error: 'upgrade_required', error_description: `Update MCPortal to ${MIN_CLIENT_VERSION} or later to keep using your linked portal.`, minClientVersion: MIN_CLIENT_VERSION }), 'application/json', server);
+    }
+    let body: unknown;
+    try {
+      body = JSON.parse((await readBody(req, MAX_API_BODY_BYTES)).toString('utf8'));
+    } catch (error) {
+      const tooLarge = errorCode(error) === 'limit_exceeded';
+      return send(res, tooLarge ? 413 : 400, JSON.stringify({ error: tooLarge ? 'too_large' : 'bad_request', error_description: tooLarge ? 'Body too large' : 'Body must be JSON' }), 'application/json', { ...server, ...(tooLarge ? { connection: 'close' } : {}) });
+    }
+    const results = await handleCalls(body, context(userId, reqLog), API_METHODS);
+    if (!results) return send(res, 400, JSON.stringify({ error: 'bad_request', error_description: 'Send { calls: [{ id, method, params }] } with 1-20 calls' }), 'application/json', server);
+    return send(res, 200, JSON.stringify({ results }), 'application/json', server);
+  }
+
   async function route(req: IncomingMessage, res: ServerResponse, url: URL, reqLog: Logger): Promise<void> {
     const hostname = hostnameOf(req.headers.host);
     // Health checks come from the platform with its own Host header.
@@ -252,7 +284,7 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
       return sendError(res, 421, 'unknown_host', 'Unknown host; set MCPORTAL_PUBLIC_URL or MCPORTAL_ALLOWED_HOSTS');
     }
     const origin = req.headers.origin;
-    if (origin && url.pathname === '/mcp') {
+    if (origin && (url.pathname === '/mcp' || url.pathname === API_PATH)) {
       const originHost = hostnameOf(origin.replace(/^[a-z]+:\/\//i, ''));
       if (!config.allowedOrigins.includes(origin) && !(originHost && config.allowedHosts.includes(originHost))) {
         return send(res, 403, JSON.stringify(rpcError(null, RPC.invalidRequest, 'Origin not allowed')));
@@ -278,6 +310,7 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
       });
     }
 
+    if (url.pathname === API_PATH) return stateApi(req, res, reqLog);
     if (url.pathname !== '/mcp') return sendError(res, 404, 'not_found', 'Not found');
     const userId = await authenticate(req);
     if (!userId) return unauthorized(res);
@@ -290,7 +323,8 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
       payload = JSON.parse((await readBody(req, MAX_BODY_BYTES)).toString('utf8'));
     } catch (error) {
       const tooLarge = errorCode(error) === 'limit_exceeded';
-      return send(res, tooLarge ? 413 : 400, JSON.stringify(rpcError(null, RPC.parseError, tooLarge ? 'Body too large' : 'Parse error')));
+      // An unread body stays on the socket: close it, so a reused connection can't read it as the next request.
+      return send(res, tooLarge ? 413 : 400, JSON.stringify(rpcError(null, RPC.parseError, tooLarge ? 'Body too large' : 'Parse error')), 'application/json', tooLarge ? { connection: 'close' } : {});
     }
     const response = await handlePayload(payload, context(userId, reqLog));
     if (response === null) {

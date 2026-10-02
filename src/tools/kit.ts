@@ -15,11 +15,11 @@ import type { Logger } from '../lib/log.ts';
 import type { ToolMetrics } from '../lib/metrics.ts';
 import { clean } from '../lib/text.ts';
 import type { ExportFormat } from '../portability.ts';
-import type { PublicProfiles } from '../public-profiles.ts';
+import type { ProfileDirectory } from '../public-profiles.ts';
 import type { HandoffStore } from '../handoffs.ts';
 import type { SeenStore } from '../seen.ts';
 import type { ReadingStore } from '../reading.ts';
-import type { Social } from '../social.ts';
+import type { SocialService } from '../social.ts';
 import type { SourceDeps } from '../sources.ts';
 import type { ProfileStore } from '../store.ts';
 
@@ -35,9 +35,9 @@ export interface ToolContext extends SourceDeps {
   /** The user's clips. Absent where clips aren't set up; the clip tools then refuse. */
   clips?: ClipStore | undefined;
   /** Handles and public profiles: hosted only (local MCPortal has no social layer). */
-  publicProfiles?: PublicProfiles | undefined;
+  publicProfiles?: ProfileDirectory | undefined;
   /** Shares, follows, mutes, blocks and reports: hosted only. */
-  social?: Social | undefined;
+  social?: SocialService | undefined;
   /** Hand an export to the user: a one-time download link (HTTP) or a file on disk (local). */
   deliver?: ((format: ExportFormat) => Promise<{ kind: 'link' | 'file'; where: string; summary: string }>) | undefined;
   /** The account page (download everything, delete the account), when the server has one. */

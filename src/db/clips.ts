@@ -16,7 +16,7 @@ export class PgClipStore implements ClipStore {
     this.db = db;
   }
 
-  async add(userId: string, clip: Clip): Promise<void> {
+  async add(userId: string, clip: Clip): Promise<Clip> {
     const refused = clipQuotaProblem(await this.usage(userId), clip.bytes);
     if (refused) throw new ClipError(refused, 'limit_exceeded');
     await this.db.query(
@@ -24,6 +24,7 @@ export class PgClipStore implements ClipStore {
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
       [clip.id, userId, clip.kind, clip.title, JSON.stringify(clip.data), JSON.stringify(summaryOf(clip)), clip.tags, searchTextOf(clip), clip.bytes, clip.createdAt, clip.updatedAt],
     );
+    return clip;
   }
 
   async get(userId: string, id: string): Promise<Clip | undefined> {

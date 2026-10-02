@@ -99,6 +99,8 @@ test('dispatcher: a bug is logged with its stack and reported by reference, neve
     get: async () => { throw new TypeError('secret internal detail'); },
     put: async () => {},
     update: async () => { throw new TypeError('secret internal detail'); },
+    versioned: async () => { throw new TypeError('secret internal detail'); },
+    replaceIf: async () => { throw new TypeError('secret internal detail'); },
     delete: async () => {},
   };
   const result = await call(ctx({ store: broken, log: createLogger({ format: 'json', write: (l) => lines.push(l) }) }), 'open_room');

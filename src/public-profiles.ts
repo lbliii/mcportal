@@ -112,6 +112,13 @@ export function suggestHandle(login: string | undefined): string | undefined {
   return 'handle' in normalizeHandle(s) ? s : undefined;
 }
 
+/**
+ * What tools ask of public profiles: read anyone's, change only the caller's own (the
+ * tools pass the signed-in account). PublicProfiles implements it on the hosted
+ * server; a linked local MCPortal implements it over the hosted API.
+ */
+export type ProfileDirectory = Pick<PublicProfiles, 'get' | 'byHandle' | 'set' | 'remove'>;
+
 export class PublicProfiles {
   private doc: SharedDocument<Doc>;
   private hidden: (accountId: string) => boolean;

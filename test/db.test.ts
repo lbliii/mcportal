@@ -37,25 +37,25 @@ test('pg profiles: default for new users, round-trip, rev increments, schema is 
   await ensureSchema(db);   // second run is a no-op
   const store = new PgProfileStore(db);
   assert.deepEqual((await store.get('nobody')).columns, defaultProfile().columns);
-  assert.equal(await store.rev('nobody'), 0);
+  assert.equal((await store.versioned('nobody')).rev, 0);
 
   const p = validateProfile({ ...defaultProfile(), name: 'Mine', onboarded: true, saved: [{ url: 'https://example.com/a', title: 'A' }] });
   await store.put('u1', p);
-  assert.equal(await store.rev('u1'), 1);
+  assert.equal((await store.versioned('u1')).rev, 1);
   const back = await store.get('u1');
   assert.equal(back.name, 'Mine');
   assert.equal(back.saved[0]!.url, 'https://example.com/a');
   assert.equal(back.onboarded, true);
 
   await store.put('u1', { ...back, layout: 'shelves' });
-  assert.equal(await store.rev('u1'), 2);
+  assert.equal((await store.versioned('u1')).rev, 2);
   assert.equal((await store.get('u1')).layout, 'shelves');
 });
 
 test('pg profiles: concurrent writes all land, last one wins, rev counts every write', { skip }, async () => {
   const store = new PgProfileStore(db);
   await Promise.all(Array.from({ length: 20 }, (_, i) => store.put('busy', { ...defaultProfile(), name: `v${i}` })));
-  assert.equal(await store.rev('busy'), 20);
+  assert.equal((await store.versioned('busy')).rev, 20);
   assert.match((await store.get('busy')).name, /^v\d+$/);
 });
 
@@ -68,10 +68,10 @@ test('pg profiles: concurrent updates from two instances all land (per-user lock
     return { profile, result: undefined };
   })));
   assert.deepEqual((await a.get('racy')).saved.map((s) => s.url).sort(), urls);
-  assert.equal(await a.rev('racy'), urls.length, 'one revision per change, none lost');
+  assert.equal((await a.versioned('racy')).rev, urls.length, 'one revision per change, none lost');
   // A change that decides not to write leaves the row alone.
   assert.equal(await a.update('racy', () => ({ result: 'kept' })), 'kept');
-  assert.equal(await a.rev('racy'), urls.length);
+  assert.equal((await a.versioned('racy')).rev, urls.length);
 });
 
 test('pg documents: two instances share OAuth and accounts without losing or missing changes', { skip }, async () => {
@@ -195,20 +195,21 @@ test('pg deletion: a profile (and its kept corrupt copies) and all clips of one 
   await clips.add('keep', buildClip({ kind: 'quote', text: 'c' }));
   await profiles.delete('del_1');
   assert.equal(await clips.deleteAll('del_1'), 2);
-  assert.equal(await profiles.rev('del_1'), 0);
+  assert.equal((await profiles.versioned('del_1')).rev, 0);
   assert.equal((await profiles.get('keep')).name, 'Kept');
   assert.equal((await clips.list('keep')).length, 1);
   const kv = await db.query<{ key: string }>(`SELECT key FROM mcportal_kv WHERE key LIKE 'corrupt-profile:del%' ORDER BY key`);
   assert.deepEqual(kv.rows.map((r) => r.key), ['corrupt-profile:del%1:1'], 'the LIKE pattern is escaped: only del_1\'s copies go');
 });
 
-test('pg social: shares, feed rules, relations, hiding, reports, forget; schema v3', { skip }, async () => {
+test('pg social: shares, feed rules, relations, hiding, reports, forget; schema version recorded', { skip }, async () => {
   const { PgSocialStore } = await import('../src/db.ts');
   const { Social } = await import('../src/social.ts');
   const { PublicProfiles } = await import('../src/public-profiles.ts');
   const { memoryPersistence } = await import('../src/accounts.ts');
+  const { SCHEMA_VERSION } = await import('../src/db/schema.ts');
   const version = await db.query<{ value: string }>(`SELECT value FROM mcportal_meta WHERE key = 'schema_version'`);
-  assert.equal(version.rows[0]!.value, '4');
+  assert.equal(version.rows[0]!.value, SCHEMA_VERSION, 'ensureSchema records the current version');
   let now = Date.parse('2026-10-01T00:00:00Z');
   const profiles = new PublicProfiles(memoryPersistence());
   for (const [id, handle] of [['pa', 'pg_alice'], ['pb', 'pg_bob'], ['pc', 'pg_carol']]) await profiles.set(id!, { handle });

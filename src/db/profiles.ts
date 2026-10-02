@@ -1,6 +1,6 @@
 /** Profiles in mcportal_profiles, one row per user; an unreadable row is set aside in mcportal_kv, not lost. */
 import { defaultProfile, validateProfile, type Profile } from '../profile.ts';
-import type { ProfileChange, ProfileStore } from '../store.ts';
+import { revisionConflict, type ProfileChange, type ProfileStore, type Versioned } from '../store.ts';
 import { transaction, type Queryable } from './schema.ts';
 
 export class PgProfileStore implements ProfileStore {
@@ -13,6 +13,20 @@ export class PgProfileStore implements ProfileStore {
 
   async get(userId: string): Promise<Profile> {
     return (await this.read(userId)).profile;
+  }
+
+  versioned(userId: string): Promise<Versioned> {
+    return this.read(userId);
+  }
+
+  /** Under the same per-user lock as update, so the revision can't move between the check and the write. */
+  async replaceIf(userId: string, profile: Profile, ifMatch: number): Promise<number> {
+    return transaction(this.db, async (tx) => {
+      await tx.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [`profile:${userId}`]);
+      const { rev } = await this.read(userId, tx);
+      if (rev !== ifMatch) throw revisionConflict(ifMatch, rev);
+      return this.write(userId, profile, tx);
+    });
   }
 
   /**
@@ -47,27 +61,24 @@ export class PgProfileStore implements ProfileStore {
     }
   }
 
-  put(userId: string, profile: Profile): Promise<void> {
-    return this.write(userId, profile);
+  async put(userId: string, profile: Profile): Promise<void> {
+    await this.write(userId, profile);
   }
 
-  private async write(userId: string, profile: Profile, db: Queryable = this.db): Promise<void> {
-    await db.query(
+  /** Resolves to the new revision. */
+  private async write(userId: string, profile: Profile, db: Queryable = this.db): Promise<number> {
+    const { rows } = await db.query<{ rev: string }>(
       `INSERT INTO mcportal_profiles (user_id, data) VALUES ($1, $2)
-       ON CONFLICT (user_id) DO UPDATE SET data = EXCLUDED.data, rev = mcportal_profiles.rev + 1, updated_at = now()`,
+       ON CONFLICT (user_id) DO UPDATE SET data = EXCLUDED.data, rev = mcportal_profiles.rev + 1, updated_at = now()
+       RETURNING rev`,
       [userId, JSON.stringify(profile)],
     );
+    return Number(rows[0]!.rev);
   }
 
   async delete(userId: string): Promise<void> {
     await this.db.query(`DELETE FROM mcportal_profiles WHERE user_id = $1`, [userId]);
     await this.db.query(`DELETE FROM mcportal_kv WHERE key LIKE $1`, [`corrupt-profile:${userId.replace(/[\\%_]/g, (c) => `\\${c}`)}:%`]);
-  }
-
-  /** Revision of a user's profile, 0 if none (for the sync plan's ETags). */
-  async rev(userId: string): Promise<number> {
-    const { rows } = await this.db.query<{ rev: string }>(`SELECT rev FROM mcportal_profiles WHERE user_id = $1`, [userId]);
-    return rows.length ? Number(rows[0]!.rev) : 0;
   }
 
   takeNotice(userId: string): string | undefined {

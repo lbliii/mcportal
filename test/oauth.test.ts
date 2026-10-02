@@ -500,6 +500,62 @@ test('account page: download everything, one-time links, and delete the account 
   }
 });
 
+test('signed-in apps and devices: listed on the account page, revoked there (CSRF) or by the client (RFC 7009)', async () => {
+  const users = { 'gh-code-lawrence': { id: 42, login: 'Lawrence' } };
+  const app = await startApp({ github: { clientId: 'gh-client', clientSecret: 'gh-secret' }, allowedGithubUsers: ['lawrence'] }, fakeUpstreams(users).fetcher);
+  const cookieOf = (res: { headers: Record<string, string | string[] | undefined> }, name: string) =>
+    ([] as string[]).concat(res.headers['set-cookie'] ?? []).map((c) => c.split(';')[0]!).find((c) => c.startsWith(`${name}=`) && c.length > name.length + 1);
+  const signIn = async (clientId: string) => {
+    const { verifier, challenge } = pkce();
+    const code = (await authorize(app, clientId, challenge, 'gh-code-lawrence')).searchParams.get('code')!;
+    return JSON.parse((await raw(app.port, { method: 'POST', path: '/oauth/token', ...form({ grant_type: 'authorization_code', code, client_id: clientId, redirect_uri: CLIENT_REDIRECT, code_verifier: verifier, resource: 'http://localhost/mcp' }) })).body);
+  };
+  const ping = (token: string) => raw(app.port, { method: 'POST', path: '/mcp', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: '{"jsonrpc":"2.0","id":1,"method":"ping"}' });
+  try {
+    const as = JSON.parse((await raw(app.port, { path: '/.well-known/oauth-authorization-server' })).body);
+    assert.equal(as.revocation_endpoint, 'http://localhost/oauth/revoke');
+
+    // RFC 7009: only the client the token was issued to can revoke it, and the answer is always 200.
+    const laptop = await register(app);
+    const tokens = await signIn(laptop);
+    const revoke = (data: Record<string, string>) => raw(app.port, { method: 'POST', path: '/oauth/revoke', ...form(data) });
+    assert.equal((await revoke({ token: tokens.refresh_token, client_id: 'mcpc_someone_else' })).status, 200);
+    assert.equal((await ping(tokens.access_token)).status, 200, 'another client cannot revoke it');
+    assert.equal((await revoke({ token: 'mcprt_not_a_token', client_id: laptop })).status, 200, 'unknown tokens are not an error');
+    assert.equal((await revoke({ token: tokens.refresh_token, client_id: laptop })).status, 200);
+    assert.equal((await ping(tokens.access_token)).status, 401, 'revoking the refresh token ends the whole grant');
+    const refresh = await raw(app.port, { method: 'POST', path: '/oauth/token', ...form({ grant_type: 'refresh_token', refresh_token: tokens.refresh_token, client_id: laptop }) });
+    assert.equal(JSON.parse(refresh.body).error, 'invalid_grant');
+
+    // The account page lists what's signed in and revokes one at a time.
+    const claude = await signIn(await register(app));
+    const start = await raw(app.port, { path: '/account/login' });
+    const gh = new URL(String(start.headers.location));
+    const done = await raw(app.port, { path: `/oauth/callback?code=gh-code-lawrence&state=${gh.searchParams.get('state')}`, headers: { cookie: cookieOf(start, 'mcportal_page')! } });
+    const session = cookieOf(done, 'mcportal_account')!;
+    const home = await raw(app.port, { path: '/account', headers: { cookie: session } });
+    assert.match(home.body, /Signed-in apps and devices/);
+    const grants = [...home.body.matchAll(/name="grant" value="([^"]+)"/g)].map((m) => m[1]!);
+    assert.equal(grants.length, 1, 'the revoked laptop is gone; Claude is listed');
+    assert.match(home.body, /<b>Claude<\/b>/);
+    const csrf = home.body.match(/name="csrf" value="([^"]+)"/)![1]!;
+    const post = (data: Record<string, string>, headers: Record<string, string> = sameOrigin(app.port)) => {
+      const f = form(data);
+      return raw(app.port, { method: 'POST', path: '/account/devices/revoke', headers: { ...f.headers, ...headers, cookie: session }, body: f.body });
+    };
+    assert.equal((await post({ csrf: 'wrong', grant: grants[0]! })).status, 403);
+    assert.equal((await post({ csrf, grant: grants[0]! }, { origin: 'https://evil.example' })).status, 403);
+    assert.equal((await ping(claude.access_token)).status, 200, 'nothing revoked yet');
+    assert.equal((await post({ csrf, grant: 'not-mine' })).status, 302, 'an unknown grant changes nothing');
+    assert.equal((await ping(claude.access_token)).status, 200);
+    assert.equal((await post({ csrf, grant: grants[0]! })).status, 302);
+    assert.equal((await ping(claude.access_token)).status, 401, 'revoked from the account page');
+    assert.match((await raw(app.port, { path: '/account', headers: { cookie: session } })).body, /None right now/);
+  } finally {
+    await app.close();
+  }
+});
+
 test('import uploads: one-time links from import_portal and the account page, CSRF, size cap', async () => {
   const { Accounts, makeBootstrap, memoryPersistence } = await import('../src/accounts.ts');
   const { MemoryClipStore, buildClip } = await import('../src/clips.ts');

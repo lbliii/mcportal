@@ -122,6 +122,18 @@ test('batches are capped and notifications return 202', async () => {
   }
 });
 
+test('an oversized /mcp body is refused and its connection closed, so the next request on it is not misread', async () => {
+  const app = await startApp({ allowUnauthenticated: true });
+  try {
+    const big = await raw(app.port, { method: 'POST', path: '/mcp', headers: { 'content-type': 'application/json', 'content-length': String(2_000_000) } });
+    assert.equal(big.status, 413);
+    assert.equal(big.headers.connection, 'close');
+    assert.equal((await raw(app.port, { method: 'POST', path: '/mcp', headers: { 'content-type': 'application/json' }, body: RPC_PING })).status, 200);
+  } finally {
+    await app.close();
+  }
+});
+
 test('config: loopback by default; refuses a public bind without auth', () => {
   const local = configFromEnv({}, '/tmp/x');
   assert.equal(local.host, '127.0.0.1');
