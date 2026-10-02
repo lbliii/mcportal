@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.6.0 — 2026-10-02
+
 ### Releases
 - **One command per release step:** `npm run release -- prepare <x.y.z | patch | minor | major>` sets the version everywhere it's stated (package.json and its lockfile, the plugin, `SERVER_INFO`, then the generated `server.json` and `manifest.json`), moves "Unreleased" under it, runs `npm run check` and opens a release PR. After the merge, `npm run release -- publish` tags it and creates the GitHub release from that version's notes. `--dry-run` previews either step. See CONTRIBUTING.md.
 
