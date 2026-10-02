@@ -54,6 +54,8 @@ export interface ToolContext extends SourceDeps {
   importer?: ((data: PortalExport) => Promise<ImportResult>) | undefined;
   /** A local MCPortal: whether it's signed in to a hosted one, and signing in and out. Absent on a hosted server. */
   link?: LinkControl | undefined;
+  /** stdio: tell the client its tool list changed (signed in or out, a handle claimed or removed). */
+  toolsChanged?: (() => void) | undefined;
   userId: string;
   /** Hosted server only: charged per tool call. Local stdio has none (unlimited). */
   budget?: UsageBudget | undefined;
@@ -79,12 +81,24 @@ export interface ToolErrorInfo {
   details?: Record<string, string | number | boolean>;
 }
 
+/**
+ * What a tool does, for hosts and directory review. All three hints are stated, never
+ * left to the spec's defaults (which call every tool destructive and open-world).
+ * openWorldHint: the tool reaches the web, or makes something visible to other people.
+ */
+export interface ToolAnnotations {
+  readOnlyHint: boolean;
+  destructiveHint: boolean;
+  openWorldHint: boolean;
+  idempotentHint?: boolean;
+}
+
 export interface ToolDef {
   name: string;
   title: string;
   description: string;
   inputSchema: Record<string, unknown>;
-  annotations?: Record<string, unknown>;
+  annotations: ToolAnnotations;
   _meta?: Record<string, unknown>;
   /** What the tool does, for the access gate: read your data, change it, or cause outbound fetches. */
   access: Exclude<Action, 'admin'>;

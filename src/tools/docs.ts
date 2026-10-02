@@ -97,7 +97,7 @@ export const DOCS_TOOLS: ToolDef[] = [
     cost: 2,
     description: "Open a docs site in the docs viewer (shown as a card) and get its contents: sections and pages, with links. Pass a docs address, a GitHub 'owner/repo' or docs-folder link, or a nested docs index's URL. Read pages with read_doc_page and find them with search_docs; keep docs in the room with find_source and add_portal.",
     inputSchema: { type: 'object', additionalProperties: false, properties: siteArgs },
-    annotations: { readOnlyHint: true, openWorldHint: true },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
     _meta: { ui: { resourceUri: ROOM_URI } },
     async handler(args, ctx) {
       try {
@@ -132,7 +132,7 @@ export const DOCS_TOOLS: ToolDef[] = [
       additionalProperties: false,
       properties: { url: { type: 'string' }, ...siteArgs, part: { type: 'integer', minimum: 1, description: 'A long page comes in parts; ask for the next one' } },
     },
-    annotations: { readOnlyHint: true, openWorldHint: true },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
     async handler(args, ctx) {
       const url = clean(args.url, 2000).replace(/#.*$/, '');
       try {
@@ -173,7 +173,7 @@ export const DOCS_TOOLS: ToolDef[] = [
       additionalProperties: false,
       properties: { query: { type: 'string' }, ...siteArgs, limit: { type: 'integer', minimum: 1, maximum: 50 } },
     },
-    annotations: { readOnlyHint: true, openWorldHint: true },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
     async handler(args, ctx) {
       const query = clean(args.query, 200);
       if (!query) return toolError('search_docs needs a query');

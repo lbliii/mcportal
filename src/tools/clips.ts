@@ -66,7 +66,7 @@ export const CLIP_TOOLS: ToolDef[] = [
         },
       },
     },
-    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     async handler(args, ctx) {
       if (!ctx.clips) return noStore();
       let clip: Clip;
@@ -105,7 +105,7 @@ export const CLIP_TOOLS: ToolDef[] = [
         before: { type: 'string', description: 'createdAt of the last clip from the previous page' },
       },
     },
-    annotations: { readOnlyHint: true },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
     async handler(args, ctx) {
       if (!ctx.clips) return noStore();
       const kind = CLIP_KINDS.includes(args.kind as ClipKind) ? (args.kind as ClipKind) : undefined;
@@ -129,7 +129,7 @@ export const CLIP_TOOLS: ToolDef[] = [
     access: 'read',
     description: "Show one of the user's clips in full, as a card in the conversation (\"show me that table\"). Get the id from search_clips or the Clips portal.",
     inputSchema: { type: 'object', required: ['id'], additionalProperties: false, properties: { id: { type: 'string' } } },
-    annotations: { readOnlyHint: true },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
     _meta: { ui: { resourceUri: ROOM_URI } },
     async handler(args, ctx) {
       if (!ctx.clips) return noStore();
@@ -155,7 +155,7 @@ export const CLIP_TOOLS: ToolDef[] = [
         tags: { type: 'array', maxItems: CLIP_LIMITS.tags, items: { type: 'string' } },
       },
     },
-    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     async handler(args, ctx) {
       if (!ctx.clips) return noStore();
       let clip: Clip | undefined;
@@ -179,7 +179,7 @@ export const CLIP_TOOLS: ToolDef[] = [
     access: 'write',
     description: "Delete one of the user's clips. Only when the user asks to delete or remove it.",
     inputSchema: { type: 'object', required: ['id'], additionalProperties: false, properties: { id: { type: 'string' } } },
-    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     async handler(args, ctx) {
       if (!ctx.clips) return noStore();
       const id = String(args.id ?? '');

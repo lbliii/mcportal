@@ -54,7 +54,7 @@ export const SOCIAL_TOOLS: ToolDef[] = [
     available: socialEntry,
     description: "Open someone's Space by handle, or the user's own without one, as a card: their profile, what they shared, and the sources they recommend.",
     inputSchema: { type: 'object', additionalProperties: false, properties: { handle: handleProp } },
-    annotations: { readOnlyHint: true },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
     _meta: { ui: { resourceUri: ROOM_URI } },
     async handler(args, ctx) {
       if (!ctx.social || !ctx.publicProfiles) return toolError(HOSTED_ONLY.sharing, 'unavailable');
@@ -98,7 +98,7 @@ export const SOCIAL_TOOLS: ToolDef[] = [
         audience: { type: 'string', enum: AUDIENCES },
       },
     },
-    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     async handler(args, ctx) {
       if (!ctx.social) return toolError(HOSTED_ONLY.sharing, 'unavailable');
       try {
@@ -127,7 +127,7 @@ export const SOCIAL_TOOLS: ToolDef[] = [
     available: socialActive,
     description: "Remove one of the user's shares. Only when they ask.",
     inputSchema: { type: 'object', required: ['id'], additionalProperties: false, properties: { id: { type: 'string' } } },
-    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     async handler(args, ctx) {
       if (!ctx.social) return toolError(HOSTED_ONLY.sharing, 'unavailable');
       const removed = await ctx.social.unshare(ctx.userId, String(args.id ?? ''));
@@ -141,7 +141,7 @@ export const SOCIAL_TOOLS: ToolDef[] = [
     available: socialActive,
     description: 'Show one share in full (the note and the shared link or clip), as a card in the conversation. Ids come from the Following portal or list_shares.',
     inputSchema: { type: 'object', required: ['id'], additionalProperties: false, properties: { id: { type: 'string' } } },
-    annotations: { readOnlyHint: true },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
     _meta: { ui: { resourceUri: ROOM_URI } },
     async handler(args, ctx) {
       if (!ctx.social) return toolError(HOSTED_ONLY.sharing, 'unavailable');
@@ -162,7 +162,7 @@ export const SOCIAL_TOOLS: ToolDef[] = [
       additionalProperties: false,
       properties: { handle: handleProp, limit: { type: 'integer', minimum: 1, maximum: 50 }, before: { type: 'string', description: 'createdAt of the last share from the previous page' } },
     },
-    annotations: { readOnlyHint: true },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
     async handler(args, ctx) {
       if (!ctx.social || !ctx.publicProfiles) return toolError(HOSTED_ONLY.sharing, 'unavailable');
       try {
@@ -189,7 +189,7 @@ export const SOCIAL_TOOLS: ToolDef[] = [
       additionalProperties: false,
       properties: { handle: handleProp, action: { type: 'string', enum: ['follow', 'unfollow', 'mute', 'unmute', 'block', 'unblock'] } },
     },
-    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     async handler(args, ctx) {
       if (!ctx.social) return toolError(HOSTED_ONLY.sharing, 'unavailable');
       const handle = String(args.handle ?? '');
@@ -228,7 +228,7 @@ export const SOCIAL_TOOLS: ToolDef[] = [
     available: socialActive,
     description: 'The handles the user follows, mutes and blocks, and how many people follow them.',
     inputSchema: { type: 'object', additionalProperties: false, properties: {} },
-    annotations: { readOnlyHint: true },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
     async handler(_args, ctx) {
       if (!ctx.social) return toolError(HOSTED_ONLY.sharing, 'unavailable');
       const c = await ctx.social.connections(ctx.userId);
@@ -248,7 +248,7 @@ export const SOCIAL_TOOLS: ToolDef[] = [
       additionalProperties: false,
       properties: { shareId: { type: 'string' }, handle: handleProp, reason: { type: 'string', maxLength: 500 } },
     },
-    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     async handler(args, ctx) {
       if (!ctx.social) return toolError(HOSTED_ONLY.sharing, 'unavailable');
       try {

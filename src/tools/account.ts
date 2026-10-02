@@ -34,7 +34,7 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
     available: socialActive,
     description: "The user's own public profile and a suggested handle (without handle), or another user's (with handle).",
     inputSchema: { type: 'object', additionalProperties: false, properties: { handle: { type: 'string', description: 'e.g. "@someone"' } } },
-    annotations: { readOnlyHint: true },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
     async handler(args, ctx) {
       if (!ctx.publicProfiles) return toolError(HOSTED_ONLY.profiles, 'unavailable');
       if (typeof args.handle === 'string' && args.handle.trim()) {
@@ -70,7 +70,7 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
         featuredPortalIds: { type: 'array', maxItems: MAX_FEATURED, items: { type: 'string' }, description: 'Ids (from open_room) of feed, Hacker News or GitHub portals to recommend; [] clears' },
       },
     },
-    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     async handler(args, ctx) {
       if (!ctx.publicProfiles) return toolError(HOSTED_ONLY.profiles, 'unavailable');
       try {
@@ -92,7 +92,7 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
         });
         const skipped = sources ? sources.length - (profile.sources?.length ?? 0) : 0;
         const head = created ? `Created your public profile as @${profile.handle}. ${UNLOCKS}` : released ? `Changed your handle from @${released} to @${profile.handle}. @${released} points to you for 30 days.` : 'Updated your public profile.';
-        return ok(`${head}\n${describeProfile(profile)}${skipped > 0 ? `\n${skipped} portal(s) weren't featured: only feeds, Hacker News and GitHub can be.` : ''}`, { profile });
+        return ok(`${head}\n${describeProfile(profile)}${skipped > 0 ? `\n${skipped} portal(s) weren't featured: only feeds, Hacker News and GitHub can be.` : ''}`, { profile } satisfies ToolResults['set_public_profile']);
       } catch (error) {
         return toolFailure(error, 'Not saved: ', '.');
       }
@@ -105,7 +105,7 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
     available: socialActive,
     description: "Make the user private again: removes their handle, name and bio. Only when they ask. Their handle stays reserved for them for 30 days.",
     inputSchema: { type: 'object', additionalProperties: false, properties: {} },
-    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     async handler(_args, ctx) {
       if (!ctx.publicProfiles) return toolError(HOSTED_ONLY.profiles, 'unavailable');
       const removed = await ctx.publicProfiles.remove(ctx.userId);
@@ -119,7 +119,7 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
     cost: 5,
     description: "Give the user a copy of their data: everything (mcportal), saved items as bookmarks, clips as Markdown, or sources as OPML. Hosted: a one-time download link (15 minutes); local: a file path. Show it to them as is.",
     inputSchema: { type: 'object', required: ['format'], additionalProperties: false, properties: { format: { type: 'string', enum: EXPORT_FORMATS } } },
-    annotations: { readOnlyHint: true },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     async handler(args, ctx) {
       const format = args.format as ExportFormat;
       if (!EXPORT_FORMATS.includes(format)) return toolError(`format must be one of ${EXPORT_FORMATS.join(', ')}`);
@@ -145,7 +145,7 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
         path: { type: 'string', description: 'Local MCPortal only: path to the .json export file' },
       },
     },
-    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     async handler(args, ctx) {
       let text: string;
       if (typeof args.data === 'string' && args.data.trim()) text = args.data;
@@ -176,14 +176,14 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
     access: 'read',
     description: "Whether the user is signed in (as whom) or in ghost mode, and the account page, where they download everything or delete their account (only there, never a tool).",
     inputSchema: { type: 'object', additionalProperties: false, properties: {} },
-    annotations: { readOnlyHint: true },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
     async handler(_args, ctx) {
       const identity = await identityOf(ctx);
       if (!ctx.accountUrl) {
         const signIn = ctx.link ? ' To keep this portal in a hosted account (the same portal on every device, plus sharing), link_account signs in.' : '';
-        return ok(`${describeIdentity(identity)} To remove everything, delete that folder.${signIn}`, { identity, url: null });
+        return ok(`${describeIdentity(identity)} To remove everything, delete that folder.${signIn}`, { identity, url: null } satisfies ToolResults['account_settings']);
       }
-      return ok(`${describeIdentity(identity)} The account page is ${ctx.accountUrl}: the user signs in with GitHub there to download everything or delete their account.`, { identity, url: ctx.accountUrl });
+      return ok(`${describeIdentity(identity)} The account page is ${ctx.accountUrl}: the user signs in with GitHub there to download everything or delete their account.`, { identity, url: ctx.accountUrl } satisfies ToolResults['account_settings']);
     },
   },
   {
@@ -211,7 +211,7 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
     available: (reach) => reach.link === 'linked',
     description: "Sign this computer out of the user's hosted MCPortal: their portal is copied back here first, so nothing disappears, and MCPortal returns to ghost mode. Only when they ask.",
     inputSchema: { type: 'object', additionalProperties: false, properties: {} },
-    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     async handler(_args, ctx) {
       if (!ctx.link?.linked) return toolError('This MCPortal isn\'t signed in.', 'failed_precondition');
       try {

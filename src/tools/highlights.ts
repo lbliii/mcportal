@@ -24,7 +24,7 @@ export const HIGHLIGHT_TOOLS: ToolDef[] = [
       additionalProperties: false,
       properties: { portals: { type: 'array', items: { type: 'string' }, description: 'Portal ids, to look at only these' } },
     },
-    annotations: { readOnlyHint: true, openWorldHint: true },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
     async handler(args, ctx) {
       const profile = await ctx.store.get(ctx.userId);
       const wanted = Array.isArray(args.portals) && args.portals.length ? new Set(args.portals.map(String)) : null;

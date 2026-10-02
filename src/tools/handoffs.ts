@@ -45,7 +45,7 @@ export const HANDOFF_TOOLS: ToolDef[] = [
     cost: 3,
     description: "Open a page the user sent here from MCPortal's reader (they say \"Open MCPortal handoff k7q2xm\"): shows it as a card where they were reading, with any passage they selected, and gives you its text. Without a code, opens the newest one they haven't opened.",
     inputSchema: { type: 'object', additionalProperties: false, properties: { code: { type: 'string' } } },
-    annotations: { readOnlyHint: true, openWorldHint: true },   // it notes the handoff was opened, nothing the user made
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },   // it notes the handoff was opened, nothing the user made
     _meta: { ui: { resourceUri: ROOM_URI } },
     async handler(args, ctx) {
       if (!ctx.handoffs) return toolError(NO_STORE, 'unavailable');
@@ -98,7 +98,7 @@ export const HANDOFF_TOOLS: ToolDef[] = [
         passage: { type: 'string', maxLength: 4000 },
       },
     },
-    annotations: { readOnlyHint: false, destructiveHint: false },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     _meta: { ui: { resourceUri: ROOM_URI, visibility: ['app'] } },
     async handler(args, ctx) {
       if (!ctx.handoffs) return toolError(NO_STORE, 'unavailable');

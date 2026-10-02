@@ -4,6 +4,7 @@
  * document that can't be read is never mistaken for an empty one.
  */
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { test } from 'node:test';
 import { Accounts, makeBootstrap } from '../src/accounts.ts';
 import { TtlCache } from '../src/lib/cache.ts';
@@ -37,8 +38,9 @@ test('tools: every tool declares its access and a sane cost, and its hints agree
   for (const tool of TOOLS) {
     assert.ok(['read', 'write', 'fetch'].includes(tool.access), `${tool.name} declares access`);
     assert.equal(tool.inputSchema.type, 'object', `${tool.name} takes an object`);
-    const readOnly = (tool.annotations as { readOnlyHint?: boolean } | undefined)?.readOnlyHint === true;
-    assert.equal(readOnly, tool.access !== 'write', `${tool.name}: readOnlyHint matches access "${tool.access}"`);
+    // Reads with a side effect outside the room: export_data writes a file (local) or makes a download link (hosted).
+    const sideEffect = ['export_data'].includes(tool.name);
+    assert.equal(tool.annotations.readOnlyHint, tool.access !== 'write' && !sideEffect, `${tool.name}: readOnlyHint matches access "${tool.access}"`);
     const cost = typeof tool.cost === 'function' ? tool.cost({}) : (tool.cost ?? 1);
     assert.ok(Number.isInteger(cost) && cost >= 1 && cost <= 20, `${tool.name} costs 1-20 units`);
   }
@@ -116,6 +118,9 @@ test('dispatcher: a bug is logged with its stack and reported by reference, neve
   assert.equal(done.outcome, 'crashed');
   assert.equal(done.user, userRef('u'), 'users appear only as a hash');
   assert.ok(!lines.some((l) => l.includes('"u"')), 'the raw user id is never logged');
+  // Keyed: the ref isn't a plain hash of the id, which anyone could recompute.
+  assert.notEqual(userRef('github-42'), createHash('sha256').update('mcportal-log:github-42').digest('hex').slice(0, 10));
+  assert.notEqual(userRef('github-42'), createHash('sha256').update('github-42').digest('hex').slice(0, 10));
 });
 
 test('errors: codes map to statuses, failures keep their reason, and only AppErrors are shown', () => {
