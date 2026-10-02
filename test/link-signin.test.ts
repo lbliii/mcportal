@@ -47,13 +47,16 @@ async function setUp() {
   });
   const dataDir = await mkdtemp(path.join(tmpdir(), 'mcportal-link-'));
   const local = { store: new FileProfileStore(dataDir), clips: new FileClipStore(dataDir), reading: new FileReadingStore(dataDir), seen: new FileSeenStore(dataDir), handoffs: new FileHandoffStore(dataDir), editions: new FileEditionStore(dataDir) };
-  const session = new LocalSession({ dataDir, localUser: 'default', local, base: { fetcher: createFixtureFetcher(), cache: new TtlCache() }, hostedUrl: app.base });
+  // How many times the client was told to list tools again (stdio's notifications/tools/list_changed).
+  const changes = { count: 0 };
+  const toolsChanged = () => { changes.count++; };
+  const session = new LocalSession({ dataDir, localUser: 'default', local, base: { fetcher: createFixtureFetcher(), cache: new TtlCache() }, hostedUrl: app.base, onLinked: toolsChanged });
   const call = async (name: string, args: Record<string, unknown> = {}) => {
-    const res = await handleMessage({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }, await session.context());
+    const res = await handleMessage({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }, { ...await session.context(), toolsChanged });
     return res!.result as { content: Array<{ text: string }>; structuredContent?: any; isError?: boolean };
   };
   const toolNames = async () => ((await handleMessage({ jsonrpc: '2.0', id: 1, method: 'tools/list' }, await session.context()))!.result as { tools: Array<{ name: string }> }).tools.map((t) => t.name);
-  return { app, hostedStore, dataDir, local, session, call, toolNames };
+  return { app, hostedStore, dataDir, local, session, call, toolNames, changes };
 }
 
 /** The browser's part: consent, approve, GitHub, back to the loopback listener. Resolves to the page this computer shows. */
@@ -98,6 +101,14 @@ test('sign in from ghost mode: the local portal merges into the account, and the
     const names = await s.toolNames();
     assert.ok(names.includes('unlink_account') && !names.includes('link_account'));
     assert.ok(names.includes('set_public_profile'), 'the ways into sharing appear');
+    assert.equal(s.changes.count, 1, 'the client is told to list tools again once the browser sign-in lands');
+
+    // Claiming a handle (the room's "Claim a handle"): the profile, the toolbar's identity, the space.
+    const claimed = await s.call('set_public_profile', { handle: 'lawrence' });
+    assert.equal(claimed.structuredContent.profile.handle, 'lawrence', claimed.content[0]!.text);
+    assert.equal((await s.call('account_settings')).structuredContent.identity.handle, 'lawrence');
+    assert.equal((await s.call('open_space')).structuredContent.space.mine, true);
+    assert.equal(s.changes.count, 2, 'a handle unlocks the rest of the social tools');
 
     // The merge happened on the hosted account, and the room says so once.
     const hosted = await s.hostedStore.get('github-42');
@@ -118,6 +129,7 @@ test('sign in from ghost mode: the local portal merges into the account, and the
     const out = await s.call('unlink_account');
     assert.equal(out.isError, undefined, out.content[0]!.text);
     assert.match(out.content[0]!.text, /Signed out\. Your portal was copied to this computer/);
+    assert.equal(s.changes.count, 3, 'and again on signing out');
     assert.ok((await s.local.store.get('default')).saved.some((x) => x.url === 'https://example.com/while-linked'), 'nothing disappears');
     assert.equal((await s.call('account_settings')).structuredContent.identity.mode, 'ghost');
     const ping = await raw(s.app.port, { method: 'POST', path: '/mcp', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: '{"jsonrpc":"2.0","id":1,"method":"ping"}' });

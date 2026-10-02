@@ -100,6 +100,9 @@ export function rpcError(id: JsonRpcRequest['id'], code: number, message: string
  * access gate, charge the budget, run it. Expected failures come back as coded tool
  * errors; anything else is a bug, logged with its stack and reported with a reference.
  */
+/** Tools that change what the caller can reach, and so which tools are listed (publicToolList). */
+const REACH_TOOLS = new Set(['unlink_account', 'set_public_profile', 'remove_public_profile', 'relationship', 'share']);
+
 async function callTool(params: Record<string, unknown>, ctx: ToolContext): Promise<CallToolResult | undefined> {
   const name = String(params.name ?? '');
   const tool = findTool(name);
@@ -131,6 +134,7 @@ async function callTool(params: Record<string, unknown>, ctx: ToolContext): Prom
   }
   try {
     const result = await tool.handler(input, { ...ctx, log });
+    if (!result.isError && REACH_TOOLS.has(name)) ctx.toolsChanged?.();
     return done(result, result.isError ? 'error' : 'ok');
   } catch (error) {
     if (isAppError(error) && error.code !== 'internal') return done(toolError(clean(error.message, 500), error.code, error.details), 'error');
@@ -161,7 +165,7 @@ export async function handleMessage(message: unknown, ctx: ToolContext): Promise
       return reply(req.id, {
         protocolVersion,
         capabilities: {
-          tools: { listChanged: false },
+          tools: { listChanged: Boolean(ctx.toolsChanged) },
           resources: { listChanged: false },
           extensions: { 'io.modelcontextprotocol/ui': { mimeTypes: [MCP_APP_MIME] } },
         },

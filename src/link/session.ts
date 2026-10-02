@@ -58,6 +58,8 @@ export interface LocalSessionOptions {
   local: LocalStores;
   /** Everything else every context has: the fetcher, cache, deliver for local files. */
   base: Omit<ToolContext, 'store' | 'userId'>;
+  /** Called once a sign-in finishes in the browser: what the caller can reach has changed. */
+  onLinked?: (() => void) | undefined;
   hostedUrl?: string | undefined;
   fetch?: typeof fetch;
   now?: () => number;
@@ -145,7 +147,7 @@ export class LocalSession {
       onLinked: (_record, client) => this.mergeLocal(client),
     });
     this.pending = pending;
-    void pending.done.then(() => {}, () => {}).finally(() => { if (this.pending === pending) this.pending = undefined; });
+    void pending.done.then(() => this.options.onLinked?.(), () => {}).finally(() => { if (this.pending === pending) this.pending = undefined; });
     return { url: pending.url };
   }
 

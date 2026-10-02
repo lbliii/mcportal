@@ -30,6 +30,11 @@ import type { ToolContext } from './tools/kit.ts';
 
 const log = loggerFromEnv();
 
+/** Tells the stdio client to list tools again: signing in or out changes which ones apply. */
+function stdioToolsChanged(): void {
+  process.stdout.write(`${JSON.stringify({ jsonrpc: '2.0', method: 'notifications/tools/list_changed' })}\n`);
+}
+
 /** `contextFor` is asked once per message: a local MCPortal can be signed in or out between them. */
 function runStdio(contextFor: () => Promise<ToolContext>): void {
   const rl = createInterface({ input: process.stdin, crlfDelay: Infinity });
@@ -56,7 +61,7 @@ function runStdio(contextFor: () => Promise<ToolContext>): void {
           if (!Array.isArray(payload) && id !== undefined) process.stdout.write(`${JSON.stringify(rpcError(id, RPC.internal, 'MCPortal could not read its settings in the data folder; see the logs.'))}\n`);
           return;
         }
-        const lineCtx = { ...base, log: log.child({ req: requestId() }) };
+        const lineCtx = { ...base, log: log.child({ req: requestId() }), toolsChanged: stdioToolsChanged };
         response = Array.isArray(payload)
           ? (await Promise.all(payload.slice(0, 20).map((m) => handleMessage(m, lineCtx)))).filter((r): r is JsonRpcResponse => r !== null)
           : await handleMessage(payload, lineCtx);
@@ -129,6 +134,7 @@ async function start(argv: string[]): Promise<void> {
       local: { store, reading, handoffs, seen, editions, clips },
       base: { fetcher, cache, deliver: (format) => deliverToFile(format, userId, { store, reading, clips }, dataDir) },
       hostedUrl: process.env.MCPORTAL_HOSTED_URL || undefined,
+      onLinked: stdioToolsChanged,
     });
     runStdio(() => session.context());
     return;

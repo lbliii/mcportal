@@ -92,6 +92,8 @@ export type ToolResults = {
   share: { share: SharedItem };
   relationship: { handle?: string; layoutChanged?: boolean; profile?: Profile };
   record_reading: { reading: ReadingState };
+  account_settings: { identity: Identity; url: string | null };
+  set_public_profile: { profile: PublicProfile };
   link_account: { url: string };
   unlink_account: { identity: Identity };
   get_reading: { reading: ReadingState | null };

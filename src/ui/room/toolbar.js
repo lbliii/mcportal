@@ -80,7 +80,9 @@
       el('p', null, linked ? `This computer keeps your portal in your hosted MCPortal (${new URL(identity.server).host}), so it's the same wherever you sign in.` : 'Signed in to your hosted MCPortal.'),
       linked && identity.offline ? el('p', { class: 'muted' }, `Offline: this is your portal as last synced${identity.syncedAt ? ` (${ago(identity.syncedAt)})` : ''}. Feeds still load; changes wait until you're back online.`) : null,
       el('div', { class: 'who-actions' },
-        el('button', { class: 'btn', type: 'button', onclick: () => { showWhoMenu(false); loadSpace('', false); } }, identity.handle ? 'Your space' : 'Claim a handle'),
+        identity.handle
+          ? el('button', { class: 'btn', type: 'button', onclick: () => { showWhoMenu(false); loadSpace('', false); } }, 'Your space')
+          : el('button', { class: 'btn primary', type: 'button', onclick: drawClaim }, 'Claim a handle'),
         identity.accountUrl ? el('button', { class: 'btn', type: 'button', onclick: () => openLink(identity.accountUrl ?? '') }, 'Account page') : null,
         linked ? el('button', { class: 'btn', type: 'button', onclick: confirmSignOut }, 'Sign out') : null));
   }
@@ -91,12 +93,97 @@
       const { url } = (await callTool('link_account')).structuredContent;
       await openLink(url);
       setWhoMenu(
-        el('p', null, 'Finish signing in with GitHub in your browser. This computer\'s portal is added to your account.'),
-        el('button', { class: 'btn primary', type: 'button', onclick: () => { showWhoMenu(false); loadRoom(); } }, 'I\'ve signed in'));
+        el('p', null, 'Finish signing in with GitHub in your browser. This computer\'s portal is added to your account, and this room updates when you\'re done.'),
+        el('button', { class: 'btn', type: 'button', onclick: () => { showWhoMenu(false); loadRoom(); } }, 'I\'ve signed in'));
+      watchSignIn();
     } catch (error) {
       setWhoMenu(el('p', { class: 'error' }, `Couldn't start signing in: ${errorText(error)}`));
     }
   }
+
+  // Claiming a handle creates the public profile, and with it the user's Space.
+  function drawClaim() {
+    const identity = state.identity;
+    // The GitHub login as a handle, when it makes one (hyphens aren't allowed).
+    const login = identity && identity.mode !== 'ghost' ? (identity.login ?? '').toLowerCase().replace(/-/g, '_').slice(0, 30) : '';
+    const input = el('input', { type: 'text', value: /^[a-z0-9_]{2,30}$/.test(login) ? login : '', placeholder: 'yourname', maxlength: '31', autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false', 'aria-label': 'Handle' });
+    const problem = el('p', { class: 'who-error', role: 'alert', hidden: true });
+    const claim = el('button', { class: 'btn primary', type: 'button' }, 'Claim');
+    const submit = async () => {
+      const handle = input.value.trim().replace(/^@/, '');
+      if (!handle) { input.focus(); return; }
+      claim.disabled = true; input.disabled = true; problem.hidden = true;
+      try {
+        const { profile } = (await callTool('set_public_profile', { handle })).structuredContent;
+        if (state.identity && state.identity.mode !== 'ghost') drawIdentity({ ...state.identity, handle: profile.handle });
+        toast(`You're @${profile.handle}.`);
+        loadSpace('', false);
+      } catch (error) {
+        claim.disabled = false; input.disabled = false;
+        problem.textContent = errorText(error);
+        problem.hidden = false;
+        input.focus();
+      }
+    };
+    claim.addEventListener('click', submit);
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); submit(); } });
+    setWhoMenu(
+      el('div', { class: 'who-head' }, icon('space'), el('b', null, 'Claim a handle')),
+      el('p', null, 'Your handle is how people on MCPortal find you, follow you and see what you share. It makes a public profile and your Space; the rest of your room stays private.'),
+      el('label', { class: 'who-claim' }, el('span', { 'aria-hidden': 'true' }, '@'), input),
+      el('p', { class: 'muted' }, '2 to 30 letters, digits or underscores. You can change it later.'),
+      problem,
+      el('div', { class: 'who-actions' },
+        el('button', { class: 'btn', type: 'button', onclick: () => drawWhoMenu() }, 'Back'),
+        claim));
+    input.focus();
+    input.select();
+  }
+
+  // Signing in finishes in the browser, outside this room: watch for it, and redraw the room
+  // (the toolbar says who it belongs to) once it lands. The sign-in link lasts 10 minutes.
+  /** @param {Identity | null} identity */
+  const identityKey = (identity) => !identity ? '' : identity.mode === 'ghost' ? 'ghost' : `${identity.mode}|${identity.handle ?? ''}`;
+  let signInWatch = 0;
+
+  /** Redraw the room if who it belongs to has changed. @returns {Promise<boolean>} whether it had */
+  async function identityChanged() {
+    if (!state.identity) return false;   // a card (an article, a space), not the room
+    try {
+      const { identity } = (await callTool('account_settings')).structuredContent;
+      if (identityKey(identity) === identityKey(state.identity)) return false;
+      await loadRoom();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  function watchSignIn() {
+    const watch = ++signInWatch;
+    const until = Date.now() + 10 * 60_000;
+    const tick = async () => {
+      if (watch !== signInWatch || Date.now() > until) return;
+      if (await identityChanged()) {
+        signInWatch++;
+        const identity = state.identity;
+        if (identity && identity.mode !== 'ghost') toast(`Signed in${identity.handle ? ` as @${identity.handle}` : identity.login ? ` as ${identity.login}` : ''}.`);
+        return;
+      }
+      setTimeout(tick, 3000);
+    };
+    setTimeout(tick, 3000);
+  }
+
+  // Back in view: the agent (or another room) may have signed in or out meanwhile.
+  let identityCheckedAt = 0;
+  const recheckIdentity = () => {
+    if (!state.identity || document.visibilityState !== 'visible' || Date.now() - identityCheckedAt < 15_000) return;
+    identityCheckedAt = Date.now();
+    void identityChanged();
+  };
+  document.addEventListener('visibilitychange', recheckIdentity);
+  window.addEventListener('focus', recheckIdentity);
 
   function confirmSignOut() {
     setWhoMenu(
@@ -120,9 +207,10 @@
 
   $('btnWho').addEventListener('click', () => showWhoMenu($('whoMenu').hidden));
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('whoMenu').hidden) { showWhoMenu(false); $('btnWho').focus(); } });
+  // The click's path, not its target: a button that redraws the menu is gone from it by now.
   document.addEventListener('click', (e) => {
-    const target = e.target;
-    if (!$('whoMenu').hidden && target instanceof Node && !$('whoMenu').contains(target) && !$('btnWho').contains(target)) showWhoMenu(false);
+    const path = e.composedPath();
+    if (!$('whoMenu').hidden && !path.includes($('whoMenu')) && !path.includes($('btnWho'))) showWhoMenu(false);
   });
   $('btnRefresh').addEventListener('click', async () => {
     if (!state.profile) return loadRoom();
