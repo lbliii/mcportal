@@ -38,7 +38,7 @@ export const SOURCE_TOOLS: ToolDef[] = [
       additionalProperties: false,
       properties: { source: { type: 'string', enum: ADDABLE }, config: { type: 'object' } },
     },
-    annotations: { readOnlyHint: true, openWorldHint: true },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
     async handler(args, ctx) {
       const source = args.source as SourceKind;
       let portal: PortalResult;
@@ -59,7 +59,7 @@ export const SOURCE_TOOLS: ToolDef[] = [
     cost: 5,
     description: "Find what MCPortal can show for something the user wants to follow, test-load it and preview it; add a candidate with add_portal. Accepts a site or feed address, 'r/subreddit', 'owner/repo', 'hn', YouTube, Bluesky, Mastodon ('@name@server') or Substack addresses, a news topic as https://news.google.com/rss/search?q=TOPIC, or docs ('docs.stripe.com', 'react.dev docs', a GitHub repo with markdown docs). For a name, pass its domain.",
     inputSchema: { type: 'object', required: ['query'], additionalProperties: false, properties: { query: { type: 'string' } } },
-    annotations: { readOnlyHint: true, openWorldHint: true },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
     async handler(args, ctx) {
       const query = clean(args.query, 500);
       if (!query) return toolError('find_source needs a "query"');
@@ -142,7 +142,7 @@ export const SOURCE_TOOLS: ToolDef[] = [
     access: 'read',
     description: 'Describe the source types MCPortal can show in a portal and the settings each accepts.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
-    annotations: { readOnlyHint: true },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
     async handler() {
       return ok(JSON.stringify(SOURCE_DOCS, null, 2), { sources: SOURCE_DOCS });
     },

@@ -33,7 +33,7 @@ export const SAVED_TOOLS: ToolDef[] = [
         source: { type: 'string', description: 'Where it came from, e.g. hn, rss, github' },
       },
     },
-    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     async handler(args, ctx) {
       const url = httpUrl(args.url);
       if (!url) return toolError('save_item needs an http(s) "url"');
@@ -66,7 +66,7 @@ export const SAVED_TOOLS: ToolDef[] = [
     access: 'write',
     description: "Remove one link from the user's saved items. Only when the user asks to remove, unsave, or delete it.",
     inputSchema: { type: 'object', required: ['url'], additionalProperties: false, properties: { url: { type: 'string' } } },
-    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     async handler(args, ctx) {
       const url = httpUrl(args.url);
       if (!url) return toolError('remove_saved needs an http(s) "url"');
@@ -118,7 +118,7 @@ export const SAVED_TOOLS: ToolDef[] = [
         column: { type: 'integer', minimum: 1, maximum: 8, description: 'Only if the user said where' },
       },
     },
-    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     async handler(args, ctx) {
       if (!Array.isArray(args.items)) return toolError('pin_portal needs "items" (an empty list is fine)');
       const items = normalizePinnedItems(args.items);

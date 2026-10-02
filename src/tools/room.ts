@@ -88,7 +88,7 @@ export const ROOM_TOOLS: ToolDef[] = [
       additionalProperties: false,
       properties: { setup: { type: 'boolean', description: 'Show the welcome and starter packs, e.g. when the user asks to start over or rebuild their room.' } },
     },
-    annotations: { readOnlyHint: true, openWorldHint: true },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
     _meta: { ui: { resourceUri: ROOM_URI } },
     async handler(args, ctx) {
       // The room first: on a linked MCPortal, reading it is what finds out whether the hosted server is reachable.
@@ -129,7 +129,7 @@ export const ROOM_TOOLS: ToolDef[] = [
         layout: { type: 'string', enum: OFFERED_LAYOUTS, description: 'Default shelves (picture rows).' },
       },
     },
-    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     async handler(args, ctx) {
       const ids = [...new Set((Array.isArray(args.packs) ? args.packs : []).map(String))];
       const unknown = ids.filter((id) => !STARTER_PACKS.some((p) => p.id === id));
@@ -171,7 +171,7 @@ export const ROOM_TOOLS: ToolDef[] = [
         openIn: { type: 'string', enum: ['card', 'chat'], description: 'stories open in the room, or as their own card in the chat' },
       },
     },
-    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     handler: (args, ctx) => rearrange(args as Arrangement, ctx),
   },
   {
@@ -185,7 +185,7 @@ export const ROOM_TOOLS: ToolDef[] = [
       additionalProperties: false,
       properties: { portals: { type: 'array', minItems: 1, items: { type: 'string' } } },
     },
-    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     handler: (args, ctx) => rearrange({ remove: (args.portals as unknown[]).map(String) }, ctx),
   },
   {
@@ -195,7 +195,7 @@ export const ROOM_TOOLS: ToolDef[] = [
     cost: 2,
     description: 'Reload a single portal, bypassing the cache. Used by the room UI.',
     inputSchema: { type: 'object', required: ['portalId'], additionalProperties: false, properties: { portalId: { type: 'string' } } },
-    annotations: { readOnlyHint: true, openWorldHint: true },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
     _meta: { ui: { resourceUri: ROOM_URI, visibility: ['app'] } },
     async handler(args, ctx) {
       const profile = await ctx.store.get(ctx.userId);
@@ -227,7 +227,7 @@ export const ROOM_TOOLS: ToolDef[] = [
         },
       },
     },
-    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     _meta: { ui: { resourceUri: ROOM_URI, visibility: ['app'] } },
     async handler(args, ctx) {
       if (!ctx.seen) return toolError('Seen tracking is not available on this server.', 'unavailable');

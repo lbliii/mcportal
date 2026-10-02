@@ -39,7 +39,7 @@ export const READING_TOOLS: ToolDef[] = [
         },
       },
     },
-    annotations: { readOnlyHint: false, destructiveHint: false },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     _meta: { ui: { resourceUri: ROOM_URI, visibility: ['app'] } },
     async handler(args, ctx) {
       const reading = ctx.reading;
@@ -57,7 +57,7 @@ export const READING_TOOLS: ToolDef[] = [
     access: 'read',
     description: 'Where the user left off in a URL, so the reader can resume there; fragments share the same URL identity.',
     inputSchema: { type: 'object', required: ['url'], additionalProperties: false, properties: { url: { type: 'string' } } },
-    annotations: { readOnlyHint: true },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
     _meta: { ui: { resourceUri: ROOM_URI, visibility: ['app'] } },
     async handler(args, ctx) {
       const reading = ctx.reading;
@@ -79,7 +79,7 @@ export const READING_TOOLS: ToolDef[] = [
       additionalProperties: false,
       properties: { unfinished: { type: 'boolean' }, limit: { type: 'integer', minimum: 1, maximum: 100 } },
     },
-    annotations: { readOnlyHint: true },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
     async handler(args, ctx) {
       const reading = ctx.reading;
       if (!reading) return toolError(NO_HISTORY, 'unavailable');

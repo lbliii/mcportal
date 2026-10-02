@@ -144,6 +144,9 @@ async function callTool(params: Record<string, unknown>, ctx: ToolContext): Prom
   }
 }
 
+/** No external origins: the app is fully self-contained. */
+const ROOM_UI_META = { csp: { connectDomains: [], resourceDomains: [] }, prefersBorder: false } as const;
+
 /** Handle one JSON-RPC message. Returns null for notifications. */
 export async function handleMessage(message: unknown, ctx: ToolContext): Promise<JsonRpcResponse | null> {
   if (typeof message !== 'object' || message === null || (message as JsonRpcRequest).jsonrpc !== '2.0') {
@@ -190,6 +193,8 @@ export async function handleMessage(message: unknown, ctx: ToolContext): Promise
             title: 'MCPortal room',
             description: 'The room: the user\'s portals, arranged by their layout',
             mimeType: MCP_APP_MIME,
+            // On the listing too, so hosts can review it when they connect.
+            _meta: { ui: ROOM_UI_META },
           },
         ],
       });
@@ -203,8 +208,7 @@ export async function handleMessage(message: unknown, ctx: ToolContext): Promise
             uri: ROOM_URI,
             mimeType: MCP_APP_MIME,
             text: await roomHtml(),
-            // No external origins: the app is fully self-contained.
-            _meta: { ui: { csp: { connectDomains: [], resourceDomains: [] }, prefersBorder: false } },
+            _meta: { ui: ROOM_UI_META },
           },
         ],
       });
