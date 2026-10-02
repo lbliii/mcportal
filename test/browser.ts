@@ -51,11 +51,12 @@ export class Page {
     this.session = session;
   }
 
-  static async open(chromePath: string, viewport = { width: 1280, height: 900 }): Promise<Page> {
+  /** `args`: extra Chrome flags, e.g. --host-resolver-rules to keep a test from reaching real sites. */
+  static async open(chromePath: string, viewport = { width: 1280, height: 900 }, args: string[] = []): Promise<Page> {
     const profileDir = await mkdtemp(path.join(tmpdir(), 'mcportal-chrome-'));
     const chrome = spawn(chromePath, [
       '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profileDir}`, '--no-first-run', '--no-default-browser-check',
-      '--disable-gpu', '--disable-extensions', '--disable-background-networking', `--window-size=${viewport.width},${viewport.height}`, 'about:blank',
+      '--disable-gpu', '--disable-extensions', '--disable-background-networking', `--window-size=${viewport.width},${viewport.height}`, ...args, 'about:blank',
     ], { stdio: ['ignore', 'ignore', 'pipe'] });
     const endpoint = await new Promise<string>((resolve, reject) => {
       let buffered = '';

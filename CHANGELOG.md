@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Fix: forms in real browsers
+- **Signing in and the account page work in a browser again.** Server-rendered pages were sent with `Referrer-Policy: no-referrer`, under which browsers send `Origin: null` with a form POST. Every form is checked for a same-origin Origin, so **Continue with GitHub** on the consent screen and the account page's sign out, import, **Revoke** and delete were refused as "Cross-site request refused". Pages now use `same-origin`, which still sends other sites no referrer. A headless-Chrome test now submits the consent screen and the account page's sign-out the way a person does (`test/ui-forms.test.ts`).
+
 ### Room layouts ([plan](docs/plans/room-layouts.md))
 - **Your agent's picks lead the room:** `show_highlights` now keeps its picks as the room's edition for 24 hours, replacing the last. `open_room` returns the picks still in their feeds, in the agent's order, and what the room leads with: the agent's first pick, else the first new item, else the top item of the first feed. Only the refs and the agent's own words are stored; items are found again in the live feeds, so no site text is kept. Editions aren't exported and are deleted with your account. `show_highlights` is no longer marked read-only. Postgres gains `mcportal_editions` (schema version 7).
 - **Front page (lab, `MCPORTAL_LABS=frontpage`):** a third layout made for the chat column. Your agent's lead story and picks with their reasons, then each portal's top three stories (picks aren't repeated) with "5 more" pages, ending with "You're caught up" or how many new stories wait inside your portals. Nothing in it scrolls on its own; the page grows instead. Without highlights, a button asks your agent to pick them. Offered in the toolbar and to the model only while the lab is on.
