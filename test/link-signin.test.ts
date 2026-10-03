@@ -92,6 +92,8 @@ test('sign in from ghost mode: the local portal merges into the account, and the
     const page = await signInInBrowser(s.app.port, started.structuredContent.url);
     assert.match(page, /This computer is signed in/);
     assert.match(page, /added to your account/);
+    assert.match(page, /go back to your app/);
+    assert.doesNotMatch(page, /Claude/);
 
     const link = await stat(path.join(s.dataDir, 'link.json'));
     assert.equal(link.mode & 0o777, 0o600, 'credentials are private to the user');
@@ -146,12 +148,35 @@ test('sign-in refused or tampered with: nothing is linked', async () => {
     const redirect = new URL(new URL(url).searchParams.get('redirect_uri')!);
     const wrong = await fetch(new URL(`${redirect.pathname}?code=x&state=not-the-state`, redirect));
     assert.equal(wrong.status, 400, 'a callback with the wrong state is refused');
+    assert.match(await wrong.text(), /Start it again from MCPortal in your app/);
     const elsewhere = await fetch(new URL('/somewhere', redirect));
     assert.equal(elsewhere.status, 404);
     assert.equal((await s.call('account_settings')).structuredContent.identity.mode, 'ghost');
     const state = new URL(url).searchParams.get('state')!;
     const denied = await fetch(new URL(`${redirect.pathname}?error=access_denied&state=${state}`, redirect));
-    assert.match(await denied.text(), /cancelled/);
+    const page = await denied.text();
+    assert.match(page, /cancelled/);
+    assert.match(page, /Start it again from MCPortal in your app/);
+    assert.doesNotMatch(page, /Claude/);
+    assert.equal((await s.call('account_settings')).structuredContent.identity.mode, 'ghost');
+  } finally {
+    await s.app.close();
+  }
+});
+
+test('sign-in denial preserves the hosted reason as bounded, escaped text', async () => {
+  const s = await setUp();
+  try {
+    const { url } = (await s.call('link_account')).structuredContent;
+    const authorize = new URL(url);
+    const callback = new URL(authorize.searchParams.get('redirect_uri')!);
+    callback.search = new URLSearchParams({ error: 'access_denied', state: authorize.searchParams.get('state')!, error_description: 'This server is invite-only. Ask its owner for an invite. <script>alert(1)</script>' + 'x'.repeat(400) }).toString();
+    const denied = await fetch(callback);
+    assert.equal(denied.status, 400);
+    const page = await denied.text();
+    assert.match(page, /This server is invite-only\. Ask its owner for an invite\./);
+    assert.match(page, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
+    assert.doesNotMatch(page, /<script>|x{301}|sign-in was cancelled|Claude/);
     assert.equal((await s.call('account_settings')).structuredContent.identity.mode, 'ghost');
   } finally {
     await s.app.close();

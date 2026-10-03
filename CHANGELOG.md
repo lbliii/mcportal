@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixes
+- The Ghost mode menu's sign-in button now starts login instead of silently failing when its click event is passed to the sign-in flow. Browser regressions cover both sign-in buttons and hosts that support, omit or decline opening links.
+- Local sign-in pages refer to your app rather than Claude and show the hosted server's failure reason instead of labelling every denied sign-in as cancelled.
+
 ### Terms of service and a private security contact ([plan](docs/plans/directory-launch.md))
 - **Terms of service at `/terms`,** with acceptable use, linked from every page and from the sign-in consent screen, which now also asks you to confirm you're at least 13.
 - **A private way to report security problems:** the security page describes what to send, response times (acknowledged within 3 business days), a 90-day disclosure window and safe harbor for good-faith research. `/.well-known/security.txt` (RFC 9116) and `SECURITY.md` point to the same contact.

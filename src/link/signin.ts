@@ -119,13 +119,15 @@ export async function startSignIn(options: SignInOptions): Promise<PendingSignIn
       res.end(html);
     };
     if (req.method !== 'GET' || url.pathname !== '/callback' || handled) return reply(404, resultPage('Not here', '<p>This page only finishes an MCPortal sign-in.</p>'));
-    if (!same(url.searchParams.get('state') ?? '', state)) return reply(400, resultPage('Sign-in not finished', '<p>This link doesn\'t match the sign-in this computer started. Start it again from Claude.</p>'));
+    if (!same(url.searchParams.get('state') ?? '', state)) return reply(400, resultPage('Sign-in not finished', '<p>This link doesn\'t match the sign-in this computer started. Start it again from MCPortal in your app.</p>'));
     handled = true;
     clearTimeout(timer);
     void (async () => {
       try {
         const denied = url.searchParams.get('error');
-        if (denied) throw new AppError('forbidden', denied === 'access_denied' ? 'The sign-in was cancelled.' : 'The hosted MCPortal did not sign this computer in.');
+        // The hosted server's reason is display text: bounded here, escaped in the error page below.
+        const reason = clean(url.searchParams.get('error_description') ?? '', 300);
+        if (denied) throw new AppError('forbidden', reason || (denied === 'access_denied' ? 'The sign-in was cancelled.' : 'The hosted MCPortal did not sign this computer in.'));
         const tokens = await postForm(fetcher, new URL('/oauth/token', server), {
           grant_type: 'authorization_code', code: url.searchParams.get('code') ?? '', client_id: clientId, redirect_uri: redirectUri, code_verifier: verifier, resource,
         });
@@ -140,12 +142,12 @@ export async function startSignIn(options: SignInOptions): Promise<PendingSignIn
           linkedAt: new Date(now()).toISOString(),
         };
         await options.link.write(record);
-        const note = await options.onLinked?.(record, client).catch(() => 'Signed in, but this computer\'s portal couldn\'t be copied to your account yet. Ask Claude to try again.');
-        reply(200, resultPage('This computer is signed in', `<p>MCPortal on this computer now keeps your portal in your hosted account${me.login ? `, as <b>${escapeHtml(me.login)}</b>` : ''}.</p>${note ? `<p>${escapeHtml(note)}</p>` : ''}<p>You can close this tab and go back to Claude.</p>`));
+        const note = await options.onLinked?.(record, client).catch(() => 'Signed in, but this computer\'s portal couldn\'t be copied to your account yet. Ask your agent to try again.');
+        reply(200, resultPage('This computer is signed in', `<p>MCPortal on this computer now keeps your portal in your hosted account${me.login ? `, as <b>${escapeHtml(me.login)}</b>` : ''}.</p>${note ? `<p>${escapeHtml(note)}</p>` : ''}<p>You can close this tab and go back to your app.</p>`));
         settle.resolve(record);
       } catch (error) {
         const message = error instanceof AppError ? error.message : 'Something went wrong while signing in.';
-        reply(400, resultPage('Sign-in not finished', `<p>${escapeHtml(message)}</p><p>Start it again from Claude.</p>`));
+        reply(400, resultPage('Sign-in not finished', `<p>${escapeHtml(message)}</p><p>Start it again from MCPortal in your app.</p>`));
         settle.reject(error);
       } finally {
         close();
