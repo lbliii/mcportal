@@ -270,7 +270,7 @@ test('search_docs: searches read page bodies without crawling, and respects TTL,
   assert.equal(c.calls.length, calls, 'body search adds no fetches');
   assert.deepEqual(c.cache.size, size, 'no duplicate full-content index');
   assert.match(after.content[0]!.text, /unvisited pages searched by outline only/);
-  await c.cache.get('docpage:https://evil.example.org/offsite', 3600, async () => ({ blocks: [{ type: 'p', text: 'otherword' }] }));
+  await c.cache.get(`docpage:${JSON.stringify([c.userId, 'https://evil.example.org/offsite'])}`, 3600, async () => ({ blocks: [{ type: 'p', text: 'otherword' }] }));
   const other = await call(c, 'search_docs', { docs: 'docs.example.dev', query: 'otherword' });
   assert.deepEqual(other.structuredContent.hits, [], 'other sites cached content is excluded');
   const python = await call(c, 'search_docs', { docs: 'docs.python.org/3', query: 'test cards' });
@@ -286,6 +286,28 @@ test('search_docs: searches read page bodies without crawling, and respects TTL,
   await call(evicted, 'read_doc_page', { docs: 'docs.example.dev', url: 'https://docs.stripe.com/testing.md' });
   const lost = await call(evicted, 'search_docs', { docs: 'docs.example.dev', query: 'test cards' });
   assert.deepEqual(lost.structuredContent.hits, [], 'evicted bodies do not linger in an auxiliary index');
+});
+
+test('search_docs: shared cache exposes bodies only after the searching account reads them', async () => {
+  const a = await docsCtx();
+  let now = Date.now();
+  a.cache = new TtlCache({ now: () => now });
+  const b = { ...a, userId: 'other' };
+  const args = { docs: 'docs.example.dev', query: 'test cards' };
+  const page = { docs: args.docs, url: 'https://docs.stripe.com/testing.md' };
+  assert.deepEqual((await call(b, 'search_docs', args)).structuredContent.hits, []);
+  await call(a, 'read_doc_page', page);
+  assert.equal((await call(a, 'search_docs', args)).structuredContent.hits.length, 1);
+  assert.deepEqual((await call(b, 'search_docs', args)).structuredContent.hits, [], 'another account reading does not change my body search');
+  const fetches = a.calls.length;
+  await call(a, 'read_doc_page', page);
+  assert.equal(a.calls.length, fetches, 'repeat reads still use this account’s cached page');
+  await call(b, 'read_doc_page', page);
+  assert.equal(a.calls.length, fetches + 1, 'a first read uses an independent account cache entry');
+  assert.equal((await call(b, 'search_docs', args)).structuredContent.hits.length, 1);
+  now += 3600 * 1000;
+  assert.deepEqual((await call(a, 'search_docs', args)).structuredContent.hits, []);
+  assert.deepEqual((await call(b, 'search_docs', args)).structuredContent.hits, [], 'expiration removes both accounts’ body matches');
 });
 
 test('search: titles rank ahead of body matches, combining outline and table content', () => {

@@ -98,7 +98,7 @@
     },
     {
       "name": "search_docs",
-      "description": "Search docs titles, sections, Sphinx symbols ('str.split') and fresh cached page bodies."
+      "description": "Search docs titles, sections, Sphinx symbols and your fresh cached page bodies."
     },
     {
       "name": "open_handoff",
