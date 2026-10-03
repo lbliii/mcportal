@@ -2,7 +2,7 @@
 
 *Vocabulary: this plan now uses the room/portal words from `docs/product-map.md` (a docs panel is a docs portal).*
 
-**Status:** phases 1–4 shipped (2026-09-30), except checking the pack's sources from the Railway server. Phase 5 now searches fresh cached/read page bodies as well as the outline and existing Sphinx symbols (3 October swarm); `llms-full.txt` indexing remains outstanding. New search code and docs reading continuity await release and deployment. **Milestone:** first new portal type after columns and shelves; the developer hook for paid plans.
+**Status:** phases 1–4 shipped (2026-09-30), except checking the pack's sources from the Railway server. Phase 5 now searches each account’s fresh cached/read page bodies as well as the outline and existing Sphinx symbols (3 October swarm); `llms-full.txt` indexing remains outstanding. New search code and docs reading continuity await release and deployment. **Milestone:** first new portal type after columns and shelves; the developer hook for paid plans.
 
 ## Goal
 

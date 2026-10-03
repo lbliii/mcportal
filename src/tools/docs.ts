@@ -22,6 +22,9 @@ import type { ArticleBlock, Provenance } from '../types.ts';
 const PART_CHARS = 10_000;
 const OUTLINE_LINES = 250;
 
+// Body search must reflect only this account's reads, even on a shared server.
+const pageCacheKey = (userId: string, url: string) => `docpage:${JSON.stringify([userId, url])}`;
+
 const siteArgs = {
   docs: { type: 'string', description: 'A docs address ("docs.stripe.com"), GitHub "owner/repo" or docs-folder link' },
   portalId: { type: 'string', description: "Or one of the user's docs portals" },
@@ -140,7 +143,7 @@ export const DOCS_TOOLS: ToolDef[] = [
         if (!inDocsScope(site, url)) return toolError(`${clean(url, 200)} isn't part of ${site.title}. Use read_article for other pages.`, 'invalid_argument');
         const where = position(site, url);
         const load = async () => where.ref?.index ? indexPage(await loadDocs({ kind: 'llms', url }, ctx.fetcher), url) : fetchDocPage(url, ctx.fetcher, where.ref ? { title: where.ref.title } : {});
-        const result = await ctx.cache.get(`docpage:${url}`, FRESHNESS.reader, load);
+        const result = await ctx.cache.get(pageCacheKey(ctx.userId, url), FRESHNESS.reader, load);
         const page = result.value;
         const provenance: Provenance = { source: 'docs', endpoint: page.sourceUrl, ttlSeconds: FRESHNESS.reader };
         const parts = textParts(page.blocks, PART_CHARS);
@@ -166,7 +169,7 @@ export const DOCS_TOOLS: ToolDef[] = [
     name: 'search_docs',
     title: 'Search a docs site',
     access: 'fetch',
-    description: "Search docs titles, sections, Sphinx symbols ('str.split') and fresh cached page bodies. Unvisited pages use the outline only. Read hits with read_doc_page.",
+    description: "Search docs titles, sections, Sphinx symbols and your fresh cached page bodies. Unread pages use the outline only. Read hits with read_doc_page.",
     inputSchema: {
       type: 'object',
       required: ['query'],
@@ -179,7 +182,7 @@ export const DOCS_TOOLS: ToolDef[] = [
       if (!query) return toolError('search_docs needs a query');
       try {
         const { site } = await siteFor(args, ctx);
-        const hits = searchDocs(site, query, typeof args.limit === 'number' ? args.limit : 20, (url) => ctx.cache.peek<DocPage>(`docpage:${url}`)?.value);
+        const hits = searchDocs(site, query, typeof args.limit === 'number' ? args.limit : 20, (url) => ctx.cache.peek<DocPage>(pageCacheKey(ctx.userId, url))?.value);
         if (!hits.length) return ok(`Nothing in ${site.title} matches "${query}" in its outline, symbols or cached page content. Unvisited or expired pages are searched only by their outline. Try other words, or open_docs to browse.`, { hits: [], site: { title: site.title, toc: site.toc } } satisfies ToolResults['search_docs']);
         const lines = hits.map((h) => `- ${h.title}${h.kind === 'symbol' ? ` (${h.role})` : h.section ? ` (in ${h.section})` : ''} <${h.url}>`);
         return ok(`${hits.length} match(es) in ${site.title} (outline, symbols and fresh cached page content; unvisited pages searched by outline only):\n${untrusted(site.toc.url, lines.join('\n'))}`, { hits, site: { title: site.title, toc: site.toc } } satisfies ToolResults['search_docs']);
