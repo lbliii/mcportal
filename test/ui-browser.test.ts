@@ -78,12 +78,16 @@ function room() {
 
 let app: Running;
 const seen = new FileSeenStore(null);
+let readingDir: string;
+let readingStore: FileReadingStore;
 const profiles = new MemoryProfileStore({ default: room() });
 let page: Page;
 
 before(async () => {
   if (skip) return;
-  app = await startApp({ allowUnauthenticated: true }, fetcher, { store: profiles, seen });
+  readingDir = await mkdtemp(path.join(tmpdir(), 'mcportal-browser-reading-'));
+  readingStore = new FileReadingStore(readingDir);
+  app = await startApp({ allowUnauthenticated: true, limits: { perMinute: 10000, perDay: 100000, globalPerDay: 1000000 } }, fetcher, { store: profiles, seen, reading: readingStore });
   page = await Page.open(chrome!);
 });
 
@@ -141,10 +145,11 @@ async function tool(name: string, args: Record<string, unknown>): Promise<any> {
 }
 
 test('browser: the reader records opening and position, resumes there, and marks read only when asked', { skip }, async () => {
+  await readingStore.deleteAll('default');
   const openArticle = async () => {
     await openRoom();
     await page.click('[data-portal="saved"] .item-main');
-    await page.waitFor(`document.querySelector('#reader .mark-read')`, 'the article and its Mark as read button');
+    await page.waitFor(`document.querySelector('#reader .mark-read:not([disabled])')`, 'the article and its Mark as read button');
     await page.eval(`document.getElementById('reader').style.maxHeight = '220px'`);   // a small window, so the fixture article scrolls
   };
   await openArticle();
@@ -170,7 +175,7 @@ test('browser: the reader records opening and position, resumes there, and marks
 
   await page.eval(`document.querySelector('#reader .mark-read').click()`);
   await page.waitFor(`document.querySelector('#reader .mark-read').textContent === 'Read'`, 'the button to say Read');
-  const read = (await tool('get_reading', { url: ARTICLE })).reading;
+  const read = await readingWhen((r) => r.status === 'read');
   assert.equal(read.status, 'read');
   assert.ok(read.readAt);
   assert.deepEqual((await tool('list_reading', {})).reading.map((r: any) => r.url), [], 'finished reading is not "in the middle of"');

@@ -88,7 +88,7 @@
     const top = [];
     for (const p of picks) { const story = take(p.portal, p.item, p.why); if (story) top.push(story); }
     const timed = portals.map((portal) => {
-      let last = Date.parse(portal.provenance.fetchedAt) || 0;
+      let last = Date.parse(portal.provenance.fetchedAt ?? '') || 0;
       return portal.items.map((item) => {
         const t = Date.parse(item.publishedAt ?? '');
         if (!Number.isNaN(t)) last = t;
@@ -322,7 +322,7 @@
     if (document.visibilityState !== 'visible' || state.profile?.layout !== 'river' || Date.now() - riverView.checkedAt < RIVER_RECHECK_MS) return;
     riverView.checkedAt = Date.now();
     for (const portal of state.portals.values()) {
-      const stale = Date.parse(portal.provenance.fetchedAt) + portal.provenance.ttlSeconds * 1000 < Date.now();
+      const stale = portal.provenance.fetchedAt && Date.parse(portal.provenance.fetchedAt) + portal.provenance.ttlSeconds * 1000 < Date.now();
       if (!portal.pin && !OFF_RIVER.has(portal.source) && stale) refreshPortal(portal.portalId);
     }
   });

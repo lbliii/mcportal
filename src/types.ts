@@ -52,8 +52,9 @@ export interface Item {
 export interface Provenance {
   source: SourceKind | 'reader';
   endpoint: string;
-  fetchedAt: string;
-  cached: boolean;
+  /** Only account-owned content: shared cache activity is private. */
+  fetchedAt?: string;
+  cached?: boolean;
   ttlSeconds: number;
 }
 

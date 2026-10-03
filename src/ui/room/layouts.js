@@ -253,9 +253,14 @@
     return items();
   }
 
+  /** @param {Provenance} provenance */
+  function provenanceTime(provenance) {
+    return provenance.fetchedAt ? ` · fetched ${new Date(provenance.fetchedAt).toLocaleString()}${provenance.cached ? ' (cached)' : ''}` : '';
+  }
+
   /** Where the items came from and how fresh they are. @param {PortalResult} portal @param {boolean} ttl */
   function portalFoot(portal, ttl) {
     const p = portal.provenance;
     return el('div', { class: 'portal-foot' }, portal.pin ? pinnedFoot(portal)
-      : `${p.source} · ${p.endpoint} · fetched ${new Date(p.fetchedAt).toLocaleTimeString()}${p.cached ? ' (cached)' : ''}${ttl ? ` · fresh for ${p.ttlSeconds}s` : ''}`);
+      : `${p.source} · ${p.endpoint}${provenanceTime(p)}${ttl ? ` · cache lifetime ${p.ttlSeconds}s` : ''}`);
   }

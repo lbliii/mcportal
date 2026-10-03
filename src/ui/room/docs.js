@@ -151,7 +151,7 @@
         el('div', { class: 'byline' }, `${minutes} min read`),
         passageSource(blockNodes(page.blocks, onLink), page.url, page.title, `Use read_doc_page with that url and ${how} for the rest of the page.`),
         pager,
-        el('div', { class: 'prov' }, `From ${provenance.endpoint} · fetched ${new Date(provenance.fetchedAt).toLocaleString()}${provenance.cached ? ' (cached)' : ''}. Text only; the site's scripts and trackers aren't loaded.`));
+        el('div', { class: 'prov' }, `From ${provenance.endpoint}${provenanceTime(provenance)}. Text only; the site's scripts and trackers aren't loaded.`));
       const heads = page.blocks.filter((b) => b.type === 'h' && typeof b.id === 'string' && (b.level === 2 || b.level === 3));
       // heads keeps only headings whose id is a string.
       otp.replaceChildren(...(heads.length > 1 ? [el('div', { class: 'otp-title' }, 'On this page'),

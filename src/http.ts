@@ -412,6 +412,7 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
     const reqLog = log.child({ req: id });
     const started = Date.now();
     res.setHeader('x-request-id', id);
+    if (new URL(config.publicUrl).protocol === 'https:') res.setHeader('strict-transport-security', 'max-age=31536000');
     let url: URL;
     try {
       url = new URL(req.url ?? '/', 'http://placeholder');

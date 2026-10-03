@@ -7,6 +7,7 @@
  * code; not reaching the server at all is `upstream_unreachable`, with a message
  * meant for the user.
  */
+import { hostedOrigin } from './hosted-url.ts';
 import { API_EXPORT_PATH, API_IMPORT_PATH, API_MAX_CALLS, API_PATH, CLIENT_HEADER } from '../api/calls.ts';
 import type { ImportResult } from '../portability.ts';
 import { AppError, ERROR_CODES, type ErrorCode } from '../lib/errors.ts';
@@ -45,7 +46,7 @@ export class StateClient {
   serverVersion: string | undefined;
 
   constructor(options: StateClientOptions) {
-    this.options = options;
+    this.options = { ...options, server: hostedOrigin(options.server) };
     this.fetch = options.fetch ?? fetch;
   }
 
@@ -109,7 +110,7 @@ export class StateClient {
         res = await this.fetch(new URL(pathAndQuery, this.options.server), {
           ...init,
           headers: { ...init.headers, authorization: `Bearer ${token}`, [CLIENT_HEADER]: this.options.version ?? SERVER_INFO.version },
-          signal: AbortSignal.timeout(timeoutMs),
+          redirect: 'error', signal: AbortSignal.timeout(timeoutMs),
         });
       } catch (error) {
         throw new AppError('upstream_unreachable', UNREACHABLE, { cause: error });

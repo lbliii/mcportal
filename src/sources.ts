@@ -234,7 +234,7 @@ export async function loadPortal(portal: PortalInput, deps: SourceDeps, force = 
       source: portal.source,
       title,
       items: result.value.items,
-      provenance: { source: portal.source, endpoint, fetchedAt: result.fetchedAt, cached: result.cached, ttlSeconds: FRESHNESS[portal.source] },
+      provenance: { source: portal.source, endpoint, ttlSeconds: FRESHNESS[portal.source] },
     };
   } catch (error) {
     return {
@@ -243,7 +243,7 @@ export async function loadPortal(portal: PortalInput, deps: SourceDeps, force = 
       title,
       items: [],
       ...loadFailure(error, deps, { source: portal.source }),
-      provenance: { source: portal.source, endpoint, fetchedAt: new Date().toISOString(), cached: false, ttlSeconds: FRESHNESS[portal.source] },
+      provenance: { source: portal.source, endpoint, ttlSeconds: FRESHNESS[portal.source] },
     };
   }
 }
@@ -254,7 +254,7 @@ export async function loadArticle(url: string, deps: SourceDeps): Promise<Articl
   return {
     url: finalUrl,
     ...article,
-    provenance: { source: 'reader', endpoint: finalUrl, fetchedAt: result.fetchedAt, cached: result.cached, ttlSeconds: FRESHNESS.reader },
+    provenance: { source: 'reader', endpoint: finalUrl, ttlSeconds: FRESHNESS.reader },
   };
 }
 

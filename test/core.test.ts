@@ -154,9 +154,9 @@ test('open_room caches within the freshness window', async () => {
   const first = calls.length;
   const again = await call(c, 'open_room');
   assert.equal(calls.length, first, 'no new upstream fetches');
-  assert.ok(again.structuredContent.portals.every((p: any) => p.provenance.cached));
+  assert.ok(again.structuredContent.portals.every((p: any) => !('cached' in p.provenance) && !('fetchedAt' in p.provenance)), 'shared cache activity stays private');
   const refreshed = await call(c, 'refresh_portal', { portalId: 'hn-top' });
-  assert.equal(refreshed.structuredContent.portal.provenance.cached, false);
+  assert.equal(refreshed.structuredContent.portal.provenance.cached, undefined);
   assert.ok(calls.length > first);
 });
 
