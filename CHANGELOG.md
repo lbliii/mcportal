@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Fixes
+- Sign-in failures identify the step, HTTP status when available, recovery action and support reference. GitHub errors distinguish expired codes, OAuth app configuration, unverified email and outages; account access messages identify the selected GitHub account. The room and agent can read the last failed attempt and retry with a fresh link. A failed initial portal import keeps sign-in and local data intact and reports a warning in the browser and room. Diagnostic logs omit credentials, callback state and raw provider text.
 - The Ghost mode menu's sign-in button now starts login instead of silently failing when its click event is passed to the sign-in flow. Browser regressions cover both sign-in buttons and hosts that support, omit or decline opening links.
 - Local sign-in pages refer to your app rather than Claude and show the hosted server's failure reason instead of labelling every denied sign-in as cancelled.
 

@@ -23,6 +23,7 @@ import { SERVER_INFO } from '../mcp.ts';
 import { StateClient } from './client.ts';
 import { FileLinkAuth, LinkFile, type LinkRecord } from './link-file.ts';
 import { startSignIn, type PendingSignIn } from './signin.ts';
+import { signInFailure, type SignInFailure } from './signin-errors.ts';
 import { linkedStores } from './stores.ts';
 
 /** The hosted MCPortal a local one signs in to (MCPORTAL_HOSTED_URL to use another). */
@@ -40,6 +41,8 @@ export interface LinkControl {
   unlink(): Promise<string>;
   /** Linked: whether the hosted server answered last time, and when the room was last synced (ms). */
   health?: (() => { offline: boolean; syncedAt?: number }) | undefined;
+  /** Last failed attempt in this process, so the room and agent can explain what happened. */
+  signInFailure?: (() => SignInFailure | undefined) | undefined;
 }
 
 export interface LocalStores {
@@ -72,6 +75,7 @@ export class LocalSession {
   /** The linked stores, kept while the link is the same, so the room cache lasts across calls. */
   private linked: { key: string; client: StateClient; stores: ReturnType<typeof linkedStores> } | undefined;
   private pending: PendingSignIn | undefined;
+  private lastSignInFailure: SignInFailure | undefined;
   /** Said once on the next open_room after signing in (what the merge did). */
   private notice: string | undefined;
   private nudged = false;
@@ -132,6 +136,7 @@ export class LocalSession {
       login: record?.login,
       start: () => this.start(),
       unlink: () => this.unlink(),
+      signInFailure: () => this.lastSignInFailure,
     };
   }
 
@@ -139,15 +144,23 @@ export class LocalSession {
   async start(): Promise<{ url: string }> {
     if (await this.link.read()) throw new AppError('conflict', 'This MCPortal is already signed in.');
     if (this.pending) return { url: this.pending.url };
+    this.lastSignInFailure = undefined;
     const pending = await startSignIn({
       server: this.server,
       link: this.link,
       ...(this.options.fetch ? { fetch: this.options.fetch } : {}),
       ...(this.options.now ? { now: this.options.now } : {}),
       onLinked: (_record, client) => this.mergeLocal(client),
+      onSyncFailure: (message) => { this.notice = message; },
+      ...(this.options.base.log ? { log: this.options.base.log } : {}),
+    }).catch((error: unknown) => {
+      if (error instanceof AppError) this.lastSignInFailure = signInFailure(error);
+      throw error;
     });
     this.pending = pending;
-    void pending.done.then(() => this.options.onLinked?.(), () => {}).finally(() => { if (this.pending === pending) this.pending = undefined; });
+    void pending.done.then(() => { this.lastSignInFailure = undefined; this.options.onLinked?.(); }, (error: unknown) => {
+      if (this.pending === pending && error instanceof AppError) this.lastSignInFailure = signInFailure(error);
+    }).finally(() => { if (this.pending === pending) this.pending = undefined; });
     return { url: pending.url };
   }
 

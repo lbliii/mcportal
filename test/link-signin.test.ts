@@ -38,7 +38,7 @@ function fakeGithub(): Fetcher {
   };
 }
 
-async function setUp() {
+async function setUp(fetcher?: typeof fetch) {
   const hostedStore = new MemoryProfileStore();
   const publicProfiles = new PublicProfiles(memoryPersistence());
   const app = await startApp({ github: { clientId: 'gh-client', clientSecret: 'gh-secret' } }, fakeGithub(), {
@@ -50,7 +50,7 @@ async function setUp() {
   // How many times the client was told to list tools again (stdio's notifications/tools/list_changed).
   const changes = { count: 0 };
   const toolsChanged = () => { changes.count++; };
-  const session = new LocalSession({ dataDir, localUser: 'default', local, base: { fetcher: createFixtureFetcher(), cache: new TtlCache() }, hostedUrl: app.base, onLinked: toolsChanged });
+  const session = new LocalSession({ dataDir, localUser: 'default', local, base: { fetcher: createFixtureFetcher(), cache: new TtlCache() }, hostedUrl: app.base, onLinked: toolsChanged, ...(fetcher ? { fetch: fetcher } : {}) });
   const call = async (name: string, args: Record<string, unknown> = {}) => {
     const res = await handleMessage({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }, { ...await session.context(), toolsChanged });
     return res!.result as { content: Array<{ text: string }>; structuredContent?: any; isError?: boolean };
@@ -141,6 +141,27 @@ test('sign in from ghost mode: the local portal merges into the account, and the
   }
 });
 
+test('a failed initial import is reported in the browser and room without undoing sign-in', async () => {
+  const s = await setUp(async (input, init) => new URL(String(input)).pathname === '/api/v1/import'
+    ? Response.json({ error: 'unavailable' }, { status: 503 }) : fetch(input, init));
+  try {
+    await s.local.store.put('default', validateProfile({ ...defaultProfile(), onboarded: true, name: 'Laptop', saved: [{ url: 'https://example.com/local', title: 'From the laptop' }] }));
+    const { url } = (await s.call('link_account')).structuredContent;
+    const page = await signInInBrowser(s.app.port, url);
+    assert.match(page, /This computer is signed in/);
+    assert.match(page, /local data is still here.*retry the import/);
+    assert.equal((await s.call('account_settings')).structuredContent.identity.mode, 'linked');
+    assert.equal((await s.local.store.get('default')).saved.length, 1, 'the local portal is preserved');
+    const room = await s.call('open_room');
+    assert.match(room.structuredContent.notice, /local data is still here.*retry the import/);
+    const reference = room.structuredContent.notice.match(/Reference: ([0-9a-f]{12})/)[1];
+    assert.ok(page.includes(reference), 'browser and room share the import diagnostic reference');
+    assert.equal((await s.call('open_room')).structuredContent.notice, undefined, 'the notice is shown once');
+  } finally {
+    await s.app.close();
+  }
+});
+
 test('sign-in refused or tampered with: nothing is linked', async () => {
   const s = await setUp();
   try {
@@ -149,6 +170,9 @@ test('sign-in refused or tampered with: nothing is linked', async () => {
     const wrong = await fetch(new URL(`${redirect.pathname}?code=x&state=not-the-state`, redirect));
     assert.equal(wrong.status, 400, 'a callback with the wrong state is refused');
     assert.match(await wrong.text(), /Start it again from MCPortal in your app/);
+    const unicodeState = 'é'.repeat(new URL(url).searchParams.get('state')!.length);
+    const unicodeWrong = await fetch(new URL(`${redirect.pathname}?code=x&state=${encodeURIComponent(unicodeState)}`, redirect));
+    assert.equal(unicodeWrong.status, 400, 'a Unicode state mismatch is refused without throwing');
     const elsewhere = await fetch(new URL('/somewhere', redirect));
     assert.equal(elsewhere.status, 404);
     assert.equal((await s.call('account_settings')).structuredContent.identity.mode, 'ghost');
@@ -158,7 +182,20 @@ test('sign-in refused or tampered with: nothing is linked', async () => {
     assert.match(page, /cancelled/);
     assert.match(page, /Start it again from MCPortal in your app/);
     assert.doesNotMatch(page, /Claude/);
-    assert.equal((await s.call('account_settings')).structuredContent.identity.mode, 'ghost');
+    const settings = await s.call('account_settings');
+    assert.equal(settings.structuredContent.identity.mode, 'ghost');
+    const failure = settings.structuredContent.identity.signInFailure;
+    assert.equal(failure.stage, 'authorization');
+    assert.match(failure.reference, /^[0-9a-f]{12}$/);
+    assert.ok(page.includes(failure.reference), 'browser and account diagnostics share a reference');
+    assert.ok(settings.content[0]!.text.includes(failure.message), 'the agent can read the failed attempt');
+    const next = (await s.call('link_account')).structuredContent.url;
+    assert.notEqual(next, url, 'retrying starts a fresh attempt');
+    assert.equal((await s.call('account_settings')).structuredContent.identity.signInFailure, undefined, 'retry clears the old failure');
+    const nextAuthorize = new URL(next);
+    const nextCallback = new URL(nextAuthorize.searchParams.get('redirect_uri')!);
+    nextCallback.search = new URLSearchParams({ error: 'access_denied', state: nextAuthorize.searchParams.get('state')! }).toString();
+    await fetch(nextCallback); // finish the retry so its listener closes too
   } finally {
     await s.app.close();
   }
