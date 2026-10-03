@@ -157,8 +157,8 @@ test('browser: the reader records opening and position, resumes there, and marks
   assert.equal(opened?.status, 'opened', 'opening records it, no model involved');
   assert.equal(opened.readAt, undefined);
 
-  // Scroll a third of the way, then leave (Back scrolls up to itself first): the furthest point is saved on the way out.
-  const scrolled = await page.eval<number>(`(() => { const r = document.getElementById('reader'); r.scrollTop = (r.scrollHeight - r.clientHeight) / 3; return r.scrollTop; })()`);
+  // Scroll a third of the way through the article's blocks, then leave (Back scrolls up to itself first): the furthest point is saved on the way out.
+  const scrolled = await page.eval<number>(`(() => { const r = document.getElementById('reader'); const blocks = document.querySelector('#reader .body').children; const target = blocks[Math.floor(blocks.length / 3)]; r.scrollTop += target.getBoundingClientRect().top - r.getBoundingClientRect().top; return r.scrollTop; })()`);
   assert.ok(scrolled > 0, 'the article is long enough to scroll');
   await page.waitFor(`Number(document.querySelector('#reader .body')?.dataset.furthest) > 0`, 'the reader to note how far it got');   // a reader pauses there
   await page.click('#reader [aria-label="Back to your room"]');
@@ -223,7 +223,7 @@ test('browser: a nested docs index opens inside the viewer, and its up button go
   await openRoom();
   await page.click('[data-portal="docs"] .item-main');
   await page.waitFor(`document.querySelector('.docs-toc a.idx')`, 'the nested index link');
-  await page.eval(`document.querySelector('.docs-toc a.idx').closest('details').querySelector('summary').click()`);   // open its section, as a reader would
+  await page.eval(`(() => { const section = document.querySelector('.docs-toc a.idx').closest('details'); if (!section.open) section.querySelector('summary').click(); })()`);   // open its section, as a reader would
   await page.click('.docs-toc a.idx');
   await page.waitFor(`document.querySelector('.docs-up')`, 'the nested docs, with an up button');
   assert.match(await page.eval<string>(`document.querySelector('.docs-toc').textContent`), /Widgets/);
