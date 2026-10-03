@@ -51,9 +51,7 @@ Get MCPortal listed in Claude's directory first and OpenAI's (ChatGPT and Codex)
 
 - [x] **Terms of service and acceptable use** at `/terms`, linked in the footer and on the consent screen: accounts and age (13+), your content, acceptable use, moderation and limits, changes and availability (30 days' notice before a shutdown), ending, no warranty, limitation of liability, governing law (`MCPORTAL_JURISDICTION`), and changes to the terms (14 days' notice).
   - [ ] Get a lawyer's read before launch if budget allows, especially the liability and governing-law sections.
-- [ ] **Privacy policy fixes** (the full list of mismatches is in Phase 2b):
-  - add the subprocessors (Railway, GitHub, Automattic's image proxy, Stripe later)
-  - add a "last updated" date and a change log
+- [x] **Privacy policy presentation:** groups Railway, GitHub and Automattic as service providers and includes the last-updated date and a change log. Stripe is added only when billing is implemented. Code/data-handling fixes remain tracked in Phase 2b.
 - [x] **Private security contact:** `MCPORTAL_CONTACT_EMAIL` on `/security` (what to send, acknowledged within 3 business days, 90-day disclosure, safe harbor), `/.well-known/security.txt` (RFC 9116) and `SECURITY.md`.
   - [ ] Set `MCPORTAL_CONTACT_EMAIL`, `MCPORTAL_OPERATOR` and `MCPORTAL_JURISDICTION` in production.
   - [ ] Turn on GitHub private vulnerability reporting once the repo is public (it isn't available for private repos).
@@ -125,14 +123,15 @@ An audit on 2026-10-02 found the foundations solid (sign-in tokens stored only a
 - [ ] **Capacity:** raise or rework `globalPerDay` (60,000 today). It's a cost guard, so size it from Railway's cost per request and alert at 80%, rather than letting directory traffic hit a hard wall.
 - [ ] **Backups:** scheduled Postgres backups, with a restore drill that's written down and has actually been run once.
 - [ ] **Uptime monitoring:** an external check on `/health` and on an authenticated `tools/list`, paging Lawrence.
+  - Probe implemented as `npm run ops:check`; external scheduling, credentials and paging still need configuration and verification.
 - [ ] **Error tracking:** count 5xx and tool crashes over time. Anthropic's health badge drops when more than 2% of requests fail over 30 days, and is "degraded" above 5%, so watch that number ourselves.
-- [ ] **A short incident runbook:** roll back a deploy, restore from backup, revoke tokens, post a status note.
+- [x] **A short incident runbook:** [hosted operations](../operations.md) covers deploy verification, rollback, isolated restores, token revocation and status communication. Running the restore drill remains part of Backups above.
 - [ ] **Status note:** a simple status line on `/support`, or a hosted status page.
 
 ## Phase 5: release discipline
 
 - [x] **Release script** (`scripts/release.ts`, `npm run release`): `prepare` sets the version everywhere it's stated (package.json and its lockfile, the plugin, `SERVER_INFO`, then the generated `server.json` and `manifest.json`), moves "Unreleased" under it, runs the checks and opens a release PR; `publish`, after the merge, tags it and creates the GitHub release. Steps in CONTRIBUTING.md. Plugin users only get updates when the version changes.
-- [ ] **Catch up:** cut v0.5.0 (or v0.6.0) with the current "Unreleased" changelog, and update the README's "latest" line.
+- [x] **Catch up:** v0.6.0 and v0.7.0 are recorded in the changelog; the old v0.5.0 target is superseded. Publish subsequent Unreleased changes through the release script.
 - [x] **Compatibility policy**, written down (CONTRIBUTING.md, "Versions and the tool interface"):
   - `MIN_CLIENT_VERSION` only rises with a release note
   - a tool rename keeps the old name for one release, as a hidden alias that says it's moving

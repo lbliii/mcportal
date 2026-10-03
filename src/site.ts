@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { escapeHtml } from './lib/web.ts';
 
 export const DEFAULT_SUPPORT_URL = 'https://github.com/lbliii/mcportal/issues';
-const POLICY_UPDATED = '2026-10-02';   // bump when what's stored changes
+const POLICY_UPDATED = '2026-10-03';   // bump when what's stored changes
 const TERMS_UPDATED = '2026-10-02';    // bump when the terms change (and announce material changes first)
 const IMAGE_DIR = fileURLToPath(new URL('./site/', import.meta.url));
 const TAGLINE = 'Your liminal webspace.';
@@ -207,7 +207,7 @@ function privacy(site: SiteConfig): string {
 <p>Usage counters (for rate limits), admin sessions and sign-in attempts in progress are held in memory only and are gone when the server restarts. Your IP address is used for rate limiting in memory and isn't stored.</p>
 
 <h2>Signing in with GitHub</h2>
-<p>MCPortal asks GitHub for the <code>read:user</code> scope and reads your user ID and login once, when you sign in. It then discards the GitHub token. It can't see your repositories, email or anything else in your GitHub account.</p>
+<p>MCPortal uses GitHub to read your public user ID and login once, when you sign in. It then discards the GitHub token. MCPortal's sign-in does not read your private repositories or email.</p>
 
 <h2>What MCPortal sends to other sites</h2>
 <p>When your room loads, MCPortal's server fetches the feeds, articles and thumbnails you asked for. Those sites see the server's address, not yours. For some large pictures on WordPress sites, the server asks WordPress.com's image service (run by Automattic) for a smaller copy, so that service sees the picture's address too. Fetched content is cached in the server's memory for between two minutes and one day, and is shared across users because it's the same public content. It isn't written to the database. When you choose to open an original story or its discussion, your browser goes to that site directly, and that site's own privacy policy applies.</p>
@@ -229,6 +229,13 @@ function privacy(site: SiteConfig): string {
 <h2>Where it's stored</h2>
 <p>Data is stored in a Postgres database hosted by Railway in the United States. Only the operator can access it. When scheduled backups are added, this page will say how long they're kept.</p>
 
+<h2>Service providers</h2>
+<ul>
+  <li><b>Railway:</b> hosts the service and its Postgres database, and processes hosting request logs.</li>
+  <li><b>GitHub:</b> completes your sign-in and supplies your public user ID and login.</li>
+  <li><b>Automattic (WordPress.com):</b> its image service receives the address of some large WordPress pictures when MCPortal asks for a smaller copy.</li>
+</ul>
+
 <h2>Your choices</h2>
 <ul>
   <li><b>See and change your data:</b> ask your agent to show your room's settings, change them, or remove saved items at any time.</li>
@@ -243,6 +250,10 @@ function privacy(site: SiteConfig): string {
 
 <h2>Changes</h2>
 <p>If this policy changes, the date at the top changes too. Changes that affect what's stored or who can see it will be announced on this page before they take effect.</p>
+<ul>
+  <li><b>3 October 2026:</b> names the service providers together and clarifies the public GitHub data used at sign-in.</li>
+  <li><b>2 October 2026:</b> describes reading state, seen marks, highlights, handoffs, linked computers, deletion and scheduled retention; clarifies that backup retention is not yet verified.</li>
+</ul>
 
 <h2>Contact</h2>
 <p>Questions or requests: <a href="${support}">${support}</a>.</p>`, site);
