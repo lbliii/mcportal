@@ -71,7 +71,7 @@
         el('p', null, 'No account: your portal lives on this computer, and nothing is synced or shared.'),
         identity.canSignIn
           ? [el('p', { class: 'muted' }, 'Sign in to keep the same portal on every device, and to share and follow. This computer\'s portal comes with you.'),
-            el('button', { class: 'btn primary', type: 'button', onclick: signIn }, 'Sign in to sync and share')]
+            el('button', { class: 'btn primary', type: 'button', onclick: () => signIn() }, 'Sign in to sync and share')]
           : null);
       return;
     }
