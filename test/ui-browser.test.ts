@@ -148,9 +148,9 @@ test('browser: the reader records opening and position, resumes there, and marks
   await readingStore.deleteAll('default');
   const openArticle = async () => {
     await openRoom();
+    await page.eval(`document.getElementById('reader').style.maxHeight = '220px'`);   // a small window, so the fixture article scrolls
     await page.click('[data-portal="saved"] .item-main');
     await page.waitFor(`document.querySelector('#reader .mark-read:not([disabled])')`, 'the article and its Mark as read button');
-    await page.eval(`document.getElementById('reader').style.maxHeight = '220px'`);   // a small window, so the fixture article scrolls
   };
   await openArticle();
   const opened = await readingWhen((r) => r.status === 'opened');
