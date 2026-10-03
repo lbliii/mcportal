@@ -29,8 +29,8 @@ const result=(structuredContent:unknown)=>({content:[],structuredContent});
 async function fixture(view:string){
  // The front page as the agent leaves it: three picks with reasons, the lab on.
  if(view==='frontpage'){const items=(await rpc('list_new_items',{},'frontpage')).structuredContent.items;await rpc('show_highlights',{title:'Morning edition',intro:'Three worth your coffee.',picks:[items[1],items[4],items[2]].map((c:{ref:string},i:number)=>({ref:c.ref,why:['It answers the question you asked yesterday about agent tooling.','A release you have been waiting on.','Short, and close to what you saved last week.'][i]}))},'frontpage');const r=await rpc('open_room',{},'frontpage');r.structuredContent.labs=['frontpage'];return r;}
- // The river with the same picks, the lab on.
- if(view==='river'){const items=(await rpc('list_new_items',{},'river')).structuredContent.items;await rpc('show_highlights',{title:'Morning edition',picks:[items[1],items[4]].map((c:{ref:string},i:number)=>({ref:c.ref,why:['It answers the question you asked yesterday about agent tooling.','A release you have been waiting on.'][i]}))},'river');const r=await rpc('open_room',{},'river');r.structuredContent.labs=['river'];
+ // The river with the same picks.
+ if(view==='river'){const items=(await rpc('list_new_items',{},'river')).structuredContent.items;await rpc('show_highlights',{title:'Morning edition',picks:[items[1],items[4]].map((c:{ref:string},i:number)=>({ref:c.ref,why:['It answers the question you asked yesterday about agent tooling.','A release you have been waiting on.'][i]}))},'river');const r=await rpc('open_room',{},'river');
   // Two follows' shares, signed in: one of a story already in a feed, one of a new link.
   const sc=r.structuredContent,hn=sc.portals.find((p:{source:string})=>p.source==='hn');sc.identity={mode:'hosted',handle:'reader'};sc.profile.columns.push({width:1,panels:[{id:'following',source:'following',title:'Following',config:{}}]});
   sc.portals.push({portalId:'following',source:'following',title:'Following',provenance:{source:'following',endpoint:'shares from people you follow',fetchedAt:now,cached:false,ttlSeconds:0},items:[

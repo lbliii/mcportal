@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Room layouts
+- River is available in the toolbar and in `arrange_room` and `build_room` without an experimental flag. Existing layouts and subscriptions are kept.
+
 ### Reading, retrieval and privacy
 - Continue Reading brings back recent unfinished articles and docs pages. Docs now resume and record explicit completion, and reading writes settle in navigation order. Inline columns offer five stories plus More, lane navigation and page controls; shelves keep visible navigation.
 - PostgreSQL clips use schema v9 full-text relevance with literal fallback. Docs search includes each account’s fresh cached page bodies within the existing bounded cache; unvisited pages still use their outline.

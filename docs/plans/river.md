@@ -152,9 +152,8 @@ under 600px they go edge to edge.
 
 ## Agent surface
 
-- `river` joins `LAYOUTS` and `LABS`; `arrange_room` and `build_room` offer it only with
-  the lab on (as `frontpage`). Footprint ceilings move by one enum word when the lab is
-  on, none when off.
+- `river` is a regular entry in `LAYOUTS`; `arrange_room` and `build_room` always offer
+  it. It no longer needs `MCPORTAL_LABS=river`.
 - When reblogging arrives, its tool applies the same audience and consent checks as the
   button, and asks before reblogging something the user hasn't opened (Twitter's 2020
   read-before-retweet prompt raised article opens 40%).
@@ -166,14 +165,14 @@ under 600px they go edge to edge.
 
 ### 1. Layout, merge, card
 
-`river` in `LAYOUTS`, `LABS` (`MCPORTAL_LABS=river`) and `offeredLayouts`; an icon in
-`scripts/brand.ts`; the toolbar button, hidden by the lab like the front page's. In
+`river` in `LAYOUTS` and `offeredLayouts`; an icon in
+`scripts/brand.ts`; the toolbar button, always visible. In
 `room/layouts.js`: `river: { gridClass: 'river', draw, portal }`, where `portal(id)`
 redraws the whole river (a single portal's refresh can move cards anywhere) but keeps
 what's expanded and how many pages are shown. The `post` form in `room/items.js`. The
 merge, dedupe and folding as plain functions in a new `room/river.js`.
 
-Tests: `arrange.test.ts` for the enum and lab; a browser test that loads a fixture room
+Tests: `arrange.test.ts` for availability without labs; a browser test that loads a fixture room
 in `river`, checks order (picks, new, divider, seen), dedupe, one fold and its expansion,
 that a page counts units not items, the feed roles, and that nothing scrolls internally; design preview gets a `river` view at 360/760/1000.
 

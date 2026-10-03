@@ -167,7 +167,7 @@ export const ROOM_TOOLS: ToolDef[] = [
         retitle: { type: 'array', items: { type: 'object', required: ['portal', 'title'], additionalProperties: false, properties: { portal: { type: 'string' }, title: { type: 'string' } } } },
         configure: { type: 'array', items: { type: 'object', required: ['portal', 'config'], additionalProperties: false, properties: { portal: { type: 'string' }, config: { type: 'object', description: 'Settings to change (list_sources)' } } } },
         name: { type: 'string' },
-        layout: { type: 'string', enum: OFFERED_LAYOUTS, description: `columns side by side, or one sideways row per portal${OFFERED_LAYOUTS.includes('frontpage') ? ", or frontpage: picks, then each portal's top items" : ''}${OFFERED_LAYOUTS.includes('river') ? ', or river: every portal merged into one stream, newest first' : ''}` },
+        layout: { type: 'string', enum: OFFERED_LAYOUTS, description: `columns: side by side; shelves: sideways rows; river: one stream, newest first${OFFERED_LAYOUTS.includes('frontpage') ? '; frontpage: picks, then top items per portal' : ''}` },
         openIn: { type: 'string', enum: ['card', 'chat'], description: 'stories open in the room, or as their own card in the chat' },
       },
     },
