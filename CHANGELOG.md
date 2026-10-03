@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Reading, retrieval and privacy
+- Continue Reading brings back recent unfinished articles and docs pages. Docs now resume and record explicit completion, and reading writes settle in navigation order. Inline columns offer five stories plus More, lane navigation and page controls; shelves keep visible navigation.
+- PostgreSQL clips use schema v9 full-text relevance with literal fallback. Docs search includes fresh cached page bodies within the existing bounded cache; unvisited pages still use their outline.
+- Export/import links require the owning account's browser session and uploads validate CSRF. Full exports include mutes, blocks, filed reports and Space preferences; shared-cache timestamps are omitted. Hosted linking requires HTTPS except loopback, credential requests refuse redirects, and new data directories are private. GitHub sign-in requests no scope; the hosted HTTPS origin sends HSTS.
+- Bounded protocol observations record recognized version/host categories without raw client identity data. The verified migration assessment corrects the planned modern protocol requirements; modern wire behavior is not implemented.
+
 ### Launch operations
 - A read-only `npm run ops:check` probe checks storage health and authenticated MCP discovery, with bounded, credential-free JSON output and no redirects or feed fetching.
 - The hosted operations runbook records deployment verification, rollback, isolated backup restores, incident response and the remaining launch evidence. Railway IaC preserves explicit sign-up, usage-budget and public-page settings without enabling sign-up.

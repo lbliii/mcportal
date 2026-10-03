@@ -186,10 +186,11 @@ test('tools: open_docs, read_doc_page and search_docs; pages are fenced and scop
   const c = await docsCtx();
   const opened = await call(c, 'open_docs', { docs: 'docs.example.dev' });
   assert.equal(opened.structuredContent.provenance.source, 'docs');
-  assert.equal(opened.structuredContent.provenance.cached, false);
-  assert.ok(opened.structuredContent.provenance.fetchedAt);
+  assert.equal('cached' in opened.structuredContent.provenance, false);
+  assert.equal('fetchedAt' in opened.structuredContent.provenance, false);
   const again = await call(c, 'open_docs', { docs: 'docs.example.dev' });
-  assert.equal(again.structuredContent.provenance.cached, true);
+  assert.equal('cached' in again.structuredContent.provenance, false);
+  assert.equal('fetchedAt' in again.structuredContent.provenance, false);
   assert.match(opened.content[0]!.text, /^Stripe Documentation: 1 sections, 10 pages/);
   assert.match(opened.content[0]!.text, /<untrusted-content[\s\S]*- Testing <https:\/\/docs\.stripe\.com\/testing\.md>/);
 

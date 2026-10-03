@@ -102,8 +102,8 @@ export const DOCS_TOOLS: ToolDef[] = [
     async handler(args, ctx) {
       try {
         const input = clean(args.docs, 500);
-        const { site, config, cached, fetchedAt } = /\/llms\.txt$/i.test(input) && !parseGithubDocs(input)
-          ? { site: await loadDocs({ kind: 'llms', url: docsInputUrl(input) }, ctx.fetcher), config: { url: docsInputUrl(input), limit: LIMITS.items }, cached: false, fetchedAt: new Date().toISOString() }
+        const { site, config } = /\/llms\.txt$/i.test(input) && !parseGithubDocs(input)
+          ? { site: await loadDocs({ kind: 'llms', url: docsInputUrl(input) }, ctx.fetcher), config: { url: docsInputUrl(input), limit: LIMITS.items } }
           : await siteFor(args, ctx);
         const github = parseGithubDocs(input);
         const page = github?.file ? githubRawUrl(github, github.file) : undefined;
@@ -112,7 +112,7 @@ export const DOCS_TOOLS: ToolDef[] = [
         return ok(`${head}\n${untrusted(site.toc.url, outlineText(site))}`, {
           site: { title: site.title, summary: site.summary, toc: site.toc, sections: site.sections, symbols: site.symbols?.length ?? 0 },
           docs: config.url,
-          provenance: { source: 'docs', endpoint: site.toc.url, fetchedAt, cached, ttlSeconds: FRESHNESS.docs },
+          provenance: { source: 'docs', endpoint: site.toc.url, ttlSeconds: FRESHNESS.docs },
           ...(page ? { page } : {}),
         } satisfies ToolResults['open_docs']);
       } catch (error) {
@@ -142,7 +142,7 @@ export const DOCS_TOOLS: ToolDef[] = [
         const load = async () => where.ref?.index ? indexPage(await loadDocs({ kind: 'llms', url }, ctx.fetcher), url) : fetchDocPage(url, ctx.fetcher, where.ref ? { title: where.ref.title } : {});
         const result = await ctx.cache.get(`docpage:${url}`, FRESHNESS.reader, load);
         const page = result.value;
-        const provenance: Provenance = { source: 'docs', endpoint: page.sourceUrl, fetchedAt: result.fetchedAt, cached: result.cached, ttlSeconds: FRESHNESS.reader };
+        const provenance: Provenance = { source: 'docs', endpoint: page.sourceUrl, ttlSeconds: FRESHNESS.reader };
         const parts = textParts(page.blocks, PART_CHARS);
         const part = Math.min(parts.length, typeof args.part === 'number' ? args.part : 1);
         const more = part < parts.length ? `\n\n… (part ${part} of ${parts.length}: call read_doc_page with part: ${part + 1} for more)` : '';

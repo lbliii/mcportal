@@ -1,6 +1,6 @@
 # Plan: clips — save what we talk about
 
-**Status:** phases 1–3 shipped (2026-09-30); phase 4 next. Open questions were settled as proposed: the first clip adds a Clips panel, exchanges are verbatim, and Markdown export comes with the portability work. **Milestone:** first piece of M2. Useful alone now; shareable once M2 sharing lands.
+**Status:** phases 1–3 shipped (2026-09-30); reader quote clipping and clip sharing shipped subsequently. Phase 4 Postgres full-text search is implemented in the 3 October swarm, with ranked results, literal fallback and schema v9 integration tests; hosted deployment remains pending. Open questions were settled as proposed: the first clip adds a Clips panel, exchanges are verbatim, and Markdown export comes with the portability work.
 
 ## Goal
 

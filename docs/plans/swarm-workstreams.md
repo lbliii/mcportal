@@ -19,6 +19,11 @@ versioning in this wave. Package/release files and shared planning status stay w
 integration. A PR records actual tests and limitations rather than treating a skipped
 database/browser check as successful.
 
+`codex/swarm-integration` locally assembles the five streams and reconciles optional
+docs provenance with UI rendering. It preserves the individual branches. Publication
+is pending explicit approval of the repository destination after automatic approval
+review rejected the first push; no branch has been pushed by this swarm yet.
+
 ## Following work
 
 The next available workers can take these independent areas once the first contracts

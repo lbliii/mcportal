@@ -82,13 +82,13 @@ An audit on 2026-10-02 found the foundations solid (sign-in tokens stored only a
 - [x] Expired highlights (editions) and handoffs are purged on schedule.
 - [x] Resolved reports go 180 days after they're resolved; pending invites lapse after 90 days; the audit log keeps a year at most (and the newest 2,000); app registrations nobody is signed in with go after 180 days unused (long, because apps like Claude sign in again with their registration when someone comes back). Each is stated in the privacy policy.
 
-**Smaller fixes:**
-- [ ] Tie the export download and upload links to the browser session that opens them; today anyone holding the link can use it for 15 minutes.
-- [ ] Stop returning `cached` and `fetchedAt` from the shared fetch cache to users: they reveal whether someone else opened the same URL within the hour.
-- [ ] The "everything" export includes mutes, blocks, reports you filed, and the full Space settings (title, accent, featured sources).
-- [ ] Send HSTS on the hosted site.
-- [ ] Request no GitHub scope instead of `read:user` (the id and login don't need one).
-- [ ] Create the local data directory with owner-only permissions; refuse `http://` hosted servers when linking (except loopback, for tests).
+**Smaller fixes (implemented in the 3 October swarm; release/deployment pending):**
+- [x] Export download/upload links require the owning account, bind to its browser session and validate upload CSRF; link expiry remains 15 minutes.
+- [x] Shared source, article and docs provenance omits `cached` and `fetchedAt`; endpoint and configured cache lifetime remain available.
+- [x] The "everything" export includes mutes, blocks, reports you filed, and full Space settings (title, accent, featured sources and reblog preferences). Report queries are account-scoped.
+- [x] HTTPS hosted responses send HSTS, including errors; local HTTP does not.
+- [x] GitHub sign-in requests no permission scope for public identity.
+- [x] New local data directories use owner-only permissions; hosted linking rejects non-loopback HTTP, and credential requests refuse redirects.
 
 ## Phase 3: access for the public and for reviewers
 

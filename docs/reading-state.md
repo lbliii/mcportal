@@ -25,4 +25,7 @@ The room's reader does; the model doesn't. `record_reading` and `get_reading` ar
 - Only the "Mark as read" button at the end of the article records `read`.
 - Failures are quiet: on a server without reading history the reader just doesn't track.
 
-Docs pages, clips and shares aren't tracked yet.
+Docs pages now use the same position and explicit-completion tracking. Continue Reading
+shows up to four recent unfinished items, reopening docs through their original portal
+where possible. Clips and shares aren't tracked yet. Reading writes are serialized
+across navigation so reopening does not race a position save or explicit completion.
