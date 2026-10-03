@@ -104,9 +104,9 @@
       clearTimeout(measureTimer); measureTimer = 0;
       if (!body.isConnected) return;
       const here = position();
-      if (here.progress <= furthest.progress) return;
-      furthest = here;
-      body.dataset.furthest = String(here.block);
+      if (here.progress <= furthest.progress && here.block <= furthest.block) return;
+      furthest = { block: Math.max(furthest.block, here.block), progress: Math.max(furthest.progress, here.progress) };
+      body.dataset.furthest = String(furthest.block);
       queueSave();
     };
     const onScroll = () => {
@@ -122,8 +122,7 @@
     const stop = () => {
       if (stopReading !== stop) return;
       detach();
-      clearTimeout(measureTimer); measureTimer = 0;
-      measure();
+      if (measureTimer) measure();
       save();
     };
     stopReading = stop;
