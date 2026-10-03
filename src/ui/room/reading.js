@@ -24,6 +24,7 @@
       strip = el('section', { class: 'continue-reading', 'aria-label': 'Continue reading', hidden: true });
       $('grid').before(strip);
     }
+    strip.setAttribute('aria-busy', 'true');
     try {
       await readingWrites.catch(() => {});
       const { reading } = (await callTool('list_reading', { unfinished: true, limit: 4 })).structuredContent;
@@ -34,7 +35,8 @@
             el('span', null, r.title || r.url),
             el('small', null, `${Math.round((r.progress ?? 0) * 100)}% · opened ${ago(r.lastOpenedAt)}`))))));
       strip.hidden = !reading.length;
-    } catch { strip.hidden = true; }   // older servers may not have reading history
+    } catch { if (generation === continueGeneration) strip.hidden = true; }   // older servers may not have reading history
+    finally { if (generation === continueGeneration) strip.setAttribute('aria-busy', 'false'); }
   }
 
   /** @param {ToolResults['list_reading']['reading'][number]} reading */
@@ -47,7 +49,18 @@
       if (portal?.items.some((item) => item.url?.split('#')[0] === reading.url)) return true;
       if (!spec.config || !('url' in spec.config) || typeof spec.config.url !== 'string') return false;
       try {
-        const site = new URL(spec.config.url), page = new URL(reading.url);
+        const toc = spec.config.toc;
+        let site = new URL(toc?.url || spec.config.url);
+        const page = new URL(reading.url);
+        // GitHub indexes use web URLs, but their pages are read from the raw host.
+        if (site.hostname === 'github.com') {
+          const [owner, repo, kind, ref, ...folder] = site.pathname.split('/').filter(Boolean);
+          if (kind !== 'tree' || !ref) return false;
+          site = new URL(`https://raw.githubusercontent.com/${owner}/${repo}/${ref}/${folder.join('/')}`);
+        } else if (toc || /\/(?:llms\.txt|objects\.inv|sitemap(?:_index)?\.xml)$/i.test(site.pathname)) {
+          // A TOC file names its directory, not a subtree beneath the filename.
+          site = new URL('.', site);
+        }
         return site.origin === page.origin && (page.pathname === site.pathname || page.pathname.startsWith(site.pathname.replace(/\/$/, '') + '/'));
       } catch { return false; }
     });

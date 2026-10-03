@@ -53,9 +53,12 @@ const API_LLMS = `# Example API
 `;
 const PAGE = `# Install\n\nRun the installer, then sign in.\n\n## Requirements\n\nA computer.\n\n[Deploy from the beginning](${DOCS}/deploy.md#step-1)\n`;
 const LONG_DOC = '# Deploy\n\n' + Array.from({ length: 45 }, (_, i) => `## Step ${i + 1}\n\nFollow the deployment instructions for step ${i + 1}. This paragraph gives the page enough content to resume at a meaningful passage.\n\n`).join('');
+const GITHUB_DOC = 'https://raw.githubusercontent.com/acme/manual/HEAD/docs/guides/deploy.md';
 
 /** Fixtures for the feeds and the article, plus a small docs site. */
 const fetcher: Fetcher = async (url, options) => {
+  if (url === 'https://api.github.com/repos/acme/manual/git/trees/HEAD?recursive=1') return { status: 200, url, contentType: 'application/json', text: JSON.stringify({ tree: [{ type: 'blob', path: 'docs/README.md' }, { type: 'blob', path: 'docs/guides/deploy.md' }] }), truncated: false };
+  if (url === GITHUB_DOC) return { status: 200, url, contentType: 'text/markdown; charset=utf-8', text: LONG_DOC, truncated: false };
   if (url === `${DOCS}/deploy.md`) return { status: 200, url, contentType: 'text/markdown; charset=utf-8', text: LONG_DOC, truncated: false };
   if (url === `${DOCS}/api/llms.txt`) return { status: 200, url, contentType: 'text/plain; charset=utf-8', text: API_LLMS, truncated: false };
   if (url === `${DOCS}/llms.txt`) return { status: 200, url, contentType: 'text/plain; charset=utf-8', text: LLMS, truncated: false };
@@ -105,6 +108,7 @@ async function openRoom(): Promise<void> {
   page.problems.length = 0;
   await page.goto(`${app.base}/preview`);
   await page.waitFor(`document.querySelectorAll('[data-portal]').length === 5 && !document.querySelector('.skeleton')`, 'the room to draw its five portals');
+  await page.waitFor(`document.querySelector('.continue-reading')?.getAttribute('aria-busy') === 'false'`, 'recent reading to finish loading before pointer coordinates are measured');
 }
 
 test('browser: the room draws every portal from real tool results', { skip }, async () => {
@@ -201,6 +205,11 @@ test('browser: viewing all blocks keeps reading unfinished and can still advance
 });
 
 test('browser: Continue reading survives a fresh view, opens docs at its saved passage, and removes completed items', { skip }, async () => {
+  const directIndex = room();
+  const docs = directIndex.columns.flatMap((column) => column.panels).find((portal) => portal.id === 'docs');
+  assert.ok(docs?.source === 'docs');
+  docs.config.url = `${DOCS}/llms.txt`;
+  await profiles.put('default', directIndex);
   const url = `${DOCS}/deploy.md`;
   await tool('record_reading', { url, title: 'Deploy', status: 'opened', anchor: { block: 20 }, progress: 0.35 });
   // Seen-only and explicitly finished pages stay out of Continue reading.
@@ -228,6 +237,30 @@ test('browser: Continue reading survives a fresh view, opens docs at its saved p
   await page.eval(`document.querySelector('#reader [aria-label="Back to your room"]').click()`);
   await page.waitFor(`document.querySelector('.continue-reading').hidden`, 'finished reading to leave the strip');
   assert.deepEqual(page.problems, []);
+  await profiles.put('default', room());
+});
+
+test('browser: Continue reading resumes a GitHub docs page outside the portal’s current section', { skip }, async () => {
+  const githubRoom = room();
+  const docs = githubRoom.columns.flatMap((column) => column.panels).find((portal) => portal.id === 'docs');
+  assert.ok(docs?.source === 'docs');
+  docs.config = { url: 'https://github.com/acme/manual/tree/HEAD', toc: { kind: 'github', url: 'https://github.com/acme/manual/tree/HEAD/docs' }, section: 'acme/manual', limit: 12 };
+  await profiles.put('default', githubRoom);
+  try {
+    await tool('record_reading', { url: GITHUB_DOC, title: 'Deploy', status: 'opened', anchor: { block: 20 }, progress: 0.35 });
+    await openRoom();
+    assert.equal(await page.eval<boolean>(`Boolean(document.querySelector('[data-portal="docs"] .error'))`), false, 'the selected GitHub docs section loads');
+    assert.doesNotMatch(await page.eval<string>(`document.querySelector('[data-portal="docs"]').textContent`), /Deploy/, 'the saved page is absent from visible portal links');
+    await page.waitFor(`document.querySelector('.continue-item')`, 'unfinished GitHub docs');
+    await page.click('.continue-item');
+    await page.waitFor(`document.querySelector('.docs-page .mark-read:not([disabled])') && document.getElementById('toast').textContent.includes('where you left off')`, 'GitHub docs to resume through the docs viewer');
+    assert.equal(await page.eval<string>(`document.querySelector('.docs-page h1').textContent`), 'Deploy');
+    assert.ok(await page.eval<number>(`document.getElementById('reader').scrollTop || window.scrollY`) > 0);
+    assert.deepEqual(page.problems, []);
+  } finally {
+    await tool('record_reading', { url: GITHUB_DOC, status: 'read' });
+    await profiles.put('default', room());
+  }
 });
 
 test('browser: docs hash navigation takes precedence over the saved position and page changes save progress', { skip }, async () => {

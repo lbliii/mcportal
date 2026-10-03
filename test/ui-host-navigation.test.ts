@@ -37,6 +37,24 @@ test('chat preference falls back inline immediately when messages are unsupporte
   assert.equal(opened.length, 1);
 });
 
+test('Continue reading routes non-visible GitHub and direct-index pages through their docs portal', async () => {
+  const opened: Array<{ kind: string; key: any; url: string }> = [];
+  const github = { id: 'manual', source: 'docs', config: { url: 'https://github.com/acme/manual/tree/HEAD', toc: { kind: 'github', url: 'https://github.com/acme/manual/tree/HEAD/docs' } } };
+  const llms = { id: 'web-docs', source: 'docs', config: { url: 'https://docs.example.com/guide/llms.txt' } };
+  const context = vm.createContext({ URL, state: { profile: { columns: [{ panels: [github, llms] }] }, portals: new Map([['manual', { items: [{ url: 'https://raw.githubusercontent.com/acme/manual/HEAD/docs/README.md' }] }]]) },
+    openDocs: (key: any, options: any) => opened.push({ kind: 'docs', key, url: options.url }),
+    openReader: (item: any) => opened.push({ kind: 'article', key: null, url: item.url }), loadArticleCard: (url: string) => opened.push({ kind: 'article', key: null, url }) });
+  vm.runInContext(shipped('continueReading'), context);
+  const resume = (url: string) => vm.runInContext(`continueReading(${JSON.stringify({ url, title: 'Deploy' })})`, context);
+  resume('https://raw.githubusercontent.com/acme/manual/HEAD/docs/guides/deploy.md');
+  resume('https://docs.example.com/guide/deploy.md');
+  assert.deepEqual(opened.map(({ kind, key }) => [kind, key?.portalId]), [['docs', 'manual'], ['docs', 'web-docs']]);
+  for (const url of ['https://raw.githubusercontent.com/other/manual/HEAD/docs/deploy.md', 'https://raw.githubusercontent.com/acme/manual/other/docs/deploy.md', 'https://raw.githubusercontent.com/acme/manual/HEAD/docs-other/deploy.md', 'https://docs.example.com/guide-other/deploy.md']) {
+    resume(url);
+    assert.equal(opened.at(-1)?.kind, 'article', `unrelated scope: ${url}`);
+  }
+});
+
 test('declined original-link requests expose an address fallback', async () => {
   const addresses: string[] = [];
   const context = vm.createContext({ DEV: false, isHttpUrl: () => true, hostRequest: async () => ({ isError: true }), showLinkFallback: (url: string) => addresses.push(url) });

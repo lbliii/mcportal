@@ -30,10 +30,13 @@ combined merge candidate because it contains the reconciled shared contracts.
 ## Validation and release boundary
 
 The combined `npm run check` passed on 3 October with local HTTP/Chrome permissions
-and an isolated PostgreSQL 14 database: **373 tests, 372 passed, one expected skip,
+and an isolated PostgreSQL 14 database: **375 tests, 374 passed, one expected skip,
 zero failures**. This includes type checks, design checks, real browser flows,
 Postgres schema-v9 migration and storage contracts. The docs account-isolation
-regression and generated distribution/footprint checks passed too. The isolated
+regression and generated distribution/footprint checks passed too. Independent
+review found a GitHub/direct-index docs resume routing bug; it was corrected,
+covered by navigation and Chrome regressions, and cleared on re-review. Browser
+fixtures wait for the reading strip to finish loading before measuring clicks. The isolated
 test database was stopped after validation.
 
 `main` and production remain unchanged. The search, privacy and UI deliverables
