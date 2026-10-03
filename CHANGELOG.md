@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Reading, retrieval and privacy
+- Continue Reading brings back recent unfinished articles and docs pages. Docs now resume and record explicit completion, and reading writes settle in navigation order. Inline columns offer five stories plus More, lane navigation and page controls; shelves keep visible navigation.
+- PostgreSQL clips use schema v9 full-text relevance with literal fallback. Docs search includes each account’s fresh cached page bodies within the existing bounded cache; unvisited pages still use their outline.
+- Export/import links require the owning account's browser session and uploads validate CSRF. Full exports include mutes, blocks, filed reports and Space preferences; shared-cache timestamps are omitted. Hosted linking requires HTTPS except loopback, credential requests refuse redirects, and new data directories are private. GitHub sign-in requests no scope; the hosted HTTPS origin sends HSTS.
+- Bounded protocol observations record recognized version/host categories without raw client identity data. The verified migration assessment corrects the planned modern protocol requirements; modern wire behavior is not implemented.
+
+### Launch operations
+- A read-only `npm run ops:check` probe checks storage health and authenticated MCP discovery, with bounded, credential-free JSON output and no redirects or feed fetching.
+- The hosted operations runbook records deployment verification, rollback, isolated backup restores, incident response and the remaining launch evidence. Railway IaC preserves explicit sign-up, usage-budget and public-page settings without enabling sign-up.
+- The privacy page groups service providers and records policy changes.
+
 ### Fixes
 - Sign-in failures identify the step, HTTP status when available, recovery action and support reference. GitHub errors distinguish expired codes, OAuth app configuration, unverified email and outages; account access messages identify the selected GitHub account. The room and agent can read the last failed attempt and retry with a fresh link. A failed initial portal import keeps sign-in and local data intact and reports a warning in the browser and room. Diagnostic logs omit credentials, callback state and raw provider text.
 - The Ghost mode menu's sign-in button now starts login instead of silently failing when its click event is passed to the sign-in flow. Browser regressions cover both sign-in buttons and hosts that support, omit or decline opening links.

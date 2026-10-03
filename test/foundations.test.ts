@@ -285,6 +285,6 @@ test('github sign-in: an unreachable or failing GitHub is a failed sign-in, neve
   assert.match(rejected.error, /GitHub sign-in token \(HTTP 401\).*Reference:/);
   assert.doesNotMatch(rejected.error, /<script>/);
   const url = new URL(githubAuthorizeUrl(app, 'https://x/cb', 'st8'));
-  assert.equal(url.searchParams.get('scope'), 'read:user');
+  assert.equal(url.searchParams.get('scope'), '');
   assert.equal(url.searchParams.get('allow_signup'), null);
 });

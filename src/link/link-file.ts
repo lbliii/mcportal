@@ -9,6 +9,7 @@
  *
  * Tokens never go to the model, the room or the logs.
  */
+import { hostedOrigin } from './hosted-url.ts';
 import { open, readFile, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { AppError } from '../lib/errors.ts';
@@ -62,13 +63,15 @@ export class LinkFile {
     }
     try {
       const parsed: unknown = JSON.parse(raw);
-      return isRecord(parsed) ? parsed : undefined;
+      if (!isRecord(parsed)) return undefined;
+      return { ...parsed, server: hostedOrigin(parsed.server) };
     } catch {
       return undefined;
     }
   }
 
   write(record: LinkRecord): Promise<void> {
+    hostedOrigin(record.server);
     return atomicWrite(this.file, `${JSON.stringify(record, null, 2)}\n`);
   }
 
@@ -133,7 +136,7 @@ export class FileLinkAuth implements LinkAuth {
           method: 'POST',
           headers: { 'content-type': 'application/x-www-form-urlencoded' },
           body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: record.refreshToken, client_id: record.clientId }).toString(),
-          signal: AbortSignal.timeout(15_000),
+          redirect: 'error', signal: AbortSignal.timeout(15_000),
         });
       } catch (error) {
         throw new AppError('upstream_unreachable', "Can't reach your hosted MCPortal right now, so nothing was changed. Check the connection and try again.", { cause: error });

@@ -12,6 +12,63 @@
   const MEASURE_AFTER = 250;
   /** Saves the open article's position, if it moved, and stops watching it. @type {(() => void) | null} */
   let stopReading = null;
+  /** Writes from the previous reader settle before another view resumes its saved position. @type {Promise<unknown>} */
+  let readingWrites = Promise.resolve();
+
+  let continueGeneration = 0;
+  /** Show recent unfinished reading without changing the user's portals or layout. */
+  async function refreshContinueReading() {
+    const generation = ++continueGeneration;
+    let strip = $first('.continue-reading');
+    if (!strip) {
+      strip = el('section', { class: 'continue-reading', 'aria-label': 'Continue reading', hidden: true });
+      $('grid').before(strip);
+    }
+    strip.setAttribute('aria-busy', 'true');
+    try {
+      await readingWrites.catch(() => {});
+      const { reading } = (await callTool('list_reading', { unfinished: true, limit: 4 })).structuredContent;
+      if (generation !== continueGeneration) return;
+      strip.replaceChildren(el('h2', null, 'Continue reading'),
+        el('ul', null, reading.filter((r) => isHttpUrl(r.url)).map((r) => el('li', null,
+          el('button', { class: 'continue-item', type: 'button', onclick: () => continueReading(r) },
+            el('span', null, r.title || r.url),
+            el('small', null, `${Math.round((r.progress ?? 0) * 100)}% · opened ${ago(r.lastOpenedAt)}`))))));
+      strip.hidden = !reading.length;
+    } catch { if (generation === continueGeneration) strip.hidden = true; }   // older servers may not have reading history
+    finally { if (generation === continueGeneration) strip.setAttribute('aria-busy', 'false'); }
+  }
+
+  /** @param {ToolResults['list_reading']['reading'][number]} reading */
+  function continueReading(reading) {
+    // Prefer the original docs portal, including pages not among its current first items.
+    const specs = state.profile?.columns.flatMap((column) => column.panels) ?? [];
+    const docs = specs.find((spec) => {
+      if (spec.source !== 'docs') return false;
+      const portal = state.portals.get(spec.id);
+      if (portal?.items.some((item) => item.url?.split('#')[0] === reading.url)) return true;
+      if (!spec.config || !('url' in spec.config) || typeof spec.config.url !== 'string') return false;
+      try {
+        const toc = spec.config.toc;
+        let site = new URL(toc?.url || spec.config.url);
+        const page = new URL(reading.url);
+        // GitHub indexes use web URLs, but their pages are read from the raw host.
+        if (site.hostname === 'github.com') {
+          const [owner, repo, kind, ref, ...folder] = site.pathname.split('/').filter(Boolean);
+          if (kind !== 'tree' || !ref) return false;
+          site = new URL(`https://raw.githubusercontent.com/${owner}/${repo}/${ref}/${folder.join('/')}`);
+        } else if (toc || /\/(?:llms\.txt|objects\.inv|sitemap(?:_index)?\.xml)$/i.test(site.pathname)) {
+          // A TOC file names its directory, not a subtree beneath the filename.
+          site = new URL('.', site);
+        }
+        return site.origin === page.origin && (page.pathname === site.pathname || page.pathname.startsWith(site.pathname.replace(/\/$/, '') + '/'));
+      } catch { return false; }
+    });
+    if (docs) return openDocs({ portalId: docs.id }, { url: reading.url });
+    const portal = [...state.portals.values()].find((p) => p.items.some((item) => item.url === reading.url)) ?? [...state.portals.values()][0];
+    if (portal) return openReader({ id: reading.url, url: reading.url, title: reading.title || reading.url, meta: [] }, portal);
+    return loadArticleCard(reading.url);
+  }
 
   /**
    * Record and resume reading for the article now shown in `reader` (its blocks in `.body`).
@@ -50,7 +107,8 @@
       if (!ready || read || key === saved) return;
       saved = key; lastSave = Date.now();
       const update = { url, status: 'opened', progress: furthest.progress, anchor: { block: furthest.block } };
-      recorded.then(() => callTool('record_reading', update)).catch(() => {});
+      recorded = recorded.then(() => callTool('record_reading', update)).catch(() => {});
+      readingWrites = recorded;
     };
     const queueSave = () => {
       if (!saveTimer) saveTimer = window.setTimeout(save, Math.max(1000, POSITION_EVERY - (Date.now() - lastSave)));
@@ -59,9 +117,9 @@
       clearTimeout(measureTimer); measureTimer = 0;
       if (!body.isConnected) return;
       const here = position();
-      if (here.progress <= furthest.progress) return;
-      furthest = here;
-      body.dataset.furthest = String(here.block);
+      if (here.progress <= furthest.progress && here.block <= furthest.block) return;
+      furthest = { block: Math.max(furthest.block, here.block), progress: Math.max(furthest.progress, here.progress) };
+      body.dataset.furthest = String(furthest.block);
       queueSave();
     };
     const onScroll = () => {
@@ -84,30 +142,40 @@
     document.addEventListener('scroll', onScroll, { capture: true, passive: true });
     document.addEventListener('visibilitychange', onHide);
 
-    const button = el('button', { class: 'btn mark-read', type: 'button' }, 'Mark as read');
+    const button = el('button', { class: 'btn mark-read', type: 'button', disabled: true }, 'Mark as read');
     button.addEventListener('click', async () => {
       read = true;
+      clearTimeout(saveTimer); saveTimer = 0;
       button.disabled = true; button.textContent = 'Read';
-      try { await callTool('record_reading', { url, status: 'read', title }); }
+      const completed = recorded.then(() => callTool('record_reading', { url, status: 'read', title }));
+      readingWrites = completed.catch(() => {});
+      try { await completed; refreshContinueReading(); }
       catch { read = false; button.disabled = false; button.textContent = 'Mark as read'; toast("Couldn't mark it as read"); }
     });
     body.after(el('div', { class: 'read-end' }, button));
 
     try {
+      await readingWrites.catch(() => {});
       const { reading } = (await callTool('get_reading', { url })).structuredContent;
       if (stopReading !== stop) return;
-      const block = reading && reading.status !== 'read' && reading.anchor ? reading.anchor.block ?? 0 : 0;
-      const target = blocks()[block];
+      const anchor = reading && reading.status !== 'read' ? reading.anchor : null;
+      const heading = anchor?.heading && [...body.querySelectorAll('[data-anchor]')].find((node) => node.getAttribute('data-anchor') === anchor.heading || node.textContent === anchor.heading);
+      const block = anchor?.block ?? (heading ? blocks().findIndex((node) => node === heading || node.contains(heading)) : 0);
+      const target = blocks()[Math.max(0, block)];
+      if (reading && reading.status !== 'read') {
+        furthest = { block: Math.max(0, Math.min(block, blocks().length - 1)), progress: reading.progress ?? 0 };
+        saved = `${furthest.block}:${furthest.progress}`;
+      }
       if (resume && reading && block > 0 && target) {
         target.scrollIntoView({ block: 'start' });
-        furthest = { block, progress: reading.progress ?? 0 };
-        saved = `${furthest.block}:${furthest.progress}`;
         toast('Picked up where you left off');
       }
       ready = true;
       recorded = callTool('record_reading', { url, status: 'opened', title });
+      readingWrites = recorded.catch(() => {});
       if (`${furthest.block}:${furthest.progress}` !== saved) queueSave();   // scrolled while the history loaded
       await recorded;
+      if (stopReading === stop) button.disabled = false;
     } catch {
       // no reading history here: stop watching
       clearTimeout(measureTimer); clearTimeout(saveTimer);

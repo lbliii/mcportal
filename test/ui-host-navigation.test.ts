@@ -37,6 +37,24 @@ test('chat preference falls back inline immediately when messages are unsupporte
   assert.equal(opened.length, 1);
 });
 
+test('Continue reading routes non-visible GitHub and direct-index pages through their docs portal', async () => {
+  const opened: Array<{ kind: string; key: any; url: string }> = [];
+  const github = { id: 'manual', source: 'docs', config: { url: 'https://github.com/acme/manual/tree/HEAD', toc: { kind: 'github', url: 'https://github.com/acme/manual/tree/HEAD/docs' } } };
+  const llms = { id: 'web-docs', source: 'docs', config: { url: 'https://docs.example.com/guide/llms.txt' } };
+  const context = vm.createContext({ URL, state: { profile: { columns: [{ panels: [github, llms] }] }, portals: new Map([['manual', { items: [{ url: 'https://raw.githubusercontent.com/acme/manual/HEAD/docs/README.md' }] }]]) },
+    openDocs: (key: any, options: any) => opened.push({ kind: 'docs', key, url: options.url }),
+    openReader: (item: any) => opened.push({ kind: 'article', key: null, url: item.url }), loadArticleCard: (url: string) => opened.push({ kind: 'article', key: null, url }) });
+  vm.runInContext(shipped('continueReading'), context);
+  const resume = (url: string) => vm.runInContext(`continueReading(${JSON.stringify({ url, title: 'Deploy' })})`, context);
+  resume('https://raw.githubusercontent.com/acme/manual/HEAD/docs/guides/deploy.md');
+  resume('https://docs.example.com/guide/deploy.md');
+  assert.deepEqual(opened.map(({ kind, key }) => [kind, key?.portalId]), [['docs', 'manual'], ['docs', 'web-docs']]);
+  for (const url of ['https://raw.githubusercontent.com/other/manual/HEAD/docs/deploy.md', 'https://raw.githubusercontent.com/acme/manual/other/docs/deploy.md', 'https://raw.githubusercontent.com/acme/manual/HEAD/docs-other/deploy.md', 'https://docs.example.com/guide-other/deploy.md']) {
+    resume(url);
+    assert.equal(opened.at(-1)?.kind, 'article', `unrelated scope: ${url}`);
+  }
+});
+
 test('declined original-link requests expose an address fallback', async () => {
   const addresses: string[] = [];
   const context = vm.createContext({ DEV: false, isHttpUrl: () => true, hostRequest: async () => ({ isError: true }), showLinkFallback: (url: string) => addresses.push(url) });
@@ -51,7 +69,7 @@ test('returning to a room restores lane/column scroll and focus without reloadin
   let focused = false;
   const nodes: any = { grid: lane, reader: { hidden: false, classList: { remove() {} } }, roomName: {} };
   const positions: unknown[] = [];
-  const context = vm.createContext({ stopReading: null, $: (id: string) => nodes[id], $$: (selector: string, from: { querySelectorAll(s: string): unknown[] }) => from.querySelectorAll(selector), state: { profile: { name: 'My room' } }, root: { classList: { remove() {} } }, document: { activeElement: { focus: () => { focused = true; } } }, window: { scrollX: 0, scrollY: 150, scrollTo: (...args: unknown[]) => positions.push(args) } });
+  const context = vm.createContext({ stopReading: null, refreshContinueReading() {}, $: (id: string) => nodes[id], $$: (selector: string, from: { querySelectorAll(s: string): unknown[] }) => from.querySelectorAll(selector), state: { profile: { name: 'My room' } }, root: { classList: { remove() {} } }, document: { activeElement: { focus: () => { focused = true; } } }, window: { scrollX: 0, scrollY: 150, scrollTo: (...args: unknown[]) => positions.push(args) } });
   vm.runInContext(`let readerGeneration = 0, roomNavigation = null, articleUrl = null, clipId = null, docsArgs = null, spaceHandle = null, docsState = null; ${shipped('rememberRoomNavigation')} ${shipped('closeReader')} rememberRoomNavigation();`, context);
   lane.hidden = true; lane.scrollLeft = 0; column.scrollTop = 0;
   await vm.runInContext('closeReader()', context);
@@ -78,7 +96,7 @@ test('a late article result cannot replace the view after home navigation', asyn
   let resolveTool!: (value: unknown) => void;
   const replaced: unknown[] = [];
   const reader = { hidden: true, scrollTop: 0, replaceChildren: (...children: unknown[]) => replaced.push(children) };
-  const context = vm.createContext({ $: (id: string) => id === 'reader' ? reader : {}, rememberRoomNavigation() {}, window: { scrollTo() {} }, readerTop() {}, el() {}, $first: () => null, takeZoomSource: () => null, transition: async (update: () => void) => update(), callTool: () => new Promise((resolve) => { resolveTool = resolve; }), articleNodes: () => { throw new Error('Stale article rendered'); } });
+  const context = vm.createContext({ stopReading: null, $: (id: string) => id === 'reader' ? reader : {}, rememberRoomNavigation() {}, window: { scrollTo() {} }, readerTop() {}, el() {}, $first: () => null, takeZoomSource: () => null, transition: async (update: () => void) => update(), callTool: () => new Promise((resolve) => { resolveTool = resolve; }), articleNodes: () => { throw new Error('Stale article rendered'); } });
   vm.runInContext(`let readerGeneration = 0; ${shipped('openReader')}`, context);
   const opened = vm.runInContext(`openReader({url:'https://example.com'}, {title:'News'})`, context);
   await new Promise((done) => setImmediate(done));   // past the transition, waiting on read_article

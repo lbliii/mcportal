@@ -44,10 +44,23 @@ export class PgClipStore implements ClipStore {
     if (tag) add('? = ANY(tags)', tag);
     if (query.before && !Number.isNaN(Date.parse(query.before))) add('created_at < ?', query.before);
     const words = queryWords(query.query);
-    if (words.length) add(`search_text LIKE ALL(?::text[])`, words.map(likeWord));
+    let order = 'created_at DESC';
+    if (words.length && words.every((word) => /^[\p{L}\p{N}]+$/u.test(word))) {
+      values.push(words.join(' '));
+      const fullText = `plainto_tsquery('english'::regconfig, $${values.length})`;
+      values.push(words.map(likeWord));
+      // Keep literal substring/punctuation and stopword-only queries useful while
+      // also matching inflections. Parameters never become tsquery syntax.
+      where.push(`(search_vector @@ ${fullText} OR search_text LIKE ALL($${values.length}::text[]))`);
+      order = `ts_rank_cd(search_vector, ${fullText}) DESC, created_at DESC`;
+    } else if (words.length) {
+      // Signs and identifier punctuation are literal, rather than silently
+      // discarded by the full-text parser (e.g. 100% must not match 100).
+      add(`search_text LIKE ALL(?::text[])`, words.map(likeWord));
+    }
     values.push(clampLimit(query.limit, 20, CLIP_LIMITS.perUser));
     const { rows } = await this.db.query<{ summary: ClipSummary }>(
-      `SELECT summary FROM mcportal_clips WHERE ${where.join(' AND ')} ORDER BY created_at DESC LIMIT $${values.length}`,
+      `SELECT summary FROM mcportal_clips WHERE ${where.join(' AND ')} ORDER BY ${order} LIMIT $${values.length}`,
       values,
     );
     return rows.map((r) => r.summary);

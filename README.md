@@ -112,6 +112,8 @@ Check a deployment with: `MCPORTAL_URL=https://<your-domain>/mcp MCPORTAL_TOKEN=
 
 **Health**: `GET /health` checks storage (Postgres answers, or the data directory is writable) and answers 503 when it can't reach it. **Usage**: the admin page shows today's budget use by account and per-tool call counts, errors and timings for the instance.
 
+For an external authenticated availability probe, use `MCPORTAL_URL=https://<your-domain>/mcp npm run ops:check` with an authorized `MCPORTAL_TOKEN` supplied securely in the environment. See [hosted operations](docs/operations.md) for deployment verification, rollback, recovery drills and remaining launch checks.
+
 **Logs** go to stderr, one event per line: `MCPORTAL_LOG_FORMAT=json` for a log platform, `MCPORTAL_LOG_LEVEL=debug|info|warn|error` (default `info`). Each HTTP request has an id, sent back as `x-request-id` and on every line it logs; a tool failure that is our bug says `reference <id>`, which finds its stack. Users appear only as a short hash.
 
 ## Security model
@@ -176,6 +178,8 @@ Limits: 8 columns, 4 portals per column, 30 items per portal, 200 saved items, 3
 
 ## Next
 
+The [delivery roadmap](docs/plans/delivery-roadmap.md) sequences the next product releases: compatibility, reading continuity, useful knowledge, proactive updates, and personal presentation.
+
 MCPortal is a **reading platform with light social**, driven by your agent. Anything people share lives natively in MCPortal, not as public feeds. Your room is yours: it works without an account, and it exports in standard formats. Detailed plans live in [`docs/plans/`](docs/plans/).
 
 **M1.5: public beta.** Done when someone who isn't the author can connect, onboard, and come back the next day to a room that still works.
@@ -193,8 +197,8 @@ MCPortal is a **reading platform with light social**, driven by your agent. Anyt
 - [ ] Show HN
 
 **M2: your room, everywhere, and light social**
-- [x] **Clips:** save quotes, exchanges, explanations, tables and images from the conversation; a Clips portal; the agent can search them across chats ([plan](docs/plans/clips.md)). Next: clip a quote from a reader selection, Postgres full-text search
-- **Devices:** link a local MCPortal to your hosted account; state syncs, fetching stays local with a hosted fallback ([plan](docs/plans/local-hosted-hybrid.md))
+- [x] **Clips:** save quotes, exchanges, explanations, tables and images from the conversation or a reader selection; a Clips portal; the agent can search them across chats ([plan](docs/plans/clips.md)). Search-quality improvements remain planned.
+- [x] **Devices:** local sign-in and hosted-state sync are implemented ([plan](docs/plans/local-hosted-hybrid.md)); production deployment and cross-host continuity still need verification.
 - [x] **Portability:** full MCPortal export and import, saved items as bookmarks, clips as Markdown, delete account at `/account` ([plan](docs/plans/identity-and-access.md#data-rights-and-portability))
 - [x] **Public profile (opt-in):** claim a handle (e.g. `@lbliii`); nothing is public until you choose
 - [x] **Share** a saved item or clip with a one-line note (Claude can draft it; you approve it); audience is your followers or everyone on MCPortal

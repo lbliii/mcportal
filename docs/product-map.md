@@ -4,6 +4,8 @@
 
 Legend: ✅ shipped · 🗺 planned (README "Next" or `docs/plans/`) · 💡 idea (not planned yet)
 
+The [delivery roadmap](plans/delivery-roadmap.md) defines the proposed implementation order and release criteria for upcoming work; this map describes current capabilities and ideas.
+
 ## 1. The levels
 
 Every item in this map sits at exactly one level:

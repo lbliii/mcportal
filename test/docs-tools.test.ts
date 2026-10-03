@@ -186,10 +186,11 @@ test('tools: open_docs, read_doc_page and search_docs; pages are fenced and scop
   const c = await docsCtx();
   const opened = await call(c, 'open_docs', { docs: 'docs.example.dev' });
   assert.equal(opened.structuredContent.provenance.source, 'docs');
-  assert.equal(opened.structuredContent.provenance.cached, false);
-  assert.ok(opened.structuredContent.provenance.fetchedAt);
+  assert.equal('cached' in opened.structuredContent.provenance, false);
+  assert.equal('fetchedAt' in opened.structuredContent.provenance, false);
   const again = await call(c, 'open_docs', { docs: 'docs.example.dev' });
-  assert.equal(again.structuredContent.provenance.cached, true);
+  assert.equal('cached' in again.structuredContent.provenance, false);
+  assert.equal('fetchedAt' in again.structuredContent.provenance, false);
   assert.match(opened.content[0]!.text, /^Stripe Documentation: 1 sections, 10 pages/);
   assert.match(opened.content[0]!.text, /<untrusted-content[\s\S]*- Testing <https:\/\/docs\.stripe\.com\/testing\.md>/);
 
@@ -253,4 +254,71 @@ test('read_doc_page: a long page comes in parts, and the last part says nothing 
   assert.match(last.content[0]!.text, new RegExp(`part ${total} of ${total}`));
   assert.doesNotMatch(last.content[0]!.text, /for more/);
   assert.ok(last.structuredContent.page.blocks.length > 50, 'the app still gets the whole page');
+});
+
+test('search_docs: searches read page bodies without crawling, and respects TTL, eviction and site scope', async () => {
+  const c = await docsCtx();
+  let now = Date.now();
+  c.cache = new TtlCache({ now: () => now });
+  const before = await call(c, 'search_docs', { docs: 'docs.example.dev', query: 'test cards' });
+  assert.deepEqual(before.structuredContent.hits, [], 'unread body is absent');
+  assert.ok(c.calls.every((url) => !url.endsWith('testing.md')), 'search only fetches the TOC');
+  await call(c, 'read_doc_page', { docs: 'docs.example.dev', url: 'https://docs.stripe.com/testing.md' });
+  const size = c.cache.size;
+  const calls = c.calls.length;
+  const after = await call(c, 'search_docs', { docs: 'docs.example.dev', query: 'test cards' });
+  assert.deepEqual(after.structuredContent.hits.map((hit: any) => hit.url), ['https://docs.stripe.com/testing.md']);
+  assert.equal(c.calls.length, calls, 'body search adds no fetches');
+  assert.deepEqual(c.cache.size, size, 'no duplicate full-content index');
+  assert.match(after.content[0]!.text, /unvisited pages searched by outline only/);
+  await c.cache.get(`docpage:${JSON.stringify([c.userId, 'https://evil.example.org/offsite'])}`, 3600, async () => ({ blocks: [{ type: 'p', text: 'otherword' }] }));
+  const other = await call(c, 'search_docs', { docs: 'docs.example.dev', query: 'otherword' });
+  assert.deepEqual(other.structuredContent.hits, [], 'other sites cached content is excluded');
+  const python = await call(c, 'search_docs', { docs: 'docs.python.org/3', query: 'test cards' });
+  assert.deepEqual(python.structuredContent.hits, [], 'one site never searches another site');
+  const afterPython = c.calls.length;
+  now += 3600 * 1000;
+  const expired = await call(c, 'search_docs', { docs: 'docs.example.dev', query: 'test cards' });
+  assert.deepEqual(expired.structuredContent.hits, [], 'expired bodies are not searched or refetched');
+  assert.equal(c.calls.length, afterPython, 'expired bodies are not refetched');
+
+  const evicted = await docsCtx();
+  evicted.cache = new TtlCache({ maxEntries: 1 });
+  await call(evicted, 'read_doc_page', { docs: 'docs.example.dev', url: 'https://docs.stripe.com/testing.md' });
+  const lost = await call(evicted, 'search_docs', { docs: 'docs.example.dev', query: 'test cards' });
+  assert.deepEqual(lost.structuredContent.hits, [], 'evicted bodies do not linger in an auxiliary index');
+});
+
+test('search_docs: shared cache exposes bodies only after the searching account reads them', async () => {
+  const a = await docsCtx();
+  let now = Date.now();
+  a.cache = new TtlCache({ now: () => now });
+  const b = { ...a, userId: 'other' };
+  const args = { docs: 'docs.example.dev', query: 'test cards' };
+  const page = { docs: args.docs, url: 'https://docs.stripe.com/testing.md' };
+  assert.deepEqual((await call(b, 'search_docs', args)).structuredContent.hits, []);
+  await call(a, 'read_doc_page', page);
+  assert.equal((await call(a, 'search_docs', args)).structuredContent.hits.length, 1);
+  assert.deepEqual((await call(b, 'search_docs', args)).structuredContent.hits, [], 'another account reading does not change my body search');
+  const fetches = a.calls.length;
+  await call(a, 'read_doc_page', page);
+  assert.equal(a.calls.length, fetches, 'repeat reads still use this account’s cached page');
+  await call(b, 'read_doc_page', page);
+  assert.equal(a.calls.length, fetches + 1, 'a first read uses an independent account cache entry');
+  assert.equal((await call(b, 'search_docs', args)).structuredContent.hits.length, 1);
+  now += 3600 * 1000;
+  assert.deepEqual((await call(a, 'search_docs', args)).structuredContent.hits, []);
+  assert.deepEqual((await call(b, 'search_docs', args)).structuredContent.hits, [], 'expiration removes both accounts’ body matches');
+});
+
+test('search: titles rank ahead of body matches, combining outline and table content', () => {
+  const site: DocSite = { title: 'Site', toc: { kind: 'llms', url: 'https://docs.example.com/llms.txt' }, sections: [{ title: 'Guides', pages: [
+    { title: 'Reference', url: 'https://docs.example.com/reference' },
+    { title: 'Widget quotas', url: 'https://docs.example.com/quotas' },
+  ] }] };
+  const page = { url: 'https://docs.example.com/reference', sourceUrl: 'https://docs.example.com/reference', title: 'Reference', route: 'markdown' as const, wordCount: 2,
+    blocks: [{ type: 'table' as const, text: '', columns: ['Widget'], rows: [['quotas']] }] };
+  const lookup = (url: string) => url === page.url ? page : undefined;
+  assert.deepEqual(searchDocs(site, 'widget quotas', 20, lookup).map((hit) => hit.title), ['Widget quotas', 'Reference']);
+  assert.deepEqual(searchDocs(site, 'reference quotas', 20, lookup).map((hit) => hit.title), ['Reference'], 'terms can span title and body');
 });

@@ -98,7 +98,7 @@
     },
     {
       "name": "search_docs",
-      "description": "Find pages of a docs site by title and section, and on Sphinx sites functions and classes by name ('str.split'); not full text."
+      "description": "Search docs titles, sections, Sphinx symbols and your fresh cached page bodies."
     },
     {
       "name": "open_handoff",

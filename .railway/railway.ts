@@ -30,11 +30,18 @@ export default defineRailway(() => {
       MCPORTAL_TOKEN: preserve(),
       MCPORTAL_ADMINS: preserve(),
       MCPORTAL_ALLOWED_GITHUB_USERS: preserve(),
+      // Public sign-up is an explicit operator setting, never enabled by a deploy.
+      MCPORTAL_OPEN_SIGNUP: preserve(),
       MCPORTAL_LABS: preserve(),
+      MCPORTAL_LIMIT_PER_MINUTE: preserve(),
+      MCPORTAL_LIMIT_PER_DAY: preserve(),
+      MCPORTAL_LIMIT_GLOBAL_PER_DAY: preserve(),
       // The public pages: who runs the service, where to reach them, the terms' law.
       MCPORTAL_OPERATOR: preserve(),
       MCPORTAL_CONTACT_EMAIL: preserve(),
       MCPORTAL_JURISDICTION: preserve(),
+      MCPORTAL_SUPPORT_URL: preserve(),
+      MCPORTAL_SOURCE_URL: preserve(),
     },
   });
 

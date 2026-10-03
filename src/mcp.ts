@@ -21,6 +21,30 @@ export const SERVER_INFO = { name: 'mcportal', title: 'MCPortal', version: '0.7.
 export const SUPPORTED_PROTOCOL_VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05'];
 export const MCP_APP_MIME = 'text/html;profile=mcp-app';
 
+/** Diagnostic vocabularies are bounded: client-supplied text never reaches logs. */
+function field(value: unknown, key: string): unknown {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  return (value as Record<string, unknown>)[key];
+}
+
+function observedVersion(value: unknown): string {
+  if (value === undefined) return 'missing';
+  return typeof value === 'string' && (SUPPORTED_PROTOCOL_VERSIONS.includes(value) || value === '2026-07-28') ? value : 'other';
+}
+
+/** Exact aliases only; self-reported host identity never controls access or behavior. */
+function observedHost(clientInfo: unknown): string {
+  const name = field(clientInfo, 'name');
+  if (typeof name !== 'string' || name.length > 64) return 'unknown';
+  switch (name.toLowerCase()) {
+    case 'claude': case 'claude-ai': case 'claude-desktop': case 'claude desktop': return 'claude';
+    case 'claude-code': case 'claude code': return 'claude_code';
+    case 'chatgpt': case 'openai-chatgpt': return 'chatgpt';
+    case 'codex': case 'codex-mcp-client': return 'codex';
+    default: return 'unknown';
+  }
+}
+
 const INSTRUCTIONS = [
   'MCPortal is the user\'s room: portals onto sources they chose (sites with feeds, Hacker News, GitHub, docs), arranged as they asked. "My portal" or "my MCPortal" means the room; stored profiles still call portals panels (columns[].panels).',
   'open_room shows it; a new user gets starter packs (build_room). To follow something new: find_source, then add_portal with the candidate they pick. For docs: open_docs, search_docs, read_doc_page.',
@@ -165,6 +189,11 @@ export async function handleMessage(message: unknown, ctx: ToolContext): Promise
     case 'initialize': {
       const requested = String(params.protocolVersion ?? '');
       const protocolVersion = SUPPORTED_PROTOCOL_VERSIONS.includes(requested) ? requested : SUPPORTED_PROTOCOL_VERSIONS[0];
+      ctx.log?.info('protocol.initialize', {
+        requestedVersion: observedVersion(params.protocolVersion),
+        selectedVersion: protocolVersion,
+        host: observedHost(params.clientInfo),
+      });
       return reply(req.id, {
         protocolVersion,
         capabilities: {
@@ -216,6 +245,13 @@ export async function handleMessage(message: unknown, ctx: ToolContext): Promise
     case 'prompts/list':
       return reply(req.id, { prompts: [] });
     default:
+      if (req.method === 'server/discover') {
+        const meta = field(params, '_meta');
+        ctx.log?.info('protocol.discovery_probe', {
+          requestedVersion: observedVersion(field(meta, 'io.modelcontextprotocol/protocolVersion')),
+          host: observedHost(field(meta, 'io.modelcontextprotocol/clientInfo')),
+        });
+      }
       return rpcError(req.id, RPC.methodNotFound, `Method not found: ${req.method}`);
   }
 }

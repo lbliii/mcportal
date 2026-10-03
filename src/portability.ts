@@ -15,7 +15,7 @@ import { buildClip, ClipError, CLIP_KINDS, clipText, type Clip, type ClipStore }
 import { buildOpml } from './opml.ts';
 import { LIMITS, normalizePinnedItems, normalizeSaved, ProfileError, validateProfile, type PortalSpec, type Profile } from './profile.ts';
 import type { PublicProfile } from './public-profiles.ts';
-import type { SharedItem, SocialService } from './social.ts';
+import type { SharedItem, SocialService, Social } from './social.ts';
 import type { ReadingStore, ReadingState } from './reading.ts';
 import type { ProfileStore } from './store.ts';
 import { addPortalTo } from './layout.ts';
@@ -41,10 +41,13 @@ export interface PortalExport {
   profile: Profile;
   clips: Clip[];
   reading?: ReadingState[];
-  publicProfile: Pick<PublicProfile, 'handle' | 'displayName' | 'bio'> | null;
+  publicProfile: Omit<PublicProfile, 'accountId' | 'createdAt' | 'updatedAt'> | null;
   /** Your shares (with the content as shared) and who you follow, by handle. Not imported. */
   shares?: Array<Omit<SharedItem, 'author' | 'mine'>>;
   following?: string[];
+  muted?: string[];
+  blocked?: string[];
+  reports?: Awaited<ReturnType<Social['reportsFiled']>>;
 }
 
 export interface ExportSources {
@@ -52,7 +55,7 @@ export interface ExportSources {
   reading?: ReadingStore | undefined;
   clips?: ClipStore | undefined;
   publicProfile?: PublicProfile | undefined;
-  social?: SocialService | undefined;
+  social?: (SocialService & Partial<Pick<Social, 'reportsFiled'>>) | undefined;
 }
 
 async function allClips(clips: ClipStore | undefined, userId: string): Promise<Clip[]> {
@@ -77,7 +80,7 @@ export async function buildExport(format: ExportFormat, userId: string, from: Ex
   if (format === 'clips') {
     return { filename: `mcportal-clips-${stamp(now)}.tar.gz`, contentType: 'application/gzip', body: clipsArchive(clips, now), summary: `${clips.length} clip(s) as Markdown` };
   }
-  const p = from.publicProfile;
+  const p = from.publicProfile?.accountId === userId ? from.publicProfile : undefined;
   const data: PortalExport = {
     format: 'mcportal-export',
     version: EXPORT_VERSION,
@@ -85,11 +88,23 @@ export async function buildExport(format: ExportFormat, userId: string, from: Ex
     profile,
     clips,
     reading: await from.reading?.list(userId, { limit: 1000 }) ?? [],
-    publicProfile: p ? { handle: p.handle, ...(p.displayName ? { displayName: p.displayName } : {}), ...(p.bio ? { bio: p.bio } : {}) } : null,
+    publicProfile: p ? {
+      handle: p.handle,
+      ...(p.displayName ? { displayName: p.displayName } : {}),
+      ...(p.bio ? { bio: p.bio } : {}),
+      ...(p.spaceTitle ? { spaceTitle: p.spaceTitle } : {}),
+      ...(p.accent ? { accent: p.accent } : {}),
+      ...(p.sources ? { sources: p.sources } : {}),
+      ...(p.reblogs ? { reblogs: p.reblogs } : {}),
+    } : null,
   };
   if (from.social) {
     data.shares = (await from.social.sharesOf(userId, userId, { limit: 100_000 })).map(({ author: _a, mine: _m, ...s }) => s);
-    data.following = (await from.social.connections(userId)).following;
+    const connections = await from.social.connections(userId, true);
+    data.following = connections.following;
+    data.muted = connections.muted;
+    data.blocked = connections.blocked;
+    data.reports = await from.social.reportsFiled?.(userId) ?? [];
   }
   const portals = profile.columns.reduce((n, c) => n + c.panels.length, 0);
   return {
@@ -349,7 +364,7 @@ export async function deliverToFile(format: ExportFormat, userId: string, from: 
   const path = await import('node:path');
   const file = await buildExport(format, userId, from);
   const dir = path.join(dataDir, 'exports');
-  await mkdir(dir, { recursive: true });
+  await mkdir(dir, { recursive: true, mode: 0o700 });
   const where = path.join(dir, file.filename);
   await writeFile(where, file.body, { mode: 0o600 });
   return { kind: 'file', where, summary: file.summary };
