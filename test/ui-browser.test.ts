@@ -151,19 +151,19 @@ test('browser: the reader records opening and position, resumes there, and marks
   await readings.deleteAll('default');
   const openArticle = async () => {
     await openRoom();
+    await page.eval(`document.getElementById('reader').style.maxHeight = '220px'`);   // set the reader window before any reading measurement
     await page.click('[data-portal="saved"] .item-main');
     await page.waitFor(`document.querySelector('#reader .mark-read:not([disabled])')`, 'the article and its ready Mark as read button');
-    await page.eval(`document.getElementById('reader').style.maxHeight = '220px'`);   // a small window, so the fixture article scrolls
   };
   await openArticle();
   const opened = await readingWhen((r) => r.status === 'opened');
   assert.equal(opened?.status, 'opened', 'opening records it, no model involved');
   assert.equal(opened.readAt, undefined);
 
-  // Scroll a third of the way, then leave (Back scrolls up to itself first): the furthest point is saved on the way out.
-  const scrolled = await page.eval<number>(`(() => { const r = document.getElementById('reader'); r.scrollTop = (r.scrollHeight - r.clientHeight) / 3; return r.scrollTop; })()`);
+  // Move to an actual passage: footer and toolbar sizes aren't part of reading progress.
+  const scrolled = await page.eval<number>(`(() => { const r = document.getElementById('reader'); const blocks = document.querySelector('#reader .body').children; const target = blocks[Math.floor(blocks.length / 3)]; r.scrollTop += target.getBoundingClientRect().top - r.getBoundingClientRect().top; return r.scrollTop; })()`);
   assert.ok(scrolled > 0, 'the article is long enough to scroll');
-  await page.waitFor(`Number(document.querySelector('#reader .body')?.dataset.furthest) > 0`, 'the reader to note how far it got');   // a reader pauses there
+  await page.waitFor(`Number(document.querySelector('#reader .body')?.dataset.furthest) > 0`, 'the reader to note how far it got');
   await page.click('#reader [aria-label="Back to your room"]');
   await page.waitFor(`!document.getElementById('grid').hidden`, 'the room to come back');
   const left = await readingWhen((r) => r.anchor?.block > 0);
@@ -182,6 +182,21 @@ test('browser: the reader records opening and position, resumes there, and marks
   assert.equal(read.status, 'read');
   assert.ok(read.readAt);
   assert.deepEqual((await tool('list_reading', {})).reading.map((r: any) => r.url), [], 'finished reading is not "in the middle of"');
+  assert.deepEqual(page.problems, []);
+});
+
+test('browser: viewing all blocks keeps reading unfinished and can still advance the resume anchor in a smaller reader', { skip }, async () => {
+  await tool('record_reading', { url: ARTICLE, status: 'opened', title: 'PS5', progress: 1, anchor: { block: 0 } });
+  await openRoom();
+  await page.eval(`document.getElementById('reader').style.maxHeight = '220px'`);
+  await page.click('[data-portal="saved"] .item-main');
+  await page.waitFor(`document.querySelector('#reader .mark-read:not([disabled])')`, 'ready reading');
+  await page.eval(`(() => { const reader = document.getElementById('reader'); reader.scrollTop = (reader.scrollHeight - reader.clientHeight) / 2; })()`);
+  await page.waitFor(`Number(document.querySelector('#reader .body').dataset.furthest) > 0`, 'the anchor to advance despite full progress');
+  await page.eval(`document.querySelector('#reader [aria-label="Back to your room"]').click()`);
+  const left = await readingWhen((reading) => reading.anchor?.block > 0);
+  assert.equal(left.progress, 1);
+  assert.equal(left.status, 'opened', 'only explicit completion marks the page read');
   assert.deepEqual(page.problems, []);
 });
 
@@ -337,7 +352,7 @@ test('browser: a nested docs index opens inside the viewer, and its up button go
   await openRoom();
   await page.click('[data-portal="docs"] .item-main');
   await page.waitFor(`document.querySelector('.docs-toc a.idx')`, 'the nested index link');
-  await page.eval(`document.querySelector('.docs-toc a.idx').closest('details').querySelector('summary').click()`);   // open its section, as a reader would
+  await page.eval(`(() => { const section = document.querySelector('.docs-toc a.idx').closest('details'); if (!section.open) section.querySelector('summary').click(); })()`);   // leave an already-open section open
   await page.click('.docs-toc a.idx');
   await page.waitFor(`document.querySelector('.docs-up')`, 'the nested docs, with an up button');
   assert.match(await page.eval<string>(`document.querySelector('.docs-toc').textContent`), /Widgets/);
