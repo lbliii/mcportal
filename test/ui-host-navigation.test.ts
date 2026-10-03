@@ -51,7 +51,7 @@ test('returning to a room restores lane/column scroll and focus without reloadin
   let focused = false;
   const nodes: any = { grid: lane, reader: { hidden: false, classList: { remove() {} } }, roomName: {} };
   const positions: unknown[] = [];
-  const context = vm.createContext({ stopReading: null, $: (id: string) => nodes[id], $$: (selector: string, from: { querySelectorAll(s: string): unknown[] }) => from.querySelectorAll(selector), state: { profile: { name: 'My room' } }, root: { classList: { remove() {} } }, document: { activeElement: { focus: () => { focused = true; } } }, window: { scrollX: 0, scrollY: 150, scrollTo: (...args: unknown[]) => positions.push(args) } });
+  const context = vm.createContext({ stopReading: null, refreshContinueReading() {}, $: (id: string) => nodes[id], $$: (selector: string, from: { querySelectorAll(s: string): unknown[] }) => from.querySelectorAll(selector), state: { profile: { name: 'My room' } }, root: { classList: { remove() {} } }, document: { activeElement: { focus: () => { focused = true; } } }, window: { scrollX: 0, scrollY: 150, scrollTo: (...args: unknown[]) => positions.push(args) } });
   vm.runInContext(`let readerGeneration = 0, roomNavigation = null, articleUrl = null, clipId = null, docsArgs = null, spaceHandle = null, docsState = null; ${shipped('rememberRoomNavigation')} ${shipped('closeReader')} rememberRoomNavigation();`, context);
   lane.hidden = true; lane.scrollLeft = 0; column.scrollTop = 0;
   await vm.runInContext('closeReader()', context);
@@ -78,7 +78,7 @@ test('a late article result cannot replace the view after home navigation', asyn
   let resolveTool!: (value: unknown) => void;
   const replaced: unknown[] = [];
   const reader = { hidden: true, scrollTop: 0, replaceChildren: (...children: unknown[]) => replaced.push(children) };
-  const context = vm.createContext({ $: (id: string) => id === 'reader' ? reader : {}, rememberRoomNavigation() {}, window: { scrollTo() {} }, readerTop() {}, el() {}, $first: () => null, takeZoomSource: () => null, transition: async (update: () => void) => update(), callTool: () => new Promise((resolve) => { resolveTool = resolve; }), articleNodes: () => { throw new Error('Stale article rendered'); } });
+  const context = vm.createContext({ stopReading: null, $: (id: string) => id === 'reader' ? reader : {}, rememberRoomNavigation() {}, window: { scrollTo() {} }, readerTop() {}, el() {}, $first: () => null, takeZoomSource: () => null, transition: async (update: () => void) => update(), callTool: () => new Promise((resolve) => { resolveTool = resolve; }), articleNodes: () => { throw new Error('Stale article rendered'); } });
   vm.runInContext(`let readerGeneration = 0; ${shipped('openReader')}`, context);
   const opened = vm.runInContext(`openReader({url:'https://example.com'}, {title:'News'})`, context);
   await new Promise((done) => setImmediate(done));   // past the transition, waiting on read_article

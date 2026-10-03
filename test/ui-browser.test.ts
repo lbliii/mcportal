@@ -51,10 +51,12 @@ const API_LLMS = `# Example API
 - [Gadgets](${DOCS}/api/gadgets.md): List gadgets
 - [Errors](${DOCS}/api/errors.md): What can go wrong
 `;
-const PAGE = '# Install\n\nRun the installer, then sign in.\n\n## Requirements\n\nA computer.\n';
+const PAGE = `# Install\n\nRun the installer, then sign in.\n\n## Requirements\n\nA computer.\n\n[Deploy from the beginning](${DOCS}/deploy.md#step-1)\n`;
+const LONG_DOC = '# Deploy\n\n' + Array.from({ length: 45 }, (_, i) => `## Step ${i + 1}\n\nFollow the deployment instructions for step ${i + 1}. This paragraph gives the page enough content to resume at a meaningful passage.\n\n`).join('');
 
 /** Fixtures for the feeds and the article, plus a small docs site. */
 const fetcher: Fetcher = async (url, options) => {
+  if (url === `${DOCS}/deploy.md`) return { status: 200, url, contentType: 'text/markdown; charset=utf-8', text: LONG_DOC, truncated: false };
   if (url === `${DOCS}/api/llms.txt`) return { status: 200, url, contentType: 'text/plain; charset=utf-8', text: API_LLMS, truncated: false };
   if (url === `${DOCS}/llms.txt`) return { status: 200, url, contentType: 'text/plain; charset=utf-8', text: LLMS, truncated: false };
   if (url.startsWith(`${DOCS}/`) && url.endsWith('.md')) return { status: 200, url, contentType: 'text/markdown; charset=utf-8', text: PAGE, truncated: false };
@@ -78,12 +80,16 @@ function room() {
 
 let app: Running;
 const seen = new FileSeenStore(null);
+let readings: FileReadingStore;
+let readingDir: string;
 const profiles = new MemoryProfileStore({ default: room() });
 let page: Page;
 
 before(async () => {
   if (skip) return;
-  app = await startApp({ allowUnauthenticated: true }, fetcher, { store: profiles, seen });
+  readingDir = await mkdtemp(path.join(tmpdir(), 'mcportal-browser-reading-'));
+  readings = new FileReadingStore(readingDir);
+  app = await startApp({ allowUnauthenticated: true, limits: { perMinute: 10000, perDay: 100000, globalPerDay: 1000000 } }, fetcher, { store: profiles, seen, reading: readings });
   page = await Page.open(chrome!);
 });
 
@@ -91,6 +97,7 @@ after(async () => {
   if (skip) return;
   await page?.close();
   await app?.close();
+  await rm(readingDir, { recursive: true, force: true });
 });
 
 /** Load the room fresh and wait until every portal has drawn. */
@@ -125,10 +132,10 @@ test('browser: an item opens in the reader, and home returns to the room', { ski
 });
 
 /** The reading record for the article, once `ready` says it's there (or the last one seen, after 10 seconds). */
-async function readingWhen(ready: (r: any) => boolean): Promise<any> {
+async function readingWhen(ready: (r: any) => boolean, url = ARTICLE): Promise<any> {
   const deadline = Date.now() + 10_000;
   for (;;) {
-    const r = (await tool('get_reading', { url: ARTICLE })).reading;
+    const r = (await tool('get_reading', { url })).reading;
     if ((r && ready(r)) || Date.now() > deadline) return r;
     await new Promise((done) => setTimeout(done, 250));   // each call spends the budget the room needs too
   }
@@ -141,10 +148,11 @@ async function tool(name: string, args: Record<string, unknown>): Promise<any> {
 }
 
 test('browser: the reader records opening and position, resumes there, and marks read only when asked', { skip }, async () => {
+  await readings.deleteAll('default');
   const openArticle = async () => {
     await openRoom();
     await page.click('[data-portal="saved"] .item-main');
-    await page.waitFor(`document.querySelector('#reader .mark-read')`, 'the article and its Mark as read button');
+    await page.waitFor(`document.querySelector('#reader .mark-read:not([disabled])')`, 'the article and its ready Mark as read button');
     await page.eval(`document.getElementById('reader').style.maxHeight = '220px'`);   // a small window, so the fixture article scrolls
   };
   await openArticle();
@@ -170,11 +178,122 @@ test('browser: the reader records opening and position, resumes there, and marks
 
   await page.eval(`document.querySelector('#reader .mark-read').click()`);
   await page.waitFor(`document.querySelector('#reader .mark-read').textContent === 'Read'`, 'the button to say Read');
-  const read = (await tool('get_reading', { url: ARTICLE })).reading;
+  const read = await readingWhen((r) => r.status === 'read');
   assert.equal(read.status, 'read');
   assert.ok(read.readAt);
   assert.deepEqual((await tool('list_reading', {})).reading.map((r: any) => r.url), [], 'finished reading is not "in the middle of"');
   assert.deepEqual(page.problems, []);
+});
+
+test('browser: Continue reading survives a fresh view, opens docs at its saved passage, and removes completed items', { skip }, async () => {
+  const url = `${DOCS}/deploy.md`;
+  await tool('record_reading', { url, title: 'Deploy', status: 'opened', anchor: { block: 20 }, progress: 0.35 });
+  // Seen-only and explicitly finished pages stay out of Continue reading.
+  await tool('record_reading', { url: `${DOCS}/first-steps.md`, title: 'First steps', status: 'seen' });
+  await tool('record_reading', { url: ARTICLE, title: 'PS5', status: 'read' });
+  await openRoom();
+  await page.waitFor(`document.querySelector('.continue-item')`, 'recent unfinished reading');
+  assert.match(await page.eval<string>(`document.querySelector('.continue-reading').textContent`), /Deploy.*35%/s);
+  assert.doesNotMatch(await page.eval<string>(`document.querySelector('.continue-reading').textContent`), /First steps|PS5/);
+  await page.click('.continue-item');
+  await page.waitFor(`document.querySelector('.docs-page .mark-read:not([disabled])') && document.getElementById('toast').textContent.includes('where you left off')`, 'the docs page to resume');
+  assert.match(await page.eval<string>(`document.querySelector('.docs-page .docs-crumb').textContent`), /Example Docs/);
+  assert.ok(await page.eval<number>(`document.getElementById('reader').scrollTop || window.scrollY`) > 0);
+  await page.eval(`document.getElementById('reader').scrollTop += 500`);
+  await page.waitFor(`Number(document.querySelector('.docs-page .body').dataset.furthest) > 20`, 'new docs reading progress');
+  await page.eval(`document.querySelector('#reader [aria-label="Back to your room"]').click()`);
+  const left = await readingWhen((r) => r.anchor?.block > 20, url);
+  assert.equal(left.status, 'opened', 'scrolling is not completion');
+  await openRoom();
+  await page.waitFor(`document.querySelector('.continue-item')`, 'unfinished docs after reopening');
+  await page.click('.continue-item');
+  await page.waitFor(`document.querySelector('.docs-page .mark-read:not([disabled])')`, 'reading to be ready');
+  await page.eval(`document.querySelector('.docs-page .mark-read').click()`);
+  await readingWhen((r) => r.status === 'read', url);
+  await page.eval(`document.querySelector('#reader [aria-label="Back to your room"]').click()`);
+  await page.waitFor(`document.querySelector('.continue-reading').hidden`, 'finished reading to leave the strip');
+  assert.deepEqual(page.problems, []);
+});
+
+test('browser: docs hash navigation takes precedence over the saved position and page changes save progress', { skip }, async () => {
+  const url = `${DOCS}/deploy.md`;
+  await tool('record_reading', { url, title: 'Deploy', status: 'opened', anchor: { block: 70 }, progress: 0.9 });
+  await openRoom();
+  await page.click('[data-portal="docs"] .item-main');
+  await page.waitFor(`document.querySelector('.docs-page .mark-read:not([disabled])')`, 'the initial docs page');
+  await page.eval(`document.querySelector('.docs-page .body a').click()`);
+  await page.waitFor(`document.querySelector('.docs-page h1')?.textContent === 'Deploy' && !document.querySelector('.docs-page .mark-read').disabled`, 'Deploy page');
+  assert.ok(await page.eval<number>(`document.getElementById('reader').scrollTop || window.scrollY`) < 500, 'the explicit first heading takes precedence over saved block 70');
+  assert.equal((await tool('get_reading', { url })).reading.anchor.block, 70, 'jumping back does not discard the furthest saved passage');
+  await page.eval(`document.querySelector('#reader [aria-label="Back to your room"]').click()`);
+  await tool('record_reading', { url, status: 'opened', anchor: { block: 0 }, progress: 0 });
+  await page.click('[data-portal="docs"] .item-main');
+  await page.waitFor(`document.querySelector('.docs-page .mark-read:not([disabled])')`, 'docs ready');
+  await page.eval(`document.querySelector('.docs-toc a[data-url="${url}"]').click()`);
+  await page.waitFor(`document.querySelector('.docs-page h1')?.textContent === 'Deploy' && !document.querySelector('.docs-page .mark-read').disabled`, 'Deploy ready');
+  assert.equal((await tool('get_reading', { url })).reading.progress, 0, 'the navigation fixture starts at the beginning');
+  await page.eval(`document.getElementById('reader').style.maxHeight = '220px'; document.getElementById('reader').scrollTop = 800`);
+  await page.waitFor(`Number(document.querySelector('.docs-page .body').dataset.furthest) > 0`, 'the docs position').catch(async (error) => {
+    const details = await page.eval(`({ top: document.getElementById('reader').scrollTop, reader: document.getElementById('reader').getBoundingClientRect().toJSON(), body: document.querySelector('.docs-page .body').getBoundingClientRect().toJSON(), data: document.querySelector('.docs-page .body').dataset })`);
+    throw new Error(`${error.message}: ${JSON.stringify(details)}`);
+  });
+  await page.eval(`document.querySelector('.docs-pager .prev').click()`);
+  await page.waitFor(`document.querySelector('.docs-page h1')?.textContent === 'Install' && !document.querySelector('.docs-page .mark-read').disabled`, 'previous page');
+  assert.ok((await readingWhen((r) => r.anchor?.block > 0, url)).anchor.block > 0);
+  assert.deepEqual(page.problems, []);
+});
+
+test('browser: inline columns have visible paging, bounded items and no nested vertical scrolling; fullscreen keeps all items', { skip }, async () => {
+  const saved = Array.from({ length: 14 }, (_, i) => ({ url: `https://example.com/item-${i}`, title: `Item ${i}`, savedAt: '2026-09-01T00:00:00.000Z' }));
+  await profiles.put('default', validateProfile({ ...room(), saved }));
+  // Exercise the actual bridge as an MCP host, including live mode notifications.
+  const { identifier } = await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `
+    Object.defineProperty(window, '__MCPORTAL_DEV__', { get: () => undefined, set: () => {} });
+    window.addEventListener('message', async (event) => {
+      const msg = event.data;
+      if (!msg?.id || !msg.method) return;
+      event.stopImmediatePropagation();
+      let result;
+      if (msg.method === 'ui/initialize') result = { hostCapabilities: { serverTools: true, updateModelContext: true }, hostContext: { displayMode: 'inline', availableDisplayModes: ['inline', 'fullscreen'] } };
+      else if (msg.method === 'tools/call') {
+        const response = await fetch('/mcp', { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream' }, body: JSON.stringify({ jsonrpc: '2.0', id: msg.id, method: 'tools/call', params: msg.params }) });
+        result = (await response.json()).result;
+      } else result = {};
+      window.postMessage({ jsonrpc: '2.0', id: msg.id, result }, '*');
+    });` });
+  try {
+    await page.send('Emulation.setDeviceMetricsOverride', { width: 380, height: 900, deviceScaleFactor: 1, mobile: false });
+    await openRoom();
+    await page.waitFor(`document.querySelector('.lane-controls:not([hidden])')`, 'visible column navigation');
+    assert.equal(await page.eval(`document.querySelectorAll('[data-portal="saved"] .items > li').length`), 5);
+    const scrolling = await page.eval<string[]>(`[...document.querySelectorAll('#grid, #grid *')].filter((n) => /auto|scroll/.test(getComputedStyle(n).overflowY) && n.scrollHeight > n.clientHeight + 1).map((n) => n.className)`);
+    assert.deepEqual(scrolling, [], 'inline portals grow to their content');
+    await page.click('.lane-controls [aria-label="Next column"]');
+    await page.waitFor(`document.getElementById('grid').scrollLeft > 20`, 'next column');
+    await page.click('.lane-page[aria-label="Column 3"]');
+    await page.click('[data-portal="saved"] .portal-more');
+    await page.waitFor(`document.querySelector('[data-portal-level="saved"]')`, 'more opens the portal level');
+    await page.eval(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))`);
+    await page.waitFor(`document.querySelector('[data-portal="saved"] .portal-more') && !document.querySelector('.level')`, 'return to bounded portal');
+    await page.eval(`window.postMessage({ jsonrpc: '2.0', method: 'ui/notifications/host-context-changed', params: { displayMode: 'fullscreen' } }, '*')`);
+    await page.waitFor(`document.documentElement.classList.contains('fullscreen')`, 'fullscreen');
+    assert.equal(await page.eval(`document.querySelectorAll('[data-portal="saved"] .items > li').length`), 14, 'fullscreen shows the full list');
+    assert.equal(await page.eval(`document.querySelector('.lane-controls')`), null);
+    await page.eval(`window.postMessage({ jsonrpc: '2.0', method: 'ui/notifications/host-context-changed', params: { displayMode: 'inline' } }, '*')`);
+    await page.waitFor(`!document.documentElement.classList.contains('fullscreen') && document.querySelector('.lane-controls')`, 'back to inline');
+    assert.equal(await page.eval(`document.querySelectorAll('[data-portal="saved"] .items > li').length`), 5);
+    await profiles.put('default', validateProfile({ ...room(), layout: 'shelves', saved }));
+    await openRoom();
+    assert.equal(await page.eval(`getComputedStyle(document.querySelector('.shelf-row')).scrollSnapType`), 'x mandatory');
+    await page.click('[data-portal="saved"] [aria-label="Scroll Saved right"]');
+    await page.waitFor(`document.querySelector('[data-portal="saved"] .shelf-row').scrollLeft > 0`, 'the always-visible shelf arrow');
+    assert.deepEqual(await page.eval<string[]>(`[...document.querySelectorAll('#grid, #grid *')].filter((n) => /auto|scroll/.test(getComputedStyle(n).overflowY) && n.scrollHeight > n.clientHeight + 1).map((n) => n.className)`), [], 'shelves have no nested vertical scroller');
+    assert.deepEqual(page.problems, []);
+  } finally {
+    await page.send('Page.removeScriptToEvaluateOnNewDocument', { identifier });
+    await profiles.put('default', room());
+    await page.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+  }
 });
 
 test('browser: new items are marked, and the ones on screen are recorded as seen', { skip }, async () => {

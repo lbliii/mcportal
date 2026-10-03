@@ -1,4 +1,6 @@
   // room/room.js: the room: welcome, pictures, saving, refreshing, loadRoom (layouts.js draws it)
+  /** Local load times support rechecks when shared-cache timestamps are private. @type {Map<string, number>} */
+  const portalLoadedAt = new Map();
   // ------------------------------------------------------------ welcome (first run, or "start over")
   /** @param {ToolResults['open_room']} data */
   function renderWelcome(data) {
@@ -91,10 +93,12 @@
     state.profile = /** @type {Profile} */ ({ layout: 'columns', openIn: 'card', saved: [], .../** @type {Partial<Profile>} */ (data.profile) });
     state.saved = new Set(state.profile.saved.map((s) => s.url));
     state.portals = new Map(data.portals.map((p) => [p.portalId, p]));
+    for (const portal of data.portals) portalLoadedAt.set(portal.portalId, Date.now());
     state.edition = data.edition; state.lead = data.lead; state.labs = data.labs ?? [];
     $('roomName').textContent = data.profile.name;
     drawIdentity(data.identity);
     drawLayout();
+    refreshContinueReading();
     setUpdated(data.generatedAt);
     if (data.notice) toast(data.notice);
   }
@@ -287,6 +291,7 @@
     try {
       const result = await callTool('refresh_portal', { portalId });
       state.portals.set(portalId, result.structuredContent.portal);
+      portalLoadedAt.set(portalId, Date.now());
     } catch (error) {
       toast(errorText(error));
     }

@@ -22,8 +22,10 @@
         const wrap = el('section', { class: 'portal', 'data-portal': portalId });
         if (!portal) return standBy(wrap);
         wrap.append(el('div', { class: 'portal-head' }, ...portalLabel(portal), el('span', { class: 'tools' }, refreshButton(portal))));
-        const items = portalItems(portal, () => el('ul', { class: 'items' }, portal.items.map((item) => el('li', null, watchNew(renderItem(item, portal, 'row'), item, portal)))));
+        const visible = displayMode === 'fullscreen' ? portal.items : portal.items.slice(0, INLINE_ITEMS);
+        const items = portalItems(portal, () => el('ul', { class: 'items' }, visible.map((item) => el('li', null, watchNew(renderItem(item, portal, 'row'), item, portal)))));
         if (items) wrap.append(items);
+        if (!portal.error && visible.length < portal.items.length) wrap.append(el('button', { class: 'link-btn portal-more', type: 'button', onclick: () => openPortal(portalId) }, `${portal.items.length - visible.length} more in ${portal.title}`));
         wrap.append(portalFoot(portal, true));
         primePictures(wrap);
         return wrap;
@@ -121,6 +123,7 @@
   // ------------------------------------------------------------ front page parts
   /** Items each portal block shows first, and how many more each "more" adds. */
   const FRONT = { first: 3, page: 5, picks: 3 };
+  const INLINE_ITEMS = 5;
   /** @param {string} portalId @param {string} itemId */
   const frontKey = (portalId, itemId) => `${portalId}\n${itemId}`;
 
@@ -203,12 +206,50 @@
     grid.classList.remove('portal-level');
     for (const other of Object.values(ROOM_LAYOUTS)) if (other.gridClass) grid.classList.toggle(other.gridClass, other === layout);
     grid.replaceChildren(...layout.draw(p));
+    drawLaneControls();
     if (layout === ROOM_LAYOUTS.frontpage) frontEnd();
     for (const b of $$('[data-layout]')) b.setAttribute('aria-pressed', String(b.dataset.layout === p.layout));
     // A lab's layout is offered while the server has the lab on, and kept for whoever chose it.
     for (const lab of LAB_LAYOUTS) $first(`[data-layout="${lab}"]`)?.toggleAttribute('hidden', !(state.labs.includes(lab) || p.layout === lab));
     $('btnOpenIn').setAttribute('aria-pressed', String(p.openIn === 'chat'));
   }
+
+  /** Visible lane navigation. Scroll and resize update the current column and end controls. */
+  function drawLaneControls() {
+    $first('.lane-controls')?.remove();
+    laneEvents?.abort(); laneObserver?.disconnect();
+    const grid = $('grid');
+    if (displayMode === 'fullscreen' || state.profile?.layout !== 'columns') return;
+    const columns = [...$$('.col', grid)];
+    if (columns.length < 2) return;
+    const go = (/** @type {number} */ index) => {
+      const column = columns[Math.max(0, Math.min(index, columns.length - 1))];
+      grid.scrollTo({ left: column.offsetLeft - grid.offsetLeft - 10, behavior: scrollBehavior() });
+    };
+    let current = 0;
+    const previous = iconButton('left', 'Previous column', () => go(current - 1));
+    const next = iconButton('right', 'Next column', () => go(current + 1));
+    const dots = columns.map((column, i) => el('button', { class: 'lane-page', type: 'button', 'aria-label': `Column ${i + 1}`, onclick: () => go(i) }, String(i + 1)));
+    const controls = el('nav', { class: 'lane-controls', 'aria-label': 'Room columns' }, previous, ...dots, next);
+    grid.before(controls);
+    const update = () => {
+      const start = grid.scrollLeft + grid.offsetLeft + 10;
+      current = columns.reduce((best, column, i) => Math.abs(column.offsetLeft - start) < Math.abs(columns[best].offsetLeft - start) ? i : best, 0);
+      previous.disabled = grid.scrollLeft <= 1;
+      next.disabled = grid.scrollLeft >= grid.scrollWidth - grid.clientWidth - 1;
+      controls.hidden = grid.scrollWidth <= grid.clientWidth + 1;
+      dots.forEach((dot, i) => dot.setAttribute('aria-current', i === current ? 'page' : 'false'));
+    };
+    // Abort the old listener when a layout redraw replaces its controls.
+    laneEvents = new AbortController();
+    grid.addEventListener('scroll', update, { passive: true, signal: laneEvents.signal });
+    laneObserver = new ResizeObserver(update); laneObserver.observe(grid);
+    requestAnimationFrame(update);
+  }
+  /** @type {AbortController | null} */
+  let laneEvents = null;
+  /** @type {ResizeObserver | null} */
+  let laneObserver = null;
 
   /** One portal, as the current layout draws it. @param {string} portalId */
   function renderPortal(portalId) {
@@ -257,5 +298,10 @@
   function portalFoot(portal, ttl) {
     const p = portal.provenance;
     return el('div', { class: 'portal-foot' }, portal.pin ? pinnedFoot(portal)
-      : `${p.source} · ${p.endpoint} · fetched ${new Date(p.fetchedAt).toLocaleTimeString()}${p.cached ? ' (cached)' : ''}${ttl ? ` · fresh for ${p.ttlSeconds}s` : ''}`);
+      : `${p.source} · ${p.endpoint}${provenanceTime(p)}${ttl ? ` · cache lifetime ${p.ttlSeconds}s` : ''}`);
+  }
+
+  /** Shared-cache timestamps may be omitted. @param {Provenance} provenance */
+  function provenanceTime(provenance) {
+    return provenance.fetchedAt ? ` · fetched ${new Date(provenance.fetchedAt).toLocaleString()}${provenance.cached ? ' (cached)' : ''}` : '';
   }
