@@ -69,6 +69,7 @@
       setWhoMenu(
         el('div', { class: 'who-head' }, icon('ghost'), el('b', null, 'Ghost mode')),
         el('p', null, 'No account: your portal lives on this computer, and nothing is synced or shared.'),
+        identity.signInFailure ? el('p', { class: 'error', role: 'alert' }, identity.signInFailure.message) : null,
         identity.canSignIn
           ? [el('p', { class: 'muted' }, 'Sign in to keep the same portal on every device, and to share and follow. This computer\'s portal comes with you.'),
             el('button', { class: 'btn primary', type: 'button', onclick: () => signIn() }, 'Sign in to sync and share')]
@@ -98,9 +99,10 @@
       fill(target,
         el('p', null, 'Finish signing in with GitHub in your browser. This computer\'s portal is added to your account, and this room updates when you\'re done.'),
         el('button', { class: 'btn', type: 'button', onclick: () => { showWhoMenu(false); loadRoom(); } }, 'I\'ve signed in'));
-      watchSignIn();
+      watchSignIn(target);
     } catch (error) {
-      fill(target, el('p', { class: 'error' }, `Couldn't start signing in: ${errorText(error)}`));
+      fill(target, el('p', { class: 'error', role: 'alert' }, `Couldn't start signing in: ${errorText(error)}`),
+        el('button', { class: 'btn', type: 'button', onclick: () => signIn(target) }, 'Try signing in again'));
     }
   }
 
@@ -154,7 +156,7 @@
     if (!state.identity) return false;   // a card (an article, a space), not the room
     try {
       const { identity } = (await callTool('account_settings')).structuredContent;
-      if (identityKey(identity) === identityKey(state.identity)) return false;
+      if (identityKey(identity) === identityKey(state.identity)) { state.identity = identity; return false; }
       await loadRoom();
       return true;
     } catch {
@@ -162,15 +164,28 @@
     }
   }
 
-  function watchSignIn() {
+  /** @param {Element} target */
+  function watchSignIn(target) {
     const watch = ++signInWatch;
     const until = Date.now() + 10 * 60_000;
     const tick = async () => {
-      if (watch !== signInWatch || Date.now() > until) return;
+      if (watch !== signInWatch) return;
+      if (Date.now() > until) {
+        fill(target, el('p', { class: 'error', role: 'alert' }, 'The sign-in link expired. Start again with a fresh link on this computer.'),
+          el('button', { class: 'btn', type: 'button', onclick: () => signIn(target) }, 'Try signing in again'));
+        return;
+      }
       if (await identityChanged()) {
         signInWatch++;
         const identity = state.identity;
         if (identity && identity.mode !== 'ghost') toast(`Signed in${identity.handle ? ` as @${identity.handle}` : identity.login ? ` as ${identity.login}` : ''}.`);
+        return;
+      }
+      const identity = state.identity;
+      if (identity?.mode === 'ghost' && identity.signInFailure) {
+        signInWatch++;
+        fill(target, el('p', { class: 'error', role: 'alert' }, identity.signInFailure.message),
+          el('button', { class: 'btn', type: 'button', onclick: () => signIn(target) }, 'Try signing in again'));
         return;
       }
       setTimeout(tick, 3000);

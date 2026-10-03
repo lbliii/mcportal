@@ -423,6 +423,7 @@ export class OAuthServer {
       this.txns.delete(txnId);
       const target = new URL(txn.redirectUri);
       target.searchParams.set('error', 'access_denied');
+      target.searchParams.set('error_description', 'You cancelled the MCPortal consent screen. Start again and choose Continue with GitHub to connect this computer.');
       if (txn.state) target.searchParams.set('state', txn.state);
       target.searchParams.set('iss', this.config.publicUrl);
       return redirect(res, target.href);
@@ -483,14 +484,19 @@ export class OAuthServer {
       redirect(res, target.href, clearCookie);
     };
     const ghCode = url.searchParams.get('code');
-    if (!ghCode) return toClient({ error: 'access_denied', error_description: 'GitHub sign-in was cancelled' });
+    if (!ghCode) return toClient({ error: 'access_denied', error_description: url.searchParams.get('error') === 'access_denied'
+      ? 'GitHub authorization was declined or cancelled. Start again and approve access with your intended GitHub account.'
+      : 'GitHub returned without an authorization code. Start sign-in again; if it keeps failing, contact the server owner.' });
     const who = await this.githubIdentity(ghCode);
     if ('error' in who) return toClient({ error: 'access_denied', error_description: who.error });
     const user = { id: who.githubId, login: who.login };
     const identity: Identity = { userId: `github-${user.id}`, githubId: user.id, login: user.login };
     const admission = await this.accounts.admit({ githubId: user.id, login: user.login });
     if (!admission.ok) {
-      const why = admission.reason === 'suspended' ? 'This account is suspended' : 'This MCPortal server is invite-only. Ask its owner for an invite.';
+      const who = `GitHub signed you in as @${clean(user.login, 39)}.`;
+      const why = admission.reason === 'suspended'
+        ? `${who} This MCPortal account is suspended. Contact the server owner to restore access.`
+        : `${who} This MCPortal server is invite-only. Use your invited GitHub account or ask its owner for an invite.`;
       return toClient({ error: 'access_denied', error_description: why });
     }
     const code = secretToken(32);

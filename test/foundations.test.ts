@@ -274,9 +274,16 @@ test('github sign-in: an unreachable or failing GitHub is a failed sign-in, neve
   const { UpstreamError } = await import('../src/lib/errors.ts');
   const app = { clientId: 'cid', clientSecret: 'secret' };
   const down = async () => { throw new UpstreamError('upstream_unreachable', 'Could not reach github.com: ECONNRESET'); };
-  assert.deepEqual(await githubIdentity(down, app, 'code', 'https://x/cb'), { error: 'GitHub sign-in failed; try again in a moment' });
+  const log = createLogger({ write: () => {} });
+  const unavailable = await githubIdentity(down, app, 'code', 'https://x/cb', log);
+  assert.ok('error' in unavailable);
+  assert.match(unavailable.error, /GitHub while exchanging authorization.*Try again.*Reference: [0-9a-f]{12}/);
+  assert.doesNotMatch(unavailable.error, /ECONNRESET/);
   const refused = async (url: string) => ({ status: 401, url, contentType: 'application/json', text: '{"error":"<script>"}', truncated: false });
-  assert.deepEqual(await githubIdentity(refused, app, 'code', 'https://x/cb'), { error: 'GitHub sign-in failed' });
+  const rejected = await githubIdentity(refused, app, 'code', 'https://x/cb', log);
+  assert.ok('error' in rejected);
+  assert.match(rejected.error, /GitHub sign-in token \(HTTP 401\).*Reference:/);
+  assert.doesNotMatch(rejected.error, /<script>/);
   const url = new URL(githubAuthorizeUrl(app, 'https://x/cb', 'st8'));
   assert.equal(url.searchParams.get('scope'), 'read:user');
   assert.equal(url.searchParams.get('allow_signup'), null);

@@ -8,6 +8,7 @@ import { createFixtureFetcher } from '../src/lib/fixture-fetch.ts';
 import { handleMessage, roomHtml } from '../src/mcp.ts';
 import { defaultProfile } from '../src/profile.ts';
 import { MemoryProfileStore } from '../src/store.ts';
+import type { SignInFailure } from '../src/link/signin-errors.ts';
 import type { ToolContext } from '../src/tools/kit.ts';
 import { findChrome, Page } from './browser.ts';
 
@@ -37,12 +38,13 @@ let server: Server;
 let base: string;
 let page: Page;
 let starts = 0;
+let failedAttempt: SignInFailure | undefined;
 
 before(async () => {
   if (skip) return;
   ctx = {
     store: new MemoryProfileStore(), fetcher: createFixtureFetcher(), cache: new TtlCache(), userId: 'default',
-    link: { linked: false, server: 'https://portal.example', start: async () => { starts++; return { url: SIGN_IN_URL }; }, unlink: async () => 'Signed out' },
+    link: { linked: false, server: 'https://portal.example', start: async () => { starts++; failedAttempt = undefined; return { url: SIGN_IN_URL }; }, unlink: async () => 'Signed out', signInFailure: () => failedAttempt },
   };
   server = createServer(async (req, res) => {
     let body = '';
@@ -66,26 +68,32 @@ after(async () => {
   await new Promise((done) => server?.close(done));
 });
 
+async function beginSignIn(entry: string, links = 'supported'): Promise<string> {
+  await ctx.store.put('default', { ...defaultProfile(), onboarded: entry === 'menu', columns: [] });
+  starts = 0;
+  failedAttempt = undefined;
+  page.problems.length = 0;
+  await page.goto(`${base}/?links=${links}`);
+  let target: string;
+  if (entry === 'menu') {
+    await page.waitFor(`!${FRAME}.getElementById('btnWho').hidden`, 'the Ghost mode menu');
+    await page.eval(`${FRAME}.getElementById('btnWho').click()`);
+    target = `${FRAME}.getElementById('whoMenu')`;
+    await page.eval(`${target}.querySelector('button').click()`);
+  } else {
+    const button = `[...${FRAME}.querySelectorAll('.welcome-actions button')].find((b) => b.textContent.startsWith('Already have a portal?'))`;
+    await page.waitFor(button, 'welcome sign-in');
+    await page.eval(`${button}.click()`);
+    target = `${FRAME}.querySelector('.welcome-actions + .building')`;
+  }
+  await page.waitFor(`${target}.textContent.includes('Finish signing in with GitHub')`, 'sign-in instructions');
+  return target;
+}
+
 for (const entry of ['menu', 'welcome']) {
   for (const links of ['supported', 'absent', 'declined']) {
     test(`sign-in: ${entry} button starts login with ${links} host links`, { skip }, async () => {
-      await ctx.store.put('default', { ...defaultProfile(), onboarded: entry === 'menu', columns: [] });
-      starts = 0;
-      page.problems.length = 0;
-      await page.goto(`${base}/?links=${links}`);
-      let target: string;
-      if (entry === 'menu') {
-        await page.waitFor(`!${FRAME}.getElementById('btnWho').hidden`, 'the Ghost mode menu');
-        await page.eval(`${FRAME}.getElementById('btnWho').click()`);
-        target = `${FRAME}.getElementById('whoMenu')`;
-        await page.eval(`${target}.querySelector('button').click()`);
-      } else {
-        const button = `[...${FRAME}.querySelectorAll('.welcome-actions button')].find((b) => b.textContent.startsWith('Already have a portal?'))`;
-        await page.waitFor(button, 'welcome sign-in');
-        await page.eval(`${button}.click()`);
-        target = `${FRAME}.querySelector('.welcome-actions + .building')`;
-      }
-      await page.waitFor(`${target}.textContent.includes('Finish signing in with GitHub')`, 'sign-in instructions');
+      await beginSignIn(entry, links);
       assert.equal(starts, 1, 'the actual link_account tool starts sign-in once');
       const requests = await page.eval<Array<{ params: { url: string } }>>(`window.log.filter((m) => m.method === 'ui/open-link')`);
       if (links === 'absent') assert.equal(requests.length, 0, 'no unsupported bridge request');
@@ -94,4 +102,17 @@ for (const entry of ['menu', 'welcome']) {
       assert.deepEqual(page.problems, [], 'clicking never throws an uncaught error');
     });
   }
+  test(`sign-in: ${entry} shows callback failures in the room and lets the user retry`, { skip }, async () => {
+    const target = await beginSignIn(entry);
+    failedAttempt = { code: 'forbidden', stage: 'authorization', reference: '123456abcdef', message: 'This server is invite-only. Use your invited GitHub account. Reference: 123456abcdef.' };
+    const shown = await page.waitFor<string>(`${target}.querySelector('[role="alert"]')?.textContent`, 'the failure to replace the waiting instructions');
+    assert.equal(shown, failedAttempt.message);
+    assert.equal(await page.eval(`${target}.textContent.includes('Finish signing in')`), false);
+    await page.eval(`${target}.querySelector('button').click()`);
+    await page.waitFor(`${target}.textContent.includes('Finish signing in with GitHub')`, 'retry instructions');
+    assert.equal(starts, 2);
+    assert.equal(failedAttempt, undefined);
+    assert.equal(await page.eval(`${target}.querySelector('[role="alert"]')`), null);
+    assert.deepEqual(page.problems, []);
+  });
 }

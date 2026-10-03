@@ -35,7 +35,8 @@
       } catch { toast('The chat is beyond our reach. Tell your agent there instead.'); }
     };
     describe.addEventListener('keydown', (e) => { if (e.key === 'Enter') askAgent(); });
-    const signingIn = el('div', { class: 'building', hidden: true });   // the account menu is hidden here, so sign-in reports under the actions
+    const signInFailure = data.identity.mode === 'ghost' ? data.identity.signInFailure : undefined;
+    const signingIn = el('div', { class: 'building', hidden: !signInFailure }, signInFailure ? el('p', { class: 'error', role: 'alert' }, signInFailure.message) : null);   // the account menu is hidden here, so sign-in reports under the actions
     $('welcome').replaceChildren(...present([
       /** @type {Element} */ ($('brandBadge').content.firstElementChild).cloneNode(true),   // the template holds the badge
       el('h1', null, rebuilding ? 'Start over' : 'Choose your destiny!'),

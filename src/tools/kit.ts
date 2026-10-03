@@ -17,6 +17,7 @@ import type { ToolMetrics } from '../lib/metrics.ts';
 import { clean } from '../lib/text.ts';
 import type { ExportFormat, ImportResult, PortalExport } from '../portability.ts';
 import type { LinkControl } from '../link/session.ts';
+import type { SignInFailure } from '../link/signin-errors.ts';
 import type { ProfileDirectory } from '../public-profiles.ts';
 import type { EditionStore } from '../editions.ts';
 import type { HandoffStore } from '../handoffs.ts';
@@ -182,14 +183,17 @@ export async function reachOf(ctx: ToolContext): Promise<Reach> {
  */
 export type Identity =
   /** canSignIn: a local MCPortal that can link to a hosted account (link_account). */
-  | { mode: 'ghost'; canSignIn?: boolean }
+  | { mode: 'ghost'; canSignIn?: boolean; signInFailure?: SignInFailure }
   | { mode: 'hosted'; login?: string | undefined; handle?: string | undefined; accountUrl?: string | undefined }
   /** A local MCPortal signed in to a hosted one: it runs here, the portal lives in the account. */
   | { mode: 'linked'; server: string; login?: string | undefined; handle?: string | undefined; accountUrl?: string | undefined; offline?: boolean; syncedAt?: string | undefined };
 
 /** The caller's identity (one public-profile read on a hosted server). */
 export async function identityOf(ctx: ToolContext): Promise<Identity> {
-  if (ctx.link && !ctx.link.linked) return { mode: 'ghost', canSignIn: true };
+  if (ctx.link && !ctx.link.linked) {
+    const failure = ctx.link.signInFailure?.();
+    return { mode: 'ghost', canSignIn: true, ...(failure ? { signInFailure: failure } : {}) };
+  }
   if (!ctx.link && !ctx.accountUrl) return { mode: 'ghost' };
   // A signed-out link still answers (the handle can't be read): the mode is what matters here.
   const handle = (await ctx.publicProfiles?.get(ctx.userId).catch(() => undefined))?.handle;
@@ -202,7 +206,7 @@ export async function identityOf(ctx: ToolContext): Promise<Identity> {
 
 /** How the identity reads in a sentence, for the model to pass on. */
 export function describeIdentity(identity: Identity): string {
-  if (identity.mode === 'ghost') return 'Ghost mode: not signed in. This MCPortal has no account, keeps the portal where it runs (~/.mcportal unless MCPORTAL_DATA_DIR is set) and shares nothing.';
+  if (identity.mode === 'ghost') return `Ghost mode: not signed in. This MCPortal has no account, keeps the portal where it runs (~/.mcportal unless MCPORTAL_DATA_DIR is set) and shares nothing.${identity.signInFailure ? ` Last sign-in attempt failed: ${identity.signInFailure.message}` : ''}`;
   const who = identity.handle ? `@${identity.handle}` : identity.login ? `${identity.login} on GitHub (no handle claimed yet)` : 'their GitHub account';
   if (identity.mode === 'linked') return `Signed in as ${who}: MCPortal runs on this computer and keeps the portal in the hosted account at ${new URL(identity.server).host}, so it's the same portal everywhere they sign in.`;
   return `Signed in to the hosted MCPortal as ${who}.`;
