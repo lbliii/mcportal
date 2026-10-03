@@ -22,9 +22,10 @@ integration. A PR records actual tests and limitations rather than treating a sk
 database/browser check as successful.
 
 `codex/swarm-integration` locally assembles the six streams, reconciles optional
-docs provenance with UI rendering, and isolates cached docs body search per account. It preserves the individual branches. Publication
-is pending explicit approval of the repository destination after automatic approval
-review rejected the first push; no branch has been pushed by this swarm yet.
+docs provenance with UI rendering, and isolates cached docs body search per account. It preserves the individual branches. Publication to `https://github.com/lbliii/mcportal.git` was explicitly approved on
+3 October after automatic approval review rejected the initial push. All PRs target
+`main`. Individual workstreams are draft review slices; the integration PR is the
+combined merge candidate because it contains the reconciled shared contracts.
 
 ## Validation and release boundary
 
