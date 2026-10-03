@@ -145,7 +145,7 @@ test('pg clips: round-trip, search, tags, paging, isolation, limits; v1 upgrades
   await db.query(`UPDATE mcportal_meta SET value = '1' WHERE key = 'schema_version'`);
   await ensureSchema(db);
   const version = await db.query<{ value: string }>(`SELECT value FROM mcportal_meta WHERE key = 'schema_version'`);
-  assert.equal(version.rows[0]!.value, '8');
+  assert.equal(version.rows[0]!.value, (await import('../src/db/schema.ts')).SCHEMA_VERSION);
 
   const t0 = new Date('2026-09-01T00:00:00Z');
   const a = buildClip({ kind: 'quote', text: 'Point-in-time recovery, 100% of the time', tags: ['infra'] }, t0);
@@ -153,6 +153,8 @@ test('pg clips: round-trip, search, tags, paging, isolation, limits; v1 upgrades
   await store.add('u1', a);
   await store.add('u1', b);
   await store.add('u2', buildClip({ kind: 'quote', text: 'recovery for someone else' }));
+  await store.add('literal_owner', buildClip({ kind: 'quote', text: '100 days' }));
+  assert.deepEqual(await store.list('literal_owner', { query: '100%' }), [], 'full-text parser must not strip literal percent');
 
   assert.deepEqual((await store.get('u1', b.id))?.data, b.data);
   assert.equal(await store.get('u2', a.id), undefined, 'scoped by user');
@@ -261,4 +263,34 @@ test('pg reading: concurrent incremental events, restart, isolation, import and 
   await store.deleteAll('reader');
   assert.deepEqual(await store.list('reader'), []);
   assert.equal((await store.list('reader2')).length, 1);
+});
+
+test('pg clips: full-text ranking, literal fallback, generated updates and v8 backfill', { skip }, async () => {
+  const { buildClip } = await import('../src/clips.ts');
+  const { PgClipStore } = await import('../src/db.ts');
+  const store = new PgClipStore(db);
+  const title = buildClip({ kind: 'quote', title: 'Backup strategy', text: 'Snapshots keep the system safe', tags: ['infra'] }, new Date('2026-09-01'));
+  const body = buildClip({ kind: 'quote', title: 'Incident note', text: 'Store backups every day', tags: ['ops'] }, new Date('2026-09-02'));
+  await store.add('fts_owner', title);
+  await store.add('fts_owner', body);
+  await store.add('fts_other', buildClip({ kind: 'quote', title: 'Backup secret', text: 'Private' }));
+
+  // Recreate a genuine v8 table with data but no vector, then migrate twice.
+  await db.query('ALTER TABLE mcportal_clips DROP COLUMN search_vector');
+  await db.query(`UPDATE mcportal_meta SET value = '8' WHERE key = 'schema_version'`);
+  await ensureSchema(db);
+  await ensureSchema(db);
+  const indexed = await db.query<{ indexdef: string }>(`SELECT indexdef FROM pg_indexes WHERE schemaname = $1 AND indexname = 'mcportal_clips_search'`, [schema]);
+  assert.match(indexed.rows[0]!.indexdef, /USING gin \(search_vector\)/i);
+  assert.deepEqual((await store.list('fts_owner', { query: 'backups' })).map((c) => c.id), [title.id, body.id], 'stems match and title relevance outranks recency');
+  assert.deepEqual((await store.list('fts_owner', { query: 'back' })).map((c) => c.id), [body.id, title.id], 'literal substring matches remain newest first');
+  assert.deepEqual((await store.list('fts_owner', { query: 'the' })).map((c) => c.id), [title.id], 'stopword-only queries retain literal semantics');
+  assert.deepEqual((await store.list('fts_owner', { query: 'backups', tag: 'ops' })).map((c) => c.id), [body.id]);
+  assert.deepEqual((await store.list('fts_owner', { query: 'backups', before: body.createdAt, limit: 1 })).map((c) => c.id), [title.id]);
+  assert.deepEqual((await store.list('fts_other', { query: 'backup' })).map((c) => c.title), ['Backup secret'], 'no other user results');
+
+  await store.update('fts_owner', title.id, { title: 'Disaster recovery', note: 'Rehearsing restores' });
+  assert.deepEqual((await store.list('fts_owner', { query: 'backups' })).map((c) => c.id), [body.id], 'generated vector removes old title');
+  assert.deepEqual((await store.list('fts_owner', { query: 'restore' })).map((c) => c.id), [title.id], 'updated note is indexed');
+  assert.deepEqual((await store.get('fts_owner', title.id))?.data, title.data, 'migration leaves content intact');
 });
