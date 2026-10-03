@@ -17,6 +17,7 @@
 
   /** @param {DocsKey} key @param {DocsOptions} [options] */
   async function openDocs(key, options = {}) {
+    if (stopReading) stopReading();
     const generation = ++readerGeneration;
     const reader = $('reader');
     rememberRoomNavigation();
@@ -124,6 +125,7 @@
     const otp = /** @type {HTMLElement} */ ($first('.docs-otp', reader));
     reader.classList.remove('toc-open');
     if (docsState.url === url && hash) { scrollToAnchor(hash); return; }
+    if (stopReading) stopReading();
     column.replaceChildren(docsMessage('Loading…'));
     try {
       const data = (await callTool('read_doc_page', { url, ...docsState.key })).structuredContent;
@@ -159,6 +161,7 @@
       const handed = (() => { const body = $first('[data-passage-url]', column); return body ? applyHandoff(body) : false; })();
       markCurrentPage();
       if (!handed && (!hash || !scrollToAnchor(hash))) { reader.scrollTop = 0; window.scrollTo(0, 0); }
+      trackReading(page.url, page.title, reader, !handed && !hash);
       if (!DEV) {
         const safeTitle = String(page.title).replace(/[\u0000-\u001f\u007f\u2028\u2029"]/g, ' ').slice(0, 160);
         hostRequest('ui/update-model-context', {
@@ -219,6 +222,7 @@
       previous.focus?.focus({ preventScroll: true });
       window.scrollTo(previous.x, previous.y);
     }
+    refreshContinueReading();
   }
   // Escape steps out one level: the reader to where it opened from, an open portal to the room.
   document.addEventListener('keydown', (e) => {

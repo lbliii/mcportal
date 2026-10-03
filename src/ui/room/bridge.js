@@ -203,6 +203,10 @@
     $('btnExpand').title = full ? 'Exit fullscreen' : 'Fullscreen: step all the way through';
     $('btnExpand').setAttribute('aria-label', $('btnExpand').title);
     if (changed && state.profile?.layout === 'river') redrawRiver();   // its page size and loading differ by mode
+    else if (changed && state.profile) {
+      if (portalLevel) { portalLevel.stale = true; portalChanged(portalLevel.portalId); }
+      else { const left = $('grid').scrollLeft; drawLayout(); $('grid').scrollLeft = left; }
+    }
   }
 
   // Tell the host how tall we are so the inline frame fits the content. Measure the

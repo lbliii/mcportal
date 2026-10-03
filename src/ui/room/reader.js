@@ -139,6 +139,7 @@
 
   /** @param {ReadableItem} item @param {PortalResult} portal */
   async function openReader(item, portal) {
+    if (stopReading) stopReading();
     const generation = ++readerGeneration;
     const reader = $('reader');
     rememberRoomNavigation();

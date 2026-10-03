@@ -322,7 +322,8 @@
     if (document.visibilityState !== 'visible' || state.profile?.layout !== 'river' || Date.now() - riverView.checkedAt < RIVER_RECHECK_MS) return;
     riverView.checkedAt = Date.now();
     for (const portal of state.portals.values()) {
-      const stale = portal.provenance.fetchedAt && Date.parse(portal.provenance.fetchedAt) + portal.provenance.ttlSeconds * 1000 < Date.now();
+      const loaded = portal.provenance.fetchedAt ? Date.parse(portal.provenance.fetchedAt) : portalLoadedAt.get(portal.portalId);
+      const stale = loaded !== undefined && loaded + portal.provenance.ttlSeconds * 1000 < Date.now();
       if (!portal.pin && !OFF_RIVER.has(portal.source) && stale) refreshPortal(portal.portalId);
     }
   });
