@@ -126,8 +126,8 @@ export async function deleteAccountData(accountId: string, deps: DeletionDeps, b
 
 export class AccountPage {
   private sessions: PageSessions;
-  private downloads = new Map<string, { userId: string; format: ExportFormat; expiresAt: number }>();
-  private uploads = new Map<string, { userId: string; expiresAt: number }>();
+  private downloads = new Map<string, { userId: string; format: ExportFormat; sessionKey?: string; expiresAt: number }>();
+  private uploads = new Map<string, { userId: string; sessionKey?: string; expiresAt: number }>();
   private deps: AccountDeps;
   private now: () => number;
 
@@ -159,6 +159,27 @@ export class AccountPage {
     const token = secretToken(24);
     this.uploads.set(hash(token), { userId, expiresAt: this.now() + DOWNLOAD_MS });
     return `${this.deps.publicUrl}/upload/${token}`;
+  }
+
+  /** Link possession is insufficient: sign in as its owner, then keep it in that browser session. */
+  private linkSession(req: IncomingMessage, res: ServerResponse, route: string, entry: { userId: string; sessionKey?: string }): ReturnType<PageSessions['current']> {
+    const current = this.sessions.current(req);
+    if (!current) {
+      if (req.method === 'GET' && !entry.sessionKey) redirect(res, `/account/login?return=${encodeURIComponent(route)}`);
+      else sendHtml(res, 403, page('Sign in required', '<p>Open this link in the browser that signed in, or ask for a new link.</p>'));
+      return undefined;
+    }
+    if (current.session.accountId !== entry.userId || (entry.sessionKey && entry.sessionKey !== current.key)) {
+      sendHtml(res, 403, page('Refused', '<p>This link belongs to another account or browser session. Ask for a new link in your account.</p>'));
+      return undefined;
+    }
+    // Only opening the page can claim the link; a POST cannot silently bind it.
+    if (!entry.sessionKey && req.method !== 'GET') {
+      sendHtml(res, 403, page('Refused', '<p>Open the import page in this browser before uploading.</p>'));
+      return undefined;
+    }
+    entry.sessionKey = current.key;
+    return current;
   }
 
   /** Import an uploaded export and answer with what happened. */
@@ -216,11 +237,14 @@ ${uploadForm('/account/import', s.csrf)}
     if (route.startsWith('/download/') && req.method === 'GET') {
       const key = token ? hash(token) : '';
       const entry = this.downloads.get(key);
-      this.downloads.delete(key);   // one use
       if (!entry || entry.expiresAt <= this.now() || this.deps.accounts.actor(entry.userId).status !== 'active') {
+        this.downloads.delete(key);
         sendHtml(res, 410, page('Link expired', '<p>This download link has expired or was already used. Ask for a new export, or download from your <a href="/account">account page</a>.</p>'));
         return true;
       }
+      const current = this.linkSession(req, res, route, entry);
+      if (!current) return true;
+      this.downloads.delete(key);   // one authenticated use
       sendFile(res, await buildExport(entry.format, entry.userId, await this.exportSources(entry.userId)));
       return true;
     }
@@ -233,19 +257,23 @@ ${uploadForm('/account/import', s.csrf)}
         sendHtml(res, 410, page('Link expired', '<p>This upload link has expired or was already used. Ask Claude for a new one, or import from your <a href="/account">account page</a>.</p>'));
         return true;
       }
+      const current = this.linkSession(req, res, route, entry);
+      if (!current) return true;
       if (req.method === 'GET') {
-        sendHtml(res, 200, page('Import into MCPortal', `<h1>Import into MCPortal</h1><p>Pick your MCPortal export file. It only adds to your room: nothing is removed or moved.</p>${uploadForm(route)}<p class="muted">This link works once, for 15 minutes.</p>`));
+        sendHtml(res, 200, page('Import into MCPortal', `<h1>Import into MCPortal</h1><p>Pick your MCPortal export file. It only adds to your room: nothing is removed or moved.</p>${uploadForm(route, current.session.csrf)}<p class="muted">This link works once, for 15 minutes.</p>`));
         return true;
       }
       if (!sameOrigin(req, this.deps.publicUrl)) return sendHtml(res, 403, page('Refused', '<p>That upload didn\'t come from the import page.</p>')), true;
-      this.uploads.delete(key);   // one use, whatever happens next
-      let upload: { file?: Buffer };
+      let upload: { file?: Buffer; csrf?: string };
       try {
         upload = await readUpload(req);
       } catch (error) {
         const big = errorCode(error) === 'limit_exceeded';
         return sendHtml(res, big ? 413 : 400, page('Not imported', `<p>${big ? `That file is over ${MAX_UPLOAD / 1024 / 1024} MB.` : 'The upload was malformed.'} Ask Claude for a new link.</p>`), { connection: 'close' }), true;
       }
+      if (!this.sessions.csrfMatches(current.session, upload.csrf)) return sendHtml(res, 403, page('Refused', '<p>Try again from the import page in the browser that opened this link.</p>')), true;
+      if (this.uploads.get(key) !== entry || entry.expiresAt <= this.now() || this.sessions.current(req)?.key !== current.key || this.deps.accounts.actor(entry.userId).status !== 'active') return sendHtml(res, 410, page('Link expired', '<p>Ask for a new import link.</p>')), true;
+      this.uploads.delete(key);   // claim after validation, before the asynchronous import
       await this.runImport(res, entry.userId, upload, '/account');
       return true;
     }
@@ -253,11 +281,13 @@ ${uploadForm('/account/import', s.csrf)}
     if (route !== '/account' && !route.startsWith('/account/')) return false;
 
     if (route === '/account/login' && req.method === 'GET') {
+      const requested = url.searchParams.get('return') ?? '';
+      const back = /^\/(download|upload)\/[A-Za-z0-9_-]{20,64}$/.test(requested) ? requested : '/account';
       this.deps.oauth.beginPageSignIn(req, res, async (who, out, clearCookie) => {
         if ('error' in who) return sendHtml(out, 400, page('Sign-in failed', `<p>${escapeHtml(who.error)}.</p><p><a href="/account">Try again</a></p>`), clearCookie);
         const account = await this.deps.accounts.forIdentity(who);
         if (!account) return sendHtml(out, 404, page('No account', `<p>@${escapeHtml(who.login)} has no account on this MCPortal server, so there's nothing stored for it.</p>`), clearCookie);
-        redirect(out, '/account', { 'set-cookie': [clearCookie['set-cookie']!, this.sessions.start(account.id, who.login)] });
+        redirect(out, back, { 'set-cookie': [clearCookie['set-cookie']!, this.sessions.start(account.id, who.login)] });
       });
       return true;
     }

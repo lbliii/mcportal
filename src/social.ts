@@ -427,9 +427,9 @@ export class Social {
     return false;
   }
 
-  /** Handles in the viewer's lists, and how many follow them (never who). */
-  async connections(viewer: string): Promise<{ following: string[]; muted: string[]; blocked: string[]; followers: number }> {
-    const handles = async (ids: string[]) => (await Promise.all(ids.map((id) => this.profiles.get(id)))).filter((p): p is PublicProfile => Boolean(p) && !this.hidden(p!.accountId)).map((p) => p.handle).sort();
+  /** Handles in the viewer's lists, and how many follow them (never who). Account exports include suspended targets. */
+  async connections(viewer: string, includeHidden = false): Promise<{ following: string[]; muted: string[]; blocked: string[]; followers: number }> {
+    const handles = async (ids: string[]) => (await Promise.all(ids.map((id) => this.profiles.get(id)))).filter((p): p is PublicProfile => Boolean(p) && (includeHidden || !this.hidden(p!.accountId))).map((p) => p.handle).sort();
     return {
       following: await handles(await this.store.outgoing('follows', viewer)),
       muted: await handles(await this.store.outgoing('mutes', viewer)),
@@ -466,6 +466,16 @@ export class Social {
     const report: Report = { id: newId('r'), reporterId: reporter, targetKind, targetId, reason: why, status: 'open', createdAt: this.at() };
     await this.store.addReport(report);
     return report;
+  }
+
+  /** The account's own reports for its data export. Moderator identities and notes stay private. */
+  async reportsFiled(accountId: string): Promise<Array<Pick<Report, 'id' | 'targetKind' | 'targetId' | 'reason' | 'status' | 'createdAt' | 'resolvedAt'>>> {
+    return Promise.all((await this.store.reportsFiled(accountId))
+      .map(async ({ id, targetKind, targetId, reason, status, createdAt, resolvedAt }) => ({
+        id, targetKind,
+        targetId: targetKind === 'profile' ? ((await this.profiles.get(targetId))?.handle ?? 'deleted account') : targetId,
+        reason, status, createdAt, ...(resolvedAt ? { resolvedAt } : {}),
+      })));
   }
 
   // ---- admin (admin page only; never tools) ----

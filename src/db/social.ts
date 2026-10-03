@@ -131,6 +131,12 @@ export class PgSocialStore implements SocialStore {
     return rows.map((r) => ({ ...r.data, reporterId: r.reporter_id }));
   }
 
+  async reportsFiled(accountId: string): Promise<Report[]> {
+    const { rows } = await this.db.query<{ data: Report; reporter_id: string }>(
+      `SELECT data, reporter_id FROM mcportal_reports WHERE reporter_id = $1 ORDER BY created_at DESC`, [accountId]);
+    return rows.map((r) => ({ ...r.data, reporterId: r.reporter_id }));
+  }
+
   async resolveReport(id: string, by: string, resolution: string, at: string): Promise<Report | undefined> {
     const { rows } = await this.db.query<{ data: Report; reporter_id: string }>(
       `UPDATE mcportal_reports SET status = 'resolved', data = data || $2::jsonb WHERE id = $1 RETURNING data, reporter_id`,

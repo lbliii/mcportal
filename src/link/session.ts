@@ -9,6 +9,7 @@
  *   - Signing out copies the account's portal back to the local files (also additive),
  *     revokes this computer's sign-in, and deletes link.json, so nothing disappears.
  */
+import { hostedOrigin } from './hosted-url.ts';
 import { AppError, errorCode } from '../lib/errors.ts';
 import { buildExport, describeImport, importExport, parseExport, type ExportFormat } from '../portability.ts';
 import type { ProfileStore } from '../store.ts';
@@ -83,7 +84,7 @@ export class LocalSession {
   constructor(options: LocalSessionOptions) {
     this.options = options;
     this.link = new LinkFile(options.dataDir);
-    this.server = new URL(options.hostedUrl ?? DEFAULT_HOSTED_URL).origin;
+    this.server = hostedOrigin(options.hostedUrl ?? DEFAULT_HOSTED_URL);
   }
 
   /** The context for one request: local, or linked when link.json says so. */
@@ -214,7 +215,7 @@ export class LocalSession {
     const path = await import('node:path');
     const file = await client.download(format);
     const dir = path.join(this.options.dataDir, 'exports');
-    await mkdir(dir, { recursive: true });
+    await mkdir(dir, { recursive: true, mode: 0o700 });
     const where = path.join(dir, file.filename);
     await writeFile(where, file.body, { mode: 0o600 });
     return { kind: 'file', where, summary: file.summary };

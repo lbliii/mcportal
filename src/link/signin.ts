@@ -11,6 +11,7 @@
  * The listener takes one request with the expected state, answers with a page that
  * says what happened, and closes. Nothing here is reachable from off the machine.
  */
+import { hostedOrigin } from './hosted-url.ts';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -64,7 +65,7 @@ function resultPage(title: string, body: string): string {
 async function requestJson(fetcher: typeof fetch, url: URL, init: RequestInit, action: string): Promise<Record<string, unknown>> {
   let res: Response;
   try {
-    res = await fetcher(url, { ...init, signal: AbortSignal.timeout(15_000) });
+    res = await fetcher(url, { ...init, redirect: 'error', signal: AbortSignal.timeout(15_000) });
   } catch (error) {
     const timedOut = error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError');
     throw new AppError(timedOut ? 'fetch_timeout' : 'upstream_unreachable', `${timedOut ? 'The hosted MCPortal took too long' : "Can't reach the hosted MCPortal"} while ${action}. Check the connection and try again.`, { cause: error });
@@ -85,7 +86,7 @@ export async function startSignIn(options: SignInOptions): Promise<PendingSignIn
   const now = options.now ?? Date.now;
   const log = options.log ?? silentLogger;
   const reference = requestId();
-  const server = new URL(options.server).origin;
+  const server = hostedOrigin(options.server);
   const verifier = b64url(randomBytes(32));
   const challenge = b64url(createHash('sha256').update(verifier).digest());
   const state = b64url(randomBytes(24));

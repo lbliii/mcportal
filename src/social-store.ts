@@ -35,6 +35,8 @@ export interface SocialStore {
   incoming(relation: Relation, b: string): Promise<string[]>;
   addReport(report: Report): Promise<void>;
   reports(status?: Report['status'], limit?: number): Promise<Report[]>;
+  /** All reports filed by this account, including resolved ones. Export only. */
+  reportsFiled(accountId: string): Promise<Report[]>;
   resolveReport(id: string, by: string, resolution: string, at: string): Promise<Report | undefined>;
   /**
    * Account deletion: their shares and relations go. Reports they filed stay, without
@@ -188,6 +190,10 @@ export class DocumentSocialStore implements SocialStore {
 
   async reports(status?: Report['status'], limit = 100): Promise<Report[]> {
     return structuredClone((await this.load()).reports.filter((r) => !status || r.status === status).slice(0, limit));
+  }
+
+  async reportsFiled(accountId: string): Promise<Report[]> {
+    return structuredClone((await this.load()).reports.filter((r) => r.reporterId === accountId));
   }
 
   resolveReport(id: string, by: string, resolution: string, at: string): Promise<Report | undefined> {

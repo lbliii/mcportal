@@ -18,13 +18,13 @@ export interface GithubIdentity {
   login: string;
 }
 
-/** Where to send the browser to sign in: read:user only, bound to `state`. */
+/** Where to send the browser to sign in: public identity only, bound to `state`. */
 export function githubAuthorizeUrl(app: GithubApp, redirectUri: string, state: string, options: { allowSignup?: boolean } = {}): string {
   const gh = new URL('https://github.com/login/oauth/authorize');
   gh.searchParams.set('client_id', app.clientId);
   gh.searchParams.set('redirect_uri', redirectUri);
   gh.searchParams.set('state', state);
-  gh.searchParams.set('scope', 'read:user');
+  gh.searchParams.set('scope', '');
   if (options.allowSignup) gh.searchParams.set('allow_signup', 'true');
   return gh.href;
 }

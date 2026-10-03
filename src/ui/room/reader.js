@@ -105,7 +105,7 @@
     const by = [a.byline, site, `${Math.max(1, Math.round(a.wordCount / 230))} min read`].filter(Boolean).join(' · ');
     const p = a.provenance;
     return [readerTop(a.url, withBack, a.title), el('h1', null, a.title), el('div', { class: 'byline' }, by), body,
-      el('div', { class: 'prov' }, `Reader view of ${p.endpoint}${via ? ` · via ${via}` : ''} · fetched ${new Date(p.fetchedAt).toLocaleString()}${p.cached ? ' (cached)' : ''}. Text only; scripts, trackers and ads removed.`)];
+      el('div', { class: 'prov' }, `Reader view of ${p.endpoint}${via ? ` · via ${via}` : ''}${provenanceTime(p)}. Text only; scripts, trackers and ads removed.`)];
   }
 
   // This view belongs to a read_article call: it is a reader card, not a room.

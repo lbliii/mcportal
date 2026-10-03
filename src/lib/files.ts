@@ -32,7 +32,7 @@ export class KeyedMutex {
 }
 
 export async function atomicWrite(file: string, contents: string): Promise<void> {
-  await mkdir(path.dirname(file), { recursive: true });
+  await mkdir(path.dirname(file), { recursive: true, mode: 0o700 });
   const temp = `${file}.${process.pid}.${randomBytes(6).toString('hex')}.tmp`;
   await writeFile(temp, contents, { encoding: 'utf8', mode: 0o600 });
   await rename(temp, file);

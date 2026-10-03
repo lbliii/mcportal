@@ -78,16 +78,16 @@ function room() {
 
 let app: Running;
 const seen = new FileSeenStore(null);
-let readings: FileReadingStore;
 let readingDir: string;
+let readingStore: FileReadingStore;
 const profiles = new MemoryProfileStore({ default: room() });
 let page: Page;
 
 before(async () => {
   if (skip) return;
-  readingDir = await mkdtemp(path.join(tmpdir(), 'mcportal-ui-reading-'));
-  readings = new FileReadingStore(readingDir);
-  app = await startApp({ allowUnauthenticated: true, limits: { perMinute: 10000, perDay: 100000, globalPerDay: 1000000 } }, fetcher, { store: profiles, seen, reading: readings });
+  readingDir = await mkdtemp(path.join(tmpdir(), 'mcportal-browser-reading-'));
+  readingStore = new FileReadingStore(readingDir);
+  app = await startApp({ allowUnauthenticated: true, limits: { perMinute: 10000, perDay: 100000, globalPerDay: 1000000 } }, fetcher, { store: profiles, seen, reading: readingStore });
   page = await Page.open(chrome!);
 });
 
@@ -95,7 +95,6 @@ after(async () => {
   if (skip) return;
   await page?.close();
   await app?.close();
-  await rm(readingDir, { recursive: true, force: true });
 });
 
 /** Load the room fresh and wait until every portal has drawn. */
@@ -146,7 +145,7 @@ async function tool(name: string, args: Record<string, unknown>): Promise<any> {
 }
 
 test('browser: the reader records opening and position, resumes there, and marks read only when asked', { skip }, async () => {
-  await readings.deleteAll('default');
+  await readingStore.deleteAll('default');
   const openArticle = async () => {
     await openRoom();
     await page.click('[data-portal="saved"] .item-main');
