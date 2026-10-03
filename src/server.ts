@@ -113,7 +113,7 @@ async function start(argv: string[]): Promise<void> {
       dataDir,
       localUser: userId,
       local: { store, reading, handoffs, seen, editions, clips },
-      base: { fetcher, cache, deliver: (format) => deliverToFile(format, userId, { store, reading, clips }, dataDir) },
+      base: { fetcher, cache, log, deliver: (format) => deliverToFile(format, userId, { store, reading, clips }, dataDir) },
       hostedUrl: process.env.MCPORTAL_HOSTED_URL || undefined,
       onLinked: stdioToolsChanged,
     });
@@ -143,7 +143,7 @@ async function start(argv: string[]): Promise<void> {
     dataDir,
     localUser: config.staticUser,
     local: { store, reading, handoffs, seen, editions, clips },
-    base: { fetcher, cache, deliver: (format) => deliverToFile(format, config.staticUser, { store, reading, clips }, dataDir) },
+    base: { fetcher, cache, log, deliver: (format) => deliverToFile(format, config.staticUser, { store, reading, clips }, dataDir) },
     hostedUrl: process.env.MCPORTAL_HOSTED_URL || undefined,
   }) : undefined;
   const server = createApp(config, { store, reading, handoffs, seen, editions, clips, publicProfiles, social, fetcher, cache, log, authPersistence, storage, checkStorage, accounts, session });
