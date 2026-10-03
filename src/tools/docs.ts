@@ -166,7 +166,7 @@ export const DOCS_TOOLS: ToolDef[] = [
     name: 'search_docs',
     title: 'Search a docs site',
     access: 'fetch',
-    description: "Find pages of a docs site by title and section, and on Sphinx sites functions and classes by name ('str.split'); not full text. Read them with read_doc_page.",
+    description: "Search docs titles, sections, Sphinx symbols ('str.split') and fresh cached page bodies. Unvisited pages use the outline only. Read hits with read_doc_page.",
     inputSchema: {
       type: 'object',
       required: ['query'],
@@ -179,10 +179,10 @@ export const DOCS_TOOLS: ToolDef[] = [
       if (!query) return toolError('search_docs needs a query');
       try {
         const { site } = await siteFor(args, ctx);
-        const hits = searchDocs(site, query, typeof args.limit === 'number' ? args.limit : 20);
-        if (!hits.length) return ok(`Nothing in ${site.title} matches "${query}" by title. Try other words, or open_docs to browse.`, { hits: [], site: { title: site.title, toc: site.toc } } satisfies ToolResults['search_docs']);
+        const hits = searchDocs(site, query, typeof args.limit === 'number' ? args.limit : 20, (url) => ctx.cache.peek<DocPage>(`docpage:${url}`)?.value);
+        if (!hits.length) return ok(`Nothing in ${site.title} matches "${query}" in its outline, symbols or cached page content. Unvisited or expired pages are searched only by their outline. Try other words, or open_docs to browse.`, { hits: [], site: { title: site.title, toc: site.toc } } satisfies ToolResults['search_docs']);
         const lines = hits.map((h) => `- ${h.title}${h.kind === 'symbol' ? ` (${h.role})` : h.section ? ` (in ${h.section})` : ''} <${h.url}>`);
-        return ok(`${hits.length} match(es) in ${site.title}:\n${untrusted(site.toc.url, lines.join('\n'))}`, { hits, site: { title: site.title, toc: site.toc } } satisfies ToolResults['search_docs']);
+        return ok(`${hits.length} match(es) in ${site.title} (outline, symbols and fresh cached page content; unvisited pages searched by outline only):\n${untrusted(site.toc.url, lines.join('\n'))}`, { hits, site: { title: site.title, toc: site.toc } } satisfies ToolResults['search_docs']);
       } catch (error) {
         return failed('Could not search those docs', error);
       }

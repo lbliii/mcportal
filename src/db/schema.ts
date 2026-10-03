@@ -47,7 +47,7 @@ export async function connect(url: string, options: { searchPath?: string } = {}
   return pool as unknown as Queryable;
 }
 
-export const SCHEMA_VERSION = '8';
+export const SCHEMA_VERSION = '9';
 
 export async function ensureSchema(db: Queryable): Promise<void> {
   await db.query(`CREATE TABLE IF NOT EXISTS mcportal_meta (key text PRIMARY KEY, value text NOT NULL)`);
@@ -79,6 +79,15 @@ export async function ensureSchema(db: Queryable): Promise<void> {
     updated_at timestamptz NOT NULL
   )`);
   await db.query(`CREATE INDEX IF NOT EXISTS mcportal_clips_user_created ON mcportal_clips (user_id, created_at DESC)`);
+  // v9: full-text clips. Generated vectors backfill existing rows and stay current
+  // on insert/update; local/file stores continue to use literal substring search.
+  await db.query(`ALTER TABLE mcportal_clips ADD COLUMN IF NOT EXISTS search_vector tsvector
+    GENERATED ALWAYS AS (
+      setweight(to_tsvector('english'::regconfig, title), 'A') ||
+      setweight(to_tsvector('english'::regconfig, search_text), 'D')
+    ) STORED`);
+  await db.query(`CREATE INDEX IF NOT EXISTS mcportal_clips_search ON mcportal_clips USING GIN (search_vector)`);
+
   // v3: sharing. A share's content is a copy in `data`; relations are (a, b) pairs.
   await db.query(`CREATE TABLE IF NOT EXISTS mcportal_shares (
     id text PRIMARY KEY,

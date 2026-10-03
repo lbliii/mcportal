@@ -35,6 +35,13 @@ export class TtlCache {
     return { entries: this.entries.size, bytes: this.bytes };
   }
 
+  /** Inspect a fresh value without fetching, extending its TTL or changing eviction order. */
+  peek<T>(key: string): Cached<T> | undefined {
+    const hit = this.entries.get(key);
+    if (!hit || hit.expiresAt <= this.now()) return undefined;
+    return { value: hit.value as T, cached: true, fetchedAt: new Date(hit.storedAt).toISOString() };
+  }
+
   async get<T>(key: string, ttlSeconds: number, load: () => Promise<T>, force = false): Promise<Cached<T>> {
     const hit = this.entries.get(key);
     if (!force && hit && hit.expiresAt > this.now()) {
