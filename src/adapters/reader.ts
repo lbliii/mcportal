@@ -257,7 +257,7 @@ export function extractArticle(html: string, baseUrl?: string, limits: { blocks:
             const resume = current ? { ...current, parts: [] as Part[] } : null;
             flush();
             const alt = clean(decodeEntities(a.alt ?? ''), 500);
-            const block: Found = { type: 'p', zone: zone(), ...listFields(), text: alt || 'Image', ...(stack.findLast((c) => c.gallery)?.gallery !== undefined ? { gallery: stack.findLast((c) => c.gallery)!.gallery! } : {}), figure: { url, ...(alt ? { alt } : {}), ...(width > 0 && width <= 10_000 ? { width } : {}), ...(height > 0 && height <= 10_000 ? { height } : {}) }, spans: [{ text: alt || 'Image', href: url }] };
+            const block: Found = { type: 'p', zone: zone(), ...listFields(), text: alt || 'Image', ...(stack.find((c) => c.gallery)?.gallery !== undefined ? { gallery: stack.find((c) => c.gallery)!.gallery! } : {}), figure: { url, ...(alt ? { alt } : {}), ...(width > 0 && width <= 10_000 ? { width } : {}), ...(height > 0 && height <= 10_000 ? { height } : {}) }, spans: [{ text: alt || 'Image', href: url }] };
             found.push(block);
             if (figure) figure.blocks.push(block);
             current = resume;
@@ -396,13 +396,13 @@ export function extractArticle(html: string, baseUrl?: string, limits: { blocks:
   const chrome = shareLists(found);
   const isChrome = (b: Found | undefined) => b?.list !== undefined && chrome.has(b.list);
   const seenFigures = new Set<string>(), seenMedia = new Set<string>();
-  const mediaKey = (url: string) => { const u = new URL(url); for (const name of ['w', 'width', 'h', 'height', 'q', 'quality', 'fit', 'format']) u.searchParams.delete(name); return u.href; };
+  const mediaKey = (url: string) => { const u = new URL(url); for (const name of ['w', 'width', 'h', 'height', 'q', 'quality', 'fit', 'format', 'dpr']) u.searchParams.delete(name); return u.href; };
   let lastCallout: { n: number; block: ArticleBlock } | undefined;
   for (const [i, { zone: z, calloutN, list: _list, shareLink: _share, gallery, ...b }] of found.entries()) {
     if (preferred && z !== preferred) continue;
     if (isChrome(found[i])) continue;
     if (b.figure) {
-      const key = `${gallery ?? 'adjacent'}:${mediaKey(b.figure.url)}:${b.figure.caption ?? ''}:${b.figure.credit ?? ''}`;
+      const key = `${gallery ?? 'adjacent'}:${mediaKey(b.figure.url)}:${b.figure.credit ?? ''}`;
       const previous = blocks.at(-1);
       if (gallery !== undefined && seenFigures.has(key) || gallery === undefined && previous?.figure && mediaKey(previous.figure.url) === mediaKey(b.figure.url) && previous.figure.caption === b.figure.caption && previous.figure.credit === b.figure.credit) continue;
       if (gallery !== undefined) seenFigures.add(key);

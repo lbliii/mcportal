@@ -122,3 +122,11 @@ test('reader extraction: different image credits survive adjacent deduplication 
   for (const b of a.blocks.filter((b) => b.listId)) { assert.equal(b.listId, li.listId); assert.equal(b.level, 0); assert.equal(b.value, 5); }
   assert.ok(a.blocks.some((b) => b.text === 'Final tail' && b.listId === li.listId));
 });
+
+test('reader extraction: nested gallery rendition wrappers share media identity and header portraits stay outside the story', () => {
+  const a = story('<header><div class="article-header-author-img"><img src="/writer.jpg" alt="Author portrait"></div></header><p>Visual story lead.</p><div class="article-gallery"><div class="gallery-carousel"><figure><img src="/one.jpg?w=1000&amp;dpr=2" alt="First work"><figcaption>First caption.</figcaption></figure><img src="/two.jpg?w=1000&amp;dpr=2" alt="Second work"></div><div class="gallery-thumbnails"><img src="/one.jpg?w=200&amp;dpr=1" alt="one-thumb.jpg"><img src="/two.jpg?w=200&amp;dpr=1" alt="two-thumb.jpg"></div><div class="gallery-fullscreen"><img src="/one.jpg?w=1800&amp;dpr=2" alt="First work"><img src="/two.jpg?w=1800&amp;dpr=2" alt="Second work"></div></div><p>Visual story end.</p>');
+  const figures = a.blocks.filter((b) => b.figure);
+  assert.equal(figures.length, 2); assert.equal(figures[0]!.figure!.caption, 'First caption.');
+  assert.doesNotMatch(JSON.stringify(a), /writer\.jpg|thumb\.jpg/);
+  assert.equal(a.blocks.at(-1)?.text, 'Visual story end.');
+});

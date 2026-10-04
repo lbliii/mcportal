@@ -3,7 +3,7 @@ import { parseAttrs, tokenize, type Token } from '../../lib/html.ts';
 import { clean, decodeEntities } from '../../lib/text.ts';
 
 const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr']);
-const CHROME = /(?:^|[\s_-])(?:newsletter|subscription|subscribe|recaptcha|consent|cookie-banner|author-bio(?:graphy)?|author-profile|breadcrumbs?|related-(?:posts|articles|stories|content)|recommended-(?:posts|articles|stories)|recommendations|recommendation-card|social-share|share-tools|article-tags|post-tags|tag-list)(?:$|[\s_-])/i;
+const CHROME = /(?:^|[\s_-])(?:newsletter|subscription|subscribe|recaptcha|consent|cookie-banner|author-bio(?:graphy)?|author-profile|author-avatar|author-img|author-image|breadcrumbs?|related-(?:posts|articles|stories|content)|recommended-(?:posts|articles|stories)|recommendations|recommendation-card|social-share|share-tools|article-tags|post-tags|tag-list)(?:$|[\s_-])/i;
 const BODY = /(?:^|[\s_-])(?:article-body|story-body|post-content|entry-content|article-content)(?:$|[\s_-])/i;
 const AUTHOR = /(?:^|[\s_-])(?:byline|author-name|article-author|post-author)(?:$|[\s_-])/i;
 interface Node { name: string; start: number; end: number; parent: number; chars: number; linked: number; prose: number; excluded: boolean; candidate: number; author: boolean; chrome: boolean; ambiguous: boolean; utility: boolean; sample: string; date?: 'publishedAt' | 'updatedAt'; datetime?: string; text: string }
