@@ -102,6 +102,8 @@ export interface ArticleBlock {
   ordered?: true;
   /** li: identity of its authored list, so adjacent lists can restart independently. */
   listId?: string;
+  /** One source list item across its text, media and continuation blocks. */
+  listItemId?: string;
   /** li: the authored ordered-list start, including zero or negative values. */
   listStart?: number;
   /** li: an explicit value attribute on this item. */
