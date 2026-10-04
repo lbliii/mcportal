@@ -37,6 +37,7 @@ declare global {
     btnWho: HTMLButtonElement;
     whoMenu: HTMLDivElement;
     grid: HTMLElement;
+    mainBar: HTMLElement;
     opmlFile: HTMLInputElement;
     reader: HTMLElement;
     roomName: HTMLDivElement;

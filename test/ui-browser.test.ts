@@ -27,6 +27,7 @@ const chrome = findChrome();
 const skip = !chrome && 'no Chrome found (set CHROME_PATH)';
 
 const ARTICLE = 'https://yashgarg.dev/posts/ps5-rtmp';
+const LONG_ARTICLE = 'https://example.com/sticky-reader';
 const DOCS = 'https://docs.example.com';
 const LLMS = `# Example Docs
 
@@ -57,6 +58,7 @@ const GITHUB_DOC = 'https://raw.githubusercontent.com/acme/manual/HEAD/docs/guid
 
 /** Fixtures for the feeds and the article, plus a small docs site. */
 const fetcher: Fetcher = async (url, options) => {
+  if (url === LONG_ARTICLE) return { status: 200, url, contentType: 'text/html', text: `<article><h1>A long read</h1>${Array.from({ length: 80 }, (_, i) => `<p>Paragraph ${i + 1}. Keep the reader controls within reach while this article scrolls. This is enough text to give the paragraph several lines on a narrow screen.</p>`).join('')}</article>`, truncated: false };
   if (url === 'https://api.github.com/repos/acme/manual/git/trees/HEAD?recursive=1') return { status: 200, url, contentType: 'application/json', text: JSON.stringify({ tree: [{ type: 'blob', path: 'docs/README.md' }, { type: 'blob', path: 'docs/guides/deploy.md' }] }), truncated: false };
   if (url === GITHUB_DOC) return { status: 200, url, contentType: 'text/markdown; charset=utf-8', text: LONG_DOC, truncated: false };
   if (url === `${DOCS}/deploy.md`) return { status: 200, url, contentType: 'text/markdown; charset=utf-8', text: LONG_DOC, truncated: false };
@@ -109,6 +111,25 @@ async function openRoom(): Promise<void> {
   await page.goto(`${app.base}/preview`);
   await page.waitFor(`document.querySelectorAll('[data-portal]').length === 5 && !document.querySelector('.skeleton')`, 'the room to draw its five portals');
   await page.waitFor(`document.querySelector('.continue-reading')?.getAttribute('aria-busy') === 'false'`, 'recent reading to finish loading before pointer coordinates are measured');
+}
+
+/** Exercise display-mode changes through the same bridge an MCP host uses. */
+async function attachHost(): Promise<string> {
+  const { identifier } = await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `
+    Object.defineProperty(window, '__MCPORTAL_DEV__', { get: () => undefined, set: () => {} });
+    window.addEventListener('message', async (event) => {
+      const msg = event.data;
+      if (!msg?.id || !msg.method) return;
+      event.stopImmediatePropagation();
+      let result;
+      if (msg.method === 'ui/initialize') result = { hostCapabilities: { serverTools: true, updateModelContext: true }, hostContext: { displayMode: 'inline', availableDisplayModes: ['inline', 'fullscreen'] } };
+      else if (msg.method === 'tools/call') {
+        const response = await fetch('/mcp', { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream' }, body: JSON.stringify({ jsonrpc: '2.0', id: msg.id, method: 'tools/call', params: msg.params }) });
+        result = (await response.json()).result;
+      } else result = {};
+      window.postMessage({ jsonrpc: '2.0', id: msg.id, result }, '*');
+    });` });
+  return identifier;
 }
 
 test('browser: the room draws every portal from real tool results', { skip }, async () => {
@@ -166,6 +187,83 @@ async function tool(name: string, args: Record<string, unknown>): Promise<any> {
   const res = await fetch(`${app.base}/mcp`, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }) });
   return (await res.json()).result.structuredContent;
 }
+
+test('browser: reader and source controls stack below the main toolbar while scrolling, including narrow screens and larger text', { skip }, async () => {
+  const host = await attachHost();
+  const saved = [{ url: LONG_ARTICLE, title: 'A long read', savedAt: '2026-09-01T00:00:00.000Z' },
+    ...Array.from({ length: 25 }, (_, i) => ({ url: `https://example.com/sticky-${i}`, title: `Saved ${i}`, savedAt: '2026-09-01T00:00:00.000Z' }))];
+  await profiles.put('default', validateProfile({ ...room(), saved }));
+  const stack = (selector: string) => page.waitFor(`(() => {
+    const row = document.querySelector(${JSON.stringify(selector)}), r = row?.getBoundingClientRect();
+    if (!r) return false;
+    const full = document.documentElement.classList.contains('fullscreen');
+    const edge = ${JSON.stringify(selector)} === '.level-head' || full ? document.getElementById('mainBar').getBoundingClientRect().bottom : document.getElementById('reader').getBoundingClientRect().top;
+    const buttons = [...row.querySelectorAll('button')].filter((b) => b.getClientRects().length);
+    const reachable = buttons.every((b) => { const r = b.getBoundingClientRect(); return b.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)); });
+    return Math.abs(r.top - edge) < 2 && reachable && getComputedStyle(row).backgroundColor !== 'rgba(0, 0, 0, 0)';
+  })()`, `${selector} to remain visible below its toolbar`).catch(async (error) => {
+    const geometry = await page.eval(`JSON.stringify({ row: document.querySelector(${JSON.stringify(selector)})?.getBoundingClientRect(), bar: document.getElementById('mainBar').getBoundingClientRect(), reader: document.getElementById('reader').getBoundingClientRect(), scroll: document.getElementById('reader').scrollTop, full: document.documentElement.classList.contains('fullscreen') })`);
+    throw new Error(`${error.message}; ${geometry}`);
+  });
+  try {
+    for (const width of [360, 1000]) for (const mode of ['inline', 'fullscreen']) {
+      await page.send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
+      await openRoom();
+      await page.eval(`document.documentElement.style.fontSize = '200%'; window.postMessage({ jsonrpc: '2.0', method: 'ui/notifications/host-context-changed', params: { displayMode: ${JSON.stringify(mode)} } }, '*')`);
+      await page.waitFor(`document.documentElement.classList.contains('fullscreen') === ${mode === 'fullscreen'}`, 'the display mode');
+      await page.click('[data-portal="saved"] .portal-title');
+      await page.waitFor(`document.querySelector('.level')`, 'the source view');
+      if (mode === 'inline') {
+        await page.click('.level .fp-more');
+        await page.click('.level .fp-more');
+      }
+      await page.eval(`window.scrollTo(0, 500)`);
+      await stack('.level-head');
+      await page.click('.level .item-main');
+      await page.waitFor(`document.querySelectorAll('#reader .body p').length === 80`, 'the long article');
+      await page.eval(mode === 'inline' ? `document.getElementById('reader').scrollTop = 500` : `window.scrollTo(0, 500)`);
+      await stack('.reader-top');
+      // The controls remain useful at the scrolled position, rather than just looking sticky.
+      await page.click('#reader .reader-top [aria-label="Back to your room"]');
+      await page.waitFor(`document.getElementById('reader').hidden && document.querySelector('.level')`, 'back at the source');
+      await page.eval(`window.scrollTo(0, 500)`);
+      await stack('.level-head');
+      await page.click('.level-head [aria-label="Back to your room"]');
+      await page.waitFor(`!document.querySelector('.level')`, 'back in the room');
+      assert.deepEqual(page.problems, []);
+    }
+  } finally {
+    await page.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: host });
+    await profiles.put('default', room());
+    await page.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+  }
+});
+
+test('browser: docs anchors stay below the reader controls and contents do not overlap them', { skip }, async () => {
+  const host = await attachHost();
+  try {
+    await openRoom();
+    await page.click('[data-portal="docs"] .item-main');
+    await page.waitFor(`document.querySelector('#reader .body')`, 'the docs viewer');
+    // Open a long page through the viewer's existing docs navigation.
+    await page.eval(`[...document.querySelectorAll('.docs-toc a')].find((n) => n.textContent === 'Deploy').click()`);
+    await page.waitFor(`document.querySelectorAll('#reader .body h2').length === 45`, 'the long docs page');
+    for (const mode of ['inline', 'fullscreen']) {
+      await page.eval(`window.postMessage({ jsonrpc: '2.0', method: 'ui/notifications/host-context-changed', params: { displayMode: ${JSON.stringify(mode)} } }, '*')`);
+      await page.waitFor(`document.documentElement.classList.contains('fullscreen') === ${mode === 'fullscreen'}`, 'the docs display mode');
+      await page.eval(`document.querySelectorAll('#reader .body h2')[20].scrollIntoView({ block: 'start' })`);
+      await page.waitFor(`(() => {
+        const tools = document.querySelector('.reader-top').getBoundingClientRect();
+        const heading = document.querySelectorAll('#reader .body h2')[20].getBoundingClientRect();
+        const contents = document.querySelector('.docs-toc').getBoundingClientRect();
+        return heading.top >= tools.bottom && contents.top >= tools.bottom;
+      })()`, 'the docs heading and contents to stay below the controls');
+    }
+    assert.deepEqual(page.problems, []);
+  } finally {
+    await page.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: host });
+  }
+});
 
 test('browser: the reader records opening and position, resumes there, and marks read only when asked', { skip }, async () => {
   await readings.deleteAll('default');

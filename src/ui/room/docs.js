@@ -192,11 +192,13 @@
 
   /** @param {string} url @param {boolean} withBack @param {string} [title] */
   function readerTop(url, withBack, title) {
-    return el('div', { class: 'reader-top' },
+    const toolbar = el('div', { class: 'reader-top', role: 'group', 'aria-label': 'Reader controls' },
       iconButton('back', withBack ? 'Back to your room' : 'Open your room', closeReader, 'ib'),
       url ? iconButton('external', 'Open the original', () => openLink(url), 'ib') : null,
       title ? saveButton({ url, title }, 'reader', 'ib save') : null,
       title && (DEV || hostCapabilities.serverTools) ? iconButton('chat', 'Send to a new chat', () => sendToNewChat(null), 'ib') : null);
+    trackReaderToolbar(toolbar);
+    return toolbar;
   }
   let readerGeneration = 0;
   /** @type {{ x: number, y: number, focus: HTMLElement | SVGElement | null, positions: Array<{ node: HTMLElement, left: number, top: number }> } | null} */

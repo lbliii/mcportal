@@ -209,6 +209,24 @@
     }
   }
 
+  // Context controls stack below the main bar in fullscreen. Measure both rows so
+  // wrapping, larger text and coarse-pointer targets don't cover controls or anchors.
+  /** @type {HTMLElement | null} */
+  let readerToolbar = null;
+  const toolbarSizes = new ResizeObserver((entries) => {
+    for (const entry of entries) {
+      const property = entry.target === $('mainBar') ? '--mp-bar-height' : '--mp-reader-tools-height';
+      root.style.setProperty(property, `${entry.target.getBoundingClientRect().height}px`);
+    }
+  });
+  toolbarSizes.observe($('mainBar'));
+  /** @param {HTMLElement} toolbar */
+  function trackReaderToolbar(toolbar) {
+    if (readerToolbar) toolbarSizes.unobserve(readerToolbar);
+    readerToolbar = toolbar;
+    toolbarSizes.observe(toolbar);
+  }
+
   // Tell the host how tall we are so the inline frame fits the content. Measure the
   // body, not documentElement.scrollHeight: that never drops below the frame's current
   // height, so the frame could grow (reader view) but never shrink back. Inline, the page's
