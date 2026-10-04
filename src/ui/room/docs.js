@@ -22,7 +22,7 @@
     const reader = $('reader');
     rememberRoomNavigation();
     $('grid').hidden = true; reader.hidden = false; reader.classList.add('docs'); reader.scrollTop = 0; window.scrollTo(0, 0);
-    reader.replaceChildren(readerTop('', !options.card), docsMessage('Opening the docs…'));
+    renderReader(readerTop('', !options.card), docsMessage('Opening the docs…'));
     try {
       const data = (await callTool('open_docs', key)).structuredContent;
       if (generation !== readerGeneration) return;
@@ -30,7 +30,7 @@
     } catch (error) {
       if (generation !== readerGeneration) return;
       console.error('[mcportal] open_docs failed', key, error);
-      reader.replaceChildren(readerTop('', !options.card), el('div', { class: 'error' }, `These docs couldn't be opened (${errorText(error)}).`));
+      renderReader(readerTop('', !options.card), el('div', { class: 'error' }, `These docs couldn't be opened (${errorText(error)}).`));
     }
   }
 
@@ -83,12 +83,15 @@
     const toc = el('aside', { class: 'docs-toc', 'aria-label': 'Contents' },
       docsState.parent ? el('button', { class: 'docs-up', onclick: () => { const up = /** @type {DocsState} */ (/** @type {DocsState} */ (docsState).parent); showDocs({ site: up.site, docs: up.docs }, up.key, { parent: up.parent, card: up.card }); } }, `← ${docsState.parent.site.title}`) : null,
       el('div', { class: 'docs-site' }, site.title), search, list);
-    reader.replaceChildren(el('div', { class: 'docs-grid' }, toc, el('div', { class: 'docs-page' }), el('nav', { class: 'docs-otp', 'aria-label': 'On this page' })));
+    renderReader(readerTop('', !options.card), el('div', { class: 'docs-grid' }, toc, el('div', { class: 'docs-page' }), el('nav', { class: 'docs-otp', 'aria-label': 'On this page' })));
     const first = site.sections.flatMap((s) => s.pages).find((p) => !p.index);
     const start = options.url || data.page || (first && first.url);
     if (start) loadDocsPage(start);
     // .docs-page was added just above.
-    else /** @type {HTMLElement} */ ($first('.docs-page', reader)).replaceChildren(readerTop('', !options.card), docsMessage('Pick a section on the left.'));
+    else {
+      setReaderControls(readerTop('', !options.card));
+      /** @type {HTMLElement} */ ($first('.docs-page', reader)).replaceChildren(docsMessage('Pick a section on the left.'));
+    }
   }
 
   function markCurrentPage() {
@@ -147,7 +150,8 @@
         next ? el('button', { class: 'next', onclick: () => loadDocsPage(next.url) }, el('small', null, 'Next'), next.title) : null);
       const minutes = Math.max(1, Math.round((page.wordCount || 0) / 230));
       const how = docsState.key.portalId ? `portalId "${docsState.key.portalId}"` : `docs "${String(docsState.key.docs).slice(0, 300)}"`;
-      column.replaceChildren(top,
+      setReaderControls(top);
+      column.replaceChildren(
         el('div', { class: 'docs-crumb' }, [docsState.site.title, section].filter(Boolean).join(' › ')),
         el('h1', null, page.title),
         el('div', { class: 'byline' }, `${minutes} min read`),
@@ -172,7 +176,8 @@
     } catch (error) {
       if (generation !== readerGeneration || docsState !== requestState) return;
       console.error('[mcportal] read_doc_page failed', { url, ...docsState.key }, error);
-      column.replaceChildren(readerTop(url, !docsState.card), el('div', { class: 'error' }, `This page couldn't be read (${errorText(error)}).`),
+      setReaderControls(readerTop(url, !docsState.card));
+      column.replaceChildren(el('div', { class: 'error' }, `This page couldn't be read (${errorText(error)}).`),
         el('button', { class: 'btn', onclick: () => openLink(url) }, 'Open the original'));
     }
   }

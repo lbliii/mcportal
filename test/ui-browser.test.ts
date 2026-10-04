@@ -130,7 +130,8 @@ test('browser: an item opens in the reader, and home returns to the room', { ski
   assert.match(title, /PS5/);
   const paragraphs = await page.waitFor<number>(`document.querySelectorAll('#reader .body p').length`, 'the article body');
   assert.ok(paragraphs >= 3, `the article's text is shown (${paragraphs} paragraphs)`);
-  await page.click('#reader [aria-label="Back to your room"]');
+  assert.ok(await page.eval(`(() => { const r = document.querySelector('#reader').getBoundingClientRect(), t = document.querySelector('.reader-top').getBoundingClientRect(), b = document.querySelector('.bar').getBoundingClientRect(); return Math.abs(r.bottom - innerHeight) < 1 && t.width === b.width && t.top === b.bottom && r.top === t.bottom; })()`), 'preview reader fills the viewport below the two full-width action rows');
+  await page.click('#readerControls [aria-label="Back to your room"]');
   await page.waitFor(`!document.getElementById('grid').hidden`, 'the room to come back');
   assert.deepEqual(page.problems, []);
 });
@@ -168,7 +169,7 @@ test('browser: the reader records opening and position, resumes there, and marks
   const scrolled = await page.eval<number>(`(() => { const r = document.getElementById('reader'); const blocks = document.querySelector('#reader .body').children; const target = blocks[Math.floor(blocks.length / 3)]; r.scrollTop += target.getBoundingClientRect().top - r.getBoundingClientRect().top; return r.scrollTop; })()`);
   assert.ok(scrolled > 0, 'the article is long enough to scroll');
   await page.waitFor(`Number(document.querySelector('#reader .body')?.dataset.furthest) > 0`, 'the reader to note how far it got');
-  await page.click('#reader [aria-label="Back to your room"]');
+  await page.click('#readerControls [aria-label="Back to your room"]');
   await page.waitFor(`!document.getElementById('grid').hidden`, 'the room to come back');
   const left = await readingWhen((r) => r.anchor?.block > 0);
   assert.ok(left?.anchor?.block > 0, 'its position was saved');
@@ -197,7 +198,7 @@ test('browser: viewing all blocks keeps reading unfinished and can still advance
   await page.waitFor(`document.querySelector('#reader .mark-read:not([disabled])')`, 'ready reading');
   await page.eval(`(() => { const reader = document.getElementById('reader'); reader.scrollTop = (reader.scrollHeight - reader.clientHeight) / 2; })()`);
   await page.waitFor(`Number(document.querySelector('#reader .body').dataset.furthest) > 0`, 'the anchor to advance despite full progress');
-  await page.eval(`document.querySelector('#reader [aria-label="Back to your room"]').click()`);
+  await page.eval(`document.querySelector('#readerControls [aria-label="Back to your room"]').click()`);
   const left = await readingWhen((reading) => reading.anchor?.block > 0);
   assert.equal(left.progress, 1);
   assert.equal(left.status, 'opened', 'only explicit completion marks the page read');
@@ -225,7 +226,7 @@ test('browser: Continue reading survives a fresh view, opens docs at its saved p
   assert.ok(await page.eval<number>(`document.getElementById('reader').scrollTop || window.scrollY`) > 0);
   await page.eval(`document.getElementById('reader').scrollTop += 500`);
   await page.waitFor(`Number(document.querySelector('.docs-page .body').dataset.furthest) > 20`, 'new docs reading progress');
-  await page.eval(`document.querySelector('#reader [aria-label="Back to your room"]').click()`);
+  await page.eval(`document.querySelector('#readerControls [aria-label="Back to your room"]').click()`);
   const left = await readingWhen((r) => r.anchor?.block > 20, url);
   assert.equal(left.status, 'opened', 'scrolling is not completion');
   await openRoom();
@@ -234,7 +235,7 @@ test('browser: Continue reading survives a fresh view, opens docs at its saved p
   await page.waitFor(`document.querySelector('.docs-page .mark-read:not([disabled])')`, 'reading to be ready');
   await page.eval(`document.querySelector('.docs-page .mark-read').click()`);
   await readingWhen((r) => r.status === 'read', url);
-  await page.eval(`document.querySelector('#reader [aria-label="Back to your room"]').click()`);
+  await page.eval(`document.querySelector('#readerControls [aria-label="Back to your room"]').click()`);
   await page.waitFor(`document.querySelector('.continue-reading').hidden`, 'finished reading to leave the strip');
   assert.deepEqual(page.problems, []);
   await profiles.put('default', room());
@@ -273,7 +274,7 @@ test('browser: docs hash navigation takes precedence over the saved position and
   await page.waitFor(`!document.getElementById('reader').hidden && document.querySelector('.docs-page h1')?.textContent === 'Deploy' && !document.querySelector('.docs-page .mark-read').disabled`, 'Deploy page');
   assert.ok(await page.eval<number>(`document.getElementById('reader').scrollTop || window.scrollY`) < 500, 'the explicit first heading takes precedence over saved block 70');
   assert.equal((await tool('get_reading', { url })).reading.anchor.block, 70, 'jumping back does not discard the furthest saved passage');
-  await page.eval(`document.querySelector('#reader [aria-label="Back to your room"]').click()`);
+  await page.eval(`document.querySelector('#readerControls [aria-label="Back to your room"]').click()`);
   // Back refreshes the unfinished-reading strip. Wait for its new height before
   // measuring another real pointer click; retained hidden docs are not readiness.
   await page.waitFor(`document.getElementById('reader').hidden && !document.getElementById('grid').hidden && document.querySelector('.continue-reading')?.getAttribute('aria-busy') === 'false'`, 'the room and refreshed reading strip after Back');
@@ -373,6 +374,7 @@ test('browser: a docs portal opens the docs viewer with its contents and a page'
   await page.waitFor(`document.querySelector('.docs-toc') && document.querySelectorAll('.docs-toc a').length >= 3`, 'the docs contents');
   const heading = await page.waitFor<string>(`document.querySelector('.docs-page h1, .docs-page h2')?.textContent`, 'a docs page');
   assert.match(heading, /Install|Getting started/);
+  assert.ok(await page.eval(`(() => { const r = document.querySelector('#reader').getBoundingClientRect(), t = document.querySelector('.reader-top').getBoundingClientRect(), b = document.querySelector('.bar').getBoundingClientRect(); return !document.querySelector('#reader .reader-top') && t.width === b.width && Math.abs(r.bottom - innerHeight) < 1 && document.querySelector('.docs-page h1').getBoundingClientRect().top >= t.bottom; })()`), 'docs share the full-width external action row and available viewport height');
   // Selecting text on a docs page offers the passage bar (no host here, so Clip and Copy).
   await page.waitFor(`document.querySelector('.docs-page [data-passage-url] p')`, 'the page text');
   await page.eval(`(() => { const p = document.querySelector('.docs-page [data-passage-url] p'); const r = document.createRange(); r.selectNodeContents(p); getSelection().removeAllRanges(); getSelection().addRange(r); })()`);
@@ -659,7 +661,7 @@ test('browser: a portal opens to fill the room; the reader returns to it, and Es
     // The reader opens over the portal and comes back to it.
     await page.click('.level .item-main');
     await page.waitFor(`!document.getElementById('reader').hidden && document.querySelector('#reader h1')`, 'the reader');
-    await page.click('#reader .reader-top .ib');
+    await page.click('#readerControls .reader-top .ib');
     await page.waitFor(`document.getElementById('reader').hidden && document.querySelector('.level')`, 'back at the portal');
     assert.equal(await page.eval(`document.querySelectorAll('.level li').length`), 15, 'still showing what it showed');
     await escape();
@@ -694,5 +696,32 @@ test('browser: a local first run offers signing in from the welcome screen, and 
   } finally {
     await ghost.close();
     await rm(dataDir, { recursive: true, force: true });
+  }
+});
+
+
+test('browser: source Back and Refresh remain below the universal controls after narrow large-text scrolling', { skip }, async () => {
+  const saved = Array.from({ length: 30 }, (_, i) => ({ url: `https://example.com/source-scroll-${i}`, title: `Source story ${i}`, savedAt: '2026-09-01T00:00:00.000Z' }));
+  await profiles.put('default', validateProfile({ ...room(), saved }));
+  try {
+    await page.send('Emulation.setDeviceMetricsOverride', { width: 380, height: 500, deviceScaleFactor: 1, mobile: false });
+    await openRoom();
+    await page.eval(`document.documentElement.style.fontSize = '200%'`);
+    await page.click('[data-portal="saved"] .portal-title');
+    await page.waitFor(`document.querySelector('.level')`, 'source view');
+    await page.eval(`window.scrollTo(0, 400)`);
+    await page.waitFor(`scrollY > 0`, 'source content scroll');
+    await page.waitFor(`(() => { const head = document.querySelector('.level-head'), back = head.querySelector('button').getBoundingClientRect(); return head.contains(document.elementFromPoint(back.left + back.width / 2, back.top + back.height / 2)); })()`, 'source transition completes with clickable actions');
+    const sourceActions = await page.eval<{ top: number; barBottom: number; hit: boolean; scroll: number; offset: string }>(`(() => { const head = document.querySelector('.level-head'), h = head.getBoundingClientRect(), b = document.querySelector('.bar').getBoundingClientRect(), back = head.querySelector('button').getBoundingClientRect(); return { top: h.top, barBottom: b.bottom, hit: head.contains(document.elementFromPoint(back.left + back.width / 2, back.top + back.height / 2)), scroll: scrollY, offset: getComputedStyle(head).top }; })()`);
+    assert.ok(Math.abs(sourceActions.top - sourceActions.barBottom) < 1 && sourceActions.hit, `source actions remain below universal row: ${JSON.stringify(sourceActions)}`);
+    await page.click('.level-head [aria-label="Refresh Saved"]');
+    await page.waitFor(`document.querySelectorAll('.level .item-main').length === 10`, 'source refresh completes');
+    await page.eval(`window.scrollTo(0, 400)`);
+    await page.click('.level-head [aria-label="Back to your room"]');
+    await page.waitFor(`!document.querySelector('.level')`, 'source Back returns to the room after scrolling');
+    assert.deepEqual(page.problems, []);
+  } finally {
+    await profiles.put('default', room());
+    await page.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
   }
 });

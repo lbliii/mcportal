@@ -120,7 +120,7 @@
     $('welcome').hidden = true;
     const reader = $('reader');
     reader.hidden = false;
-    reader.replaceChildren(el('div', { class: 'error', role: 'alert' }, `${context}: ${errorText(error)}. Ask your agent to open it again.`));
+    renderReader(el('div', { class: 'error', role: 'alert' }, `${context}: ${errorText(error)}. Ask your agent to open it again.`));
     setStatus('View failed');
   }
 
