@@ -80,7 +80,7 @@
     if (stopReading) stopReading();
     const body = reader.querySelector('.body');
     if (!(body instanceof HTMLElement)) return;
-    const blocks = () => [...body.children];
+    const blocks = () => logicalBlocks(body);
     let read = false;
     let ready = false;   // the stored position is known: saves may go out
     /** @type {Promise<unknown>} */
@@ -94,7 +94,7 @@
     // Where the user is: the first block on screen, and how much has been on screen.
     const position = () => {
       const box = reader.getBoundingClientRect();
-      const top = Math.max(0, box.top), bottom = Math.min(window.innerHeight, box.bottom);
+      const top = readerVisibleTop(reader), bottom = Math.min(window.innerHeight, box.bottom);
       const list = blocks();
       const first = Math.max(0, list.findIndex((b) => b.getBoundingClientRect().bottom > top + 1));
       let last = -1;
@@ -106,7 +106,7 @@
       const key = `${furthest.block}:${furthest.progress}`;
       if (!ready || read || key === saved) return;
       saved = key; lastSave = Date.now();
-      const update = { url, status: 'opened', progress: furthest.progress, anchor: { block: furthest.block } };
+      const update = { url, status: 'opened', progress: furthest.progress, anchor: { block: furthest.block, heading: headingAnchorAt(body, furthest.block) } };
       recorded = recorded.then(() => callTool('record_reading', update)).catch(() => {});
       readingWrites = recorded;
     };
@@ -159,9 +159,8 @@
       const { reading } = (await callTool('get_reading', { url })).structuredContent;
       if (stopReading !== stop) return;
       const anchor = reading && reading.status !== 'read' ? reading.anchor : null;
-      const heading = anchor?.heading && [...body.querySelectorAll('[data-anchor]')].find((node) => node.getAttribute('data-anchor') === anchor.heading || node.textContent === anchor.heading);
-      const block = anchor?.block ?? (heading ? blocks().findIndex((node) => node === heading || node.contains(heading)) : 0);
-      const target = blocks()[Math.max(0, block)];
+      const block = resolveBlock(body, anchor);
+      const target = blocks()[block];
       if (reading && reading.status !== 'read') {
         furthest = { block: Math.max(0, Math.min(block, blocks().length - 1)), progress: reading.progress ?? 0 };
         saved = `${furthest.block}:${furthest.progress}`;
