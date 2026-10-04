@@ -1,0 +1,2733 @@
+{
+  "startedAt": "2026-10-04T01:58:35.926Z",
+  "finishedAt": "2026-10-04T01:58:38.908Z",
+  "limits": {
+    "samples": 24,
+    "timeoutMs": 8000,
+    "concurrency": 3,
+    "inputBytes": 1500000,
+    "blocks": 400,
+    "blockChars": 4000,
+    "totalChars": 200000,
+    "tableColumns": 50,
+    "tableRows": 500,
+    "cellChars": 2000
+  },
+  "method": "safeFetch then extractArticle, bypassing cache; whole-response hints and heuristic flags need human review; counts are not completeness evidence; no publisher HTML or article body is saved",
+  "results": [
+    {
+      "source": "Collider",
+      "url": "https://collider.com/the-mandalorian-disney-plus-star-wars-best-small-franchise/",
+      "mode": "article",
+      "corpus": "original",
+      "httpStatus": 200,
+      "finalUrl": "https://collider.com/the-mandalorian-disney-plus-star-wars-best-small-franchise/",
+      "fetchTruncated": false,
+      "inputBytes": 338087,
+      "durationMs": 241,
+      "outcome": "extracted",
+      "inputParserCapped": false,
+      "outputAtLimit": false,
+      "metadata": {
+        "title": "This 3-Part Disney+ Star Wars Show Was at Its Best When It Kept the Franchise Small",
+        "siteName": "Collider",
+        "byline": "Julio Bardini",
+        "publishedAt": "2026-10-03T23:52:12.000Z",
+        "updatedAt": "2026-10-03T23:52:12.000Z"
+      },
+      "counts": {
+        "words": 999,
+        "outputChars": 6974,
+        "blocks": 33,
+        "headings": 4,
+        "paragraphs": 29,
+        "listItems": 0,
+        "quotes": 0,
+        "figures": 8,
+        "media": 0,
+        "tables": 0,
+        "code": 0,
+        "markedSpans": 48,
+        "breaks": 0
+      },
+      "sourceShape": {
+        "counts": {
+          "ul": 23,
+          "main": 1,
+          "article": 1,
+          "figure": 12,
+          "p": 20,
+          "em": 19,
+          "strong": 32,
+          "figcaption": 10
+        },
+        "containerHints": [
+          {
+            "hint": "w-display-card-content",
+            "count": 8
+          },
+          {
+            "hint": "body-img",
+            "count": 7
+          },
+          {
+            "hint": "article",
+            "count": 4
+          },
+          {
+            "hint": "article-block",
+            "count": 4
+          },
+          {
+            "hint": "article-tags-name",
+            "count": 3
+          },
+          {
+            "hint": "active-content",
+            "count": 3
+          },
+          {
+            "hint": "w-author",
+            "count": 2
+          },
+          {
+            "hint": "w-author-name",
+            "count": 2
+          },
+          {
+            "hint": "article-date",
+            "count": 2
+          },
+          {
+            "hint": "article-body",
+            "count": 2
+          },
+          {
+            "hint": "display-card-content",
+            "count": 2
+          },
+          {
+            "hint": "body-anchor",
+            "count": 1
+          },
+          {
+            "hint": "inner-content",
+            "count": 1
+          },
+          {
+            "hint": "header-search-content",
+            "count": 1
+          },
+          {
+            "hint": "w-content",
+            "count": 1
+          },
+          {
+            "hint": "w-article",
+            "count": 1
+          },
+          {
+            "hint": "w-article-header-title",
+            "count": 1
+          },
+          {
+            "hint": "article-header-bg",
+            "count": 1
+          },
+          {
+            "hint": "w-article-header-comp",
+            "count": 1
+          },
+          {
+            "hint": "article-header-data",
+            "count": 1
+          },
+          {
+            "hint": "w-article-header-author-img",
+            "count": 1
+          },
+          {
+            "hint": "article-header-author-img",
+            "count": 1
+          },
+          {
+            "hint": "article-meta",
+            "count": 1
+          },
+          {
+            "hint": "sensa-widget-content",
+            "count": 1
+          },
+          {
+            "hint": "top-of-sensa-content",
+            "count": 1
+          },
+          {
+            "hint": "sensa-summary-footer-content",
+            "count": 1
+          },
+          {
+            "hint": "content-block-regular",
+            "count": 1
+          },
+          {
+            "hint": "img-article-item",
+            "count": 1
+          },
+          {
+            "hint": "article__gallery",
+            "count": 1
+          },
+          {
+            "hint": "article-gallery-1-1932196472",
+            "count": 1
+          }
+        ]
+      },
+      "qualityFlags": [],
+      "manualCompletenessVerified": false
+    },
+    {
+      "source": "Polygon",
+      "url": "https://www.polygon.com/uncharted-lost-legacy-rec-playstation-naughty-dog/",
+      "mode": "article",
+      "corpus": "original",
+      "httpStatus": 200,
+      "finalUrl": "https://www.polygon.com/uncharted-lost-legacy-rec-playstation-naughty-dog/",
+      "fetchTruncated": false,
+      "inputBytes": 286094,
+      "durationMs": 192,
+      "outcome": "extracted",
+      "inputParserCapped": false,
+      "outputAtLimit": false,
+      "metadata": {
+        "title": "Uncharted: The Lost Legacy Is Still the Best Uncharted Game",
+        "siteName": "Polygon.com",
+        "byline": "Willa Rowe",
+        "publishedAt": "2026-10-03T23:00:16.000Z",
+        "updatedAt": "2026-10-03T23:00:16.000Z"
+      },
+      "counts": {
+        "words": 843,
+        "outputChars": 5197,
+        "blocks": 16,
+        "headings": 1,
+        "paragraphs": 15,
+        "listItems": 0,
+        "quotes": 0,
+        "figures": 4,
+        "media": 0,
+        "tables": 0,
+        "code": 0,
+        "markedSpans": 32,
+        "breaks": 0
+      },
+      "sourceShape": {
+        "counts": {
+          "ul": 25,
+          "main": 1,
+          "article": 2,
+          "p": 17,
+          "figure": 3,
+          "em": 28,
+          "strong": 2
+        },
+        "containerHints": [
+          {
+            "hint": "w-display-card-content",
+            "count": 13
+          },
+          {
+            "hint": "article",
+            "count": 10
+          },
+          {
+            "hint": "active-content",
+            "count": 9
+          },
+          {
+            "hint": "article-block",
+            "count": 9
+          },
+          {
+            "hint": "article-tags-name",
+            "count": 4
+          },
+          {
+            "hint": "article-body",
+            "count": 2
+          },
+          {
+            "hint": "body-img",
+            "count": 2
+          },
+          {
+            "hint": "img-article-item",
+            "count": 2
+          },
+          {
+            "hint": "body-anchor",
+            "count": 1
+          },
+          {
+            "hint": "header-search-content",
+            "count": 1
+          },
+          {
+            "hint": "w-content",
+            "count": 1
+          },
+          {
+            "hint": "w-article",
+            "count": 1
+          },
+          {
+            "hint": "w-article-header-comp",
+            "count": 1
+          },
+          {
+            "hint": "w-article-header-comp--poly-regular",
+            "count": 1
+          },
+          {
+            "hint": "article-header-data",
+            "count": 1
+          },
+          {
+            "hint": "article-header-author-main",
+            "count": 1
+          },
+          {
+            "hint": "w-article-header-author-img",
+            "count": 1
+          },
+          {
+            "hint": "article-header-author-img",
+            "count": 1
+          },
+          {
+            "hint": "article-meta",
+            "count": 1
+          },
+          {
+            "hint": "w-author",
+            "count": 1
+          },
+          {
+            "hint": "w-author-name",
+            "count": 1
+          },
+          {
+            "hint": "article-date",
+            "count": 1
+          },
+          {
+            "hint": "article-header-author-bio",
+            "count": 1
+          },
+          {
+            "hint": "article-header-bg",
+            "count": 1
+          },
+          {
+            "hint": "article-header-complementary",
+            "count": 1
+          },
+          {
+            "hint": "sensa-widget-content",
+            "count": 1
+          },
+          {
+            "hint": "top-of-sensa-content",
+            "count": 1
+          },
+          {
+            "hint": "sensa-summary-footer-content",
+            "count": 1
+          },
+          {
+            "hint": "content-block-regular",
+            "count": 1
+          },
+          {
+            "hint": "polygon-nl__body",
+            "count": 1
+          }
+        ]
+      },
+      "qualityFlags": [],
+      "manualCompletenessVerified": false
+    },
+    {
+      "source": "Rock Paper Shotgun",
+      "url": "https://www.rockpapershotgun.com/the-other-one-jordan-magnusons-game-poem-jam-is-a-fascinating-collection-of-chimeras",
+      "mode": "article",
+      "corpus": "original",
+      "httpStatus": 200,
+      "finalUrl": "https://www.rockpapershotgun.com/the-other-one-jordan-magnusons-game-poem-jam-is-a-fascinating-collection-of-chimeras",
+      "fetchTruncated": false,
+      "inputBytes": 236771,
+      "durationMs": 247,
+      "outcome": "extracted",
+      "inputParserCapped": false,
+      "outputAtLimit": false,
+      "metadata": {
+        "title": "The Other One: Jordan Magnuson's Game Poem jam is a fascinating collection of chimeras",
+        "siteName": "Rock Paper Shotgun",
+        "byline": "Edwin Evans-Thirlwell",
+        "publishedAt": "2026-10-03T11:00:00.000Z",
+        "updatedAt": null
+      },
+      "counts": {
+        "words": 1951,
+        "outputChars": 12050,
+        "blocks": 19,
+        "headings": 0,
+        "paragraphs": 19,
+        "listItems": 0,
+        "quotes": 0,
+        "figures": 1,
+        "media": 0,
+        "tables": 0,
+        "code": 0,
+        "markedSpans": 1,
+        "breaks": 0
+      },
+      "sourceShape": {
+        "counts": {
+          "ul": 8,
+          "main": 1,
+          "article": 1,
+          "p": 22,
+          "figure": 6,
+          "figcaption": 6,
+          "em": 1
+        },
+        "containerHints": [
+          {
+            "hint": "page_content",
+            "count": 2
+          },
+          {
+            "hint": "content",
+            "count": 1
+          },
+          {
+            "hint": "content_above",
+            "count": 1
+          },
+          {
+            "hint": "article-content",
+            "count": 1
+          },
+          {
+            "hint": "article-container",
+            "count": 1
+          },
+          {
+            "hint": "article",
+            "count": 1
+          },
+          {
+            "hint": "main-content",
+            "count": 1
+          },
+          {
+            "hint": "byline",
+            "count": 1
+          },
+          {
+            "hint": "article_body",
+            "count": 1
+          },
+          {
+            "hint": "article_body_content",
+            "count": 1
+          },
+          {
+            "hint": "article-styling",
+            "count": 1
+          },
+          {
+            "hint": "author-inline",
+            "count": 1
+          },
+          {
+            "hint": "author-inline__bio",
+            "count": 1
+          },
+          {
+            "hint": "content_below",
+            "count": 1
+          },
+          {
+            "hint": "after_article",
+            "count": 1
+          }
+        ]
+      },
+      "qualityFlags": [],
+      "manualCompletenessVerified": false
+    },
+    {
+      "source": "Kotaku",
+      "url": "https://kotaku.com/troves-of-unseen-star-wars-material-emerge-online-after-effects-wizards-garage-sale-2000739602",
+      "mode": "article",
+      "corpus": "original",
+      "httpStatus": 200,
+      "finalUrl": "https://kotaku.com/troves-of-unseen-star-wars-material-emerge-online-after-effects-wizards-garage-sale-2000739602",
+      "fetchTruncated": false,
+      "inputBytes": 126483,
+      "durationMs": 2733,
+      "outcome": "extracted",
+      "inputParserCapped": false,
+      "outputAtLimit": false,
+      "metadata": {
+        "title": "Troves Of Unseen Star Wars Material Emerge Online After Effects Wizard’s Garage Sale",
+        "siteName": "Kotaku",
+        "byline": "Zack Kotzer",
+        "publishedAt": "2026-10-03T20:03:47.000Z",
+        "updatedAt": "2026-10-03T20:05:53.000Z"
+      },
+      "counts": {
+        "words": 427,
+        "outputChars": 2666,
+        "blocks": 11,
+        "headings": 2,
+        "paragraphs": 6,
+        "listItems": 0,
+        "quotes": 3,
+        "figures": 1,
+        "media": 0,
+        "tables": 0,
+        "code": 0,
+        "markedSpans": 11,
+        "breaks": 0
+      },
+      "sourceShape": {
+        "counts": {
+          "ul": 11,
+          "main": 1,
+          "article": 1,
+          "p": 23,
+          "figure": 1,
+          "figcaption": 1,
+          "em": 13,
+          "blockquote": 1,
+          "br": 1
+        },
+        "containerHints": [
+          {
+            "hint": "main-content",
+            "count": 1
+          },
+          {
+            "hint": "byline",
+            "count": 1
+          },
+          {
+            "hint": "author",
+            "count": 1
+          },
+          {
+            "hint": "entry-content",
+            "count": 1
+          },
+          {
+            "hint": "Content_Bottom",
+            "count": 1
+          },
+          {
+            "hint": "optidigital-adslot-Content_Bottom",
+            "count": 1
+          }
+        ]
+      },
+      "qualityFlags": [
+        "source-br-without-rendered-breaks"
+      ],
+      "manualCompletenessVerified": false
+    },
+    {
+      "source": "/Film",
+      "url": "https://www.slashfilm.com/2276428/behemoth-review-pedro-pascal-tony-gilroy-movie/",
+      "mode": "article",
+      "corpus": "original",
+      "httpStatus": 200,
+      "finalUrl": "https://www.slashfilm.com/2276428/behemoth-review-pedro-pascal-tony-gilroy-movie/",
+      "fetchTruncated": false,
+      "inputBytes": 65624,
+      "durationMs": 146,
+      "outcome": "extracted",
+      "inputParserCapped": false,
+      "outputAtLimit": false,
+      "metadata": {
+        "title": "Behemoth! Review: Pedro Pascal Finally Finds His Perfect Movie Star Role",
+        "siteName": "SlashFilm",
+        "byline": "Jeremy Mathai",
+        "publishedAt": "2026-10-03T00:00:00.000Z",
+        "updatedAt": "2026-10-03T00:00:00.000Z"
+      },
+      "counts": {
+        "words": 1214,
+        "outputChars": 7749,
+        "blocks": 21,
+        "headings": 4,
+        "paragraphs": 17,
+        "listItems": 0,
+        "quotes": 0,
+        "figures": 4,
+        "media": 0,
+        "tables": 0,
+        "code": 0,
+        "markedSpans": 7,
+        "breaks": 0
+      },
+      "sourceShape": {
+        "counts": {
+          "iframe": 1,
+          "ul": 10,
+          "main": 1,
+          "article": 1,
+          "p": 13,
+          "em": 6,
+          "strong": 1
+        },
+        "containerHints": [
+          {
+            "hint": "news-article",
+            "count": 5
+          },
+          {
+            "hint": "article",
+            "count": 1
+          },
+          {
+            "hint": "content",
+            "count": 1
+          },
+          {
+            "hint": "byline-container",
+            "count": 1
+          },
+          {
+            "hint": "byline-text-wrap",
+            "count": 1
+          }
+        ]
+      },
+      "qualityFlags": [],
+      "manualCompletenessVerified": false
+    },
+    {
+      "source": "IndieWire",
+      "url": "https://www.indiewire.com/awards/predictions/behemoth-oscar-chances-pedro-pascal-1235220080/",
+      "mode": "article",
+      "corpus": "original",
+      "httpStatus": 200,
+      "finalUrl": "https://www.indiewire.com/awards/predictions/behemoth-oscar-chances-pedro-pascal-1235220080/",
+      "fetchTruncated": false,
+      "inputBytes": 511400,
+      "durationMs": 63,
+      "outcome": "extracted",
+      "inputParserCapped": false,
+      "outputAtLimit": false,
+      "metadata": {
+        "title": "'Behemoth!' Oscar Chances for Pedro Pascal Movie Launch at NYFF",
+        "siteName": "IndieWire",
+        "byline": "Anne Thompson",
+        "publishedAt": "2026-10-03T04:11:06.000Z",
+        "updatedAt": "2026-10-03T04:11:06.000Z"
+      },
+      "counts": {
+        "words": 371,
+        "outputChars": 3922,
+        "blocks": 43,
+        "headings": 3,
+        "paragraphs": 40,
+        "listItems": 0,
+        "quotes": 0,
+        "figures": 19,
+        "media": 0,
+        "tables": 0,
+        "code": 0,
+        "markedSpans": 1,
+        "breaks": 0
+      },
+      "sourceShape": {
+        "counts": {
+          "iframe": 1,
+          "ul": 18,
+          "p": 10,
+          "br": 2,
+          "figure": 20,
+          "figcaption": 1,
+          "em": 1
+        },
+        "containerHints": [
+          {
+            "hint": "nova-js-newsletter-capture",
+            "count": 4
+          },
+          {
+            "hint": "adm-inline-article-ad-1",
+            "count": 1
+          },
+          {
+            "hint": "gpt-iw-article-mid-article-uid0",
+            "count": 1
+          },
+          {
+            "hint": "adm-inline-article-ad-2",
+            "count": 1
+          },
+          {
+            "hint": "gpt-iw-article-mid-article2-uid1",
+            "count": 1
+          },
+          {
+            "hint": "adm-in-article-footer",
+            "count": 1
+          }
+        ]
+      },
+      "qualityFlags": [
+        "source-br-without-rendered-breaks"
+      ],
+      "manualCompletenessVerified": false
+    },
+    {
+      "source": "Colossal",
+      "url": "https://www.thisiscolossal.com/2026/10/gaia-alari-animation/",
+      "mode": "article",
+      "corpus": "original",
+      "httpStatus": 200,
+      "finalUrl": "https://www.thisiscolossal.com/2026/10/gaia-alari-animation/",
+      "fetchTruncated": false,
+      "inputBytes": 301230,
+      "durationMs": 96,
+      "outcome": "extracted",
+      "inputParserCapped": false,
+      "outputAtLimit": false,
+      "metadata": {
+        "title": "Gaia Alari’s Lilting Animations are Drawn Frame by Frame",
+        "siteName": "Colossal",
+        "byline": "Jackie Andres",
+        "publishedAt": "2026-10-02T19:00:00.000Z",
+        "updatedAt": null
+      },
+      "counts": {
+        "words": 100,
+        "outputChars": 1060,
+        "blocks": 8,
+        "headings": 0,
+        "paragraphs": 8,
+        "listItems": 0,
+        "quotes": 0,
+        "figures": 4,
+        "media": 2,
+        "tables": 0,
+        "code": 0,
+        "markedSpans": 0,
+        "breaks": 0
+      },
+      "sourceShape": {
+        "counts": {
+          "p": 9,
+          "ul": 13,
+          "figure": 9,
+          "main": 1,
+          "article": 1,
+          "figcaption": 1,
+          "iframe": 2,
+          "strong": 1
+        },
+        "containerHints": [
+          {
+            "hint": "is-content-justification-center",
+            "count": 1
+          },
+          {
+            "hint": "content",
+            "count": 1
+          },
+          {
+            "hint": "entry-content",
+            "count": 1
+          },
+          {
+            "hint": "wp-block-post-author-name",
+            "count": 1
+          },
+          {
+            "hint": "rp4wp-related-posts",
+            "count": 1
+          },
+          {
+            "hint": "rp4wp-related-post",
+            "count": 1
+          },
+          {
+            "hint": "footer-newsletter-cta",
+            "count": 1
+          },
+          {
+            "hint": "newsletter-cta-text",
+            "count": 1
+          }
+        ]
+      },
+      "qualityFlags": [
+        "source-emphasis-without-rendered-marks"
+      ],
+      "manualCompletenessVerified": false
+    },
+    {
+      "source": "Dezeen",
+      "url": "https://www.dezeen.com/2026/10/03/kimpton-era-hotel-new-york-city-inc/",
+      "mode": "article",
+      "corpus": "original",
+      "httpStatus": 200,
+      "finalUrl": "https://www.dezeen.com/2026/10/03/kimpton-era-hotel-new-york-city-inc/",
+      "fetchTruncated": false,
+      "inputBytes": 394346,
+      "durationMs": 82,
+      "outcome": "extracted",
+      "inputParserCapped": false,
+      "outputAtLimit": false,
+      "metadata": {
+        "title": "Luxury ocean liners inform New York's Kimpton Era hotel by INC",
+        "siteName": "Dezeen",
+        "byline": "Dan Howarth",
+        "publishedAt": "2026-10-03T17:00:08.000Z",
+        "updatedAt": "2026-10-03T17:00:08.000Z"
+      },
+      "counts": {
+        "words": 479,
+        "outputChars": 3951,
+        "blocks": 25,
+        "headings": 1,
+        "paragraphs": 24,
+        "listItems": 0,
+        "quotes": 0,
+        "figures": 7,
+        "media": 0,
+        "tables": 0,
+        "code": 0,
+        "markedSpans": 3,
+        "breaks": 0
+      },
+      "sourceShape": {
+        "counts": {
+          "iframe": 2,
+          "ul": 16,
+          "main": 1,
+          "article": 12,
+          "figure": 62,
+          "p": 86,
+          "figcaption": 6,
+          "em": 1,
+          "strong": 22,
+          "br": 47,
+          "ol": 4
+        },
+        "containerHints": [
+          {
+            "hint": "side-article",
+            "count": 10
+          },
+          {
+            "hint": "main-content",
+            "count": 2
+          },
+          {
+            "hint": "newsletter-form",
+            "count": 2
+          },
+          {
+            "hint": "newsletter-form-container",
+            "count": 2
+          },
+          {
+            "hint": "newsletter-step-1",
+            "count": 2
+          },
+          {
+            "hint": "newsletter-email-container",
+            "count": 2
+          },
+          {
+            "hint": "newsletter-step-2",
+            "count": 2
+          },
+          {
+            "hint": "newsletter-options",
+            "count": 2
+          },
+          {
+            "hint": "newsletter-error-message",
+            "count": 2
+          },
+          {
+            "hint": "newsletter-step-3",
+            "count": 2
+          },
+          {
+            "hint": "main-article",
+            "count": 1
+          },
+          {
+            "hint": "article-body-sharing-wrap",
+            "count": 1
+          },
+          {
+            "hint": "author-info",
+            "count": 1
+          },
+          {
+            "hint": "main-article-body",
+            "count": 1
+          },
+          {
+            "hint": "related-in-article",
+            "count": 1
+          },
+          {
+            "hint": "related-in-article-text",
+            "count": 1
+          },
+          {
+            "hint": "article-tags",
+            "count": 1
+          },
+          {
+            "hint": "rh-related-wrapper",
+            "count": 1
+          },
+          {
+            "hint": "sidebar-newsletter-image",
+            "count": 1
+          }
+        ]
+      },
+      "qualityFlags": [
+        "source-br-without-rendered-breaks"
+      ],
+      "manualCompletenessVerified": false
+    },
+    {
+      "source": "Dezeen",
+      "url": "https://www.dezeen.com/2026/10/03/brutalist-asia-book-roundup/",
+      "mode": "article",
+      "corpus": "original",
+      "httpStatus": 200,
+      "finalUrl": "https://www.dezeen.com/2026/10/03/brutalist-asia-book-roundup/",
+      "fetchTruncated": false,
+      "inputBytes": 387821,
+      "durationMs": 58,
+      "outcome": "extracted",
+      "inputParserCapped": false,
+      "outputAtLimit": false,
+      "metadata": {
+        "title": "Ten monumental brutalist buildings in Asia",
+        "siteName": "Dezeen",
+        "byline": "Amy Peacock",
+        "publishedAt": "2026-10-03T09:00:59.000Z",
+        "updatedAt": "2026-10-03T09:00:59.000Z"
+      },
+      "counts": {
+        "words": 823,
+        "outputChars": 6158,
+        "blocks": 50,
+        "headings": 1,
+        "paragraphs": 49,
+        "listItems": 0,
+        "quotes": 0,
+        "figures": 11,
+        "media": 0,
+        "tables": 0,
+        "code": 0,
+        "markedSpans": 10,
+        "breaks": 0
+      },
+      "sourceShape": {
+        "counts": {
+          "iframe": 2,
+          "ul": 16,
+          "main": 1,
+          "article": 11,
+          "figure": 44,
+          "p": 107,
+          "figcaption": 10,
+          "strong": 32,
+          "br": 47,
+          "ol": 4
+        },
+        "containerHints": [
+          {
+            "hint": "side-article",
+            "count": 10
+          },
+          {
+            "hint": "main-content",
+            "count": 2
+          },
+          {
+            "hint": "newsletter-form",
+            "count": 2
+          },
+          {
+            "hint": "newsletter-form-container",
+            "count": 2
+          },
+          {
+            "hint": "newsletter-step-1",
+            "count": 2
+          },
+          {
+            "hint": "newsletter-email-container",
+            "count": 2
+          },
+          {
+            "hint": "newsletter-step-2",
+            "count": 2
+          },
+          {
+            "hint": "newsletter-options",
+            "count": 2
+          },
+          {
+            "hint": "newsletter-error-message",
+            "count": 2
+          },
+          {
+            "hint": "newsletter-step-3",
+            "count": 2
+          },
+          {
+            "hint": "main-article",
+            "count": 1
+          },
+          {
+            "hint": "article-body-sharing-wrap",
+            "count": 1
+          },
+          {
+            "hint": "author-info",
+            "count": 1
+          },
+          {
+            "hint": "main-article-body",
+            "count": 1
+          },
+          {
+            "hint": "article-tags",
+            "count": 1
+          },
+          {
+            "hint": "rh-related-wrapper",
+            "count": 1
+          },
+          {
+            "hint": "sidebar-newsletter-image",
+            "count": 1
+          }
+        ]
+      },
+      "qualityFlags": [
+        "source-br-without-rendered-breaks"
+      ],
+      "manualCompletenessVerified": false
+    },
+    {
+      "source": "It's Nice That",
+      "url": "https://www.itsnicethat.com/articles/mox-formula-e-graphic-design-project-011026",
+      "mode": "article",
+      "corpus": "original",
+      "httpStatus": 200,
+      "finalUrl": "https://www.itsnicethat.com/articles/mox-formula-e-graphic-design-project-011026",
+      "fetchTruncated": false,
+      "inputBytes": 226671,
+      "durationMs": 286,
+      "outcome": "extracted",
+      "inputParserCapped": false,
+      "outputAtLimit": false,
+      "metadata": {
+        "title": "Mox reimagine racing entertainment with a brand refresh for Formula E, one of the fastest and sleekest sports in the world",
+        "siteName": "itsnicethat.com",
+        "byline": "Paul Moore",
+        "publishedAt": null,
+        "updatedAt": null
+      },
+      "counts": {
+        "words": 786,
+        "outputChars": 4939,
+        "blocks": 56,
+        "headings": 6,
+        "paragraphs": 20,
+        "listItems": 30,
+        "quotes": 0,
+        "figures": 4,
+        "media": 0,
+        "tables": 0,
+        "code": 0,
+        "markedSpans": 0,
+        "breaks": 0
+      },
+      "sourceShape": {
+        "counts": {
+          "p": 96,
+          "ul": 16,
+          "article": 1,
+          "figure": 4,
+          "figcaption": 1,
+          "br": 2
+        },
+        "containerHints": [
+          {
+            "hint": "text-caption-40",
+            "count": 2
+          },
+          {
+            "hint": "js-content",
+            "count": 1
+          },
+          {
+            "hint": "js-main-content-container",
+            "count": 1
+          },
+          {
+            "hint": "module-newsletter",
+            "count": 1
+          }
+        ]
+      },
+      "qualityFlags": [
+        "source-br-without-rendered-breaks"
+      ],
+      "manualCompletenessVerified": false
+    },
+    {
+      "source": "Bandcamp Daily",
+      "url": "https://daily.bandcamp.com/best-electronic/the-best-electronic-music-on-bandcamp-september-2026",
+      "mode": "article",
+      "corpus": "original",
+      "httpStatus": 200,
+      "finalUrl": "https://daily.bandcamp.com/best-electronic/the-best-electronic-music-on-bandcamp-september-2026",
+      "fetchTruncated": false,
+      "inputBytes": 384856,
+      "durationMs": 639,
+      "outcome": "extracted",
+      "inputParserCapped": false,
+      "outputAtLimit": false,
+      "metadata": {
+        "title": "The Best Electronic Music on Bandcamp, September 2026",
+        "siteName": "Bandcamp Daily",
+        "byline": "Joe Muggs",
+        "publishedAt": "2026-10-02T17:28:49.000Z",
+        "updatedAt": "2026-10-02T17:28:49.000Z"
+      },
+      "counts": {
+        "words": 1615,
+        "outputChars": 9883,
+        "blocks": 41,
+        "headings": 13,
+        "paragraphs": 28,
+        "listItems": 0,
+        "quotes": 0,
+        "figures": 14,
+        "media": 0,
+        "tables": 0,
+        "code": 0,
+        "markedSpans": 20,
+        "breaks": 13
+      },
+      "sourceShape": {
+        "counts": {
+          "strong": 2,
+          "article": 1,
+          "p": 14,
+          "em": 20,
+          "br": 18
+        },
+        "containerHints": [
+          {
+            "hint": "content",
+            "count": 1
+          },
+          {
+            "hint": "bc-content",
+            "count": 1
+          },
+          {
+            "hint": "pagebody",
+            "count": 1
+          },
+          {
+            "hint": "p-daily-article",
+            "count": 1
+          },
+          {
+            "hint": "fan-signup-addnl-bundle",
+            "count": 1
+          }
+        ]
+      },
+      "qualityFlags": [],
+      "manualCompletenessVerified": false
+    },
+    {
+      "source": "Pitchfork",
+      "url": "https://pitchfork.com/story/fontaines-dc-plot-2027-north-american-tour/",
+      "mode": "article",
+      "corpus": "original",
+      "httpStatus": 200,
+      "finalUrl": "https://pitchfork.com/story/fontaines-dc-plot-2027-north-american-tour/",
+      "fetchTruncated": false,
+      "inputBytes": 874448,
+      "durationMs": 134,
+      "outcome": "extracted",
+      "inputParserCapped": false,
+      "outputAtLimit": false,
+      "metadata": {
+        "title": "Fontaines D.C. Plot 2027 North American Tour",
+        "siteName": "Pitchfork",
+        "byline": "Jazz Monroe",
+        "publishedAt": "2026-10-02T17:40:27.119Z",
+        "updatedAt": "2026-10-02T17:40:27.119Z"
+      },
+      "counts": {
+        "words": 541,
+        "outputChars": 3269,
+        "blocks": 6,
+        "headings": 0,
+        "paragraphs": 6,
+        "listItems": 0,
+        "quotes": 0,
+        "figures": 1,
+        "media": 0,
+        "tables": 0,
+        "code": 0,
+        "markedSpans": 20,
+        "breaks": 62
+      },
+      "sourceShape": {
+        "counts": {
+          "iframe": 1,
+          "ul": 7,
+          "main": 1,
+          "article": 1,
+          "figure": 1,
+          "p": 9,
+          "em": 4,
+          "br": 62,
+          "strong": 19
+        },
+        "containerHints": [
+          {
+            "hint": "grid-layout__content",
+            "count": 6
+          },
+          {
+            "hint": "body",
+            "count": 3
+          },
+          {
+            "hint": "main-content",
+            "count": 2
+          },
+          {
+            "hint": "body__container",
+            "count": 2
+          },
+          {
+            "hint": "article__body",
+            "count": 2
+          },
+          {
+            "hint": "container--body",
+            "count": 2
+          },
+          {
+            "hint": "container--body-inner",
+            "count": 2
+          },
+          {
+            "hint": "ArticlePageCommentingGrid-jIsOyv",
+            "count": 2
+          },
+          {
+            "hint": "CommentingMainContent",
+            "count": 2
+          },
+          {
+            "hint": "ArticlePageBase-gybiYJ",
+            "count": 1
+          },
+          {
+            "hint": "page--article",
+            "count": 1
+          },
+          {
+            "hint": "BasePageMainContent-cMAuVb",
+            "count": 1
+          },
+          {
+            "hint": "page__main-content",
+            "count": 1
+          },
+          {
+            "hint": "article",
+            "count": 1
+          },
+          {
+            "hint": "AIContentWrapper-lBLcd",
+            "count": 1
+          },
+          {
+            "hint": "ArticlePageLedeBackground-bNmFvK",
+            "count": 1
+          },
+          {
+            "hint": "ContentHeaderContainer-byIANm",
+            "count": 1
+          },
+          {
+            "hint": "ContentHeaderHedAccreditationWrapper-hBwBhB",
+            "count": 1
+          },
+          {
+            "hint": "ContentHeaderTitleBlockWrapper-joMOrX",
+            "count": 1
+          },
+          {
+            "hint": "ContentHeaderRubricBlock-cfeHaB",
+            "count": 1
+          },
+          {
+            "hint": "ContentHeaderRubricDateBlock-efKFWV",
+            "count": 1
+          },
+          {
+            "hint": "ContentHeaderRubricContainer-eVExCf",
+            "count": 1
+          },
+          {
+            "hint": "ContentHeaderAccreditation-gSVrun",
+            "count": 1
+          },
+          {
+            "hint": "content-header__accreditation",
+            "count": 1
+          },
+          {
+            "hint": "ContentHeaderDek-tmXxz",
+            "count": 1
+          },
+          {
+            "hint": "ContentHeaderByline-bsLfvw",
+            "count": 1
+          },
+          {
+            "hint": "ContentHeaderBylineContent-cgGVat",
+            "count": 1
+          },
+          {
+            "hint": "BylinesWrapper-hmpxZW",
+            "count": 1
+          },
+          {
+            "hint": "bylines",
+            "count": 1
+          },
+          {
+            "hint": "ContentHeaderBylines-kclYwb",
+            "count": 1
+          }
+        ]
+      },
+      "qualityFlags": [],
+      "manualCompletenessVerified": false
+    },
+    {
+      "source": "Pitchfork",
+      "url": "https://pitchfork.com/story/10-new-albums-you-should-listen-to-now-greg-freeman-quavo-victoria-monet/",
+      "mode": "article",
+      "corpus": "original",
+      "httpStatus": 200,
+      "finalUrl": "https://pitchfork.com/story/10-new-albums-you-should-listen-to-now-greg-freeman-quavo-victoria-monet/",
+      "fetchTruncated": false,
+      "inputBytes": 1006243,
+      "durationMs": 112,
+      "outcome": "extracted",
+      "inputParserCapped": false,
+      "outputAtLimit": false,
+      "metadata": {
+        "title": "10 New Albums You Should Listen to Now: Greg Freeman, Quavo, and More",
+        "siteName": "Pitchfork",
+        "byline": "Walden Green, Kiana Mickles, Jazz Monroe, Hattie Lindert, Nina Corcoran",
+        "publishedAt": "2026-10-02T13:48:25.677Z",
+        "updatedAt": "2026-10-02T13:48:25.677Z"
+      },
+      "counts": {
+        "words": 1286,
+        "outputChars": 8834,
+        "blocks": 43,
+        "headings": 10,
+        "paragraphs": 33,
+        "listItems": 0,
+        "quotes": 0,
+        "figures": 11,
+        "media": 0,
+        "tables": 0,
+        "code": 0,
+        "markedSpans": 31,
+        "breaks": 44
+      },
+      "sourceShape": {
+        "counts": {
+          "iframe": 1,
+          "ul": 6,
+          "main": 1,
+          "article": 1,
+          "figure": 11,
+          "p": 26,
+          "em": 31,
+          "br": 44
+        },
+        "containerHints": [
+          {
+            "hint": "grid-layout__content",
+            "count": 15
+          },
+          {
+            "hint": "body",
+            "count": 12
+          },
+          {
+            "hint": "body__container",
+            "count": 11
+          },
+          {
+            "hint": "article__body",
+            "count": 11
+          },
+          {
+            "hint": "ArticlePageChunksGrid-kSknMg",
+            "count": 10
+          },
+          {
+            "hint": "BodyWrapper-cuqCAc",
+            "count": 10
+          },
+          {
+            "hint": "body__inner-container",
+            "count": 10
+          },
+          {
+            "hint": "main-content",
+            "count": 2
+          },
+          {
+            "hint": "BylinesWrapper-hmpxZW",
+            "count": 2
+          },
+          {
+            "hint": "bylines",
+            "count": 2
+          },
+          {
+            "hint": "CaptionWrapper-bpPcvW",
+            "count": 2
+          },
+          {
+            "hint": "caption",
+            "count": 2
+          },
+          {
+            "hint": "container--body",
+            "count": 2
+          },
+          {
+            "hint": "container--body-inner",
+            "count": 2
+          },
+          {
+            "hint": "ArticlePageCommentingGrid-jIsOyv",
+            "count": 2
+          },
+          {
+            "hint": "CommentingMainContent",
+            "count": 2
+          },
+          {
+            "hint": "ArticlePageBase-gybiYJ",
+            "count": 1
+          },
+          {
+            "hint": "page--article",
+            "count": 1
+          },
+          {
+            "hint": "BasePageMainContent-cMAuVb",
+            "count": 1
+          },
+          {
+            "hint": "page__main-content",
+            "count": 1
+          },
+          {
+            "hint": "article",
+            "count": 1
+          },
+          {
+            "hint": "AIContentWrapper-lBLcd",
+            "count": 1
+          },
+          {
+            "hint": "ArticlePageLedeBackground-bNmFvK",
+            "count": 1
+          },
+          {
+            "hint": "ContentHeaderContainer-byIANm",
+            "count": 1
+          },
+          {
+            "hint": "ContentHeaderHedAccreditationWrapper-hBwBhB",
+            "count": 1
+          },
+          {
+            "hint": "ContentHeaderTitleBlockWrapper-joMOrX",
+            "count": 1
+          },
+          {
+            "hint": "ContentHeaderRubricBlock-cfeHaB",
+            "count": 1
+          },
+          {
+            "hint": "ContentHeaderRubricDateBlock-efKFWV",
+            "count": 1
+          },
+          {
+            "hint": "ContentHeaderRubricContainer-eVExCf",
+            "count": 1
+          },
+          {
+            "hint": "ContentHeaderAccreditation-gSVrun",
+            "count": 1
+          }
+        ]
+      },
+      "qualityFlags": [],
+      "manualCompletenessVerified": false
+    },
+    {
+      "source": "Stereogum",
+      "url": "https://stereogum.com/2513514/mike-patton-performs-with-mariachi-gama-1000-for-mondo-canes-mexico-debut/news/",
+      "mode": "article",
+      "corpus": "original",
+      "httpStatus": 200,
+      "finalUrl": "https://stereogum.com/2513514/mike-patton-performs-with-mariachi-gama-1000-for-mondo-canes-mexico-debut/news",
+      "fetchTruncated": false,
+      "inputBytes": 277732,
+      "durationMs": 166,
+      "outcome": "extracted",
+      "inputParserCapped": false,
+      "outputAtLimit": false,
+      "metadata": {
+        "title": "Mike Patton Performs With Mariachi Gama 1000 For Mondo Cane’s Mexico Debut",
+        "siteName": "stereogum.com",
+        "byline": "Danielle Chelosky, Scott Lapatine",
+        "publishedAt": "2026-10-03T15:39:40.000Z",
+        "updatedAt": "2026-10-03T19:44:42.000Z"
+      },
+      "counts": {
+        "words": 159,
+        "outputChars": 1043,
+        "blocks": 9,
+        "headings": 0,
+        "paragraphs": 7,
+        "listItems": 0,
+        "quotes": 2,
+        "figures": 0,
+        "media": 4,
+        "tables": 0,
+        "code": 0,
+        "markedSpans": 1,
+        "breaks": 0
+      },
+      "sourceShape": {
+        "counts": {
+          "ul": 12,
+          "main": 1,
+          "p": 9,
+          "figure": 13,
+          "strong": 1,
+          "iframe": 4,
+          "blockquote": 2
+        },
+        "containerHints": [
+          {
+            "hint": "Container_contentWidthWrapper__RL4A5",
+            "count": 4
+          },
+          {
+            "hint": "AuthorCard_initials__pSjJO",
+            "count": 2
+          },
+          {
+            "hint": "PostBylineRiver_authorWrapper__6ThRc",
+            "count": 2
+          },
+          {
+            "hint": "PostBylineRiver_avatar__yBHju",
+            "count": 2
+          },
+          {
+            "hint": "PostBylineRiver_nameWrapper__FlnzW",
+            "count": 2
+          },
+          {
+            "hint": "NewsletterSignup_wrapper__rmf2c",
+            "count": 2
+          },
+          {
+            "hint": "NewsletterSignup_inner__5Ov2E",
+            "count": 2
+          },
+          {
+            "hint": "NewsletterSignup_iconWrapper__XJmRP",
+            "count": 2
+          },
+          {
+            "hint": "NewsletterSignup_intro__fw3yq",
+            "count": 2
+          },
+          {
+            "hint": "NewsletterSignup_registerWrapper__D9dv5",
+            "count": 2
+          },
+          {
+            "hint": "NewsletterSignup_inputWrapper__BBryu",
+            "count": 2
+          },
+          {
+            "hint": "PostByline_authorsWrapper__yDZwO",
+            "count": 1
+          },
+          {
+            "hint": "PostByline_groupedAvatars__v8EA9",
+            "count": 1
+          },
+          {
+            "hint": "PostByline_initials__cA2hb",
+            "count": 1
+          },
+          {
+            "hint": "PostByline_textColumn__bFZQs",
+            "count": 1
+          },
+          {
+            "hint": "CommentCountSingle_content__Hwr8c",
+            "count": 1
+          },
+          {
+            "hint": "single_contentContainer__2fe6_",
+            "count": 1
+          },
+          {
+            "hint": "Container_postContentWrapper__BPgvJ",
+            "count": 1
+          },
+          {
+            "hint": "PostContent_wrapper__oih1Z",
+            "count": 1
+          },
+          {
+            "hint": "entry-content",
+            "count": 1
+          },
+          {
+            "hint": "PostContent_content__FblEJ",
+            "count": 1
+          },
+          {
+            "hint": "ArticleShareFooter_metaFooter__PfCD7",
+            "count": 1
+          },
+          {
+            "hint": "ArticleShareFooter_sharingInner__OTTMj",
+            "count": 1
+          },
+          {
+            "hint": "PostBylineRiver_wrapper__2QH_p",
+            "count": 1
+          },
+          {
+            "hint": "PostBylineRiver_initials__Osxbp",
+            "count": 1
+          },
+          {
+            "hint": "PostBylineRiver_socials__rShyR",
+            "count": 1
+          },
+          {
+            "hint": "NewsletterSignup_borderless__NhdZB",
+            "count": 1
+          },
+          {
+            "hint": "NewsletterSignup_right__1U2ri",
+            "count": 1
+          },
+          {
+            "hint": "NewsletterSignup_inputWrapperPill__2AprX",
+            "count": 1
+          }
+        ]
+      },
+      "qualityFlags": [
+        "source-figure-without-rendered-figure"
+      ],
+      "manualCompletenessVerified": false
+    },
+    {
+      "source": "Polygon",
+      "url": "https://www.polygon.com/the-witcher-season-5-when-release-date-netflix/",
+      "mode": "article",
+      "corpus": "original",
+      "httpStatus": 200,
+      "finalUrl": "https://www.polygon.com/the-witcher-season-5-when-release-date-netflix/",
+      "fetchTruncated": false,
+      "inputBytes": 264198,
+      "durationMs": 130,
+      "outcome": "extracted",
+      "inputParserCapped": false,
+      "outputAtLimit": false,
+      "metadata": {
+        "title": "Netflix Sets The Witcher Season 5's Fate",
+        "siteName": "Polygon.com",
+        "byline": "Polygon Staff, Michael McWhertor",
+        "publishedAt": "2026-10-03T20:13:16.000Z",
+        "updatedAt": "2026-10-03T20:13:16.000Z"
+      },
+      "counts": {
+        "words": 427,
+        "outputChars": 2557,
+        "blocks": 12,
+        "headings": 1,
+        "paragraphs": 11,
+        "listItems": 0,
+        "quotes": 0,
+        "figures": 1,
+        "media": 0,
+        "tables": 0,
+        "code": 0,
+        "markedSpans": 9,
+        "breaks": 0
+      },
+      "sourceShape": {
+        "counts": {
+          "ul": 25,
+          "main": 1,
+          "article": 2,
+          "p": 18,
+          "figure": 1,
+          "em": 9,
+          "strong": 2
+        },
+        "containerHints": [
+          {
+            "hint": "w-display-card-content",
+            "count": 14
+          },
+          {
+            "hint": "article",
+            "count": 10
+          },
+          {
+            "hint": "article-block",
+            "count": 10
+          },
+          {
+            "hint": "active-content",
+            "count": 9
+          },
+          {
+            "hint": "article-tags-name",
+            "count": 4
+          },
+          {
+            "hint": "article-header-author-img",
+            "count": 2
+          },
+          {
+            "hint": "article-body",
+            "count": 2
+          },
+          {
+            "hint": "body-anchor",
+            "count": 1
+          },
+          {
+            "hint": "header-search-content",
+            "count": 1
+          },
+          {
+            "hint": "w-content",
+            "count": 1
+          },
+          {
+            "hint": "w-article",
+            "count": 1
+          },
+          {
+            "hint": "w-article-header-comp",
+            "count": 1
+          },
+          {
+            "hint": "w-article-header-comp--poly-regular",
+            "count": 1
+          },
+          {
+            "hint": "article-header-data",
+            "count": 1
+          },
+          {
+            "hint": "article-header-author-main",
+            "count": 1
+          },
+          {
+            "hint": "w-article-header-author-img",
+            "count": 1
+          },
+          {
+            "hint": "article-meta",
+            "count": 1
+          },
+          {
+            "hint": "w-author",
+            "count": 1
+          },
+          {
+            "hint": "w-author-name",
+            "count": 1
+          },
+          {
+            "hint": "article-date",
+            "count": 1
+          },
+          {
+            "hint": "article-header-bg",
+            "count": 1
+          },
+          {
+            "hint": "article-header-complementary",
+            "count": 1
+          },
+          {
+            "hint": "sensa-widget-content",
+            "count": 1
+          },
+          {
+            "hint": "top-of-sensa-content",
+            "count": 1
+          },
+          {
+            "hint": "sensa-summary-footer-content",
+            "count": 1
+          },
+          {
+            "hint": "content-block-regular",
+            "count": 1
+          },
+          {
+            "hint": "article-waypoint",
+            "count": 1
+          },
+          {
+            "hint": "article-tags",
+            "count": 1
+          },
+          {
+            "hint": "article-credit-container",
+            "count": 1
+          },
+          {
+            "hint": "article-add-google",
+            "count": 1
+          }
+        ]
+      },
+      "qualityFlags": [],
+      "manualCompletenessVerified": false
+    },
+    {
+      "source": "Rock Paper Shotgun",
+      "url": "https://www.rockpapershotgun.com/what-are-we-all-playing-this-weekend-402",
+      "mode": "article",
+      "corpus": "original",
+      "httpStatus": 200,
+      "finalUrl": "https://www.rockpapershotgun.com/what-are-we-all-playing-this-weekend-402",
+      "fetchTruncated": false,
+      "inputBytes": 244942,
+      "durationMs": 14,
+      "outcome": "extracted",
+      "inputParserCapped": false,
+      "outputAtLimit": false,
+      "metadata": {
+        "title": "What are we all playing this weekend?",
+        "siteName": "Rock Paper Shotgun",
+        "byline": "Julian Benson",
+        "publishedAt": "2026-10-03T07:00:00.000Z",
+        "updatedAt": null
+      },
+      "counts": {
+        "words": 564,
+        "outputChars": 3182,
+        "blocks": 13,
+        "headings": 0,
+        "paragraphs": 13,
+        "listItems": 0,
+        "quotes": 0,
+        "figures": 1,
+        "media": 0,
+        "tables": 0,
+        "code": 0,
+        "markedSpans": 8,
+        "breaks": 7
+      },
+      "sourceShape": {
+        "counts": {
+          "ul": 9,
+          "main": 1,
+          "article": 1,
+          "p": 25,
+          "figure": 1,
+          "figcaption": 1,
+          "strong": 7,
+          "br": 7,
+          "em": 1
+        },
+        "containerHints": [
+          {
+            "hint": "page_content",
+            "count": 2
+          },
+          {
+            "hint": "article-styling",
+            "count": 2
+          },
+          {
+            "hint": "content",
+            "count": 1
+          },
+          {
+            "hint": "content_above",
+            "count": 1
+          },
+          {
+            "hint": "article-content",
+            "count": 1
+          },
+          {
+            "hint": "article-container",
+            "count": 1
+          },
+          {
+            "hint": "article",
+            "count": 1
+          },
+          {
+            "hint": "main-content",
+            "count": 1
+          },
+          {
+            "hint": "byline",
+            "count": 1
+          },
+          {
+            "hint": "article_body",
+            "count": 1
+          },
+          {
+            "hint": "article_body_content",
+            "count": 1
+          },
+          {
+            "hint": "author-inline",
+            "count": 1
+          },
+          {
+            "hint": "author-inline__bio",
+            "count": 1
+          },
+          {
+            "hint": "content_below",
+            "count": 1
+          },
+          {
+            "hint": "after_article",
+            "count": 1
+          }
+        ]
+      },
+      "qualityFlags": [],
+      "manualCompletenessVerified": false
+    },
+    {
+      "source": "IndieWire",
+      "url": "https://www.indiewire.com/criticism/movies/behemoth-movie-review-pedro-pascal-1235220030/",
+      "mode": "article",
+      "corpus": "original",
+      "httpStatus": 200,
+      "finalUrl": "https://www.indiewire.com/criticism/movies/behemoth-movie-review-pedro-pascal-1235220030/",
+      "fetchTruncated": false,
+      "inputBytes": 529926,
+      "durationMs": 17,
+      "outcome": "extracted",
+      "inputParserCapped": false,
+      "outputAtLimit": false,
+      "metadata": {
+        "title": "Behemoth! Review: Pedro Pascal Stars in Tony Gilroy's Atonal Drama",
+        "siteName": "IndieWire",
+        "byline": "David Ehrlich",
+        "publishedAt": "2026-10-03T00:06:00.000Z",
+        "updatedAt": "2026-10-03T00:06:00.000Z"
+      },
+      "counts": {
+        "words": 1593,
+        "outputChars": 10935,
+        "blocks": 50,
+        "headings": 4,
+        "paragraphs": 46,
+        "listItems": 0,
+        "quotes": 0,
+        "figures": 19,
+        "media": 1,
+        "tables": 0,
+        "code": 0,
+        "markedSpans": 5,
+        "breaks": 0
+      },
+      "sourceShape": {
+        "counts": {
+          "iframe": 2,
+          "ul": 18,
+          "p": 15,
+          "br": 2,
+          "figure": 21,
+          "figcaption": 1,
+          "em": 5
+        },
+        "containerHints": [
+          {
+            "hint": "nova-js-newsletter-capture",
+            "count": 4
+          },
+          {
+            "hint": "adm-inline-article-ad-1",
+            "count": 1
+          },
+          {
+            "hint": "gpt-iw-article-mid-article-uid0",
+            "count": 1
+          },
+          {
+            "hint": "adm-inline-article-ad-2",
+            "count": 1
+          },
+          {
+            "hint": "gpt-iw-article-mid-article2-uid1",
+            "count": 1
+          },
+          {
+            "hint": "adm-inline-article-ad-x-3",
+            "count": 1
+          },
+          {
+            "hint": "gpt-iw-article-mid-articleX-uid2",
+            "count": 1
+          },
+          {
+            "hint": "adm-inline-article-ad-x-5-1",
+            "count": 1
+          },
+          {
+            "hint": "gpt-iw-article-mid-articleX-uid3",
+            "count": 1
+          },
+          {
+            "hint": "adm-inline-article-ad-x-7-2",
+            "count": 1
+          },
+          {
+            "hint": "gpt-iw-article-mid-articleX-uid4",
+            "count": 1
+          },
+          {
+            "hint": "adm-inline-article-ad-x-9-3",
+            "count": 1
+          },
+          {
+            "hint": "gpt-iw-article-mid-articleX-uid5",
+            "count": 1
+          },
+          {
+            "hint": "adm-in-article-footer",
+            "count": 1
+          }
+        ]
+      },
+      "qualityFlags": [
+        "source-br-without-rendered-breaks"
+      ],
+      "manualCompletenessVerified": false
+    },
+    {
+      "source": "Colossal",
+      "url": "https://www.thisiscolossal.com/2026/10/comedy-wildlife-awards-2026-finalists/",
+      "mode": "article",
+      "corpus": "original",
+      "httpStatus": 200,
+      "finalUrl": "https://www.thisiscolossal.com/2026/10/comedy-wildlife-awards-2026-finalists/",
+      "fetchTruncated": false,
+      "inputBytes": 317622,
+      "durationMs": 42,
+      "outcome": "extracted",
+      "inputParserCapped": false,
+      "outputAtLimit": false,
+      "metadata": {
+        "title": "Wild Hijinx and Hilarious Happenstance Reign in the 2026 Comedy Wildlife Awards",
+        "siteName": "Colossal",
+        "byline": "Kate Mothes",
+        "publishedAt": "2026-10-02T13:41:17.000Z",
+        "updatedAt": "2026-10-02T13:41:18.000Z"
+      },
+      "counts": {
+        "words": 208,
+        "outputChars": 2970,
+        "blocks": 18,
+        "headings": 0,
+        "paragraphs": 18,
+        "listItems": 0,
+        "quotes": 0,
+        "figures": 14,
+        "media": 0,
+        "tables": 0,
+        "code": 0,
+        "markedSpans": 0,
+        "breaks": 0
+      },
+      "sourceShape": {
+        "counts": {
+          "p": 11,
+          "ul": 13,
+          "figure": 17,
+          "main": 1,
+          "article": 1,
+          "figcaption": 14,
+          "strong": 1
+        },
+        "containerHints": [
+          {
+            "hint": "is-content-justification-center",
+            "count": 1
+          },
+          {
+            "hint": "content",
+            "count": 1
+          },
+          {
+            "hint": "entry-content",
+            "count": 1
+          },
+          {
+            "hint": "wp-block-post-author-name",
+            "count": 1
+          },
+          {
+            "hint": "rp4wp-related-posts",
+            "count": 1
+          },
+          {
+            "hint": "rp4wp-related-post",
+            "count": 1
+          },
+          {
+            "hint": "footer-newsletter-cta",
+            "count": 1
+          },
+          {
+            "hint": "newsletter-cta-text",
+            "count": 1
+          }
+        ]
+      },
+      "qualityFlags": [
+        "source-emphasis-without-rendered-marks"
+      ],
+      "manualCompletenessVerified": false
+    },
+    {
+      "source": "It's Nice That",
+      "url": "https://www.itsnicethat.com/articles/sandy-christ-illustration-discover-011026",
+      "mode": "article",
+      "corpus": "original",
+      "httpStatus": 200,
+      "finalUrl": "https://www.itsnicethat.com/articles/sandy-christ-illustration-discover-011026",
+      "fetchTruncated": false,
+      "inputBytes": 237015,
+      "durationMs": 20,
+      "outcome": "extracted",
+      "inputParserCapped": false,
+      "outputAtLimit": false,
+      "metadata": {
+        "title": "Sandy Christ crafts fuzzy, out-of-focus illustrations that make you embrace ambiguity",
+        "siteName": "itsnicethat.com",
+        "byline": "Ellis Tree",
+        "publishedAt": null,
+        "updatedAt": null
+      },
+      "counts": {
+        "words": 420,
+        "outputChars": 4435,
+        "blocks": 61,
+        "headings": 3,
+        "paragraphs": 23,
+        "listItems": 35,
+        "quotes": 0,
+        "figures": 12,
+        "media": 0,
+        "tables": 0,
+        "code": 0,
+        "markedSpans": 3,
+        "breaks": 0
+      },
+      "sourceShape": {
+        "counts": {
+          "p": 103,
+          "ul": 16,
+          "article": 1,
+          "figure": 11,
+          "figcaption": 11,
+          "br": 2
+        },
+        "containerHints": [
+          {
+            "hint": "text-caption-40",
+            "count": 2
+          },
+          {
+            "hint": "js-content",
+            "count": 1
+          },
+          {
+            "hint": "js-main-content-container",
+            "count": 1
+          },
+          {
+            "hint": "module-newsletter",
+            "count": 1
+          }
+        ]
+      },
+      "qualityFlags": [
+        "source-br-without-rendered-breaks"
+      ],
+      "manualCompletenessVerified": false
+    },
+    {
+      "source": "Bandcamp Daily",
+      "url": "https://daily.bandcamp.com/album-of-the-day/stef-chura-dancing-alone-on-the-concrete-review",
+      "mode": "article",
+      "corpus": "original",
+      "httpStatus": 200,
+      "finalUrl": "https://daily.bandcamp.com/album-of-the-day/stef-chura-dancing-alone-on-the-concrete-review",
+      "fetchTruncated": false,
+      "inputBytes": 113147,
+      "durationMs": 325,
+      "outcome": "extracted",
+      "inputParserCapped": false,
+      "outputAtLimit": false,
+      "metadata": {
+        "title": "Stef Chura, “Dancing Alone on the Concrete”",
+        "siteName": "Bandcamp Daily",
+        "byline": "Jennifer Kelly",
+        "publishedAt": "2026-10-02T13:31:47.000Z",
+        "updatedAt": "2026-10-02T13:31:47.000Z"
+      },
+      "counts": {
+        "words": 474,
+        "outputChars": 2676,
+        "blocks": 5,
+        "headings": 0,
+        "paragraphs": 5,
+        "listItems": 0,
+        "quotes": 0,
+        "figures": 1,
+        "media": 0,
+        "tables": 0,
+        "code": 0,
+        "markedSpans": 2,
+        "breaks": 0
+      },
+      "sourceShape": {
+        "counts": {
+          "strong": 2,
+          "article": 1,
+          "br": 1,
+          "p": 4,
+          "em": 2
+        },
+        "containerHints": [
+          {
+            "hint": "content",
+            "count": 1
+          },
+          {
+            "hint": "bc-content",
+            "count": 1
+          },
+          {
+            "hint": "pagebody",
+            "count": 1
+          },
+          {
+            "hint": "p-daily-article",
+            "count": 1
+          },
+          {
+            "hint": "fan-signup-addnl-bundle",
+            "count": 1
+          }
+        ]
+      },
+      "qualityFlags": [
+        "source-br-without-rendered-breaks"
+      ],
+      "manualCompletenessVerified": false
+    },
+    {
+      "source": "NASA Science",
+      "url": "https://science.nasa.gov/missions/webb/nasas-webb-hubble-combine-to-create-most-colorful-view-of-universe/",
+      "mode": "article",
+      "corpus": "holdout",
+      "httpStatus": 200,
+      "finalUrl": "https://science.nasa.gov/missions/webb/nasas-webb-hubble-combine-to-create-most-colorful-view-of-universe/",
+      "fetchTruncated": false,
+      "inputBytes": 339477,
+      "durationMs": 58,
+      "outcome": "extracted",
+      "inputParserCapped": false,
+      "outputAtLimit": false,
+      "metadata": {
+        "title": "NASA's Webb, Hubble Combine to Create Most Colorful View of Universe",
+        "siteName": "NASA Science",
+        "byline": "Marty McCoy",
+        "publishedAt": "2023-11-09T15:00:00.000Z",
+        "updatedAt": "2026-09-21T19:24:36.000Z"
+      },
+      "counts": {
+        "words": 1347,
+        "outputChars": 11250,
+        "blocks": 76,
+        "headings": 19,
+        "paragraphs": 44,
+        "listItems": 13,
+        "quotes": 0,
+        "figures": 8,
+        "media": 0,
+        "tables": 0,
+        "code": 0,
+        "markedSpans": 17,
+        "breaks": 5
+      },
+      "sourceShape": {
+        "counts": {
+          "iframe": 3,
+          "ul": 38,
+          "main": 1,
+          "article": 1,
+          "ol": 1,
+          "figure": 9,
+          "figcaption": 5,
+          "p": 41,
+          "strong": 15,
+          "em": 2,
+          "br": 5
+        },
+        "containerHints": [
+          {
+            "hint": "hds-caption-text",
+            "count": 4
+          },
+          {
+            "hint": "article-meta-item",
+            "count": 3
+          },
+          {
+            "hint": "hds-article-hero-header",
+            "count": 1
+          },
+          {
+            "hint": "wp-block-nasa-blocks-article-hero-header",
+            "count": 1
+          },
+          {
+            "hint": "usa-article-scroll-wrapper",
+            "count": 1
+          },
+          {
+            "hint": "usa-article__scroll",
+            "count": 1
+          },
+          {
+            "hint": "usa-article-content",
+            "count": 1
+          },
+          {
+            "hint": "entry-content",
+            "count": 1
+          },
+          {
+            "hint": "nasa_template_article_b",
+            "count": 1
+          },
+          {
+            "hint": "width-fit-content",
+            "count": 1
+          },
+          {
+            "hint": "pum-theme-content-only",
+            "count": 1
+          },
+          {
+            "hint": "pum-content",
+            "count": 1
+          },
+          {
+            "hint": "popmake-content",
+            "count": 1
+          },
+          {
+            "hint": "wp-block-nasa-blocks-article-intro",
+            "count": 1
+          },
+          {
+            "hint": "form-entry-content",
+            "count": 1
+          },
+          {
+            "hint": "gform-body",
+            "count": 1
+          },
+          {
+            "hint": "gform_body",
+            "count": 1
+          }
+        ]
+      },
+      "qualityFlags": [],
+      "manualCompletenessVerified": false
+    },
+    {
+      "source": "The Guardian",
+      "url": "https://www.theguardian.com/food/2026/oct/03/nitrite-free-bacon-sales-consumers-health-risks",
+      "mode": "article",
+      "corpus": "holdout",
+      "httpStatus": 200,
+      "finalUrl": "https://www.theguardian.com/food/2026/oct/03/nitrite-free-bacon-sales-consumers-health-risks",
+      "fetchTruncated": false,
+      "inputBytes": 329307,
+      "durationMs": 144,
+      "outcome": "extracted",
+      "inputParserCapped": false,
+      "outputAtLimit": false,
+      "metadata": {
+        "title": "Nitrite-free bacon sales boom in UK amid fears over curing chemicals",
+        "siteName": "the Guardian",
+        "byline": "Sarah Marsh",
+        "publishedAt": "2026-10-03T12:00:58.000Z",
+        "updatedAt": "2026-10-03T12:00:58.000Z"
+      },
+      "counts": {
+        "words": 819,
+        "outputChars": 5360,
+        "blocks": 31,
+        "headings": 0,
+        "paragraphs": 23,
+        "listItems": 8,
+        "quotes": 0,
+        "figures": 1,
+        "media": 0,
+        "tables": 0,
+        "code": 0,
+        "markedSpans": 0,
+        "breaks": 1
+      },
+      "sourceShape": {
+        "counts": {
+          "ul": 18,
+          "main": 1,
+          "article": 1,
+          "figure": 2,
+          "figcaption": 2,
+          "p": 22,
+          "br": 1,
+          "ol": 1
+        },
+        "containerHints": [
+          {
+            "hint": "article",
+            "count": 1
+          },
+          {
+            "hint": "the-caption",
+            "count": 1
+          },
+          {
+            "hint": "maincontent",
+            "count": 1
+          },
+          {
+            "hint": "article-body-commercial-selector",
+            "count": 1
+          },
+          {
+            "hint": "article-body-viewer-selector",
+            "count": 1
+          },
+          {
+            "hint": "content-footer",
+            "count": 1
+          }
+        ]
+      },
+      "qualityFlags": [],
+      "manualCompletenessVerified": false
+    },
+    {
+      "source": "Ars Technica",
+      "url": "https://arstechnica.com/science/2026/10/research-roundup-6-cool-science-stories-we-almost-missed-6/",
+      "mode": "article",
+      "corpus": "holdout",
+      "httpStatus": 200,
+      "finalUrl": "https://arstechnica.com/science/2026/10/research-roundup-6-cool-science-stories-we-almost-missed-6/",
+      "fetchTruncated": false,
+      "inputBytes": 178703,
+      "durationMs": 234,
+      "outcome": "extracted",
+      "inputParserCapped": false,
+      "outputAtLimit": false,
+      "metadata": {
+        "title": "Research roundup: 6 cool science stories we almost missed",
+        "siteName": "Ars Technica",
+        "byline": "Jennifer Ouellette",
+        "publishedAt": "2026-10-02T18:17:27.000Z",
+        "updatedAt": "2026-10-02T18:17:27.000Z"
+      },
+      "counts": {
+        "words": 1954,
+        "outputChars": 13279,
+        "blocks": 42,
+        "headings": 6,
+        "paragraphs": 36,
+        "listItems": 0,
+        "quotes": 0,
+        "figures": 7,
+        "media": 1,
+        "tables": 0,
+        "code": 0,
+        "markedSpans": 1,
+        "breaks": 0
+      },
+      "sourceShape": {
+        "counts": {
+          "iframe": 2,
+          "ul": 6,
+          "br": 2,
+          "main": 1,
+          "article": 1,
+          "p": 34,
+          "figure": 5,
+          "figcaption": 4,
+          "em": 1,
+          "ol": 1
+        },
+        "containerHints": [
+          {
+            "hint": "caption",
+            "count": 6
+          },
+          {
+            "hint": "caption-icon",
+            "count": 6
+          },
+          {
+            "hint": "caption-content",
+            "count": 6
+          },
+          {
+            "hint": "post-content",
+            "count": 6
+          },
+          {
+            "hint": "post-content-double",
+            "count": 6
+          },
+          {
+            "hint": "pswp-caption-content",
+            "count": 5
+          },
+          {
+            "hint": "ad--mid-content",
+            "count": 5
+          },
+          {
+            "hint": "ars-gallery-caption-credit",
+            "count": 4
+          },
+          {
+            "hint": "sign-in-panel-body",
+            "count": 1
+          },
+          {
+            "hint": "caption-2172819",
+            "count": 1
+          },
+          {
+            "hint": "in-content-interlude",
+            "count": 1
+          },
+          {
+            "hint": "caption-2172822",
+            "count": 1
+          },
+          {
+            "hint": "caption-2170632",
+            "count": 1
+          },
+          {
+            "hint": "caption-2172824",
+            "count": 1
+          },
+          {
+            "hint": "caption-2166710",
+            "count": 1
+          },
+          {
+            "hint": "author-mini-bio",
+            "count": 1
+          }
+        ]
+      },
+      "qualityFlags": [
+        "source-br-without-rendered-breaks"
+      ],
+      "manualCompletenessVerified": false
+    },
+    {
+      "source": "MDN",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/map",
+      "mode": "docs",
+      "corpus": "holdout",
+      "httpStatus": 200,
+      "finalUrl": "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/map",
+      "fetchTruncated": false,
+      "inputBytes": 178516,
+      "durationMs": 115,
+      "outcome": "extracted",
+      "inputParserCapped": false,
+      "outputAtLimit": false,
+      "metadata": {
+        "title": "Array.prototype.map() - JavaScript | MDN",
+        "siteName": "MDN Web Docs",
+        "byline": null,
+        "publishedAt": null,
+        "updatedAt": null
+      },
+      "counts": {
+        "words": 1428,
+        "outputChars": 8576,
+        "blocks": 88,
+        "headings": 24,
+        "paragraphs": 36,
+        "listItems": 10,
+        "quotes": 0,
+        "figures": 0,
+        "media": 0,
+        "tables": 0,
+        "code": 18,
+        "markedSpans": 4,
+        "breaks": 0
+      },
+      "sourceShape": {
+        "counts": {
+          "ul": 31,
+          "p": 45,
+          "ol": 11,
+          "main": 1,
+          "strong": 1,
+          "pre": 18,
+          "em": 4,
+          "table": 1,
+          "br": 1
+        },
+        "containerHints": [
+          {
+            "hint": "content-section",
+            "count": 19
+          },
+          {
+            "hint": "menu__panel-content",
+            "count": 8
+          },
+          {
+            "hint": "layout__content",
+            "count": 1
+          },
+          {
+            "hint": "content",
+            "count": 1
+          },
+          {
+            "hint": "layout__body",
+            "count": 1
+          },
+          {
+            "hint": "reference-layout__body",
+            "count": 1
+          },
+          {
+            "hint": "article-footer",
+            "count": 1
+          },
+          {
+            "hint": "article-footer__inner",
+            "count": 1
+          },
+          {
+            "hint": "article-footer__svg-container",
+            "count": 1
+          },
+          {
+            "hint": "content-feedback--buttons",
+            "count": 1
+          },
+          {
+            "hint": "article-footer__links",
+            "count": 1
+          },
+          {
+            "hint": "left-sidebar__content",
+            "count": 1
+          }
+        ]
+      },
+      "qualityFlags": [
+        "source-br-without-rendered-breaks"
+      ],
+      "manualCompletenessVerified": false
+    }
+  ]
+}
