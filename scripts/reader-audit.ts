@@ -19,8 +19,21 @@ const HOLDOUTS: Sample[] = [
 export function sourceShape(html: string) {
   const counts: Record<string, number> = {};
   const containers = new Map<string, number>();
+  const tables: { cells: number; maxCells: number }[] = [];
   for (const token of tokenize(html.slice(0, READER_LIMITS.inputBytes))) {
+    if (token.kind === 'close' && token.name === 'tr') {
+      const table = tables.at(-1);
+      if (table) table.maxCells = Math.max(table.maxCells, table.cells);
+    }
+    if (token.kind === 'close' && token.name === 'table') {
+      const table = tables.pop();
+      if (table && Math.max(table.cells, table.maxCells) > 1) counts.multiColumnTable = (counts.multiColumnTable ?? 0) + 1;
+    }
     if (token.kind !== 'open') continue;
+    if (token.name === 'table') tables.push({ cells: 0, maxCells: 0 });
+    const table = tables.at(-1);
+    if (table && token.name === 'tr') table.cells = 0;
+    if (table && (token.name === 'th' || token.name === 'td')) table.cells++;
     if (['article', 'main', 'p', 'br', 'strong', 'em', 'ol', 'ul', 'blockquote', 'figure', 'figcaption', 'iframe', 'pre', 'table'].includes(token.name)) counts[token.name] = (counts[token.name] ?? 0) + 1;
     if (['article', 'main', 'div', 'section'].includes(token.name)) {
       const attrs = parseAttrs(token.attrs);
@@ -43,7 +56,7 @@ export function qualityFlags(title: string, blocks: ArticleBlock[], shape: Retur
   if (((shape.counts.strong ?? 0) + (shape.counts.em ?? 0)) > 0 && !blocks.some((block) => block.spans?.some((span) => span.strong || span.em))) flags.push('source-emphasis-without-rendered-marks');
   if ((shape.counts.figure ?? 0) > 0 && !blocks.some((block) => block.figure)) flags.push('source-figure-without-rendered-figure');
   if (mode === 'docs' && (shape.counts.pre ?? 0) > 0 && !blocks.some((block) => block.type === 'pre')) flags.push('docs-code-missing');
-  if (mode === 'docs' && (shape.counts.table ?? 0) > 0 && !blocks.some((block) => block.type === 'table')) flags.push('docs-table-missing');
+  if (mode === 'docs' && (shape.counts.multiColumnTable ?? 0) > 0 && !blocks.some((block) => block.type === 'table')) flags.push('docs-table-missing');
   return flags;
 }
 

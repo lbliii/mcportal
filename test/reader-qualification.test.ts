@@ -132,6 +132,11 @@ test('qualification: audit diagnostics distinguish source hints from article gua
   assert.ok(qualityFlags('Story', [], shape, 'article').includes('empty-content'));
   assert.ok(!qualityFlags('Story', [{ type: 'p', text: 'Lead' }, { type: 'h', text: 'Story' }], sourceShape(''), 'article').includes('possible-leading-duplicate-title'));
   assert.ok(qualityFlags('Story', [{ type: 'h', text: 'Story' }], sourceShape(''), 'article').includes('possible-leading-duplicate-title'));
+  const specification = sourceShape('<table><tr><th>Specification</th></tr><tr><td>ECMAScript link</td></tr></table>');
+  assert.equal(specification.counts.table, 1);
+  assert.ok(!qualityFlags('Docs', [{ type: 'p', text: 'Specification: ECMAScript link' }], specification, 'docs').includes('docs-table-missing'), 'one-column layout tables can intentionally become prose');
+  const data = sourceShape('<table><tr><th>Parameter</th><th>Default</th></tr><tr><td>depth</td><td>3</td></tr></table>');
+  assert.ok(qualityFlags('Docs', [], data, 'docs').includes('docs-table-missing'));
 });
 
 
@@ -152,4 +157,61 @@ test('qualification: a main-only story keeps repeated sibling content wrappers a
   const result = extractArticle('<title>The field report</title><main><div class="standfirst"><p>MAINDECK: Several teams share an instrument.</p></div><section class="post-content"><p>MAINOPENING: The first team starts a careful observation and logs every change in the sky.</p><p>MAINMIDDLE: Longer discussion of the measurements compares three independent trials and explains why each difference matters.</p></section><section class="post-content"><p>MAINENDING: The final team repeats the test tomorrow.</p></section><div class="related-posts"><p>MAINWIDGET: Read about a different project.</p></div></main>', base);
   for (const marker of ['MAINDECK:', 'MAINOPENING:', 'MAINMIDDLE:', 'MAINENDING:']) assert.ok(content(result).includes(marker), marker);
   assert.ok(!content(result).includes('MAINWIDGET:'));
+});
+
+test('qualification: inline media never consumes surrounding editorial text', () => {
+  const result = extractArticle('<title>A record with media</title><article><p>IMAGEPREFIX: Before <img src="/chart.png" alt="A chart"> IMAGESUFFIX: After the chart.</p><p>VIDEOPREFIX: Before <video src="/clip.mp4" controls></video> VIDEOSUFFIX: After the clip.</p><p>AUDIOPREFIX: Before <audio src="/clip.mp3" controls></audio> AUDIOSUFFIX: After the recording.</p><p>LASTPARAGRAPH: The next paragraph remains readable.</p></article>', base);
+  const text = content(result);
+  for (const marker of ['IMAGEPREFIX:', 'IMAGESUFFIX:', 'VIDEOPREFIX:', 'VIDEOSUFFIX:', 'AUDIOPREFIX:', 'AUDIOSUFFIX:', 'LASTPARAGRAPH:']) assert.ok(text.includes(marker), marker);
+  assert.ok(text.indexOf('IMAGEPREFIX:') < text.indexOf('IMAGESUFFIX:'));
+  assert.ok(text.indexOf('VIDEOPREFIX:') < text.indexOf('VIDEOSUFFIX:'));
+  assert.ok(text.indexOf('AUDIOPREFIX:') < text.indexOf('AUDIOSUFFIX:'));
+});
+
+test('qualification: a nested quote preserves both outer tails and quotation identity', () => {
+  const result = extractArticle('<title>A nested account</title><article><p>QUOTECONTEXT: An observer quotes a notebook.</p><blockquote>OUTERQUOTELEAD: The note starts here.<blockquote>INNERQUOTE: An earlier observer wrote this.</blockquote>OUTERQUOTETAIL: The note ends here.</blockquote><p>QUOTEEND: The report continues.</p></article>', base);
+  const text = content(result);
+  for (const marker of ['OUTERQUOTELEAD:', 'INNERQUOTE:', 'OUTERQUOTETAIL:', 'QUOTEEND:']) assert.ok(text.includes(marker), marker);
+  const outer = result.blocks.find((block) => block.text.includes('OUTERQUOTELEAD:'))!;
+  const tail = result.blocks.find((block) => block.text.includes('OUTERQUOTETAIL:'))!;
+  const inner = result.blocks.find((block) => block.text.includes('INNERQUOTE:'))!;
+  assert.ok(outer.quoteId); assert.equal(tail.quoteId, outer.quoteId); assert.notEqual(inner.quoteId, outer.quoteId);
+  assert.ok(text.indexOf('OUTERQUOTELEAD:') < text.indexOf('INNERQUOTE:') && text.indexOf('INNERQUOTE:') < text.indexOf('OUTERQUOTETAIL:'));
+});
+
+test('qualification: nested-list parent continuation retains its authored parent group', async () => {
+  const result = extractArticle(await fixture('inline-lists'), base);
+  const outer = result.blocks.find((block) => block.text.startsWith('OUTERFIRST:'))!;
+  const continuation = result.blocks.find((block) => block.text.startsWith('OUTERTAIL:'))!;
+  assert.ok(continuation, 'nested list suffix survives');
+  assert.equal(continuation.listId, outer.listId, 'renderer can place the continuation inside its parent item');
+  assert.equal(continuation.level, outer.level);
+  assert.ok(outer.listItemId);
+  assert.equal(continuation.listItemId, outer.listItemId, 'continuation belongs to the same authored item');
+  const next = result.blocks.find((block) => block.text.startsWith('OUTERSECOND:'))!;
+  assert.notEqual(next.listItemId, outer.listItemId, 'a sibling item keeps a distinct identity');
+});
+
+test('qualification: body selection excludes unlabelled publisher panels and commerce images', async () => {
+  const result = extractArticle(await fixture('widget-boundaries'), base);
+  const text = content(result);
+  for (const marker of ['BOUNDDECK:', 'BOUNDLEAD:', 'BOUNDMIDDLE:', 'BOUNDCAPTION:', 'BOUNDPOPULAR:', 'BOUNDAUTHOR:', 'BOUNDEND:']) assert.ok(text.includes(marker), marker);
+  assert.ok(!text.includes('WIDGET'), 'body selection handles surrounding panels even when attributes are styling-only');
+  const images = result.blocks.filter((block) => block.figure).map((block) => block.figure!.url);
+  assert.ok(images.includes('https://holdout.example/cover.png'));
+  assert.ok(!images.some((url) => /recommended|other|shirt|popular/.test(url)), 'recommendation/commerce images are outside the story');
+});
+
+test('qualification: peripheral panels can be recognized around a story with CSS-only wrapper names', () => {
+  const result = extractArticle('<title>A notebook history</title><article><div class="column"><div class="rich-text"><p>CSSLEAD: Researchers compared notebooks collected over many years before evaluating the newest observations.</p><h2>About the Author</h2><p>CSSAUTHORPROSE: The story describes the author of a historical notebook and the specific observations that shaped the original theory.</p><h2>Most Popular</h2><p>CSSPOPULARPROSE: The most popular measurement method in this study performed better under several conditions, so the team repeated the trial.</p><p>CSSEND: The report ends with a proposal for another independent field survey.</p></div></div><div class="panel"><h3>About the Author</h3><p>WIDGETCSSBIO: Mira Vale writes about science and has contributed to many publications.</p><a href="/writer">Writer profile</a></div><div class="panel"><h2>Most Popular</h2><a href="/other"><img src="/other.png"><h3>WIDGETCSSCARD: An unrelated story</h3></a></div></article>', base);
+  const text = content(result);
+  for (const marker of ['CSSLEAD:', 'CSSAUTHORPROSE:', 'CSSPOPULARPROSE:', 'CSSEND:']) assert.ok(text.includes(marker), marker);
+  assert.ok(!text.includes('WIDGETCSS'), 'peripheral biography/link cards do not require publisher-specific class names');
+});
+
+test('qualification: an editorial newsletter section survives action words and an ambiguous class', () => {
+  const result = extractArticle('<title>A guide to publications</title><article><div class="article-body"><p>NEWSLETTERLEAD: This story compares the ways readers learn about new publications and participate in their communities.</p><section class="newsletter"><h2>Subscribe to newsletters</h2><p>NEWSLETTERCONTROL: People subscribe to newsletters when editors offer useful work. An editorial newsletter can serve a specialist audience by providing clear summaries, links to primary sources, and context about the author. This paragraph discusses that publication format as the subject of the article; it is not a form or a publisher promotion. A good editor also distinguishes sponsored material from independent reporting.</p></section><p>NEWSLETTEREND: The conclusion compares several publication formats.</p></div><div class="newsletter"><form><label>Email</label><input type="email"><button>Subscribe</button></form><p>WIDGETNEWSLETTER: Join our newsletter and accept our privacy policy.</p></div></article>', base);
+  const text = content(result);
+  for (const marker of ['NEWSLETTERLEAD:', 'NEWSLETTERCONTROL:', 'NEWSLETTEREND:']) assert.ok(text.includes(marker), marker);
+  assert.ok(!text.includes('WIDGETNEWSLETTER:'));
 });
