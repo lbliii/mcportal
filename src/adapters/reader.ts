@@ -106,7 +106,7 @@ export function extractArticle(html: string, baseUrl?: string, limits: { blocks:
   const stack: Container[] = [];
   const found: Found[] = [];
   let current: { type: ArticleBlock['type'] | 'label'; zone: Zone; parts: Part[]; level?: number; id?: string; lang?: string; callout?: Container['callout']; list?: number; ordered?: true; listStart?: number; value?: number; quoteId?: string; shareLink?: boolean } | null = null;
-  const lists: { id: number; ordered: boolean; start: number; next: number }[] = [];   // open <ul>/<ol> ids, innermost last
+  const lists: { id: number; ordered: boolean; start: number; next: number; itemValue?: number; itemOpen?: boolean }[] = [];   // open <ul>/<ol> ids, innermost last
   let listId = 0;
   let table: { depth: number; zone: Zone; rows: string[][]; row: string[] | null; cell: string[] | null; header: boolean } | null = null;
 
@@ -137,7 +137,7 @@ export function extractArticle(html: string, baseUrl?: string, limits: { blocks:
       return;
     }
     const block: Found = { type: c.type, text, zone: c.zone, ...(c.list !== undefined ? { list: c.list } : {}), ...(c.shareLink ? { shareLink: true } : {}) };
-    if (c.type === 'li') {
+    if (c.list !== undefined) {
       block.level = Math.min(3, lists.length - 1);
       block.listId = `html-list-${c.list ?? 0}`;
       if (c.ordered) { block.ordered = true; if (c.listStart !== undefined) block.listStart = c.listStart; if (c.value !== undefined) block.value = c.value; }
@@ -173,6 +173,10 @@ export function extractArticle(html: string, baseUrl?: string, limits: { blocks:
     found.push({ type: 'table', text, zone: t.zone, columns: columns!, rows: body.slice(0, READER_LIMITS.tableRows) });
   };
 
+  const continuation = () => {
+    const list = lists.at(-1);
+    return { type: quote ? 'quote' as const : 'p' as const, zone: zone(), parts: [] as Part[], ...(quotes.at(-1) ? { quoteId: quotes.at(-1)! } : {}), ...(list?.itemOpen ? { list: list.id, ...(list.ordered ? { ordered: true as const, listStart: list.start, ...(list.itemValue !== undefined ? { value: list.itemValue } : {}) } : {}) } : {}) };
+  };
   const integer = (value: string | undefined, fallback: number) => value && /^-?\d{1,6}$/.test(value) ? Number(value) : fallback;
   const finishFigure = () => {
     for (const block of figure?.blocks ?? []) {
@@ -187,8 +191,10 @@ export function extractArticle(html: string, baseUrl?: string, limits: { blocks:
   };
   const addMedia = (url: string | undefined, kind: 'video' | 'audio', label: string) => {
     if (!url) return;
+    const resume = current ? { ...current, parts: [] as Part[] } : null;
     flush();
     found.push({ type: 'p', zone: zone(), text: label, spans: [{ text: label, href: url }], media: { url, kind, label } });
+    current = resume;
   };
   for (const tok of structure.tokens) {
     if (found.length >= limits.blocks * 3) break;
@@ -199,6 +205,7 @@ export function extractArticle(html: string, baseUrl?: string, limits: { blocks:
     if (tok.kind === 'text') {
       if (skip > 0 || headerlink) continue;
       if (figure?.inCaption || figure?.inCredit) { if (figure.inCredit) figure.credit += tok.text; else figure.caption += tok.text; continue; }
+      if (!current && (quote || lists.at(-1)?.itemOpen) && !table) current = continuation();
       if (table?.cell) table.cell.push(tok.text);
       else if (current) current.parts.push({ text: tok.text, ...(href ? { href } : {}), ...(code > 0 && !pre ? { code: true as const } : {}), ...(strong ? { strong: true as const } : {}), ...(em ? { em: true as const } : {}), ...(breakBefore ? { breakBefore: true as const } : {}) });
       if (current && tok.text.trim()) breakBefore = false;
@@ -243,11 +250,13 @@ export function extractArticle(html: string, baseUrl?: string, limits: { blocks:
           const candidate = set.find((part) => parseInt(part[1]!) <= 1600) ?? set.at(-1);
           const url = safeHttpUrl(a['data-src'] || a['data-lazy-src'] || candidate?.[0] || a.src, baseUrl);
           if (url) {
+            const resume = current ? { ...current, parts: [] as Part[] } : null;
             flush();
             const alt = clean(decodeEntities(a.alt ?? ''), 500);
             const block: Found = { type: 'p', zone: zone(), text: alt || 'Image', ...(stack.findLast((c) => c.gallery)?.gallery !== undefined ? { gallery: stack.findLast((c) => c.gallery)!.gallery! } : {}), figure: { url, ...(alt ? { alt } : {}), ...(width > 0 && width <= 10_000 ? { width } : {}), ...(height > 0 && height <= 10_000 ? { height } : {}) }, spans: [{ text: alt || 'Image', href: url }] };
             found.push(block);
             if (figure) figure.blocks.push(block);
+            current = resume;
           }
           continue;
         }
@@ -312,9 +321,9 @@ export function extractArticle(html: string, baseUrl?: string, limits: { blocks:
         const signatureId = name === 'dt' && a.id && ID.test(a.id) ? a.id : undefined;
         const callout = innerCallout();
         const isLabel = callout && type === 'p' && /\badmonition-title\b/.test(a.class ?? '');
-        const list = name === 'li' ? lists.at(-1) : undefined;
-        const value = list?.ordered ? integer(a.value, list.next) : undefined;
-        if (list && value !== undefined) list.next = value + 1;
+        const list = name === 'li' || type === 'p' && lists.at(-1)?.itemOpen ? lists.at(-1) : undefined;
+        const value = list?.ordered ? name === 'li' ? integer(a.value, list.next) : list.itemValue : undefined;
+        if (list && name === 'li') { list.itemOpen = true; if (value !== undefined) { list.next = value + 1; list.itemValue = value; } }
         current = { type: isLabel ? 'label' : signatureId ? 'h' : type === 'p' && quote > 0 ? 'quote' : type, zone: zone(), parts: [], ...(callout ? { callout } : {}), ...(list !== undefined ? { list: list.id, ...(list.ordered ? { ordered: true as const, listStart: list.start, ...(value !== undefined ? { value } : {}) } : {}) } : {}), ...(quote && quotes.at(-1) ? { quoteId: quotes.at(-1)! } : {}) };
         if (signatureId) { current.level = 4; current.id = signatureId; }
         if (type === 'h') {
@@ -358,13 +367,15 @@ export function extractArticle(html: string, baseUrl?: string, limits: { blocks:
       if (at !== -1) { flush(); stack.length = at; }
       continue;
     }
-    if (name === 'ul' || name === 'ol') { flush(); lists.pop(); if (lists.length) current = { type: quote ? 'quote' : 'p', zone: zone(), parts: [] }; continue; }
+    if (name === 'ul' || name === 'ol') { flush(); lists.pop(); if (lists.at(-1)?.itemOpen || quote) current = continuation(); continue; }
     if (name === 'a') { href = undefined; headerlink = false; continue; }
     if (CODE.has(name)) { if (code > 0) code--; continue; }
     if (BLOCK[name]) {
       if (name === 'blockquote' && quote > 0) { quote--; quotes.pop(); }
       if (name === 'pre' && pre > 0) { pre--; if (pre > 0) continue; }
       flush();
+      if (name === 'li' && lists.at(-1)) lists.at(-1)!.itemOpen = false;
+      if (name === 'blockquote' && quote > 0) current = continuation();
       continue;
     }
     if (current && !INLINE.has(name) && !pre) current.parts.push({ text: ' ' });

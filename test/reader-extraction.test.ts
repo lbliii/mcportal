@@ -96,3 +96,21 @@ test('reader extraction: every distinct image in a multi-image figure keeps its 
   assert.equal(a.blocks.find((b) => b.type === 'li')?.value, 3);
   assert.ok(a.blocks.some((b) => b.text === 'Its continuation.'));
 });
+
+test('reader extraction: inline image, audio and trusted embed preserve the surrounding editorial phrasing', () => {
+  const a = story('<p>Image lead <img src="/diagram.jpg" alt="Diagram"> image tail.</p><p>Audio lead <audio><source src="/voice.mp3"></audio> audio tail.</p><p>Video lead <iframe src="https://www.youtube.com/embed/story"></iframe> video tail.</p><p>Final paragraph.</p>');
+  const text = a.blocks.map((b) => b.text).join(' ');
+  for (const phrase of ['Image lead', 'image tail.', 'Audio lead', 'audio tail.', 'Video lead', 'video tail.', 'Final paragraph.']) assert.ok(text.includes(phrase), phrase);
+  assert.equal(a.blocks.filter((b) => b.figure).length, 1); assert.equal(a.blocks.filter((b) => b.media).length, 2);
+});
+
+test('reader extraction: nested quotation tails and multi-paragraph list continuation retain explicit ownership', () => {
+  const a = story('<blockquote>Outer lead.<blockquote>Inner text.</blockquote>Outer tail.</blockquote><ol start="3"><li><p>List lead.</p><p>Second paragraph.</p><ul><li>Nested item.</li></ul>Parent tail.</li><li>Next item.</li></ol>');
+  const outer = a.blocks.find((b) => b.text === 'Outer lead.')!, tail = a.blocks.find((b) => b.text === 'Outer tail.')!, inner = a.blocks.find((b) => b.text === 'Inner text.')!;
+  assert.equal(outer.quoteId, tail.quoteId); assert.notEqual(inner.quoteId, tail.quoteId);
+  const first = a.blocks.find((b) => b.text === 'List lead.')!;
+  assert.equal(first.type, 'li'); assert.equal(first.value, 3);
+  for (const phrase of ['Second paragraph.', 'Parent tail.']) { const b = a.blocks.find((b) => b.text === phrase)!; assert.equal(b.type, 'p'); assert.equal(b.listId, first.listId); assert.equal(b.level, 0); assert.equal(b.value, 3); }
+  assert.equal(a.blocks.find((b) => b.text === 'Nested item.')!.level, 1);
+  assert.equal(a.blocks.find((b) => b.text === 'Next item.')!.value, 4);
+});
