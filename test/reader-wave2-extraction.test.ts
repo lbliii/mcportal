@@ -61,3 +61,13 @@ test('wave2 extraction: deeply nested quiz controls remain bounded and preserve 
   assert.ok(result.blocks.length <= 2);
   assert.ok(result.blocks.every((b) => b.text.length <= READER_LIMITS.blockChars && !b.spans?.some((s) => s.href?.startsWith('javascript:'))));
 });
+
+
+test('wave2 extraction: input examples do not delete explicit body containers carrying a quiz class', () => {
+  for (const body of ['class="article-body quiz"', 'class="quiz" itemprop="articleBody"']) {
+    const result = extractArticle(`<article><div ${body}><input type="radio"><input type="radio"><p>EXPLICITLEAD: This editorial article explains how researchers design a quiz instrument to measure knowledge and compare recall between groups.</p><p>EXPLICITEND: These controls are illustrative examples within the declared body, followed by the conclusion and discussion of the measured differences.</p></div></article>`, base);
+    for (const marker of ['EXPLICITLEAD:', 'EXPLICITEND:']) assert.ok(text(result).includes(marker), body);
+  }
+  const enclosing = extractArticle('<article><section class="quiz"><input type="radio"><input type="radio"><div itemprop="articleBody"><p>EXPLICITNESTED: A widget-looking outer class cannot swallow a declared body subtree.</p></div></section></article>', base);
+  assert.ok(text(enclosing).includes('EXPLICITNESTED:'));
+});

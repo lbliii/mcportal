@@ -4,7 +4,7 @@ Latest-main baseline: `448f8a2`. Fresh safeFetch requests for all five room samp
 
 Three remaining problems were reproduced and fixed:
 
-- Collider's CSS quiz contributes six result paragraphs despite its input controls being absent from reader output. Component names containing quiz/poll/survey now require at least two radio/checkbox/select controls before their result subtree is excluded. Text-only editorial discussions with those names remain. The rule is disabled for documentation.
+- Collider's CSS quiz contributes six result paragraphs despite its input controls being absent from reader output. Component names containing quiz/poll/survey now require at least two radio/checkbox/select controls before their result subtree is excluded. A container declaring or enclosing an explicit article body is protected, even when it carries a quiz class. Text-only editorial discussions with those names remain. The rule is disabled for documentation.
 - SlashFilm has a full H1 and OG headline but a shorter matching JSON-LD headline. The header keeps the existing metadata preference, and initial duplicate heading detection accepts exact OG/document-title variants after removing the declared site suffix. Prefix similarity is insufficient. Later editorial headings remain.
 - Dezeen's SVG-only share links leave a stranded `Share:` heading. A sharing component is excluded only when it contains a known share endpoint, has less than 160 prose characters, and does not contain a protected body. Substantive discussions of sharing remain.
 
@@ -22,9 +22,9 @@ Breadcrumbs/tag tails and Colossal's empty related heading were already absent o
 
 ## Verification
 
-`node --test test/reader-extraction.test.ts test/reader-qualification.test.ts test/reader-entities.test.ts test/reader-wave2-extraction.test.ts test/reader-cache.test.ts`: **51 passing**. Six dedicated checks cover these changes and preservation of substantial share/related/newsletter/quiz prose, grouped illustrated numbered paragraphs, later exact title sections, documentation code/callouts/tables, unsafe links, bounded nesting and content limits. Synthetic fixtures copy component structure but use newly authored content, not publisher article bodies.
+`node --test test/reader-extraction.test.ts test/reader-qualification.test.ts test/reader-entities.test.ts test/reader-wave2-extraction.test.ts test/reader-cache.test.ts`: **52 passing**. Seven dedicated checks cover these changes and preservation of substantial share/related/newsletter/quiz prose, grouped illustrated numbered paragraphs, later exact title sections, documentation code/callouts/tables, unsafe links, bounded nesting and content limits. Synthetic fixtures copy component structure but use newly authored content, not publisher article bodies.
 
-`git diff --check`: passed. Full `tsc --noEmit` could not verify this dependency-free worktree: global TypeScript lacks ES2023/erasableSyntaxOnly support, and project packages are absent. Integration should run the repository's normal TypeScript with installed dependencies. No source/type errors were reported in changed extraction files by that attempted check.
+`git diff --check`: passed. `npm run typecheck`: passed using the existing primary checkout's installed project dependencies via a local node_modules symlink; UI check reports 49 casts at its ceiling of 49. An initial attempt with global TypeScript failed because it was outdated and project packages were unavailable; the proper project check supersedes that result.
 
 ## Limits and integration
 
