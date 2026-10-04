@@ -28,4 +28,8 @@ Review the disjoint worker commits independently, then combine on the integratio
 
 ## Status
 
-Workers are implementing. Latest-main baseline type and design checks passed. Fresh parser checks reproduced three remaining defects: Collider input-backed quiz outputs, a SlashFilm title variant, and a Dezeen orphan Share heading. Most earlier breadcrumb/tag cleanup observations no longer reproduce on current main. Media review found permanent UI null caching, retained detached image nodes, stale queued work and outer-viewport lazy-loading margins.
+All three workers completed and their reviewed changes are integrated. Draft slices target main: [layout #57](https://github.com/lbliii/mcportal/pull/57), [extraction #58](https://github.com/lbliii/mcportal/pull/58), and [media #59](https://github.com/lbliii/mcportal/pull/59). The integration branch combines their final code and reports, refreshes the extraction cache version, and adapts isolated VM harnesses to load the shipped reader controls helpers.
+
+Combined typecheck, design output check, diff check and in-process smoke passed. The complete serialized suite passed: **445 tests, 422 passed, zero failures, 23 skipped** (22 require TEST_DATABASE_URL; one file-store purge contract is covered by the file-age retention test). Browser suites ran with Chrome; they were not skipped.
+
+Actual Polygon preview checks at 1280×720, 897×984 and 375×812 reached the viewport bottom with equally wide universal and reader controls, no reader-control background/border and no horizontal overflow. Deep scrolling loaded later media; Back and Continue reading restored the saved passage. See reports/reader-wave2-integration.md for evidence and limits. No merge or deployment performed.
