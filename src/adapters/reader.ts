@@ -105,9 +105,9 @@ export function extractArticle(html: string, baseUrl?: string, limits: { blocks:
   const labels = new Map<number, string>();
   const stack: Container[] = [];
   const found: Found[] = [];
-  let current: { type: ArticleBlock['type'] | 'label'; zone: Zone; parts: Part[]; level?: number; id?: string; lang?: string; callout?: Container['callout']; list?: number; ordered?: true; listStart?: number; value?: number; quoteId?: string; shareLink?: boolean } | null = null;
-  const lists: { id: number; ordered: boolean; start: number; next: number; itemValue?: number; itemOpen?: boolean }[] = [];   // open <ul>/<ol> ids, innermost last
-  let listId = 0;
+  let current: { type: ArticleBlock['type'] | 'label'; zone: Zone; parts: Part[]; level?: number; id?: string; lang?: string; callout?: Container['callout']; list?: number; listItemId?: string; ordered?: true; listStart?: number; value?: number; quoteId?: string; shareLink?: boolean } | null = null;
+  const lists: { id: number; ordered: boolean; start: number; next: number; itemValue?: number; itemId?: string; itemOpen?: boolean }[] = [];   // open <ul>/<ol> ids, innermost last
+  let listId = 0, itemId = 0;
   let table: { depth: number; zone: Zone; rows: string[][]; row: string[] | null; cell: string[] | null; header: boolean } | null = null;
 
   const zone = (): Zone => (article > 0 ? 'article' : main > 0 || stack.some((c) => c.main) ? 'main' : 'body');
@@ -140,6 +140,7 @@ export function extractArticle(html: string, baseUrl?: string, limits: { blocks:
     if (c.list !== undefined) {
       block.level = Math.min(3, lists.length - 1);
       block.listId = `html-list-${c.list ?? 0}`;
+      if (c.listItemId) block.listItemId = c.listItemId;
       if (c.ordered) { block.ordered = true; if (c.listStart !== undefined) block.listStart = c.listStart; if (c.value !== undefined) block.value = c.value; }
     }
     if (c.quoteId) block.quoteId = c.quoteId;
@@ -175,11 +176,11 @@ export function extractArticle(html: string, baseUrl?: string, limits: { blocks:
 
   const continuation = () => {
     const list = lists.at(-1);
-    return { type: quote ? 'quote' as const : 'p' as const, zone: zone(), parts: [] as Part[], ...(quotes.at(-1) ? { quoteId: quotes.at(-1)! } : {}), ...(list?.itemOpen ? { list: list.id, ...(list.ordered ? { ordered: true as const, listStart: list.start, ...(list.itemValue !== undefined ? { value: list.itemValue } : {}) } : {}) } : {}) };
+    return { type: quote ? 'quote' as const : 'p' as const, zone: zone(), parts: [] as Part[], ...(quotes.at(-1) ? { quoteId: quotes.at(-1)! } : {}), ...(list?.itemOpen ? { list: list.id, ...(list.itemId ? { listItemId: list.itemId } : {}), ...(list.ordered ? { ordered: true as const, listStart: list.start, ...(list.itemValue !== undefined ? { value: list.itemValue } : {}) } : {}) } : {}) };
   };
   const listFields = () => {
     const list = lists.at(-1);
-    return list?.itemOpen ? { listId: `html-list-${list.id}`, level: Math.min(3, lists.length - 1), ...(list.ordered ? { ordered: true as const, listStart: list.start, ...(list.itemValue !== undefined ? { value: list.itemValue } : {}) } : {}) } : {};
+    return list?.itemOpen ? { listId: `html-list-${list.id}`, ...(list.itemId ? { listItemId: list.itemId } : {}), level: Math.min(3, lists.length - 1), ...(list.ordered ? { ordered: true as const, listStart: list.start, ...(list.itemValue !== undefined ? { value: list.itemValue } : {}) } : {}) } : {};
   };
   const integer = (value: string | undefined, fallback: number) => value && /^-?\d{1,6}$/.test(value) ? Number(value) : fallback;
   const finishFigure = () => {
@@ -195,7 +196,7 @@ export function extractArticle(html: string, baseUrl?: string, limits: { blocks:
   };
   const addMedia = (url: string | undefined, kind: 'video' | 'audio', label: string) => {
     if (!url) return;
-    const resume = current ? { ...current, parts: [] as Part[] } : null;
+    const resume = current ? { ...current, type: current.type === 'li' ? 'p' as const : current.type, parts: [] as Part[] } : null;
     flush();
     found.push({ type: 'p', zone: zone(), ...listFields(), text: label, spans: [{ text: label, href: url }], media: { url, kind, label } });
     current = resume;
@@ -254,7 +255,7 @@ export function extractArticle(html: string, baseUrl?: string, limits: { blocks:
           const candidate = set.find((part) => parseInt(part[1]!) <= 1600) ?? set.at(-1);
           const url = safeHttpUrl(a['data-src'] || a['data-lazy-src'] || candidate?.[0] || a.src, baseUrl);
           if (url) {
-            const resume = current ? { ...current, parts: [] as Part[] } : null;
+            const resume = current ? { ...current, type: current.type === 'li' ? 'p' as const : current.type, parts: [] as Part[] } : null;
             flush();
             const alt = clean(decodeEntities(a.alt ?? ''), 500);
             const block: Found = { type: 'p', zone: zone(), ...listFields(), text: alt || 'Image', ...(stack.find((c) => c.gallery)?.gallery !== undefined ? { gallery: stack.find((c) => c.gallery)!.gallery! } : {}), figure: { url, ...(alt ? { alt } : {}), ...(width > 0 && width <= 10_000 ? { width } : {}), ...(height > 0 && height <= 10_000 ? { height } : {}) }, spans: [{ text: alt || 'Image', href: url }] };
@@ -327,8 +328,8 @@ export function extractArticle(html: string, baseUrl?: string, limits: { blocks:
         const isLabel = callout && type === 'p' && /\badmonition-title\b/.test(a.class ?? '');
         const list = name === 'li' || type === 'p' && lists.at(-1)?.itemOpen ? lists.at(-1) : undefined;
         const value = list?.ordered ? name === 'li' ? integer(a.value, list.next) : list.itemValue : undefined;
-        if (list && name === 'li') { list.itemOpen = true; if (value !== undefined) { list.next = value + 1; list.itemValue = value; } }
-        current = { type: isLabel ? 'label' : signatureId ? 'h' : type === 'p' && quote > 0 ? 'quote' : type, zone: zone(), parts: [], ...(callout ? { callout } : {}), ...(list !== undefined ? { list: list.id, ...(list.ordered ? { ordered: true as const, listStart: list.start, ...(value !== undefined ? { value } : {}) } : {}) } : {}), ...(quote && quotes.at(-1) ? { quoteId: quotes.at(-1)! } : {}) };
+        if (list && name === 'li') { list.itemOpen = true; list.itemId = `html-item-${++itemId}`; if (value !== undefined) { list.next = value + 1; list.itemValue = value; } }
+        current = { type: isLabel ? 'label' : signatureId ? 'h' : type === 'p' && quote > 0 ? 'quote' : type, zone: zone(), parts: [], ...(callout ? { callout } : {}), ...(list !== undefined ? { list: list.id, ...(list.itemId ? { listItemId: list.itemId } : {}), ...(list.ordered ? { ordered: true as const, listStart: list.start, ...(value !== undefined ? { value } : {}) } : {}) } : {}), ...(quote && quotes.at(-1) ? { quoteId: quotes.at(-1)! } : {}) };
         if (signatureId) { current.level = 4; current.id = signatureId; }
         if (type === 'h') {
           current.level = Number(name[1]);

@@ -28,7 +28,7 @@ function names(value: unknown): string[] {
   const items = Array.isArray(value) ? value.slice(0, 8) : [value];
   return items.flatMap((item) => {
     const raw = typeof item === 'string' ? item : item && typeof item === 'object' && 'name' in item ? item.name : undefined;
-    const name = clean(raw, 120).replace(/^by\s+/i, '');
+    const name = clean(decodeEntities(clean(raw, 120)), 120).replace(/^by\s+/i, '');
     return name && !/^https?:\/\//i.test(name) ? [name] : [];
   });
 }

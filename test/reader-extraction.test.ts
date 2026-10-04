@@ -130,3 +130,18 @@ test('reader extraction: nested gallery rendition wrappers share media identity 
   assert.doesNotMatch(JSON.stringify(a), /writer\.jpg|thumb\.jpg/);
   assert.equal(a.blocks.at(-1)?.text, 'Visual story end.');
 });
+
+test('reader extraction: source-item identities distinguish media-first unordered siblings and repeated ordered numbers', () => {
+  const a = story('<ul><li><img src="/first.jpg">First text.</li><li><audio src="/second.mp3"></audio>Second text.</li></ul><ol><li value="3"><img src="/third.jpg">Third text.</li><li value="3"><img src="/fourth.jpg">Fourth text.</li></ol>');
+  assert.equal(a.blocks.filter((b) => b.type === 'li').length, 0, 'media-first items do not emit an extra text item');
+  const media = a.blocks.filter((b) => b.figure || b.media);
+  assert.equal(new Set(media.map((b) => b.listItemId)).size, 4);
+  for (let i = 0; i < a.blocks.length; i += 2) { assert.ok(a.blocks[i]!.listItemId); assert.equal(a.blocks[i]!.listItemId, a.blocks[i + 1]!.listItemId); }
+  assert.equal(media[0]!.ordered, undefined); assert.equal(media[1]!.value, undefined);
+  assert.equal(media[2]!.value, 3); assert.equal(media[3]!.value, 3); assert.notEqual(media[2]!.listItemId, media[3]!.listItemId);
+});
+
+test('reader extraction: entity-encoded structured authors decode once into bounded credits', () => {
+  const a = extractArticle('<title>Credits</title><script type="application/ld+json">{"@type":"Article","headline":"Credits","author":[{"name":"Jos&eacute; &amp; Co"},{"name":"https://authors.example/person"}]}</script><article><p>Story.</p></article>', 'https://journal.example/credits');
+  assert.equal(a.byline, 'José & Co');
+});
