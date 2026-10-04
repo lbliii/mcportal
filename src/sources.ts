@@ -249,7 +249,8 @@ export async function loadPortal(portal: PortalInput, deps: SourceDeps, force = 
 }
 
 export async function loadArticle(url: string, deps: SourceDeps): Promise<Article> {
-  const result = await deps.cache.get(`reader:${url}`, FRESHNESS.reader, () => fetchArticle(url, deps.fetcher));
+  // Keep legacy text-only extractions out of the structured reader cache.
+  const result = await deps.cache.get(`reader:v2:${url}`, FRESHNESS.reader, () => fetchArticle(url, deps.fetcher));
   const { finalUrl, ...article } = result.value;
   return {
     url: finalUrl,
