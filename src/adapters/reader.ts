@@ -1,18 +1,22 @@
 /**
- * Reader view: turn an article page into clean, plain-text blocks in one linear
- * pass. Output is data only (no HTML), so the UI renders it without injection
+ * Reader view: turn an article page into clean, plain-text blocks in bounded linear
+ * passes. Output is data only (no HTML), so the UI renders it without injection
  * risk and the agent can treat it as content, never as instructions.
  */
 import { AppError, upstreamStatus } from '../lib/errors.ts';
-import { parseAttrs, tokenize } from '../lib/html.ts';
+import { parseAttrs } from '../lib/html.ts';
 import { linkTarget, toneOf } from '../lib/markdown.ts';
-import { clean, decodeEntities, INLINE } from '../lib/text.ts';
+import { clean, decodeEntities, INLINE, safeHttpUrl } from '../lib/text.ts';
+import { articleStructure } from './reader/structure.ts';
+import { articleDate, articleMetadata, titleKey } from './reader/metadata.ts';
 import type { ArticleBlock, CalloutTone, Fetcher, Span } from '../types.ts';
 
 export interface Extracted {
   title: string;
   siteName?: string;
   byline?: string;
+  publishedAt?: string;
+  updatedAt?: string;
   blocks: ArticleBlock[];
   wordCount: number;
 }
@@ -29,9 +33,9 @@ const LANG = /\b(?:language|lang|highlight)-([\w+#-]{1,30})/;
 const ID = /^[\w\-.:]{1,80}$/;
 
 type Zone = 'article' | 'main' | 'body';
-interface Part { text: string; href?: string; code?: true }
-interface Container { name: string; main: boolean; callout?: { tone: CalloutTone; n: number }; lang?: string; id?: string }
-interface Found extends ArticleBlock { zone: Zone; calloutN?: number; list?: number; shareLink?: boolean }
+interface Part extends Span {}
+interface Container { name: string; main: boolean; callout?: { tone: CalloutTone; n: number }; lang?: string; id?: string; gallery?: number }
+interface Found extends ArticleBlock { zone: Zone; calloutN?: number; list?: number; shareLink?: boolean; gallery?: number }
 
 // Share bars and article toolbars ("Share • Pin • Email", "Comments • Read Later") are lists
 // of short links. An action label, or a link to a share endpoint, marks a list as chrome; network
@@ -67,18 +71,20 @@ function toSpans(parts: Part[]): Span[] {
     const last = spans[spans.length - 1];
     if ((!last || last.text.endsWith(' ')) && text.startsWith(' ')) text = text.slice(1);
     if (!text) continue;
-    if (last && last.href === part.href && last.code === part.code) last.text += text;
-    else spans.push({ text, ...(part.href ? { href: part.href } : {}), ...(part.code ? { code: true as const } : {}) });
+    if (last && !part.breakBefore && last.href === part.href && last.code === part.code && last.strong === part.strong && last.em === part.em) last.text += text;
+    else spans.push({ ...part, text });
   }
   if (spans.length) spans[spans.length - 1]!.text = spans[spans.length - 1]!.text.trimEnd();
   return spans.filter((s) => s.text);
 }
 
 /**
- * Article blocks from a page, in one linear pass. `baseUrl` resolves relative links; without
+ * Article blocks from a page, in bounded linear passes. `baseUrl` resolves relative links; without
  * it only absolute http(s) links and in-page anchors are kept. Docs pages pass larger limits.
  */
-export function extractArticle(html: string, baseUrl?: string, limits: { blocks: number; totalChars: number } = READER_LIMITS): Extracted {
+export function extractArticle(html: string, baseUrl?: string, limits: { blocks: number; totalChars: number } = READER_LIMITS, options: { mode?: 'article' | 'docs' } = {}): Extracted {
+  const docs = options.mode === 'docs';
+  const structure = articleStructure(html.slice(0, READER_LIMITS.inputBytes), docs);
   const meta: Record<string, string> = {};
   let docTitle = '';
   let skip = 0;
@@ -86,15 +92,21 @@ export function extractArticle(html: string, baseUrl?: string, limits: { blocks:
   let main = 0;
   let quote = 0;
   let pre = 0;
-  let code = 0;
+  let code = 0, strong = 0, em = 0;
+  let breakBefore = false;
+  let quoteId = 0;
+  const quotes: string[] = [];
+  let galleryId = 0;
+  let figure: { blocks: Found[]; caption: string; inCaption: number; credit: string; inCredit: number } | null = null;
+  let mediaKind: 'video' | 'audio' | undefined;
   let href: string | undefined;
   let headerlink = false;
   let callouts = 0;
   const labels = new Map<number, string>();
   const stack: Container[] = [];
   const found: Found[] = [];
-  let current: { type: ArticleBlock['type'] | 'label'; zone: Zone; parts: Part[]; level?: number; id?: string; lang?: string; callout?: Container['callout']; list?: number; shareLink?: boolean } | null = null;
-  const lists: number[] = [];   // open <ul>/<ol> ids, innermost last
+  let current: { type: ArticleBlock['type'] | 'label'; zone: Zone; parts: Part[]; level?: number; id?: string; lang?: string; callout?: Container['callout']; list?: number; ordered?: true; listStart?: number; value?: number; quoteId?: string; shareLink?: boolean } | null = null;
+  const lists: { id: number; ordered: boolean; start: number; next: number }[] = [];   // open <ul>/<ol> ids, innermost last
   let listId = 0;
   let table: { depth: number; zone: Zone; rows: string[][]; row: string[] | null; cell: string[] | null; header: boolean } | null = null;
 
@@ -105,6 +117,7 @@ export function extractArticle(html: string, baseUrl?: string, limits: { blocks:
     if (!current) return;
     const c = current;
     current = null;
+    breakBefore = false;
     if (c.type === 'pre') {
       const text = decodeEntities(c.parts.map((p) => p.text).join('')).replace(/^\n+|\s+$/g, '').slice(0, READER_LIMITS.blockChars);
       if (text) found.push({ type: 'pre', text, zone: c.zone, ...(c.lang ? { lang: c.lang } : {}) });
@@ -124,6 +137,12 @@ export function extractArticle(html: string, baseUrl?: string, limits: { blocks:
       return;
     }
     const block: Found = { type: c.type, text, zone: c.zone, ...(c.list !== undefined ? { list: c.list } : {}), ...(c.shareLink ? { shareLink: true } : {}) };
+    if (c.type === 'li') {
+      block.level = Math.min(3, lists.length - 1);
+      block.listId = `html-list-${c.list ?? 0}`;
+      if (c.ordered) { block.ordered = true; if (c.listStart !== undefined) block.listStart = c.listStart; if (c.value !== undefined) block.value = c.value; }
+    }
+    if (c.quoteId) block.quoteId = c.quoteId;
     if (c.type === 'h') {
       block.level = c.level ?? 2;
       if (c.id) block.id = c.id;
@@ -133,7 +152,7 @@ export function extractArticle(html: string, baseUrl?: string, limits: { blocks:
       block.tone = c.callout.tone;
       block.calloutN = c.callout.n;
     }
-    if (text === joined && spans.some((s) => s.href || s.code)) block.spans = spans;
+    if (text === joined && spans.some((s) => s.href || s.code || s.strong || s.em || s.breakBefore)) block.spans = spans;
     found.push(block);
   };
 
@@ -154,7 +173,24 @@ export function extractArticle(html: string, baseUrl?: string, limits: { blocks:
     found.push({ type: 'table', text, zone: t.zone, columns: columns!, rows: body.slice(0, READER_LIMITS.tableRows) });
   };
 
-  for (const tok of tokenize(html.slice(0, READER_LIMITS.inputBytes))) {
+  const integer = (value: string | undefined, fallback: number) => value && /^-?\d{1,6}$/.test(value) ? Number(value) : fallback;
+  const finishFigure = () => {
+    for (const block of figure?.blocks ?? []) {
+      const f = block.figure!;
+      const caption = clean(decodeEntities(figure!.caption), 1200), credit = clean(decodeEntities(figure!.credit), 300);
+      if (caption) f.caption = caption;
+      if (credit) f.credit = credit;
+      block.text = [f.alt, caption, credit].filter(Boolean).join(' — ') || 'Image';
+      block.spans = [{ text: block.text, href: f.url }];
+    }
+    figure = null;
+  };
+  const addMedia = (url: string | undefined, kind: 'video' | 'audio', label: string) => {
+    if (!url) return;
+    flush();
+    found.push({ type: 'p', zone: zone(), text: label, spans: [{ text: label, href: url }], media: { url, kind, label } });
+  };
+  for (const tok of structure.tokens) {
     if (found.length >= limits.blocks * 3) break;
     if (tok.kind === 'raw') {
       if (tok.name === 'title' && !docTitle) docTitle = clean(decodeEntities(tok.text), 300);
@@ -162,8 +198,10 @@ export function extractArticle(html: string, baseUrl?: string, limits: { blocks:
     }
     if (tok.kind === 'text') {
       if (skip > 0 || headerlink) continue;
+      if (figure?.inCaption || figure?.inCredit) { if (figure.inCredit) figure.credit += tok.text; else figure.caption += tok.text; continue; }
       if (table?.cell) table.cell.push(tok.text);
-      else if (current) current.parts.push({ text: tok.text, ...(href ? { href } : {}), ...(code > 0 && !pre ? { code: true as const } : {}) });
+      else if (current) current.parts.push({ text: tok.text, ...(href ? { href } : {}), ...(code > 0 && !pre ? { code: true as const } : {}), ...(strong ? { strong: true as const } : {}), ...(em ? { em: true as const } : {}), ...(breakBefore ? { breakBefore: true as const } : {}) });
+      if (current && tok.text.trim()) breakBefore = false;
       continue;
     }
     const name = tok.name;
@@ -174,7 +212,47 @@ export function extractArticle(html: string, baseUrl?: string, limits: { blocks:
         if (key && a.content && !(key in meta)) meta[key] = clean(decodeEntities(a.content), 300);
         continue;
       }
-      if (SKIP.has(name) && !tok.selfClosing) { skip++; continue; }
+      if (!docs && !skip) {
+        if (name === 'iframe') {
+          const a = parseAttrs(tok.attrs), url = safeHttpUrl(a.src, baseUrl);
+          if (url) {
+            const host = new URL(url).hostname;
+            if (/^(?:www\.)?(?:youtube(?:-nocookie)?\.com|youtu\.be|player\.vimeo\.com)$/.test(host)) addMedia(url, 'video', 'Watch video');
+            else if (/^(?:w\.)?(?:soundcloud\.com|bandcamp\.com)$/.test(host) || host.endsWith('.bandcamp.com')) addMedia(url, 'audio', 'Listen to audio');
+          }
+        }
+        if (name === 'video' || name === 'audio') {
+          mediaKind = name;
+          addMedia(safeHttpUrl(parseAttrs(tok.attrs).src, baseUrl), mediaKind, mediaKind === 'video' ? 'Watch video' : 'Listen to audio');
+        }
+        if (name === 'source' && mediaKind) addMedia(safeHttpUrl(parseAttrs(tok.attrs).src, baseUrl), mediaKind, mediaKind === 'video' ? 'Watch video' : 'Listen to audio');
+        if (name === 'figure') { flush(); if (figure) finishFigure(); figure = { blocks: [], caption: '', inCaption: 0, credit: '', inCredit: 0 }; }
+        if (figure && name === 'figcaption') { figure.inCaption = 1; continue; }
+        if (figure?.inCaption) {
+          if (!tok.selfClosing && !['br', 'img', 'hr'].includes(name)) figure.inCaption++;
+          if (/(?:^|[\s_-])(?:image-credit|photo-credit|credit)(?:$|[\s_-])/i.test(parseAttrs(tok.attrs).class ?? '')) figure.inCredit = figure.inCaption;
+          if (name === 'br') figure.caption += ' ';
+          continue;
+        }
+        if (figure && /(?:^|[\s_-])(?:image-credit|photo-credit|credit)(?:$|[\s_-])/i.test(parseAttrs(tok.attrs).class ?? '')) { figure.inCredit++; continue; }
+        if (name === 'img') {
+          const a = parseAttrs(tok.attrs);
+          const width = integer(a.width, 0), height = integer(a.height, 0);
+          if (width && height && width < 64 && height < 64 || /(?:^|[\s_-])(?:avatar|logo|icon|emoji)(?:$|[\s_-])/i.test(a.class ?? '')) continue;
+          const set = (a['data-srcset'] || a.srcset || '').split(',').slice(0, 32).map((part) => part.trim().split(/\s+/)).filter((part) => /^\d{1,5}w$/.test(part[1] ?? '')).sort((a, b) => parseInt(b[1]!) - parseInt(a[1]!));
+          const candidate = set.find((part) => parseInt(part[1]!) <= 1600) ?? set.at(-1);
+          const url = safeHttpUrl(a['data-src'] || a['data-lazy-src'] || candidate?.[0] || a.src, baseUrl);
+          if (url) {
+            flush();
+            const alt = clean(decodeEntities(a.alt ?? ''), 500);
+            const block: Found = { type: 'p', zone: zone(), text: alt || 'Image', ...(stack.findLast((c) => c.gallery)?.gallery !== undefined ? { gallery: stack.findLast((c) => c.gallery)!.gallery! } : {}), figure: { url, ...(alt ? { alt } : {}), ...(width > 0 && width <= 10_000 ? { width } : {}), ...(height > 0 && height <= 10_000 ? { height } : {}) }, spans: [{ text: alt || 'Image', href: url }] };
+            found.push(block);
+            if (figure) figure.blocks.push(block);
+          }
+          continue;
+        }
+      }
+      if ((SKIP.has(name) && (name !== 'header' || docs)) && !tok.selfClosing) { skip++; continue; }
       if (skip > 0) continue;
       if (table) {
         if (name === 'table') table.depth++;
@@ -197,10 +275,12 @@ export function extractArticle(html: string, baseUrl?: string, limits: { blocks:
         const lang = cls.match(LANG)?.[1];
         if (lang && lang !== 'default') entry.lang = lang;
         if (a.id && ID.test(a.id)) entry.id = a.id;
+        if (/\b(?:gallery|carousel|slideshow)\b/.test(cls)) entry.gallery = ++galleryId;
         stack.push(entry);
         continue;
       }
-      if (name === 'ul' || name === 'ol') { lists.push(listId++); continue; }
+      if (name === 'ul' || name === 'ol') { flush(); const start = integer(parseAttrs(tok.attrs).start, 1); lists.push({ id: listId++, ordered: name === 'ol', start, next: start }); continue; }
+      if (name === 'cite' && quote && !current) current = { type: 'quote', zone: zone(), parts: [], quoteId: quotes.at(-1)! };
       if (name === 'a') {
         const a = parseAttrs(tok.attrs);
         if (current && SHARE_HREF.test(a.href ?? '')) current.shareLink = true;
@@ -208,6 +288,8 @@ export function extractArticle(html: string, baseUrl?: string, limits: { blocks:
         href = a.href ? linkTarget(decodeEntities(a.href), baseUrl) : undefined;
         continue;
       }
+      if (name === 'strong' || name === 'b') { strong++; continue; }
+      if (name === 'em' || name === 'i') { em++; continue; }
       if (CODE.has(name)) {
         code++;
         if (current?.type === 'pre' && !current.lang) {
@@ -216,20 +298,24 @@ export function extractArticle(html: string, baseUrl?: string, limits: { blocks:
         }
         continue;
       }
-      if (name === 'br') { if (current) current.parts.push({ text: pre ? '\n' : ' ' }); continue; }
+      if (name === 'br') { if (current) { current.parts.push({ text: pre ? '\n' : ' ' }); if (!pre) breakBefore = true; } continue; }
+      // Common HTML list items wrap their first paragraph; keep its numbering.
+      if (name === 'p' && current?.type === 'li' && !current.parts.some((p) => p.text.trim())) continue;
       const type = BLOCK[name];
       if (type) {
-        if (name === 'blockquote') quote++;
+        if (name === 'blockquote') { quote++; quotes.push(`html-quote-${++quoteId}`); }
         if (name === 'pre') pre++;
         if (pre > 1) continue; // a <pre> inside a <pre> stays one block
         flush();
-        const a = type === 'h' || type === 'pre' || type === 'p' || name === 'dt' ? parseAttrs(tok.attrs) : {};
+        const a = parseAttrs(tok.attrs);
         // A definition term with an id is an API signature (Sphinx: <dt id="os.path.join">); symbol links point at it.
         const signatureId = name === 'dt' && a.id && ID.test(a.id) ? a.id : undefined;
         const callout = innerCallout();
         const isLabel = callout && type === 'p' && /\badmonition-title\b/.test(a.class ?? '');
         const list = name === 'li' ? lists.at(-1) : undefined;
-        current = { type: isLabel ? 'label' : signatureId ? 'h' : type === 'p' && quote > 0 ? 'quote' : type, zone: zone(), parts: [], ...(callout ? { callout } : {}), ...(list !== undefined ? { list } : {}) };
+        const value = list?.ordered ? integer(a.value, list.next) : undefined;
+        if (list && value !== undefined) list.next = value + 1;
+        current = { type: isLabel ? 'label' : signatureId ? 'h' : type === 'p' && quote > 0 ? 'quote' : type, zone: zone(), parts: [], ...(callout ? { callout } : {}), ...(list !== undefined ? { list: list.id, ...(list.ordered ? { ordered: true as const, listStart: list.start, ...(value !== undefined ? { value } : {}) } : {}) } : {}), ...(quote && quotes.at(-1) ? { quoteId: quotes.at(-1)! } : {}) };
         if (signatureId) { current.level = 4; current.id = signatureId; }
         if (type === 'h') {
           current.level = Number(name[1]);
@@ -247,8 +333,16 @@ export function extractArticle(html: string, baseUrl?: string, limits: { blocks:
       continue;
     }
     // close
-    if (SKIP.has(name)) { if (skip > 0) skip--; continue; }
+    if (SKIP.has(name) && (name !== 'header' || docs)) { if (skip > 0) skip--; continue; }
     if (skip > 0) continue;
+    if (!docs && figure) {
+      if (figure.inCaption) { if (figure.inCredit === figure.inCaption) figure.inCredit = 0; figure.inCaption--; continue; }
+      if (figure.inCredit && (name === 'span' || name === 'div' || name === 'small')) { figure.inCredit = 0; continue; }
+      if (name === 'figure') { finishFigure(); continue; }
+    }
+    if (name === 'video' || name === 'audio') mediaKind = undefined;
+    if (name === 'strong' || name === 'b') { strong = Math.max(0, strong - 1); continue; }
+    if (name === 'em' || name === 'i') { em = Math.max(0, em - 1); continue; }
     if (table) {
       if (name === 'table' && --table.depth === 0) { if (table.row) table.rows.push(table.row); endTable(); }
       else if (table.depth === 1 && (name === 'td' || name === 'th') && table.cell) {
@@ -264,11 +358,11 @@ export function extractArticle(html: string, baseUrl?: string, limits: { blocks:
       if (at !== -1) { flush(); stack.length = at; }
       continue;
     }
-    if (name === 'ul' || name === 'ol') { flush(); lists.pop(); continue; }
+    if (name === 'ul' || name === 'ol') { flush(); lists.pop(); if (lists.length) current = { type: quote ? 'quote' : 'p', zone: zone(), parts: [] }; continue; }
     if (name === 'a') { href = undefined; headerlink = false; continue; }
     if (CODE.has(name)) { if (code > 0) code--; continue; }
     if (BLOCK[name]) {
-      if (name === 'blockquote' && quote > 0) quote--;
+      if (name === 'blockquote' && quote > 0) { quote--; quotes.pop(); }
       if (name === 'pre' && pre > 0) { pre--; if (pre > 0) continue; }
       flush();
       continue;
@@ -277,19 +371,32 @@ export function extractArticle(html: string, baseUrl?: string, limits: { blocks:
   }
   flush();
   if (table) endTable();
+  if (figure) finishFigure();
 
-  const title = meta['og:title'] || docTitle || 'Untitled';
+  const metadata = articleMetadata(meta, docTitle, structure.scripts, structure.authors, structure.dates, baseUrl);
+  const title = metadata.title;
   const preferred: Zone | undefined = found.some((b) => b.zone === 'article') ? 'article' : found.some((b) => b.zone === 'main') ? 'main' : undefined;
   const blocks: ArticleBlock[] = [];
   let chars = 0;
   const chrome = shareLists(found);
   const isChrome = (b: Found | undefined) => b?.list !== undefined && chrome.has(b.list);
+  const seenFigures = new Set<string>(), seenMedia = new Set<string>();
+  const mediaKey = (url: string) => { const u = new URL(url); for (const name of ['w', 'width', 'h', 'height', 'q', 'quality', 'fit', 'format']) u.searchParams.delete(name); return u.href; };
   let lastCallout: { n: number; block: ArticleBlock } | undefined;
-  for (const [i, { zone: z, calloutN, list: _list, shareLink: _share, ...b }] of found.entries()) {
+  for (const [i, { zone: z, calloutN, list: _list, shareLink: _share, gallery, ...b }] of found.entries()) {
     if (preferred && z !== preferred) continue;
     if (isChrome(found[i])) continue;
+    if (b.figure) {
+      const key = `${gallery ?? 'adjacent'}:${mediaKey(b.figure.url)}:${b.figure.caption ?? ''}:${b.figure.credit ?? ''}`;
+      const previous = blocks.at(-1);
+      if (gallery !== undefined && seenFigures.has(key) || gallery === undefined && previous?.figure && mediaKey(previous.figure.url) === mediaKey(b.figure.url) && previous.figure.caption === b.figure.caption) continue;
+      if (gallery !== undefined) seenFigures.add(key);
+    }
+    if (b.media) { const key = b.media.url; if (seenMedia.has(key)) continue; seenMedia.add(key); }
     if (b.type === 'h' && SHARE_HEADING.test(b.text) && isChrome(found[i + 1])) continue;
-    if (b.type === 'h' && b.text === title) continue;
+    if (b.type === 'h' && (docs ? b.text === title : (blocks.length === 0 || b.level === 1 && blocks.length < 3) && titleKey(b.text) === titleKey(title))) continue;
+    if (!docs && blocks.length < 4 && metadata.byline && b.text.replace(/^by\s+/i, '') === metadata.byline) continue;
+    if (!docs && blocks.length < 4 && (articleDate(b.text) === metadata.publishedAt && metadata.publishedAt || articleDate(b.text) === metadata.updatedAt && metadata.updatedAt)) continue;
     if (blocks.length >= limits.blocks || chars + b.text.length > limits.totalChars) break;
     chars += b.text.length;
     // One admonition, one callout: its paragraphs join up, under its title.
@@ -306,12 +413,10 @@ export function extractArticle(html: string, baseUrl?: string, limits: { blocks:
     }
     blocks.push(b);
   }
-  const wordCount = blocks.reduce((n, b) => n + words(b.text), 0);
-  const siteName = meta['og:site_name'], byline = meta.author || meta['article:author'];
+  const wordCount = blocks.reduce((n, b) => n + (b.figure || b.media ? 0 : words(b.text)), 0);
+
   return {
-    title,
-    ...(siteName ? { siteName } : {}),
-    ...(byline ? { byline } : {}),
+    ...metadata,
     blocks,
     wordCount,
   };

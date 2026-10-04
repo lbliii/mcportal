@@ -1,0 +1,98 @@
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import test from 'node:test';
+import { extractArticle, READER_LIMITS } from '../src/adapters/reader.ts';
+const fixture = (name: string) => readFile(new URL(`./fixtures/reader-extraction/${name}.html`, import.meta.url), 'utf8');
+const story = (body: string) => extractArticle(`<article>${body}</article>`, 'https://journal.example/story');
+
+test('reader extraction: selects an encompassing story and excludes component chrome, with editorial preservation controls', async () => {
+  const a = extractArticle(await fixture('editorial'), 'https://journal.example/forest');
+  assert.equal(a.title, "Ada's Forest");
+  assert.equal(a.siteName, 'Field Journal');
+  assert.equal(a.byline, 'Ada Grove, Bo Leaf');
+  assert.equal(a.publishedAt, '2026-10-03T12:00:00.000Z');
+  assert.equal(a.updatedAt, '2026-10-03T14:00:00.000Z');
+  assert.equal(a.blocks.filter((b) => b.type === 'h').length, 2);
+  const text = a.blocks.map((b) => b.text).join('\n');
+  assert.doesNotMatch(text, /UI marker|card headline|Unrelated widget|Ada's Forest/);
+  for (const marker of ['short editorial deck', 'FIRST', 'MIDDLE', 'LAST', 'Correction:', 'Photography by', 'Related measurements', 'Share of the sample']) assert.ok(text.includes(marker), marker);
+  assert.equal(a.blocks.find((b) => b.text.startsWith('LAST'))?.spans?.find((s) => s.href)?.href, 'https://journal.example/reference');
+});
+
+test('reader extraction: composed emphasis, links and inline code retain authored line breaks', () => {
+  const a = story('<p>Intro <strong><em><a href="/dates"><code>New dates</code></a></em></strong><br>October 4<br><b>October 6</b></p>');
+  const spans = a.blocks[0]!.spans!;
+  const marked = spans.find((s) => s.text.includes('New dates'))!;
+  assert.equal(marked.strong, true); assert.equal(marked.em, true); assert.equal(marked.code, true); assert.equal(marked.href, 'https://journal.example/dates');
+  assert.equal(spans.filter((s) => s.breakBefore).length, 2);
+  assert.match(a.blocks[0]!.text, /New dates October 4 October 6/);
+});
+
+test('reader extraction: numbered groups, explicit values, nesting and parent continuation survive', () => {
+  const a = story('<ol start="4"><li>Parent lead<ol start="9"><li>Child one</li><li value="15">Child two</li></ol>Parent tail</li><li>Next parent</li></ol><ol start="2"><li>Separate group</li></ol>');
+  const lis = a.blocks.filter((b) => b.type === 'li');
+  assert.deepEqual(lis.map((b) => [b.text, b.level, b.value, b.listStart]), [['Parent lead', 0, 4, 4], ['Child one', 1, 9, 9], ['Child two', 1, 15, 9], ['Next parent', 0, 5, 4], ['Separate group', 0, 2, 2]]);
+  assert.ok(lis.every((b) => b.ordered));
+  assert.equal(lis[0]!.listId, lis[3]!.listId); assert.notEqual(lis[0]!.listId, lis[4]!.listId);
+  assert.equal(a.blocks[3]!.text, 'Parent tail');
+});
+
+test('reader extraction: coherent quotes preserve attribution and separate adjacent quotations', () => {
+  const a = story('<blockquote><p>First paragraph.</p><p>Second paragraph.</p><cite>— First speaker</cite></blockquote><blockquote><p>Separate quotation.</p></blockquote>');
+  assert.deepEqual(a.blocks.map((b) => b.text), ['First paragraph.', 'Second paragraph.', '— First speaker', 'Separate quotation.']);
+  assert.equal(a.blocks[0]!.quoteId, a.blocks[2]!.quoteId); assert.notEqual(a.blocks[0]!.quoteId, a.blocks[3]!.quoteId);
+});
+
+test('reader extraction: figures attach captions and credit, dedup gallery renditions, preserve distinct/repeated works and safe media fallback', async () => {
+  const a = extractArticle(await fixture('gallery'), 'https://journal.example/gallery');
+  const figures = a.blocks.filter((b) => b.figure);
+  assert.equal(figures.length, 4);
+  assert.equal(figures[0]!.figure!.caption, 'A bright forest.'); assert.equal(figures[0]!.figure!.credit, '© Ada Grove');
+  assert.equal(figures[1]!.figure!.url, 'https://journal.example/second.jpg?w=1400');
+  assert.ok(figures.every((b) => b.spans?.[0]?.href === b.figure!.url && b.text.length > 0));
+  assert.deepEqual(a.blocks.filter((b) => b.media).map((b) => b.media!.kind), ['video', 'audio']);
+  assert.doesNotMatch(JSON.stringify(a), /tracking\.example|javascript:|tracker\.gif/);
+  assert.equal(a.wordCount, 21, 'only editorial text contributes to reading time');
+});
+
+test('reader extraction: metadata graph ignores unrelated articles and invalid/rolled-over dates', () => {
+  const a = extractArticle(`<head><title>Local headline | Journal</title><meta property="og:site_name" content="Journal"><meta name="author" content="https://journal.example/ada"><script type="application/ld+json">{"@graph":[{"@type":"NewsArticle","url":"https://journal.example/other","headline":"Other","author":{"name":"Wrong Author"},"datePublished":"2026-02-31"},{"@type":"NewsArticle","url":"https://journal.example/local","headline":"Local headline","author":{"name":"Right Author"},"datePublished":"2026-02-28","dateModified":"2"}]}</script></head><article><h1>Local headline</h1><p>Leading prose.</p><h2>Local headline</h2><p>Deeper prose.</p></article>`, 'https://journal.example/local');
+  assert.equal(a.title, 'Local headline'); assert.equal(a.byline, 'Right Author'); assert.equal(a.publishedAt, '2026-02-28T00:00:00.000Z'); assert.equal(a.updatedAt, undefined);
+  assert.equal(a.blocks.filter((b) => b.type === 'h').length, 1, 'a deeper repeated heading remains editorial');
+  assert.equal(story('<p>A small uncredited story.</p>').byline, undefined);
+});
+
+test('reader extraction: recognized markup authors can populate a header without biography substitution', () => {
+  const a = story('<header><p class="byline">By <span>Ada Grove</span></p><time itemprop="datePublished" datetime="2026-10-03">October 3, 2026</time></header><p>Lead.</p><div class="author-profile"><p>Ada writes many stories and enjoys trees.</p></div>');
+  assert.equal(a.byline, 'Ada Grove'); assert.equal(a.publishedAt, '2026-10-03T00:00:00.000Z'); assert.deepEqual(a.blocks.map((b) => b.text), ['Lead.']);
+});
+
+test('reader extraction: docs mode preserves generic component classes and technical structure', () => {
+  const a = extractArticle('<main><h1>Reference</h1><section class="newsletter"><h2>Related subscriptions</h2><p>A documented newsletter endpoint.</p></section><div class="admonition warning"><p class="admonition-title">Careful</p><p>Warning text.</p></div><pre><code class="language-js">const x = 1;\nreturn x;</code></pre><table><tr><th>Key</th><th>Value</th></tr><tr><td>x</td><td>1</td></tr></table></main>', 'https://docs.example/reference', READER_LIMITS, { mode: 'docs' });
+  assert.ok(a.blocks.some((b) => b.text.includes('documented newsletter')));
+  assert.equal(a.blocks.find((b) => b.type === 'callout')?.label, 'Careful'); assert.equal(a.blocks.find((b) => b.type === 'pre')?.lang, 'js'); assert.deepEqual(a.blocks.find((b) => b.type === 'table')?.columns, ['Key', 'Value']);
+});
+
+test('reader extraction: malformed/deep inputs and custom content limits stay bounded', () => {
+  const start = performance.now();
+  for (const html of ['<article>' + '<div>'.repeat(150_000) + '<p>Deep text</p>', '<article><p>one<p>two<p>three', '<article>' + '<p>x</p>'.repeat(50_000)]) {
+    const a = extractArticle(html, undefined, { blocks: 5, totalChars: 20 });
+    assert.ok(a.blocks.length <= 5); assert.ok(a.blocks.reduce((n, b) => n + b.text.length, 0) <= 20);
+  }
+  assert.ok(performance.now() - start < 1500);
+  assert.deepEqual(story('<p>one<p>two<p>three').blocks.map((b) => b.text), ['one', 'two', 'three']);
+});
+
+test('reader extraction: ambiguous component names retain substantial editorial prose while actionable widgets are excluded', () => {
+  const prose = 'This section examines subscription funding models used by small publications. Readers may support a publication for many different reasons, and our interviews discuss how these choices shape the articles they encounter and the communities around them.';
+  const a = story(`<section id="subscription"><h2>Subscription models</h2><p>${prose}</p></section><section class="related-content"><h2>Related content</h2><p>${prose}</p></section><div class="newsletter"><p>Sign up for our newsletter and enter your email to get the latest news.</p><button>Subscribe</button></div>`);
+  assert.equal(a.blocks.filter((b) => b.text === prose).length, 2);
+  assert.doesNotMatch(a.blocks.map((b) => b.text).join('\n'), /Sign up|enter your email/);
+});
+
+test('reader extraction: every distinct image in a multi-image figure keeps its shared caption and credit', () => {
+  const a = story('<p>Compare the works.</p><figure><img src="/left.jpg" alt="Left"><img src="/right.jpg" alt="Right"><figcaption><p>Two complementary works.</p><span class="credit">Photo: Ada</span></figcaption></figure><ol start="3"><li><p>A wrapped item.</p><p>Its continuation.</p></li></ol>');
+  assert.deepEqual(a.blocks.filter((b) => b.figure).map((b) => [b.figure!.alt, b.figure!.caption, b.figure!.credit]), [['Left', 'Two complementary works.', 'Photo: Ada'], ['Right', 'Two complementary works.', 'Photo: Ada']]);
+  assert.equal(a.blocks.find((b) => b.type === 'li')?.value, 3);
+  assert.ok(a.blocks.some((b) => b.text === 'Its continuation.'));
+});
