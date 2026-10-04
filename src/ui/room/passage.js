@@ -109,7 +109,7 @@
    * @param {HTMLElement} reader
    */
   function readerVisibleTop(reader) {
-    return Math.max(0, reader.getBoundingClientRect().top, $first('.reader-top', reader)?.getBoundingClientRect().bottom || 0);
+    return Math.max(0, reader.getBoundingClientRect().top);
   }
 
   function hidePassageBar() {

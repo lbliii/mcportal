@@ -47,7 +47,7 @@
     $('grid').hidden = true;
     const reader = $('reader');
     reader.hidden = false; reader.scrollTop = 0;
-    reader.replaceChildren(...clipNodes(clip, false));
+    renderReader(...clipNodes(clip, false));
     setStatus('');
   }
 
@@ -60,7 +60,7 @@
       setStatus('');
       $('grid').hidden = true;
       $('reader').hidden = false;
-      $('reader').replaceChildren(el('div', { class: 'error' }, `That clip has vanished into another dimension (${errorText(error)}).`));
+      renderReader(el('div', { class: 'error' }, `That clip has vanished into another dimension (${errorText(error)}).`));
     }
   }
 
@@ -69,11 +69,11 @@
     const reader = $('reader');
     rememberRoomNavigation();
     $('grid').hidden = true; reader.hidden = false; reader.scrollTop = 0; window.scrollTo(0, 0);
-    reader.replaceChildren(el('div', { class: 'reader-top' }, iconButton('back', 'Back to your room', closeReader, 'ib')), el('h1', null, item.title), el('div', { class: 'byline' }, 'Stand by…'));
+    renderReader(el('div', { class: 'reader-top' }, iconButton('back', 'Back to your room', closeReader, 'ib')), el('h1', null, item.title), el('div', { class: 'byline' }, 'Stand by…'));
     try {
       // Only clip items come here (openItem checks item.clip).
       const clip = (await callTool('get_clip', { id: /** @type {NonNullable<Item['clip']>} */ (item.clip).id })).structuredContent.clip;
-      reader.replaceChildren(...clipNodes(clip, true));
+      renderReader(...clipNodes(clip, true));
       if (!DEV) {
         hostRequest('ui/update-model-context', {
           content: [{ type: 'text', text: `The user opened their clip ${clip.id} (${clip.kind}) in MCPortal. Use get_clip with that id if they ask about it.` }],
@@ -81,7 +81,7 @@
         }, 5000).catch(() => {});
       }
     } catch (error) {
-      reader.replaceChildren(el('div', { class: 'reader-top' }, iconButton('back', 'Back to your room', closeReader, 'ib')), el('h1', null, item.title),
+      renderReader(el('div', { class: 'reader-top' }, iconButton('back', 'Back to your room', closeReader, 'ib')), el('h1', null, item.title),
         el('div', { class: 'error' }, `That clip has vanished into another dimension (${errorText(error)}).`));
     }
   }
@@ -122,7 +122,7 @@
     const reader = $('reader');
     rememberRoomNavigation();
     $('grid').hidden = true; reader.hidden = false; reader.scrollTop = 0; window.scrollTo(0, 0);
-    reader.replaceChildren(...present([el('div', { class: 'reader-top' }, iconButton('back', 'Back to your room', closeReader, 'ib')),
+    renderReader(...present([el('div', { class: 'reader-top' }, iconButton('back', 'Back to your room', closeReader, 'ib')),
       el('h1', null, item.title), el('div', { class: 'byline' }, [item.url, quote ? `reblogging @${quote.by}` : ''].filter(Boolean).join(' · ')),
       quote && quote.note ? el('p', { class: 'story-note' }, el('span', { class: 'story-note-by' }, `@${quote.by}`), quote.note) : null,
       composer(target, item.title, { verb, onDone })]));
@@ -205,7 +205,7 @@
     reader.style.setProperty('--mp-space-accent', ACCENT[/** @type {keyof typeof ACCENT} */ (space.accent)] || 'var(--mp-action-primary)');
     reader.classList.add('space');
     $('grid').hidden = true; reader.hidden = false;
-    reader.replaceChildren(...spaceNodes(space, withBack, back));
+    renderReader(...spaceNodes(space, withBack, back));
     setStatus('');
   }
 
@@ -301,7 +301,7 @@
     $('grid').hidden = true;
     const reader = $('reader');
     reader.hidden = false; reader.scrollTop = 0;
-    reader.replaceChildren(...shareNodes(share, false, rebloggers));
+    renderReader(...shareNodes(share, false, rebloggers));
     setStatus('');
   }
 
@@ -316,7 +316,7 @@
       setStatus('');
       $('grid').hidden = true;
       $('reader').hidden = false;
-      $('reader').replaceChildren(el('div', { class: 'error' }, `That share has vanished into another dimension (${errorText(error)}).`));
+      renderReader(el('div', { class: 'error' }, `That share has vanished into another dimension (${errorText(error)}).`));
     }
   }
 
@@ -327,16 +327,16 @@
     reader.classList.remove('space');
     rememberRoomNavigation();
     $('grid').hidden = true; reader.hidden = false; reader.scrollTop = 0; window.scrollTo(0, 0);
-    reader.replaceChildren(el('div', { class: 'reader-top' }, iconButton('back', 'Back', back ? () => back(scroll) : closeReader, 'ib')), el('h1', null, item.title), el('div', { class: 'byline' }, 'Stand by…'));
+    renderReader(el('div', { class: 'reader-top' }, iconButton('back', 'Back', back ? () => back(scroll) : closeReader, 'ib')), el('h1', null, item.title), el('div', { class: 'byline' }, 'Stand by…'));
     try {
       // Only shares come here: openItem checks item.share, and space posts always carry one.
       const { share, rebloggers, labs } = (await callTool('get_share', { id: /** @type {NonNullable<ShareRef['share']>} */ (item.share).id })).structuredContent;
       if (labs) state.labs = labs;
       const nodes = shareNodes(share, true, rebloggers);
       if (back) nodes[0].replaceChildren(iconButton('back', 'Back to the space', () => back(scroll), 'ib'), ...[...nodes[0].children].slice(1));
-      reader.replaceChildren(...nodes);
+      renderReader(...nodes);
     } catch (error) {
-      reader.replaceChildren(el('div', { class: 'reader-top' }, iconButton('back', 'Back to your room', closeReader, 'ib')), el('h1', null, item.title),
+      renderReader(el('div', { class: 'reader-top' }, iconButton('back', 'Back to your room', closeReader, 'ib')), el('h1', null, item.title),
         el('div', { class: 'error' }, `That share has vanished into another dimension (${errorText(error)}).`));
     }
   }

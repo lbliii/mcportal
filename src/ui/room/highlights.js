@@ -13,7 +13,7 @@
     $('grid').hidden = true;
     const reader = $('reader');
     reader.hidden = false; reader.scrollTop = 0;
-    reader.replaceChildren(readerTop('', false), el('h1', null, h.title),
+    renderReader(readerTop('', false), el('h1', null, h.title),
       el('div', { class: 'byline' }, h.intro ?? ''),
       el('ul', { class: 'highlights' }, h.picks.map(highlightNode)));
     setStatus('');

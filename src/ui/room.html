@@ -49,7 +49,10 @@
 </main>
 <section id="welcome" class="welcome" hidden></section>
 <input type="file" id="opmlFile" accept=".opml,.xml,text/xml,application/xml,text/x-opml" hidden>
-<article id="reader" class="reader" hidden></article>
+<section class="reader-shell" aria-label="Reader">
+  <div id="readerControls"></div>
+  <article id="reader" class="reader" hidden></article>
+</section>
 <div class="toast" id="toast" role="status"></div>
 
 <script>

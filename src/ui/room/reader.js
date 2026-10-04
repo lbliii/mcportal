@@ -32,10 +32,31 @@
     }
   }
 
-  // The room bar can wrap in a narrow host. Keep fullscreen actions below its
-  // actual height instead of guessing a fixed offset.
-  const readerBar = $first('.bar');
-  if (readerBar) new ResizeObserver(() => root.style.setProperty('--mp-reader-bar-height', `${readerBar.getBoundingClientRect().height}px`)).observe(readerBar);
+  // Controls belong to the full-width shell, outside the scrolling article. Keep
+  // #reader as the content viewport so history, selections and social views share
+  // the same scroll owner in inline cards, preview and expanded host frames.
+  /** @param {...(Node | string)} nodes */
+  function renderReader(...nodes) {
+    const top = nodes.find((node) => node instanceof HTMLElement && node.classList.contains('reader-top'));
+    setReaderControls(top instanceof HTMLElement ? top : null);
+    $('reader').replaceChildren(...nodes.filter((node) => node !== top));
+  }
+
+  /** @param {HTMLElement | null} top */
+  function setReaderControls(top) {
+    if (top) {
+      top.setAttribute('role', 'group');
+      top.setAttribute('aria-label', 'Reader controls');
+    }
+    $('readerControls').replaceChildren(...(top ? [top] : []));
+  }
+
+  // The universal row can wrap: source navigation sticks below its measured edge.
+  const roomBar = $first('.bar');
+  if (roomBar) new ResizeObserver(() => { root.style.setProperty('--mp-bar-height', `${roomBar.getBoundingClientRect().height}px`); }).observe(roomBar);
+
+  // Docs sidebars fit the actual content viewport, even when either toolbar wraps.
+  new ResizeObserver(([entry]) => { root.style.setProperty('--mp-reader-height', `${entry.contentRect.height}px`); }).observe($('reader'));
 
   // Reader blocks (articles, docs pages, note clips) as DOM. Everything is built as text;
   // links are only http(s), opened through the host, or #anchors within the same view.
@@ -212,7 +233,7 @@
     $('grid').hidden = true;
     const reader = $('reader');
     reader.hidden = false; reader.scrollTop = 0;
-    reader.replaceChildren(...articleNodes(a, null, false));
+    renderReader(...articleNodes(a, null, false));
     setStatus('');
     const body = $first('[data-passage-url]', reader);
     trackReading(a.url, a.title, reader, !(body && applyHandoff(body)));
@@ -228,7 +249,7 @@
       setStatus('');
       $('grid').hidden = true;
       $('reader').hidden = false;
-      $('reader').replaceChildren(readerTop(url, false), el('div', { class: 'error' }, `Reader view isn't available for this page (${errorText(error)}).`));
+      renderReader(readerTop(url, false), el('div', { class: 'error' }, `Reader view isn't available for this page (${errorText(error)}).`));
     }
   }
 
@@ -241,14 +262,14 @@
     // The story grows into the reader's title (where the browser can animate it).
     await transition(() => {
       $('grid').hidden = true; reader.hidden = false; reader.scrollTop = 0; window.scrollTo(0, 0);
-      reader.replaceChildren(readerTop(item.url, true), el('h1', null, item.title), el('div', { class: 'byline' }, 'Unrolling the scroll…'));
+      renderReader(readerTop(item.url, true), el('h1', null, item.title), el('div', { class: 'byline' }, 'Unrolling the scroll…'));
     }, takeZoomSource(), () => $first('h1', reader));
     if (generation !== readerGeneration) return;
     try {
       const result = await callTool('read_article', { url: item.url });
       if (generation !== readerGeneration) return;
       const a = result.structuredContent.article;
-      reader.replaceChildren(...articleNodes(a, portal.title, true));
+      renderReader(...articleNodes(a, portal.title, true));
       trackReading(a.url, a.title, reader);
       if (!DEV) {
         const safeTitle = String(a.title).replace(/[\u0000-\u001f\u007f\u2028\u2029"]/g, ' ').slice(0, 160);
@@ -259,7 +280,7 @@
       }
     } catch (error) {
       if (generation !== readerGeneration) return;
-      reader.replaceChildren(readerTop(item.url, true), el('h1', null, item.title),
+      renderReader(readerTop(item.url, true), el('h1', null, item.title),
         el('div', { class: 'error' }, `Reader view isn't available for this page (${errorText(error)}).`),
         el('button', { class: 'btn', onclick: () => openLink(item.url) }, 'Open the original'));
     }
