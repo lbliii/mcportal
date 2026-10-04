@@ -145,3 +145,11 @@ test('reader extraction: entity-encoded structured authors decode once into boun
   const a = extractArticle('<title>Credits</title><script type="application/ld+json">{"@type":"Article","headline":"Credits","author":[{"name":"Jos&eacute; &amp; Co"},{"name":"https://authors.example/person"}]}</script><article><p>Story.</p></article>', 'https://journal.example/credits');
   assert.equal(a.byline, 'José & Co');
 });
+
+test('reader extraction: localized peripheral panels respect explicit bodies, sibling corrections, credits, ratings and source links', () => {
+  const a = story('<p>Short deck.</p><section class="article-body"><h2>Most Popular</h2><p>Editorial comparison of popular techniques.</p><h2>About the Author</h2><p>The historical author is the subject of this section.</p><p>Story ending.</p></section><section><h3>About the Author</h3><p>A staff biography belongs to the publisher panel.</p></section><section><h2>Most Popular</h2><a href="/popular"><img src="/popular.jpg"><h3>A popular recommendation.</h3></a></section><div class="post-bottom"><div><p>Sign up for our free newsletter.</p></div><a href="/next"><img src="/next.jpg"><h3>Recommended next story.</h3></a><p class="correction">Correction: the estimate is six.</p><p>Rating: four stars.</p><p>Image credit: Ada.</p><p>Further information: <a href="/source">original measurements</a>.</p></div><div class="player-wrapper"><img src="/album.jpg" alt="Editorial album cover"><div class="merchrow"><img src="/shirt.jpg" alt="Merchandise"></div></div><div class="author-mini-bio"><img src="/portrait.jpg"></div><div class="topic-card"><a href="/topic"><img src="/topic.jpg">A different topic</a></div>');
+  const text = a.blocks.map((b) => b.text).join('\n');
+  for (const phrase of ['Short deck.', 'Editorial comparison', 'historical author', 'Story ending.', 'Correction:', 'Rating:', 'Image credit:', 'original measurements', 'Editorial album cover']) assert.ok(text.includes(phrase), phrase);
+  assert.doesNotMatch(text, /staff biography|popular recommendation|Sign up|Recommended next story|Merchandise|different topic/);
+  assert.doesNotMatch(JSON.stringify(a), /popular\.jpg|next\.jpg|shirt\.jpg|portrait\.jpg|topic\.jpg/);
+});
