@@ -74,7 +74,9 @@ async function fetchImage(url: string, deps: SourceDeps): Promise<string | null 
     const res = await deps.fetcher(url, { binary: true, maxBytes: MAX_THUMB_BYTES, timeoutMs: 6000, headers: { accept: 'image/webp,image/jpeg,image/png,image/gif' } });
     if (res.status >= 500 || res.status === 429) return 'retry';
     if (res.status < 200 || res.status >= 300) return null;
+    if (res.truncated) return 'too-big';
     const bytes = Buffer.from(res.text, 'base64');
+    if (bytes.length > MAX_THUMB_BYTES) return 'too-big';
     const type = Object.keys(IMAGE_TYPES).find((t) => IMAGE_TYPES[t]!(bytes));
     return type ? `data:${type};base64,${res.text}` : null;
   } catch (error) {
