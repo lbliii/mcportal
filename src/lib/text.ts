@@ -1,18 +1,13 @@
 import { tokenize } from './html.ts';
-
-const NAMED: Record<string, string> = {
-  amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ',
-  mdash: '—', ndash: '–', hellip: '…', rsquo: '’', lsquo: '‘', rdquo: '”', ldquo: '“',
-  copy: '©', reg: '®', trade: '™', middot: '·', bull: '•',
-};
+import { HTML_ENTITIES } from './html-entities.ts';
 
 export function decodeEntities(input: string): string {
-  return input.replace(/&(#x[0-9a-f]{1,6}|#\d{1,7}|[a-z]{2,8});/gi, (match, code: string) => {
+  return input.replace(/&(#x[0-9a-f]{1,6}|#\d{1,7}|[a-z][a-z0-9]{0,31});/gi, (match, code: string) => {
     if (code[0] === '#') {
       const n = code[1] === 'x' || code[1] === 'X' ? parseInt(code.slice(2), 16) : parseInt(code.slice(1), 10);
-      return Number.isFinite(n) && n > 0 && n < 0x110000 ? String.fromCodePoint(n) : match;
+      return Number.isFinite(n) && n > 0 && n < 0x110000 && !(n >= 0xd800 && n <= 0xdfff) ? String.fromCodePoint(n) : match;
     }
-    return NAMED[code.toLowerCase()] ?? match;
+    return Object.hasOwn(HTML_ENTITIES, code) ? HTML_ENTITIES[code]! : match;
   });
 }
 
