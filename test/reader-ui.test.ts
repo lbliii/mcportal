@@ -5,7 +5,7 @@ import { after, before, test } from 'node:test';
 import type { Handoff } from '../src/handoffs.ts';
 import type { ReadingState } from '../src/reading.ts';
 import { findChrome, Page } from './browser.ts';
-import { article } from './fixtures/reader-ui/article.ts';
+import { article, continuationArticle, mediaListArticle } from './fixtures/reader-ui/article.ts';
 import { startApp, type Running } from './helpers.ts';
 
 const chrome = findChrome();
@@ -143,5 +143,40 @@ test('reader UI: short articles suppress the outline and invalid dates do not en
   assert.equal(await page.eval(`document.querySelectorAll('.article-meta time').length`), 0);
   assert.equal(await page.eval(`document.querySelector('.reader-outline')`), null);
   assert.equal(await page.eval(`document.querySelector('.body h2').dataset.anchor`), 'section-preparation');
+  assert.deepEqual(page.problems, []);
+});
+
+test('reader UI: multi-paragraph list items and nested parent tails retain order, grouping and passage identity', { skip }, async () => {
+  await open({ article: continuationArticle });
+  assert.equal(await page.eval(`document.querySelectorAll('.body > ol').length`), 2, 'a parent continuation does not split the numbered group');
+  assert.equal(await page.eval(`document.querySelectorAll('.body > ol:first-of-type > li').length`), 2, 'continuation paragraphs do not add numbered items');
+  assert.equal(await page.eval(`document.querySelectorAll('.body > ul').length`), 0, 'the child list stays inside its parent item');
+  assert.deepEqual(await page.eval(`Array.from(document.querySelector('.body > ol > li').children).map(n => n.dataset.readerBlock || n.tagName)`), ['1', '2', 'UL', '5'], 'parent tail follows its nested list inside the same item');
+  assert.deepEqual(await page.eval(`Array.from(document.querySelector('.body > ol > li > ul > li').children).map(n => n.dataset.readerBlock)`), ['3', '4']);
+  assert.deepEqual(await page.eval(`Array.from(document.querySelector('.body > ol > li:nth-child(2)').children).map(n => n.dataset.readerBlock)`), ['6', '7']);
+  assert.deepEqual(await page.eval(`Array.from(document.querySelectorAll('.body [data-reader-block]')).map(n => Number(n.dataset.readerBlock))`), continuationArticle.blocks.map((_, i) => i), 'logical traversal retains source order through semantic groups');
+  assert.equal(await page.eval(`document.querySelector('[data-reader-block="10"]').parentElement.className`), 'body', 'unmatched metadata cannot attach prose to an unrelated item');
+  await page.eval(`(() => { const n = document.querySelector('[data-reader-block="4"]'); const range = document.createRange(); range.selectNodeContents(n); const s = getSelection(); s.removeAllRanges(); s.addRange(range); })()`);
+  await page.waitFor(`document.querySelector('.passage-bar')`, 'the nested continuation selection actions');
+  await page.click('.passage-bar button:nth-child(3)');
+  const call = await page.waitFor<{ args: { anchor: { block: number; heading: string }; passage: string } }>(`window.__calls.find(c => c.name === 'create_handoff')`, 'nested continuation handoff');
+  assert.equal(call.args.anchor.block, 4); assert.equal(call.args.anchor.heading, 'continuations');
+  assert.equal(call.args.passage, continuationArticle.blocks[4]!.text);
+  assert.deepEqual(page.problems, []);
+});
+
+test('reader UI: media-first items retain list identity without placeholders or merging sibling values', { skip }, async () => {
+  await open({ article: mediaListArticle });
+  assert.equal(await page.eval(`document.querySelectorAll('.body > ol').length`), 1);
+  assert.equal(await page.eval(`document.querySelectorAll('.body > ol > li').length`), 3);
+  assert.deepEqual(await page.eval(`Array.from(document.querySelectorAll('.body > ol > li')).map(n => n.value)`), [3, 3, 4], 'distinct identities preserve intentional repeated numbering');
+  assert.deepEqual(await page.eval(`Array.from(document.querySelector('.body > ol > li').children).map(n => [n.tagName, n.dataset.readerBlock])`), [['FIGURE', '1'], ['P', '2']], 'first image and resumed text share one item with no empty placeholder');
+  assert.deepEqual(await page.eval(`Array.from(document.querySelector('.body > ol > li:nth-child(2)').children).map(n => n.dataset.readerBlock)`), ['3', '4']);
+  assert.deepEqual(await page.eval(`Array.from(document.querySelector('.body > ol > li:nth-child(3)').children).map(n => n.dataset.readerBlock)`), ['5', '6']);
+  assert.equal(await page.eval(`document.querySelectorAll('.body > ul > li').length`), 4, 'unordered media-first siblings remain separate items');
+  assert.deepEqual(await page.eval(`Array.from(document.querySelector('.body > ul > li:nth-child(2)').children).map(n => n.dataset.readerBlock)`), ['9', '10']);
+  assert.deepEqual(await page.eval(`Array.from(document.querySelector('.body > ul > li:nth-child(3)').children).map(n => n.dataset.readerBlock)`), ['11'], 'a figure-only item still has its semantic list marker');
+  assert.deepEqual(await page.eval(`Array.from(document.querySelectorAll('.body [data-reader-block]')).map(n => Number(n.dataset.readerBlock))`), mediaListArticle.blocks.map((_, i) => i), 'every actual source block keeps its order and identity');
+  assert.equal(await page.eval(`document.querySelector('[data-reader-block="14"]').parentElement.className`), 'body');
   assert.deepEqual(page.problems, []);
 });

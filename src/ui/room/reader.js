@@ -75,15 +75,46 @@
     let body = null;
     const scope = () => /** @type {HTMLElement} */ (body);   // links are clicked only after body is built below
     body = el('div', { class: 'body' });
-    /** @type {Array<{ node: HTMLOListElement | HTMLUListElement, last: HTMLLIElement | null, id: string | undefined, ordered: boolean }>} */
+    /** @type {Array<{ node: HTMLOListElement | HTMLUListElement, last: HTMLLIElement | null, id: string | undefined, itemId: string | undefined, ordered: boolean }>} */
     const lists = [];
+    /** Get the authored list's semantic container; malformed depth jumps clamp to a real parent.
+     * @param {ArticleBlock} b
+     */
+    const listGroup = (b) => {
+      const depth = Math.min(3, Math.max(0, b.level || 0), lists.length);
+      lists.length = Math.min(lists.length, depth + 1);
+      let group = lists[depth];
+      if (!group || group.ordered !== !!b.ordered || group.id !== b.listId) {
+        const list = b.ordered ? el('ol', { start: Number.isInteger(b.listStart) ? b.listStart : null }) : el('ul');
+        const parent = depth > 0 ? lists[depth - 1]?.last : body;
+        (parent || body).append(list);
+        group = { node: list, last: null, id: b.listId, itemId: undefined, ordered: !!b.ordered };
+        lists[depth] = group;
+      }
+      return group;
+    };
+    /** @param {ArticleBlock} b */
+    const listItem = (b) => {
+      const group = listGroup(b);
+      const item = el('li', { value: b.ordered && Number.isInteger(b.value) ? b.value : null });
+      group.node.append(item); group.last = item; group.itemId = b.listItemId;
+      return item;
+    };
     /** @type {HTMLElement | null} */
     let quote = null;
     let quoteId = '';
     const anchors = new Set();
     blocks.forEach((b, i) => {
       const attrs = { 'data-reader-block': String(i) };
-      if (b.type !== 'li') lists.length = 0;
+      const continuationDepth = Math.min(3, Math.max(0, b.level || 0));
+      const continuationGroup = b.type === 'p' && b.listId ? lists[continuationDepth] : null;
+      let continuation = continuationGroup && continuationGroup.id === b.listId && (!b.listItemId || continuationGroup.itemId === b.listItemId) ? continuationGroup.last : null;
+      // An authored item can start with a figure or another paragraph. Its explicit
+      // identity lets us create the li without an empty logical placeholder, and
+      // distinguish sibling items even when their ordered values are identical.
+      if (!continuation && b.type === 'p' && typeof b.listId === 'string' && b.listId && typeof b.listItemId === 'string' && b.listItemId && Number.isInteger(b.level) && (b.level || 0) >= 0 && (b.level || 0) <= 3) continuation = listItem(b);
+      if (continuation) lists.length = lists.findIndex((group) => group?.last === continuation) + 1;
+      else if (b.type !== 'li') lists.length = 0;
       if (b.type !== 'quote' || !b.quoteId || b.quoteId !== quoteId) quote = null;
       /** @type {HTMLElement} */
       let node;
@@ -105,20 +136,8 @@
           break;
         }
         case 'li': {
-          // A jump in malformed input is clamped to a real parent item, so lists never
-          // contain lists directly. Old blocks without ids still form consecutive lists.
-          const depth = Math.min(3, Math.max(0, b.level || 0), lists.length);
-          lists.length = Math.min(lists.length, depth + 1);
-          let group = lists[depth];
-          if (!group || group.ordered !== !!b.ordered || group.id !== b.listId) {
-            const list = b.ordered ? el('ol', { start: Number.isInteger(b.listStart) ? b.listStart : null }) : el('ul');
-            const parent = depth > 0 ? lists[depth - 1]?.last : body;
-            (parent || body).append(list);
-            group = { node: list, last: null, id: b.listId, ordered: !!b.ordered };
-            lists[depth] = group;
-          }
-          const item = el('li', { value: b.ordered && Number.isInteger(b.value) ? b.value : null }, el('div', attrs, spanNodes(b, scope, onLink)));
-          group.node.append(item); group.last = item;
+          const item = listItem(b);
+          item.append(el('div', attrs, spanNodes(b, scope, onLink)));
           return;
         }
         case 'quote': {
@@ -153,7 +172,7 @@
           }
         }
       }
-      body.append(node);
+      (continuation || body).append(node);
     });
     return body;
   }

@@ -27,3 +27,37 @@ export const article: Article = {
     { type: 'p', text: 'Closing paragraph preserved in full.' },
   ],
 };
+
+/** List-item paragraphs and parent tails retain their containing item identity. */
+export const continuationArticle: Article = { ...article, wordCount: 120, blocks: [
+  { type: 'h', text: 'Continuation notes', id: 'continuations', level: 2 },
+  { type: 'li', text: 'Parent lead.', ordered: true, listId: 'outer', listStart: 3, value: 3 },
+  { type: 'p', text: 'Second paragraph in the parent item.', level: 0, ordered: true, listId: 'outer', listStart: 3, value: 3 },
+  { type: 'li', text: 'Nested lead.', level: 1, listId: 'inner' },
+  { type: 'p', text: 'Nested second paragraph selected for discussion.', level: 1, listId: 'inner' },
+  { type: 'p', text: 'Parent tail after the nested list.', level: 0, ordered: true, listId: 'outer', listStart: 3, value: 3 },
+  { type: 'li', text: 'Next numbered parent.', ordered: true, listId: 'outer', listStart: 3, value: 4 },
+  { type: 'p', text: 'Paragraph in the next numbered parent.', level: 0, ordered: true, listId: 'outer', listStart: 3, value: 4 },
+  { type: 'p', text: 'An ordinary paragraph outside the list.' },
+  { type: 'li', text: 'A fresh numbered group.', ordered: true, listId: 'fresh', listStart: 2, value: 2 },
+  { type: 'p', text: 'Unmatched continuation metadata remains visible as prose.', level: 0, listId: 'unmatched' },
+] };
+
+/** Explicit item identity separates media-first siblings, including repeated numbering. */
+export const mediaListArticle: Article = { ...article, wordCount: 100, blocks: [
+  { type: 'h', text: 'Media in lists', id: 'media-lists', level: 2 },
+  { type: 'p', text: 'First item image', listId: 'ordered', listItemId: 'o1', level: 0, ordered: true, listStart: 3, value: 3, figure: { url: 'https://images.example.com/first.png', alt: 'First item image' } },
+  { type: 'p', text: 'First item tail.', listId: 'ordered', listItemId: 'o1', level: 0, ordered: true, value: 3 },
+  { type: 'p', text: 'Video in another item', listId: 'ordered', listItemId: 'o2', level: 0, ordered: true, listStart: 3, value: 3, media: { url: 'https://example.com/video', kind: 'video', label: 'Video in another item' } },
+  { type: 'p', text: 'Second item tail.', listId: 'ordered', listItemId: 'o2', level: 0, ordered: true, value: 3 },
+  { type: 'li', text: 'Third numbered item.', listId: 'ordered', listItemId: 'o3', ordered: true, listStart: 3, value: 4 },
+  { type: 'p', text: 'Image following text', listId: 'ordered', listItemId: 'o3', level: 0, ordered: true, value: 4, figure: { url: 'https://images.example.com/third.png' } },
+  { type: 'p', text: 'Ordinary prose between lists.' },
+  { type: 'li', text: 'First unordered item.', listId: 'unordered', listItemId: 'u1' },
+  { type: 'p', text: 'Second unordered item image', listId: 'unordered', listItemId: 'u2', level: 0, figure: { url: 'https://images.example.com/second.png' } },
+  { type: 'p', text: 'Second unordered item tail.', listId: 'unordered', listItemId: 'u2', level: 0 },
+  { type: 'p', text: 'A figure-only unordered item', listId: 'unordered', listItemId: 'u3', level: 0, figure: { url: 'https://images.example.com/only.png' } },
+  { type: 'li', text: 'Fourth unordered item.', listId: 'unordered', listItemId: 'u4' },
+  { type: 'p', text: 'Fourth item tail.', listId: 'unordered', listItemId: 'u4', level: 0 },
+  { type: 'p', text: 'Ordinary prose after all lists.' },
+] };
