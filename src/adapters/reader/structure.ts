@@ -72,7 +72,7 @@ export function articleStructure(html: string, docs: boolean): Structure {
   // prose component. Parent wrappers cannot swallow adjacent utility panels.
   if (!docs) for (let i = nodes.length - 1; i >= 0; i--) {
     const n = nodes[i]!;
-    if (!n.excluded && !n.chrome && !n.utility && !n.coherentBelow && ['div', 'section'].includes(n.name) && n.proseParagraphs >= 2 && n.prose >= 300 && n.prose > n.chars * .55 && n.linked < n.chars * .25 && n.actionProse === 0) n.inferredBody = true;
+    if (!n.excluded && (!n.chrome || n.ambiguous && n.prose >= 160 && n.linked < n.chars * .25) && !n.utility && !n.coherentBelow && ['div', 'section'].includes(n.name) && n.proseParagraphs >= 2 && n.prose >= 300 && n.prose > n.chars * .55 && n.linked < n.chars * .25 && n.actionProse === 0) n.inferredBody = true;
     if (n.parent >= 0 && (n.coherentBelow || n.inferredBody || n.candidate === 2)) nodes[n.parent]!.coherentBelow = true;
   }
   for (const n of nodes) n.body ||= n.inferredBody || n.parent >= 0 && nodes[n.parent]!.body;
@@ -101,7 +101,7 @@ export function articleStructure(html: string, docs: boolean): Structure {
       if (!n.body && n.peripheral && n.name === 'a' && n.images > 0 && n.prose < 160) n.chrome = true;
     }
     if (n.parent >= 0 && nodes[n.parent]!.excluded) n.excluded = true;
-    if (n.chrome && (!n.ambiguous || n.utility || n.prose < 160 || n.linked > n.chars * .45 || /\b(?:sign up|subscribe (?:now|to|for)|enter your email|join (?:our|the) newsletter|get (?:our|the) newsletter|privacy policy|recaptcha)\b/i.test(n.sample))) n.excluded = true;
+    if (n.chrome && (!n.ambiguous || n.utility || !(n.body && n.prose >= 160 && n.linked <= n.chars * .45) && (n.prose < 160 || n.linked > n.chars * .45 || /\b(?:sign up|subscribe (?:now|to|for)|enter your email|join (?:our|the) newsletter|get (?:our|the) newsletter|privacy policy|recaptcha)\b/i.test(n.sample)))) n.excluded = true;
     if (n.excluded && n.parent >= 0 && !nodes[n.parent]!.excluded) {
       let ancestor = n.parent;
       while (ancestor >= 0) { const p = nodes[ancestor]!; p.chars -= n.chars; p.linked -= n.linked; p.prose -= n.prose; ancestor = p.parent; }

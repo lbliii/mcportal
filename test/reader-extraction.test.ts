@@ -170,3 +170,13 @@ test('reader extraction: decorative brand art in utility footers is excluded whi
   assert.ok(a.blocks.some((b) => b.text === 'Four stars.')); assert.ok(a.blocks.some((b) => b.figure?.alt === 'The reviewed film'));
   assert.doesNotMatch(JSON.stringify(a), /brand-icon\.svg/);
 });
+
+test('reader extraction: substantial editorial newsletter sections survive action words in headings without utility controls', () => {
+  const prose = 'EDITORIALNEWSLETTER: This part of the history examines the newsletter as a publication format. Subscribers received essays and reports that differed from daily newspapers, and the writers developed a distinct editorial voice. Our interviews describe the labor of producing these publications and the cultural settings in which readers encountered them, without asking this article’s reader to purchase or register for anything.';
+  const body = `<section class="newsletter"><h2>Subscribe to newsletters</h2><p>${prose}</p></section><p>A substantive concluding paragraph gives readers the result of the study and explains how the publication format changed over several decades.</p>`;
+  for (const wrapper of [`<section class="article-body">${body}</section>`, `<div class="rich-text">${body}</div>`]) {
+    const a = story(`${wrapper}<div class="newsletter"><p>Sign up for our newsletter.</p><form><input><button>Subscribe</button></form></div>`);
+    assert.ok(a.blocks.some((b) => b.text === prose)); assert.ok(a.blocks.some((b) => b.text === 'Subscribe to newsletters'));
+    assert.doesNotMatch(a.blocks.map((b) => b.text).join('\n'), /Sign up for our newsletter/);
+  }
+});
