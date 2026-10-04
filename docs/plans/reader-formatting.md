@@ -1,6 +1,7 @@
 # Plan: improve article formatting in reader view
 
-**Status:** draft, October 3, 2026. No implementation started.  
+**Status:** implementation in progress, October 3, 2026. Three disjoint workstreams target `main`; qualification and final integration are pending.
+
 **Evidence:** [20-article audit](../../reports/Reader%20view%20formatting%20audit.md), covering 12 sources on MCPortal 0.7.0 at `9868338`.
 
 ## Outcome
