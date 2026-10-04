@@ -153,3 +153,13 @@ test('reader extraction: localized peripheral panels respect explicit bodies, si
   assert.doesNotMatch(text, /staff biography|popular recommendation|Sign up|Recommended next story|Merchandise|different topic/);
   assert.doesNotMatch(JSON.stringify(a), /popular\.jpg|next\.jpg|shirt\.jpg|portrait\.jpg|topic\.jpg/);
 });
+
+test('reader extraction: inferred prose protects styling-only editorial sections and drops separate utility panels or empty shells', () => {
+  const paragraph = 'Researchers compared the observation methods over many years. Their field notes describe the conditions under which the instruments were deployed and explain why each independent team repeated the trial before drawing a conclusion.';
+  const a = story(`<p>A small standfirst.</p><div class="column"><div class="rich-text"><h2>About the Author</h2><p>${paragraph}</p><h2>Most Popular</h2><p>${paragraph}</p><p>Our conclusion.</p></div></div><section><h3>About the Author</h3><p>A staff writer contributes to the publication.</p></section><div><h2>Most Popular</h2></div><section><h2>Most Popular</h2><a href="/other"><img src="/other.jpg">Unrelated story card.</a></section><section><h2>Further reading</h2><p>Source material: <a href="/notes">field notes</a>.</p></section>`);
+  const text = a.blocks.map((b) => b.text).join('\n');
+  assert.equal(a.blocks.filter((b) => b.text === paragraph).length, 2);
+  assert.equal(a.blocks.filter((b) => b.text === 'Most Popular').length, 1); assert.equal(a.blocks.filter((b) => b.text === 'About the Author').length, 1);
+  for (const marker of ['small standfirst', 'Our conclusion.', 'Source material:', 'field notes']) assert.ok(text.includes(marker), marker);
+  assert.doesNotMatch(text, /staff writer|Unrelated story card/);
+});

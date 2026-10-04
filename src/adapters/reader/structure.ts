@@ -7,7 +7,7 @@ const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input'
 const CHROME = /(?:^|[\s_-])(?:newsletter|subscription|subscribe|recaptcha|consent|cookie-banner|author-bio(?:graphy)?|author-profile|author-mini-bio|author-avatar|author-img|author-image|breadcrumbs?|related-(?:posts|articles|stories|content)|recommended-(?:posts|articles|stories)|recommendations|recommendation-card|social-share|share-tools|article-tags|post-tags|tag-list)(?:$|[\s_-])/i;
 const BODY = /(?:^|[\s_-])(?:article-body|story-body|post-content|entry-content|article-content)(?:$|[\s_-])/i;
 const AUTHOR = /(?:^|[\s_-])(?:byline|author-name|article-author|post-author)(?:$|[\s_-])/i;
-interface Node { name: string; start: number; end: number; parent: number; chars: number; linked: number; prose: number; excluded: boolean; candidate: number; author: boolean; chrome: boolean; ambiguous: boolean; utility: boolean; sample: string; body: boolean; containsBody: boolean; scope: number; images: number; actionProse: number; peripheral: boolean; linkedCard: boolean; commerce: boolean; date?: 'publishedAt' | 'updatedAt'; datetime?: string; text: string }
+interface Node { name: string; start: number; end: number; parent: number; chars: number; linked: number; prose: number; excluded: boolean; candidate: number; author: boolean; chrome: boolean; ambiguous: boolean; utility: boolean; sample: string; body: boolean; containsBody: boolean; scope: number; images: number; actionProse: number; proseParagraphs: number; coherentBelow: boolean; inferredBody: boolean; peripheral: boolean; linkedCard: boolean; commerce: boolean; date?: 'publishedAt' | 'updatedAt'; datetime?: string; text: string }
 export interface Structure { tokens: Token[]; scripts: string[]; authors: string[]; dates: Partial<Record<'publishedAt' | 'updatedAt', string>> }
 
 /** Token/node/depth caps keep all ancestry work bounded, including malformed HTML. */
@@ -38,7 +38,7 @@ export function articleStructure(html: string, docs: boolean): Structure {
       if (stack.length >= 64 || nodes.length >= 30_000) { overflow = tok.selfClosing || VOID.has(tok.name) ? 0 : 1; overflowStart = i; if (!overflow) overflowRanges.push([i, i]); continue; }
       const parent = stack.at(-1) ?? -1;
       const date = a.itemprop === 'datePublished' ? 'publishedAt' : a.itemprop === 'dateModified' ? 'updatedAt' : undefined;
-      const n: Node = { name: tok.name, start: i, end: i, parent, chars: 0, linked: 0, prose: 0, text: '', excluded: (parent >= 0 && nodes[parent]!.excluded) || (!docs && (a['aria-hidden'] === 'true' || 'hidden' in a)), chrome: !docs && CHROME.test(attrs), ambiguous: /(?:^|[\s_-])(?:newsletter|subscription|subscribe|related-content)(?:$|[\s_-])/i.test(attrs), utility: ['form', 'input', 'button'].includes(tok.name), sample: '', body: (parent >= 0 && nodes[parent]!.body) || a.itemprop === 'articleBody' || BODY.test(attrs), containsBody: a.itemprop === 'articleBody' || BODY.test(attrs), scope: tok.name === 'article' || tok.name === 'main' ? nodes.length : parent >= 0 ? nodes[parent]!.scope : -1, images: tok.name === 'img' ? 1 : 0, actionProse: 0, peripheral: (parent >= 0 && nodes[parent]!.peripheral) || /(?:^|[\s_-])post-bottom(?:$|[\s_-])/i.test(attrs), linkedCard: /(?:^|[\s_-])(?:listing-item|topic-card)(?:$|[\s_-])/i.test(attrs), commerce: /(?:^|[\s_-])(?:merchrow|mpmerchitem|mpmerch)(?:$|[\s_-])/i.test(attrs), candidate: tok.name === 'article' ? 3 : a.itemprop === 'articleBody' || BODY.test(attrs) ? 2 : tok.name === 'main' || a.role === 'main' ? 1 : 0, author: a.itemprop === 'author' || a.rel === 'author' || AUTHOR.test(attrs), ...(date ? { date, datetime: a.datetime ?? a.content } : {}) };
+      const n: Node = { name: tok.name, start: i, end: i, parent, chars: 0, linked: 0, prose: 0, text: '', excluded: (parent >= 0 && nodes[parent]!.excluded) || (!docs && (a['aria-hidden'] === 'true' || 'hidden' in a)), chrome: !docs && CHROME.test(attrs), ambiguous: /(?:^|[\s_-])(?:newsletter|subscription|subscribe|related-content)(?:$|[\s_-])/i.test(attrs), utility: ['form', 'input', 'button'].includes(tok.name), sample: '', body: (parent >= 0 && nodes[parent]!.body) || a.itemprop === 'articleBody' || BODY.test(attrs), containsBody: a.itemprop === 'articleBody' || BODY.test(attrs), scope: tok.name === 'article' || tok.name === 'main' ? nodes.length : parent >= 0 ? nodes[parent]!.scope : -1, images: tok.name === 'img' ? 1 : 0, actionProse: 0, proseParagraphs: 0, coherentBelow: false, inferredBody: false, peripheral: (parent >= 0 && nodes[parent]!.peripheral) || /(?:^|[\s_-])post-bottom(?:$|[\s_-])/i.test(attrs), linkedCard: /(?:^|[\s_-])(?:listing-item|topic-card)(?:$|[\s_-])/i.test(attrs), commerce: /(?:^|[\s_-])(?:merchrow|mpmerchitem|mpmerch)(?:$|[\s_-])/i.test(attrs), candidate: tok.name === 'article' ? 3 : a.itemprop === 'articleBody' || BODY.test(attrs) ? 2 : tok.name === 'main' || a.role === 'main' ? 1 : 0, author: a.itemprop === 'author' || a.rel === 'author' || AUTHOR.test(attrs), ...(date ? { date, datetime: a.datetime ?? a.content } : {}) };
       const id = nodes.push(n) - 1;
       if (!tok.selfClosing && !VOID.has(tok.name)) stack.push(id);
     } else if (tok.kind === 'close') {
@@ -60,14 +60,24 @@ export function articleStructure(html: string, docs: boolean): Structure {
   for (const id of stack) nodes[id]!.end = tokens.length;
   for (let i = nodes.length - 1; i >= 0; i--) {
     const n = nodes[i]!;
+    if (n.name === 'p' && n.chars >= 80) n.proseParagraphs++;
     if (n.name === 'p' && n.chars < 800 && ACTION.test(n.sample)) n.actionProse = n.prose;
     if (n.parent < 0 || n.excluded) continue;
     const p = nodes[n.parent]!;
-    p.chars += n.chars; p.linked += n.linked; p.prose += n.prose; p.utility ||= n.utility; p.containsBody ||= n.containsBody; p.images += n.images; p.actionProse += n.actionProse;
+    p.chars += n.chars; p.linked += n.linked; p.prose += n.prose; p.utility ||= n.utility; p.containsBody ||= n.containsBody; p.images += n.images; p.actionProse += n.actionProse; p.proseParagraphs += n.proseParagraphs;
     if (p.sample.length < 400) p.sample += n.sample.slice(0, 400 - p.sample.length);
 
   }
-  const bodyScopes = new Set(nodes.filter((n) => n.candidate === 2).map((n) => n.scope));
+  // For templates with styling-only wrappers, protect the innermost coherent
+  // prose component. Parent wrappers cannot swallow adjacent utility panels.
+  if (!docs) for (let i = nodes.length - 1; i >= 0; i--) {
+    const n = nodes[i]!;
+    if (!n.excluded && !n.chrome && !n.utility && !n.coherentBelow && ['div', 'section'].includes(n.name) && n.proseParagraphs >= 2 && n.prose >= 300 && n.prose > n.chars * .55 && n.linked < n.chars * .25 && n.actionProse === 0) n.inferredBody = true;
+    if (n.parent >= 0 && (n.coherentBelow || n.inferredBody || n.candidate === 2)) nodes[n.parent]!.coherentBelow = true;
+  }
+  for (const n of nodes) n.body ||= n.inferredBody || n.parent >= 0 && nodes[n.parent]!.body;
+  for (let i = nodes.length - 1; i >= 0; i--) { const n = nodes[i]!; n.containsBody ||= n.inferredBody; if (n.parent >= 0) nodes[n.parent]!.containsBody ||= n.containsBody; }
+  const bodyScopes = new Set(nodes.filter((n) => n.candidate === 2 || n.inferredBody).map((n) => n.scope));
   // Exact utility headings identify their own peripheral panel only when the
   // same story supplies an explicit body. Identical editorial headings in that
   // body, and arbitrary later sections/corrections/source links, remain intact.
@@ -78,7 +88,7 @@ export function articleStructure(html: string, docs: boolean): Structure {
     let id = n.parent;
     while (id >= 0 && !['div', 'section', 'article', 'main'].includes(nodes[id]!.name)) id = nodes[id]!.parent;
     const panel = nodes[id];
-    if (panel && ['div', 'section'].includes(panel.name) && !panel.containsBody && (heading.toLowerCase() === 'about the author' && panel.prose < 1200 || panel.linked > 0 || panel.images > 0)) panel.chrome = true;
+    if (panel && ['div', 'section'].includes(panel.name) && !panel.containsBody && (heading.toLowerCase() === 'about the author' && panel.prose < 1200 || panel.linked > 0 || panel.images > 0 || panel.prose === 0 && panel.chars <= heading.length + 40)) panel.chrome = true;
   }
   // Identity alone is insufficient for ambiguous editorial section names. Remove
   // those only with utility/action evidence, short prose, or link-dense cards.
