@@ -12,7 +12,7 @@ The local unpublished River changes are outside this work.
 
 Workers inherit the shared contract commit but edit disjoint files. Integration collects their reviewed commits and targets `main`. Worker PRs identify their shared dependency; the combined PR is the intended review candidate. Publication and deployment remain separate from this implementation.
 
-The contract remains additive: legacy block types and plain text survive. Optional marks combine, lists carry identity/start/value, quotations carry group identity, and figure/media metadata uses paragraph blocks with readable fallback text. Dates are optional validated ISO strings. Existing saved reading fields remain compatible; UI traversal follows logical blocks after semantic grouping.
+The contract remains additive: legacy block types and plain text survive. Optional marks combine, lists carry group/item identity and start/value, quotations carry group identity, and figure/media metadata uses paragraph blocks with readable fallback text. Item identity distinguishes multiple paragraphs or media in one item from a new sibling, even in unordered lists or repeated ordered values. Dates are optional validated ISO strings. Existing saved reading fields remain compatible; UI traversal follows logical blocks after semantic grouping.
 
 ## Completion gates
 
