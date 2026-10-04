@@ -21,10 +21,10 @@ async function viewer() {
     $: (id: string) => nodes.get(id), root: { classList: { add() {}, remove() {} } },
     showDocs: (data: unknown, key: unknown, options: unknown) => shown.push({ data, key, options }),
     setStatus: (text: string) => statuses.push(text), console: { error: (...args: unknown[]) => errors.push(args) },
-    el: (_tag: string, _attrs: unknown, text: string) => text,
+    el: (_tag: string, _attrs: unknown, text: string) => text, HTMLElement: class {},
   });
   vm.runInContext(`let docsArgs = { docs: 'acme/widgets' }; let toolRunning = true; let gotInitialResult = false;
-    ${fn('errorText')}\n${fn('showAppError')}\n${fn('showDocsCard')}\n${fn('onHostNotification')}
+    ${fn('errorText')}\n${fn('renderReader')}\n${fn('setReaderControls')}\n${fn('showAppError')}\n${fn('showDocsCard')}\n${fn('onHostNotification')}
     function dispatch(params) { try { onHostNotification('ui/notifications/tool-result', params); } catch (error) { showAppError('Could not display the tool result', error); } }`, context);
   return { context, nodes, shown, errors, statuses };
 }

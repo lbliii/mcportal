@@ -32,3 +32,10 @@ The screenshot showed controls on the canvas, a centered article column, and the
 ## Limits
 
 This branch does not change extraction, guarded image fetching or source card visual styling. Host expansion still depends on the advertised fullscreen capability and does not request OS/browser fullscreen. Browser verification uses synthetic fixtures; the integrated tranche should additionally inspect actual publisher articles after extraction and media changes land.
+
+
+## VM harness follow-up
+
+The full integration suite exposed four harness failures because the isolated dispatcher/navigation contexts did not load the new reader shell helpers. Both harnesses now extract the shipped `renderReader` and `setReaderControls` definitions. Error-boundary diagnostic assertions are unchanged; the stale-article test also verifies that a late result cannot replace controls or reinsert them into the content viewport.
+
+`node --test test/ui-docs.test.ts test/ui-host-navigation.test.ts`: 12 passed, zero failures or skips. No production source changes were needed.
