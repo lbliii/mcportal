@@ -268,17 +268,20 @@ test('browser: docs hash navigation takes precedence over the saved position and
   await tool('record_reading', { url, title: 'Deploy', status: 'opened', anchor: { block: 70 }, progress: 0.9 });
   await openRoom();
   await page.click('[data-portal="docs"] .item-main');
-  await page.waitFor(`document.querySelector('.docs-page .mark-read:not([disabled])')`, 'the initial docs page');
+  await page.waitFor(`!document.getElementById('reader').hidden && document.querySelector('.docs-page h1')?.textContent === 'Install' && document.querySelector('.docs-page .mark-read:not([disabled])')`, 'the initial docs page');
   await page.eval(`document.querySelector('.docs-page .body a').click()`);
-  await page.waitFor(`document.querySelector('.docs-page h1')?.textContent === 'Deploy' && !document.querySelector('.docs-page .mark-read').disabled`, 'Deploy page');
+  await page.waitFor(`!document.getElementById('reader').hidden && document.querySelector('.docs-page h1')?.textContent === 'Deploy' && !document.querySelector('.docs-page .mark-read').disabled`, 'Deploy page');
   assert.ok(await page.eval<number>(`document.getElementById('reader').scrollTop || window.scrollY`) < 500, 'the explicit first heading takes precedence over saved block 70');
   assert.equal((await tool('get_reading', { url })).reading.anchor.block, 70, 'jumping back does not discard the furthest saved passage');
   await page.eval(`document.querySelector('#reader [aria-label="Back to your room"]').click()`);
+  // Back refreshes the unfinished-reading strip. Wait for its new height before
+  // measuring another real pointer click; retained hidden docs are not readiness.
+  await page.waitFor(`document.getElementById('reader').hidden && !document.getElementById('grid').hidden && document.querySelector('.continue-reading')?.getAttribute('aria-busy') === 'false'`, 'the room and refreshed reading strip after Back');
   await tool('record_reading', { url, status: 'opened', anchor: { block: 0 }, progress: 0 });
   await page.click('[data-portal="docs"] .item-main');
-  await page.waitFor(`document.querySelector('.docs-page .mark-read:not([disabled])')`, 'docs ready');
+  await page.waitFor(`!document.getElementById('reader').hidden && document.querySelector('.docs-page h1')?.textContent === 'Install' && document.querySelector('.docs-page .mark-read:not([disabled])')`, 'docs ready');
   await page.eval(`document.querySelector('.docs-toc a[data-url="${url}"]').click()`);
-  await page.waitFor(`document.querySelector('.docs-page h1')?.textContent === 'Deploy' && !document.querySelector('.docs-page .mark-read').disabled`, 'Deploy ready');
+  await page.waitFor(`!document.getElementById('reader').hidden && document.querySelector('.docs-page h1')?.textContent === 'Deploy' && !document.querySelector('.docs-page .mark-read').disabled`, 'Deploy ready');
   assert.equal((await tool('get_reading', { url })).reading.progress, 0, 'the navigation fixture starts at the beginning');
   await page.eval(`document.getElementById('reader').style.maxHeight = '220px'; document.getElementById('reader').scrollTop = 800`);
   await page.waitFor(`Number(document.querySelector('.docs-page .body').dataset.furthest) > 0`, 'the docs position').catch(async (error) => {
