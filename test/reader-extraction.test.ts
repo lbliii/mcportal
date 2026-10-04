@@ -163,3 +163,10 @@ test('reader extraction: inferred prose protects styling-only editorial sections
   for (const marker of ['small standfirst', 'Our conclusion.', 'Source material:', 'field notes']) assert.ok(text.includes(marker), marker);
   assert.doesNotMatch(text, /staff writer|Unrelated story card/);
 });
+
+test('reader extraction: decorative brand art in utility footers is excluded while editorial logos and ratings survive', () => {
+  const a = story('<p>A design review.</p><figure><a class="studio-logo" href="/studio"><img src="/brand.jpg" alt="The redesigned logo"></a><figcaption>An editorial logo illustration.</figcaption></figure><div class="display-card"><h2>Review rating</h2><p>Four stars.</p><img src="/poster.jpg" alt="The reviewed film"><div class="display-card-footer"><a class="srdb-logo"><picture><img src="/brand-icon.svg" alt="Publisher logo"></picture></a></div></div>');
+  assert.ok(a.blocks.some((b) => b.figure?.alt === 'The redesigned logo'));
+  assert.ok(a.blocks.some((b) => b.text === 'Four stars.')); assert.ok(a.blocks.some((b) => b.figure?.alt === 'The reviewed film'));
+  assert.doesNotMatch(JSON.stringify(a), /brand-icon\.svg/);
+});
