@@ -177,6 +177,10 @@ export function extractArticle(html: string, baseUrl?: string, limits: { blocks:
     const list = lists.at(-1);
     return { type: quote ? 'quote' as const : 'p' as const, zone: zone(), parts: [] as Part[], ...(quotes.at(-1) ? { quoteId: quotes.at(-1)! } : {}), ...(list?.itemOpen ? { list: list.id, ...(list.ordered ? { ordered: true as const, listStart: list.start, ...(list.itemValue !== undefined ? { value: list.itemValue } : {}) } : {}) } : {}) };
   };
+  const listFields = () => {
+    const list = lists.at(-1);
+    return list?.itemOpen ? { listId: `html-list-${list.id}`, level: Math.min(3, lists.length - 1), ...(list.ordered ? { ordered: true as const, listStart: list.start, ...(list.itemValue !== undefined ? { value: list.itemValue } : {}) } : {}) } : {};
+  };
   const integer = (value: string | undefined, fallback: number) => value && /^-?\d{1,6}$/.test(value) ? Number(value) : fallback;
   const finishFigure = () => {
     for (const block of figure?.blocks ?? []) {
@@ -193,7 +197,7 @@ export function extractArticle(html: string, baseUrl?: string, limits: { blocks:
     if (!url) return;
     const resume = current ? { ...current, parts: [] as Part[] } : null;
     flush();
-    found.push({ type: 'p', zone: zone(), text: label, spans: [{ text: label, href: url }], media: { url, kind, label } });
+    found.push({ type: 'p', zone: zone(), ...listFields(), text: label, spans: [{ text: label, href: url }], media: { url, kind, label } });
     current = resume;
   };
   for (const tok of structure.tokens) {
@@ -253,7 +257,7 @@ export function extractArticle(html: string, baseUrl?: string, limits: { blocks:
             const resume = current ? { ...current, parts: [] as Part[] } : null;
             flush();
             const alt = clean(decodeEntities(a.alt ?? ''), 500);
-            const block: Found = { type: 'p', zone: zone(), text: alt || 'Image', ...(stack.findLast((c) => c.gallery)?.gallery !== undefined ? { gallery: stack.findLast((c) => c.gallery)!.gallery! } : {}), figure: { url, ...(alt ? { alt } : {}), ...(width > 0 && width <= 10_000 ? { width } : {}), ...(height > 0 && height <= 10_000 ? { height } : {}) }, spans: [{ text: alt || 'Image', href: url }] };
+            const block: Found = { type: 'p', zone: zone(), ...listFields(), text: alt || 'Image', ...(stack.findLast((c) => c.gallery)?.gallery !== undefined ? { gallery: stack.findLast((c) => c.gallery)!.gallery! } : {}), figure: { url, ...(alt ? { alt } : {}), ...(width > 0 && width <= 10_000 ? { width } : {}), ...(height > 0 && height <= 10_000 ? { height } : {}) }, spans: [{ text: alt || 'Image', href: url }] };
             found.push(block);
             if (figure) figure.blocks.push(block);
             current = resume;
@@ -400,7 +404,7 @@ export function extractArticle(html: string, baseUrl?: string, limits: { blocks:
     if (b.figure) {
       const key = `${gallery ?? 'adjacent'}:${mediaKey(b.figure.url)}:${b.figure.caption ?? ''}:${b.figure.credit ?? ''}`;
       const previous = blocks.at(-1);
-      if (gallery !== undefined && seenFigures.has(key) || gallery === undefined && previous?.figure && mediaKey(previous.figure.url) === mediaKey(b.figure.url) && previous.figure.caption === b.figure.caption) continue;
+      if (gallery !== undefined && seenFigures.has(key) || gallery === undefined && previous?.figure && mediaKey(previous.figure.url) === mediaKey(b.figure.url) && previous.figure.caption === b.figure.caption && previous.figure.credit === b.figure.credit) continue;
       if (gallery !== undefined) seenFigures.add(key);
     }
     if (b.media) { const key = b.media.url; if (seenMedia.has(key)) continue; seenMedia.add(key); }

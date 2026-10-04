@@ -114,3 +114,11 @@ test('reader extraction: nested quotation tails and multi-paragraph list continu
   assert.equal(a.blocks.find((b) => b.text === 'Nested item.')!.level, 1);
   assert.equal(a.blocks.find((b) => b.text === 'Next item.')!.value, 4);
 });
+
+test('reader extraction: different image credits survive adjacent deduplication and list media keeps item ownership', () => {
+  const a = story('<figure><img src="/same.jpg"><figcaption>Caption<span class="credit">First credit</span></figcaption></figure><figure><img src="/same.jpg"><figcaption>Caption<span class="credit">Second credit</span></figcaption></figure><ol start="5"><li>Item lead<img src="/list.jpg" alt="List diagram">Item tail<audio src="/item.mp3"></audio>Final tail</li></ol>');
+  assert.deepEqual(a.blocks.filter((b) => b.figure && !b.listId).map((b) => b.figure!.credit), ['First credit', 'Second credit']);
+  const li = a.blocks.find((b) => b.type === 'li')!;
+  for (const b of a.blocks.filter((b) => b.listId)) { assert.equal(b.listId, li.listId); assert.equal(b.level, 0); assert.equal(b.value, 5); }
+  assert.ok(a.blocks.some((b) => b.text === 'Final tail' && b.listId === li.listId));
+});
