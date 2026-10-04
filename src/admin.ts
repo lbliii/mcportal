@@ -1,4 +1,5 @@
 import { DESIGN_CSS, PRIMITIVES_CSS } from './design/generated.ts';
+import { WEB_BRAND_CSS, webHeader, webFooter } from './web-brand.ts';
 /**
  * The admin page (identity plan, phase 2): invites, suspensions and the audit
  * log in a browser. Deliberately not MCP: nothing a model reads can reach it.
@@ -165,13 +166,13 @@ export class AdminPanel {
 
     if (route === '/admin' && req.method === 'GET') {
       if (!current) {
-        sendHtml(res, 200, page('MCPortal admin', '<h1>MCPortal admin</h1><p>Invites, suspensions and the audit log.</p><p><a href="/admin/login"><button class="primary">Sign in with GitHub</button></a></p><p class="muted">Admins only.</p>'));
+        sendHtml(res, 200, page('MCPortal admin', '<h1>MCPortal admin</h1><p>Invites, suspensions and the audit log.</p><p><a class="button primary" href="/admin/login">Sign in with GitHub</a></p><p class="muted">Admins only.</p>'));
         return true;
       }
       const nonce = randomBytes(16).toString('base64');
-      const html = (await readFile(ADMIN_HTML, 'utf8')).replace('/*MCPORTAL_DESIGN*/', DESIGN_CSS + PRIMITIVES_CSS).replaceAll('__NONCE__', nonce);
+      const html = (await readFile(ADMIN_HTML, 'utf8')).replace('/*MCPORTAL_DESIGN*/', DESIGN_CSS + PRIMITIVES_CSS + WEB_BRAND_CSS).replace('<!--MCPORTAL_WEB_HEADER-->', webHeader()).replace('<!--MCPORTAL_WEB_FOOTER-->', webFooter()).replaceAll('__NONCE__', nonce);
       sendHtml(res, 200, html, {
-        'content-security-policy': `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; form-action 'self'; frame-ancestors 'none'; base-uri 'none'`,
+        'content-security-policy': `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline'; font-src data:; connect-src 'self'; img-src 'self' data:; form-action 'self'; frame-ancestors 'none'; base-uri 'none'`,
       });
       return true;
     }

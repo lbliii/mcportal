@@ -26,7 +26,7 @@ import { AppError, errorCode, isAppError } from './lib/errors.ts';
 import { secretToken, sha256Hex } from './lib/ids.ts';
 import type { Logger } from './lib/log.ts';
 import { boundaryOf, parseMultipart } from './lib/multipart.ts';
-import { escapeHtml, readBody, readForm, redirect, sameOrigin, sendHtml } from './lib/web.ts';
+import { escapeHtml, PAGE_CSP, readBody, readForm, redirect, sameOrigin, sendHtml } from './lib/web.ts';
 import { page } from './page.ts';
 import { PageSessions, type PageSession } from './page-sessions.ts';
 import { buildExport, describeImport, EXPORT_FORMATS, importExport, parseExport, type ExportFile, type ExportFormat } from './portability.ts';
@@ -295,7 +295,7 @@ ${uploadForm('/account/import', s.csrf)}
     const current = this.sessions.current(req);
     if (route === '/account' && req.method === 'GET') {
       if (!current) {
-        sendHtml(res, 200, page('Your MCPortal account', '<h1>Your MCPortal account</h1><p>Download your data or delete your account.</p><p><a href="/account/login"><button class="primary">Sign in with GitHub</button></a></p>'));
+        sendHtml(res, 200, page('Your MCPortal account', '<h1>Your MCPortal account</h1><p>Download your data or delete your account.</p><p><a class="button primary" href="/account/login">Sign in with GitHub</a></p>'));
       } else await this.home(res, current.session);
       return true;
     }
@@ -356,7 +356,7 @@ ${uploadForm('/account/import', s.csrf)}
       for (const [k, d] of this.downloads) if (d.userId === accountId) this.downloads.delete(k);
       for (const [k, u] of this.uploads) if (u.userId === accountId) this.uploads.delete(k);
       this.deps.log?.info('account.deleted', { clips: done.clips, tokens: done.tokens });
-      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'set-cookie': this.sessions.cookie('', 0), 'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'" });
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'set-cookie': this.sessions.cookie('', 0), 'content-security-policy': PAGE_CSP });
       res.end(page('Account deleted', '<h1>Your account is deleted</h1><p>Your room, saved items, clips, public profile, shares and follows are gone, and you\'re signed out everywhere. Remove MCPortal from your Claude connectors too.</p>'));
       return true;
     }

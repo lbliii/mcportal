@@ -8,9 +8,10 @@
 <style>
   /*MCPORTAL_DESIGN*/
   * { box-sizing: border-box; }
-  body { margin: 0; color: var(--mp-text-primary); font: var(--mp-type-14)/var(--mp-line-body) var(--mp-font-ui); }
+  body.web-page { margin: 0; color: var(--mp-text-primary); font: var(--mp-type-14)/var(--mp-line-body) var(--mp-font-ui); }
   main { max-width: 900px; margin: 0 auto; padding: 22px 18px 40px; }
-  header { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+  .admin-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
+  h1, h2 { font-family: var(--mp-font-heading); }
   h1 { font-size: var(--mp-type-19); margin: 0; letter-spacing: -0.01em; }
   h1 span { color: var(--mp-action-primary); }
   h2 { font-size: var(--mp-type-15); margin: 26px 0 8px; }
@@ -38,10 +39,11 @@
   .actions { display: flex; gap: 6px; flex-wrap: wrap; }
 </style>
 </head>
-<body>
-<main>
-  <header>
-    <h1>MC<span>Portal</span> admin</h1>
+<body class="web-page">
+<!--MCPORTAL_WEB_HEADER-->
+<main class="web-main">
+  <header class="admin-head">
+    <h1>Admin</h1>
     <span class="muted" id="me"></span>
     <span class="spacer"></span>
     <form method="post" action="/admin/logout"><button type="submit">Sign out</button></form>
@@ -78,6 +80,7 @@
   <h2>Audit log</h2>
   <div class="wrap"><table><thead><tr><th>When</th><th>Action</th><th>Target</th><th>By</th><th>Detail</th></tr></thead><tbody id="audit"></tbody></table></div>
 </main>
+<!--MCPORTAL_WEB_FOOTER-->
 <script nonce="__NONCE__">
 (() => {
   'use strict';
