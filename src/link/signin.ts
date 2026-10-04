@@ -18,7 +18,8 @@ import type { AddressInfo } from 'node:net';
 import { hostname } from 'node:os';
 import { AppError } from '../lib/errors.ts';
 import { requestId, silentLogger, type Logger } from '../lib/log.ts';
-import { escapeHtml } from '../lib/web.ts';
+import { escapeHtml, PAGE_CSP } from '../lib/web.ts';
+import { page } from '../page.ts';
 import { clean } from '../lib/text.ts';
 import { StateClient } from './client.ts';
 import type { LinkFile, LinkRecord } from './link-file.ts';
@@ -56,12 +57,6 @@ const same = (a: string, b: string) => {
   return left.length === right.length && timingSafeEqual(left, right);
 };
 
-function resultPage(title: string, body: string): string {
-  return `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)}</title>
-<style>body{font:16px/1.5 system-ui,sans-serif;max-width:520px;margin:12vh auto;padding:0 20px;color:#1d2321}h1{font-size:22px}p{color:#4a524f}</style>
-<h1>${escapeHtml(title)}</h1>${body}`;
-}
-
 async function requestJson(fetcher: typeof fetch, url: URL, init: RequestInit, action: string): Promise<Record<string, unknown>> {
   let res: Response;
   try {
@@ -87,6 +82,7 @@ export async function startSignIn(options: SignInOptions): Promise<PendingSignIn
   const log = options.log ?? silentLogger;
   const reference = requestId();
   const server = hostedOrigin(options.server);
+  const resultPage = (title: string, body: string) => page(title, body, { siteUrl: server });
   const verifier = b64url(randomBytes(32));
   const challenge = b64url(createHash('sha256').update(verifier).digest());
   const state = b64url(randomBytes(24));
@@ -137,7 +133,7 @@ export async function startSignIn(options: SignInOptions): Promise<PendingSignIn
   listener.on('request', (req, res) => {
     const url = new URL(req.url ?? '/', redirectUri);
     const reply = (status: number, html: string) => {
-      res.writeHead(status, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'", 'referrer-policy': 'no-referrer' });
+      res.writeHead(status, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'content-security-policy': PAGE_CSP, 'referrer-policy': 'no-referrer' });
       res.end(html);
     };
     if (req.method !== 'GET' || url.pathname !== '/callback' || handled) return reply(404, resultPage('Not here', '<p>This page only finishes an MCPortal sign-in.</p>'));

@@ -1,0 +1,44 @@
+# Standalone surface design and ownership
+
+The hosted consent screen and the local OAuth callback are both MCPortal-owned UI. The former is rendered by src/auth/oauth.ts through page(); the latter is served by src/link/signin.ts on a one-shot loopback listener. GitHub's own sign-in and the agent application's browser chrome are separate products.
+
+## Surface inventory
+
+| Surface | Renderer / ownership | Design coverage |
+| --- | --- | --- |
+| Public landing, privacy, terms, security, support | src/site.ts | Existing branded paperback layout, generated logo and local Jost font |
+| OAuth consent and all hosted sign-in errors, expiry and rate-limit messages | src/auth/oauth.ts → src/page.ts | Shared branded header, card, type and footer |
+| Local sign-in success, refusal, mismatched state, missing code, exchange/save/sync errors and invalid callback path | src/link/signin.ts → src/page.ts | Same self-contained shell; help/legal links use the hosted origin |
+| Account entry, signed-in account, downloads, imports, expired/refused links, failure and deletion results | src/account.ts → src/page.ts | Shared branded shell and responsive forms; correct CSP on deletion result |
+| Invite entry, revoked/invalid and already accepted invites | src/admin.ts → src/page.ts | Shared branded shell |
+| Admin sign-in, denial and sign-in failure | src/admin.ts → src/page.ts | Shared branded shell |
+| Signed-in admin dashboard | src/ui/admin.html via src/admin.ts | Shared brand header, Jost headings and footer; existing action/data logic |
+| Browser 404 and unavailable preview | src/http.ts → src/page.ts | Branded HTML for browser navigation; protocol/API responses retain JSON |
+| Room, reader, docs, clips, shares, spaces, highlights and their in-app states | src/ui/room.html and room modules | Existing adaptive MCP Apps theme and generated brand marks; reader wave 2 is a separate tranche |
+| MCP, state API, health, OAuth metadata/token responses and downloadable open-format files | Server protocols and exports | Machine/data formats, not standalone UI pages |
+
+## Shared contract
+
+src/web-brand.ts loads the generated outlined logo, small mark and Jost Bold from the committed brand source. The web page is self-contained: logo SVG is inline, favicon and font are data URIs, and CSS uses the generated design tokens plus src/ui/web-brand.css. There are no CDN requests, trackers, scripts or asset routes required on the local callback listener.
+
+Standalone pages use the public site's paper/ink semantic roles in light and dark schemes. They carry a full-width brand masthead, a readable content card with a mustard print shadow and teal halftone rule, a meaningful h1, wrapped controls and a Help/Privacy/Terms/Security footer. The admin dashboard uses the same masthead/footer around its wider work area. Generated wordmark outlines are used rather than retyping the logo.
+
+The page CSP permits only embedded image/font assets alongside inline styles, with no script/network-source permission. Hosted form origin and CSRF behavior, PKCE/state validation, invite/account access and callback error escaping stay covered by existing end-to-end checks. The consent form still names the requesting client and return destination. Link navigation uses real anchors without nested buttons. A local callback cannot assume an agent deep link, so its next step tells the person to return to their app; help links go to the hosted origin.
+
+Responsive checks include 897px and 320px viewports, 200% text, light/dark palettes, font loading, one heading, card text contrast and no horizontal overflow. Shared focus, reduced-motion, coarse-pointer and forced-color primitives apply; native assistive-technology and OS preference smoke checks remain release checks.
+
+## Review preview
+
+Run node scripts/design-preview.ts and open http://127.0.0.1:8799. The fixture host now exposes consent, local success/error, invite, import and admin pages, plus the existing app matrix and public site. Fixtures contain no user credentials or production writes. Browser validation additionally exercises the real hosted consent and the actual local callback listener with fake upstream identity/token responses.
+
+Production deployment and installed local-client updates are separate from a reviewed source change. The hosted consent changes ship with the server; local callback changes ship with the local MCPortal version.
+
+## Completed validation
+
+- `npm run typecheck` and `npm run design:check`: passed; UI cast ceiling remains 49.
+- Existing auth/account/local sign-in/diagnostics/browser-form/http/design checks: 45 passed, no skips. Actual consent submission and account sign-out retain browser same-origin behavior; nonce/admin, PKCE, CSRF, invite refusal, import and deletion regressions pass.
+- New standalone checks: three passed, including real hosted pages and actual local success/denial callback responses in Chrome. They verify embedded font loading, branded assets, title/link escaping, inert hostile diagnostics, hosted help destinations, one h1, no nested interactive controls, card text contrast and narrow/dark/enlarged-text layout.
+- Full serialized suite: 429 tests; 406 passed, zero failures, 23 skipped (22 need TEST_DATABASE_URL; one file-store purge contract is covered by the separate file-age retention test). Browser suites ran with Chrome.
+- `git diff --check`: passed.
+- CUA inspected consent/error at 897×984 and error/import/admin at 375×812. No horizontal overflow; the file picker fits its card and admin tables scroll locally. Keyboard Tab reaches the brand home link with a visible 2px mustard outline on the dark masthead.
+- Review screenshots: `/Users/lb/.codex/visualizations/2026/10/04/01a106f8-a520-78b3-91f8-190443bf8ecd/portal-consent-branded.jpg` and `portal-signin-error-branded.jpg` in the same directory. These are offline fixture previews, not a deployed production change.
