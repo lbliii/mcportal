@@ -32,19 +32,29 @@
     }
   }
 
+  // The room bar can wrap in a narrow host. Keep fullscreen actions below its
+  // actual height instead of guessing a fixed offset.
+  const readerBar = $first('.bar');
+  if (readerBar) new ResizeObserver(() => root.style.setProperty('--mp-reader-bar-height', `${readerBar.getBoundingClientRect().height}px`)).observe(readerBar);
+
   // Reader blocks (articles, docs pages, note clips) as DOM. Everything is built as text;
   // links are only http(s), opened through the host, or #anchors within the same view.
   /** @param {ArticleBlock} b @param {() => ParentNode} scope @param {LinkHandler} [onLink] */
   function spanNodes(b, scope, onLink = openLink) {
     if (!Array.isArray(b.spans)) return [b.text];
-    return b.spans.map((s) => {
-      const text = s.code ? el('code', null, s.text) : s.strong ? el('strong', null, s.text) : s.text;
-      if (typeof s.href !== 'string') return text;   // so s.href is a string in the click handlers below (casts restate it)
-      if (/^#[\w\-.:%~]{1,200}$/.test(s.href)) {
-        return el('a', { href: s.href, onclick: (/** @type {MouseEvent} */ e) => { e.preventDefault(); scope().querySelector(`[data-anchor="${CSS.escape(/** @type {string} */ (s.href).slice(1))}"]`)?.scrollIntoView({ block: 'start', behavior: scrollBehavior() }); } }, text);
+    return b.spans.flatMap((s) => {
+      /** @type {Node | string} */
+      let text = s.text;
+      if (s.code) text = el('code', null, text);
+      if (s.em) text = el('em', null, text);
+      if (s.strong) text = el('strong', null, text);
+      const href = s.href;
+      if (typeof href === 'string' && /^#[\w\-.:%~]{1,200}$/.test(href)) {
+        text = el('a', { href, onclick: (/** @type {MouseEvent} */ e) => { e.preventDefault(); scope().querySelector(`[data-anchor="${CSS.escape(href.slice(1))}"]`)?.scrollIntoView({ block: 'start', behavior: scrollBehavior() }); } }, text);
+      } else if (typeof href === 'string' && isHttpUrl(href)) {
+        text = el('a', { href, title: href, onclick: (/** @type {MouseEvent} */ e) => { e.preventDefault(); onLink(href); } }, text);
       }
-      if (!isHttpUrl(s.href)) return text;
-      return el('a', { href: s.href, title: s.href, onclick: (/** @type {MouseEvent} */ e) => { e.preventDefault(); onLink(/** @type {string} */ (s.href)); } }, text);
+      return s.breakBefore ? [el('br'), text] : [text];
     });
   }
 
@@ -64,48 +74,114 @@
     /** @type {HTMLElement | null} */
     let body = null;
     const scope = () => /** @type {HTMLElement} */ (body);   // links are clicked only after body is built below
-    const counters = [0, 0, 0, 0];
-    const nodes = blocks.map((b, i) => {
-      if (b.type !== 'li') counters.fill(0);
+    body = el('div', { class: 'body' });
+    /** @type {Array<{ node: HTMLOListElement | HTMLUListElement, last: HTMLLIElement | null, id: string | undefined, ordered: boolean }>} */
+    const lists = [];
+    /** @type {HTMLElement | null} */
+    let quote = null;
+    let quoteId = '';
+    const anchors = new Set();
+    blocks.forEach((b, i) => {
+      const attrs = { 'data-reader-block': String(i) };
+      if (b.type !== 'li') lists.length = 0;
+      if (b.type !== 'quote' || !b.quoteId || b.quoteId !== quoteId) quote = null;
+      /** @type {HTMLElement} */
+      let node;
       switch (b.type) {
         case 'h': {
           const level = /** @type {2 | 3 | 4} */ (Math.min(4, Math.max(2, b.level || 2)));
           const sig = b.level === 4 && typeof b.id === 'string' && /[.(]/.test(b.text);
-          return el(`h${level}`, { class: sig ? 'sig' : null, 'data-anchor': typeof b.id === 'string' ? b.id : null }, spanNodes(b, scope, onLink));
+          const slug = b.text.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 80);
+          const base = b.id || `section-${slug || i + 1}`;
+          let id = base, n = 2;
+          while (anchors.has(id)) id = `${base}-${n++}`;
+          anchors.add(id);
+          node = el(`h${level}`, { ...attrs, class: sig ? 'sig' : null, 'data-anchor': id, tabindex: '-1' }, spanNodes(b, scope, onLink));
+          break;
         }
         case 'pre': {
           const head = b.lang || b.label ? el('div', { class: 'code-head' }, [b.label, b.lang].filter(Boolean).join(' · '), copyButton(b.text)) : null;
-          return el('div', { class: 'code' }, head, el('pre', null, b.text));
+          node = el('div', { ...attrs, class: 'code' }, head, el('pre', null, b.text));
+          break;
         }
         case 'li': {
-          const depth = Math.min(3, Math.max(0, b.level || 0));
-          counters.fill(0, depth + 1);
-          const n = ++counters[depth];
-          return el('div', { class: 'li', style: `--mp-list-depth:${depth}`, 'data-marker': b.ordered ? `${n}.` : depth % 2 ? '◦' : '•' }, spanNodes(b, scope, onLink));
+          // A jump in malformed input is clamped to a real parent item, so lists never
+          // contain lists directly. Old blocks without ids still form consecutive lists.
+          const depth = Math.min(3, Math.max(0, b.level || 0), lists.length);
+          lists.length = Math.min(lists.length, depth + 1);
+          let group = lists[depth];
+          if (!group || group.ordered !== !!b.ordered || group.id !== b.listId) {
+            const list = b.ordered ? el('ol', { start: Number.isInteger(b.listStart) ? b.listStart : null }) : el('ul');
+            const parent = depth > 0 ? lists[depth - 1]?.last : body;
+            (parent || body).append(list);
+            group = { node: list, last: null, id: b.listId, ordered: !!b.ordered };
+            lists[depth] = group;
+          }
+          const item = el('li', { value: b.ordered && Number.isInteger(b.value) ? b.value : null }, el('div', attrs, spanNodes(b, scope, onLink)));
+          group.node.append(item); group.last = item;
+          return;
         }
-        case 'quote': return el('blockquote', null, spanNodes(b, scope, onLink));
-        case 'table': return Array.isArray(b.columns) && Array.isArray(b.rows) ? el('div', { class: 'table-wrap' }, el('table', null,
+        case 'quote': {
+          if (!quote) { quote = el('blockquote'); body.append(quote); }
+          quoteId = b.quoteId || '';
+          quote.append(el('p', attrs, spanNodes(b, scope, onLink)));
+          return;
+        }
+        case 'table': node = Array.isArray(b.columns) && Array.isArray(b.rows) ? el('div', { ...attrs, class: 'table-wrap' }, el('table', null,
           el('thead', null, el('tr', null, b.columns.map((c) => el('th', null, c)))),
-          el('tbody', null, b.rows.map((r) => el('tr', null, r.map((c) => el('td', null, c))))))) : el('p', null, b.text);
+          el('tbody', null, b.rows.map((r) => el('tr', null, r.map((c) => el('td', null, c))))))) : el('p', attrs, b.text); break;
         case 'callout': {
           const tone = /** @type {Array<string | undefined>} */ (['note', 'tip', 'warning', 'danger']).includes(b.tone) ? b.tone : 'note';
-          return el('div', { class: `callout ${tone}`, role: 'note' }, b.label ? el('span', { class: 'callout-label' }, b.label) : null, spanNodes(b, scope, onLink));
+          node = el('div', { ...attrs, class: `callout ${tone}`, role: 'note' }, b.label ? el('span', { class: 'callout-label' }, b.label) : null, spanNodes(b, scope, onLink));
+          break;
         }
-        default: return el('p', null, spanNodes(b, scope, onLink));
+        default: {
+          if (b.figure && isHttpUrl(b.figure.url)) {
+            const f = b.figure;
+            const ratio = f.width && f.height && f.width > 0 && f.height > 0 ? Math.min(3, Math.max(0.5, f.width / f.height)) : 1.5;
+            const image = watchPicture(el('div', { class: 'reader-image', 'data-img': f.url, style: `aspect-ratio:${ratio}` }, el('img', { alt: f.alt || '', decoding: 'async' })));
+            const link = el('a', { href: f.url, onclick: (/** @type {MouseEvent} */ e) => { e.preventDefault(); (onLink || openLink)(f.url); } }, 'Open image at source');
+            node = el('figure', attrs, image, el('figcaption', null, (f.caption || f.alt || b.text) ? el('span', { class: 'figure-caption' }, f.caption || f.alt || b.text) : null, f.credit ? el('span', { class: 'figure-credit' }, f.credit) : null, link));
+          } else if (b.media && isHttpUrl(b.media.url)) {
+            const m = b.media;
+            node = el('p', { ...attrs, class: 'reader-media' }, el('a', { href: m.url, onclick: (/** @type {MouseEvent} */ e) => { e.preventDefault(); (onLink || openLink)(m.url); } }, m.label || `Open ${m.kind} at source`));
+          } else {
+            // Only a paragraph consisting of recognized listening links and separators
+            // becomes a link group; prose and unknown destinations keep normal styling.
+            const listening = b.spans && b.spans.filter((s) => s.href).length >= 2 && b.spans.every((s) => s.href ? /^https:\/\/(?:open\.spotify\.com|music\.apple\.com|(?:www\.)?bandcamp\.com|[^/]+\.bandcamp\.com|(?:www\.)?youtube\.com|youtu\.be|(?:www\.)?tidal\.com|listen\.tidal\.com|(?:www\.)?soundcloud\.com)\//i.test(s.href) : /^(?:Listen(?:ing)?(?: here)?\s*:)?[\s·|,;/]*$/i.test(s.text));
+            node = el('p', { ...attrs, class: listening ? 'listening-links' : null }, spanNodes(b, scope, onLink));
+          }
+        }
       }
+      body.append(node);
     });
-    body = el('div', { class: 'body' }, nodes);
     return body;
+  }
+
+  /** @param {string | undefined} value @param {string} label */
+  function articleDate(value, label) {
+    if (!value || !/^\d{4}-\d{2}-\d{2}(?:T|$)/.test(value) || !Number.isFinite(Date.parse(value))) return null;
+    return el('time', { datetime: value }, `${label}${new Date(value).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' })}`);
   }
 
   /** @param {Article} a @param {string | null} via @param {boolean} withBack @param {LinkHandler} [onLink] */
   function articleNodes(a, via, withBack, onLink) {
     const body = passageSource(blockNodes(a.blocks, onLink), a.url, a.title, 'Use read_article on that URL for the rest of the page.');
-    const site = a.siteName && a.siteName !== a.byline ? a.siteName : null;
-    const by = [a.byline, site, `${Math.max(1, Math.round(a.wordCount / 230))} min read`].filter(Boolean).join(' · ');
+    let site = a.siteName;
+    if (!site) { try { site = new URL(a.url).hostname.replace(/^www\./, ''); } catch { site = ''; } }
+    const metadata = present([a.byline, site && site !== a.byline ? site : null, articleDate(a.publishedAt, ''), a.updatedAt !== a.publishedAt ? articleDate(a.updatedAt, 'Updated ') : null, `${Math.max(1, Math.round(a.wordCount / 230))} min read`]);
+    const top = readerTop(a.url, withBack, a.title);
+    const heads = logicalBlocks(body).filter((node) => /^H[23]$/.test(node.tagName));
+    if (a.wordCount >= 800 && heads.length >= 3) {
+      const outline = el('details', { class: 'reader-outline' });
+      outline.append(el('summary', null, 'On this page'), el('nav', { 'aria-label': 'On this page' }, heads.slice(0, 60).map((h) => el('a', {
+        href: `#${h.dataset.anchor}`, onclick: (/** @type {MouseEvent} */ e) => { e.preventDefault(); outline.open = false; h.scrollIntoView({ block: 'start', behavior: scrollBehavior() }); h.focus({ preventScroll: true }); },
+      }, h.textContent))));
+      top.append(outline);
+    }
     const p = a.provenance;
-    return [readerTop(a.url, withBack, a.title), el('h1', null, a.title), el('div', { class: 'byline' }, by), body,
-      el('div', { class: 'prov' }, `Reader view of ${p.endpoint}${via ? ` · via ${via}` : ''}${provenanceTime(p)}. Text only; scripts, trackers and ads removed.`)];
+    return [top, el('h1', null, a.title), el('div', { class: 'byline article-meta' }, metadata.map((part) => el('span', null, part))), body,
+      el('div', { class: 'prov' }, `Reader view of ${p.endpoint}${via ? ` · via ${via}` : ''}${provenanceTime(p)}. Publisher scripts and trackers are not loaded; media opens at its source.`)];
   }
 
   // This view belongs to a read_article call: it is a reader card, not a room.

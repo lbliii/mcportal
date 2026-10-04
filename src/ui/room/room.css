@@ -304,7 +304,9 @@
   .reader { max-width: 740px; margin: 0 auto; padding: var(--mp-space-16) var(--mp-space-20) var(--mp-space-40); }
   .reader[hidden] { display: none; }
   :root:not(.fullscreen) .reader { max-height: 640px; overflow-y: auto; }
-  .reader-top { display: flex; gap: var(--mp-space-2); align-items: center; margin: -6px 0 10px -6px; }
+  .reader-top { display: flex; gap: var(--mp-space-2); align-items: center; margin: -6px 0 10px -6px; position: sticky; top: 0; z-index: 2; background: var(--mp-surface-canvas); border-bottom: 1px solid var(--mp-border-divider); padding: var(--mp-space-4) 0; }
+  :root.fullscreen .reader-top { top: var(--mp-reader-bar-height, 38px); }
+  :root.fullscreen .reader .body [data-reader-block] { scroll-margin-top: calc(var(--mp-reader-bar-height, 38px) + 66px); }
   .reader h1 { font-size: 24px; line-height: 1.25; margin: 6px 0 6px; letter-spacing: -0.01em; }
   .reader .byline { color: var(--mp-text-secondary); margin-bottom: 18px; }
   .passage-bar { position: fixed; z-index: var(--mp-layer-toast); display: flex; gap: var(--mp-space-4); padding: var(--mp-space-4); background: var(--mp-surface-raised); border: 1px solid var(--mp-border-control); border-radius: var(--mp-radius-control); box-shadow: 0 4px 16px rgb(0 0 0 / 0.18); }
@@ -328,9 +330,28 @@
   .reader .body h3 { font-size: var(--mp-type-15-5); margin: 18px 0 6px; }
   .reader .body h4 { font-size: var(--mp-type-14); margin: 16px 0 6px; }
   .reader .body h4.sig { font: var(--mp-weight-strong) var(--mp-type-13)/var(--mp-line-ui) var(--mp-font-mono); padding: var(--mp-space-6) var(--mp-space-10); background: var(--mp-surface-hover); border-radius: var(--mp-radius-sm); overflow-wrap: anywhere; }
-  .reader .body .li { position: relative; font-size: var(--mp-type-15); line-height: 1.65; margin: 0 0 6px; padding-left: calc(22px + var(--mp-list-depth, 0) * 20px); }
-  .reader .body .li::before { content: attr(data-marker); position: absolute; left: calc(var(--mp-list-depth, 0) * 20px); width: 18px; text-align: right; color: var(--mp-text-secondary); font-variant-numeric: tabular-nums; }
-  .reader .body .li + :not(.li) { margin-top: 14px; }
+  .reader .body ul, .reader .body ol { margin: 0 0 14px; padding-left: 24px; }
+  .reader .body li { margin-bottom: 6px; }
+  .reader .body li > ul, .reader .body li > ol { margin: 6px 0 0; padding-left: 22px; }
+  .reader .body li::marker { color: var(--mp-text-secondary); font-variant-numeric: tabular-nums; }
+  .reader .body [data-reader-block] { scroll-margin-top: 66px; }
+  .reader .body blockquote p:last-child { margin-bottom: 0; }
+  .article-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: var(--mp-type-12-5); }
+  .article-meta > span + span::before { content: '·'; margin-right: 12px; }
+  .reader-outline { margin-left: auto; position: relative; font-size: var(--mp-type-12-5); }
+  .reader-outline summary { cursor: pointer; padding: 10px 6px; }
+  .reader-outline nav { position: absolute; right: 0; width: min(320px, 65vw); max-height: 50vh; overflow-y: auto; background: var(--mp-surface-raised); border: 1px solid var(--mp-border-control); border-radius: var(--mp-radius-control); padding: 6px; box-shadow: 0 4px 16px rgb(0 0 0 / 0.12); }
+  .reader-outline a { display: block; padding: 8px; color: var(--mp-action-primary); }
+  .reader .body figure { margin: 0 0 20px; }
+  .reader-image { width: 100%; overflow: hidden; background: var(--mp-surface-inset); border-radius: var(--mp-radius-control); }
+  .reader-image img { display: block; width: 100%; height: 100%; object-fit: contain; opacity: 0; }
+  .reader-image img.on { opacity: 1; }
+  .reader .body figcaption { color: var(--mp-text-secondary); font-size: var(--mp-type-12-5); line-height: 1.5; margin-top: 6px; }
+  .figure-caption, .figure-credit { display: block; }
+  .figure-credit { font-size: var(--mp-type-11-5); }
+  .reader .body .listening-links { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .reader .body .listening-links a { padding: 4px 8px; background: var(--mp-surface-hover); border-radius: var(--mp-radius-sm); font-size: var(--mp-type-12-5); }
+  .reader .body .reader-media { padding: 10px 12px; border: 1px solid var(--mp-border-divider); border-radius: var(--mp-radius-control); }
   .reader .body code { font: 0.88em/1.4 var(--mp-font-mono, ui-monospace, "SF Mono", Menlo, monospace); background: var(--mp-surface-hover); border-radius: var(--mp-radius-xs); padding: 1px var(--mp-space-4); }
   .reader .body a { color: var(--mp-action-primary); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
   .reader .body .code { position: relative; margin: 0 0 14px; }

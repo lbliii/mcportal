@@ -18,8 +18,8 @@
 
   /** The first block of `body` on screen. @param {HTMLElement} body */
   function firstVisibleBlock(body) {
-    const top = Math.max(0, $('reader').getBoundingClientRect().top);
-    return Math.max(0, [...body.children].findIndex((b) => b.getBoundingClientRect().bottom > top + 1));
+    const top = readerVisibleTop($('reader'));
+    return Math.max(0, logicalBlocks(body).findIndex((b) => b.getBoundingClientRect().bottom > top + 1));
   }
 
   /** Send the page (and the selected passage, if any) to a new chat. @param {Passage | null} p */
@@ -27,7 +27,7 @@
     const page = currentPage();
     if (!page) return;
     const block = p ? p.block : firstVisibleBlock(page.body);
-    const heading = p ? p.heading : headingAt(page.body, block);
+    const heading = headingAnchorAt(page.body, block);
     try {
       const { prompt } = (await callTool('create_handoff', {
         url: page.url, title: page.title, place: page.place,
@@ -60,7 +60,7 @@
     const h = pendingHandoff;
     if (!h || h.url !== body.dataset.passageUrl) return false;
     pendingHandoff = null;
-    const target = h.anchor && typeof h.anchor.block === 'number' && h.anchor.block > 0 ? body.children[h.anchor.block] : null;
+    const target = h.anchor || h.passage ? logicalBlocks(body)[resolveBlock(body, h.anchor, h.passage)] : null;
     // With a passage, show it first, and a way to its place in the page; without, go straight there.
     const note = el('div', { class: 'handoff-note' },
       el('div', { class: 'handoff-label' }, h.passage ? 'You sent this passage from your room' : 'Sent from your room'),
