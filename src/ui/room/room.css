@@ -126,6 +126,9 @@
   .card .item-title { font-weight: 600; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   .card .item-summary { margin-top: 0; }
   .card .item-meta { margin-top: auto; flex-wrap: nowrap; overflow: hidden; white-space: nowrap; }
+  /* A narrow card gives up its words (a domain, a language) before its counts, age and buttons. */
+  .card .item-meta > * { flex-shrink: 0; }
+  .card .item-meta > .meta-text { flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
   :root.fullscreen .card { flex-basis: 264px; width: 264px; height: 176px; }
   .shelf .portal-foot { border: 0; padding: 0 var(--mp-space-12) var(--mp-space-4); }
   /* a portal's title opens it at the portal level */

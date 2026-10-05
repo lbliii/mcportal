@@ -33,7 +33,7 @@
           ? el('button', { class: 'mi', title: 'Open the discussion', 'aria-label': `${hit[1]} comments, open the discussion`, onclick: (/** @type {MouseEvent} */ e) => { e.stopPropagation(); openLink(url); } }, icon('comment'), hit[1])
           : el('span', { class: 'mi', style: 'cursor:default' }, icon('comment'), hit[1]));
       } else if (/^by /.test(m)) byline = m;
-      else out.push(el('span', null, m));
+      else out.push(el('span', /^\W*[\d.,]+k?\b/.test(m) ? null : { class: 'meta-text' }, m));   // words (a domain, a language) can give way; counts can't
     }
     if (when && item.publishedAt) out.push(el('span', null, ago(item.publishedAt)));
     return { out, byline };
@@ -46,16 +46,16 @@
   }
 
   /**
-   * A row's and the lead's actions: points and comments, then open the original, save, share
-   * (Saved) or reblog (Following).
-   * @param {Item} item @param {PortalResult} portal @param {boolean} [when] @param {boolean} [reblog] add the reblog button for Following items
+   * A row's and the lead's actions: points and comments, then open the original, save, and
+   * share (Saved) or reblog (everything else: a follow's post, else the link).
+   * @param {Item} item @param {PortalResult} portal @param {boolean} [when] @param {boolean} [reblog] add the reblog button
    */
   function itemActions(item, portal, when = true, reblog = true) {
     const { out, byline } = compactMeta(item, when);
     if (item.url) out.push(el('button', { class: 'mi go', title: 'Open the original', 'aria-label': 'Open the original', onclick: () => openLink(item.url ?? '') }, icon('external')));   // checked just before
     out.push(saveButton(item, portal.source));
     if (portal.source === 'saved' && item.url) out.push(el('button', { class: 'mi go', title: 'Share to your space', 'aria-label': 'Share to your space', onclick: () => openComposer(item) }, icon('share')));
-    if (reblog && reblogLab() && portal.source === 'following' && item.share) out.push(reblogButton(reblogTarget(item, portal, item.share)));
+    if (reblog && portal.source !== 'saved') { const button = reblogButton(reblogTarget(item, portal, item.share)); if (button) out.push(button); }
     return { out, byline };
   }
 
@@ -159,6 +159,8 @@
       const meta = compactMeta(item).out;
       const save = saveButton(item, portal.source);
       if (save) { save.classList.add('go'); meta.push(save); }
+      const reblog = portal.source === 'saved' ? null : reblogButton(reblogTarget(item, portal, item.share));
+      if (reblog) meta.push(reblog);
       const content = [itemTitle(item), media ? null : item.summary ? el('span', { class: 'item-summary' }, item.summary) : null];
       const main = el('button', { class: 'card-main', type: 'button', title: item.title, onclick: (/** @type {MouseEvent} */ e) => openFrom(e, item, portal) },
         media ? [thumbBox(item.image && item.image.kind === 'thumb' ? item : { ...item, image: undefined }, portal), el('span', { class: 'card-body' }, content)] : content);

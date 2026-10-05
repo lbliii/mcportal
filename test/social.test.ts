@@ -284,21 +284,15 @@ test("tools: reblog with share, undo with unshare, who reblogged in get_share, a
   assert.equal((await social.get('a', post.structuredContent.share.id))?.reblogCount, 0);
 });
 
-test('reblog lab: off, the tools neither list nor accept reblogging', async () => {
+test('reblogging is on everywhere: the tools list and accept it without any lab', async () => {
   const { ctx } = await world();
-  const off = (id: string): ToolContext => ({ ...ctx(id), labs: [] });
-  const post = await call(off('a'), 'share', { savedUrl: 'https://example.com/a', audience: 'mcportal' });
-  assert.ok(!post.isError, 'sharing works as before');
-  const names = async (c: ToolContext) => ((await handleMessage({ jsonrpc: '2.0', id: 1, method: 'tools/list' }, c))!.result as any).tools as Array<{ name: string; description: string; inputSchema: { properties: Record<string, unknown> } }>;
-  const listed = await names(off('a'));
-  assert.ok(!listed.some((t) => t.name === 'share_settings'));
-  const share = listed.find((t) => t.name === 'share')!;
-  assert.ok(!('reblogOf' in share.inputSchema.properties) && !/reblog/.test(share.description), "share doesn't mention reblogging");
-  assert.ok(!('reblogs' in listed.find((t) => t.name === 'set_public_profile')!.inputSchema.properties));
-  assert.match((await call(off('b'), 'share', { reblogOf: post.structuredContent.share.id })).content[0]!.text, /share wasn't called: .*reblogOf/);
-  assert.match((await call(off('a'), 'share_settings', { id: post.structuredContent.share.id, reblogs: 'nobody' })).content[0]!.text, /Reblogging isn't on/);
-  const on = await names(ctx('a'));
-  assert.ok(on.some((t) => t.name === 'share_settings') && 'reblogOf' in on.find((t) => t.name === 'share')!.inputSchema.properties, 'on, they are offered');
+  const bare = (id: string): ToolContext => ({ ...ctx(id), labs: [] });
+  const post = await call(bare('a'), 'share', { savedUrl: 'https://example.com/a', audience: 'mcportal' });
+  const names = async (c: ToolContext) => ((await handleMessage({ jsonrpc: '2.0', id: 1, method: 'tools/list' }, c))!.result as any).tools as Array<{ name: string; inputSchema: { properties: Record<string, unknown> } }>;
+  const listed = await names(bare('a'));
+  assert.ok(listed.some((t) => t.name === 'share_settings') && 'reblogOf' in listed.find((t) => t.name === 'share')!.inputSchema.properties);
+  assert.ok('reblogs' in listed.find((t) => t.name === 'set_public_profile')!.inputSchema.properties);
+  assert.match((await call(bare('b'), 'share', { reblogOf: post.structuredContent.share.id })).content[0]!.text, /Reblogged @/);
 });
 
 test('spaces: title, accent and featured sources; visitors see what the rules allow; big posts are trimmed', async () => {

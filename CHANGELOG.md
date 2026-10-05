@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### The river and reblogging are on for everyone
+- **The river is a regular layout,** beside columns and shelves, no longer behind `MCPORTAL_LABS=river`. The front page stays a lab.
+- **Reblog from anywhere:** every story, row and shelf card has a reblog button, not only the river and Following. A story nobody has posted is saved first, then posted to your Space; one someone you follow posted reblogs their post, so the credit stays theirs. Saved items keep their Share button.
+- **Reblogging is no longer a lab:** `share` takes `reblogOf`, `share_settings` is always listed and the API's reblog methods always answer. `MCPORTAL_LABS=reblog` and `=river` are now ignored.
+- Narrow shelf cards shorten a domain or language before they drop a count, an age or a button.
+
 ### Standalone pages get a door, and the account page a dashboard
 - **Door plates:** consent, account, invite, import and sign-in pages open with a night-sky plate over the card. The door is lit with the moon in it for a welcome or good news, and dark when a link has expired or sign-in failed (with a brick shadow in place of mustard). A short line over the heading carries the pulp voice where the news is good ("It's alive!", "A door has opened!") and a few words on light failures ("Signal lost"); consent, deletion and account text stay plain.
 - **Consent screen:** the requesting app and MCPortal are joined by an orbit of dots above the text that names them.
