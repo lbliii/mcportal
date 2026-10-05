@@ -119,11 +119,11 @@ export class AdminPanel {
     const headers = { 'x-robots-tag': 'noindex, nofollow' };
     const invite = await this.accounts.findInvite(code);
     if (!invite) {
-      return sendHtml(res, 404, page('Invite not valid', '<h1>This invite link isn\'t valid anymore</h1><p>It may have been revoked. Ask the person who invited you for a new one.</p>'), headers);
+      return sendHtml(res, 404, page('Invite not valid', '<h1>This invite link isn\'t valid anymore</h1><p>It may have been revoked. Ask the person who invited you for a new one.</p>', { door: 'shut', kicker: 'This door has closed' }), headers);
     }
     const login = escapeHtml(invite.login);
     if (invite.acceptedAt) {
-      return sendHtml(res, 200, page('Already in', `<h1>@${login} is already in</h1><p>MCPortal is connected to that account. In Claude, ask <i>“open my room”</i>.</p>`), headers);
+      return sendHtml(res, 200, page('Already in', `<h1>@${login} is already in</h1><p>MCPortal is connected to that account. In your agent, ask <i>“open my room”</i>.</p>`, { door: 'open', kicker: 'Welcome back!' }), headers);
     }
     const inviter = invite.invitedBy.startsWith('admin:') ? `@${escapeHtml(invite.invitedBy.slice(6))}` : 'The admin';
     const mcp = escapeHtml(`${this.publicUrl}/mcp`);
@@ -136,7 +136,7 @@ export class AdminPanel {
   <li>Click <b>Connect</b> and sign in with GitHub as <b>@${login}</b>.</li>
   <li>In a new chat, ask: <i>“open my portal”</i>.</li>
 </ol>
-<p class="muted">The invite is for @${login}, so signing in with another GitHub account won't work. If your organization's Claude doesn't allow custom connectors, hosted MCPortal isn't available to you yet.</p>`), headers);
+<p class="muted">The invite is for @${login}, so signing in with another GitHub account won't work. If your organization's Claude doesn't allow custom connectors, hosted MCPortal isn't available to you yet.</p>`, { door: 'open', kicker: 'A door has opened!' }), headers);
   }
 
   /** Returns true if it handled the request. */
@@ -151,7 +151,7 @@ export class AdminPanel {
 
     if (route === '/admin/login' && req.method === 'GET') {
       this.oauth.beginPageSignIn(req, res, async (who, out, clearCookie) => {
-        if ('error' in who) return sendHtml(out, 400, page('Sign-in failed', `<p>${escapeHtml(who.error)}.</p><p><a href="/admin">Try again</a></p>`), clearCookie);
+        if ('error' in who) return sendHtml(out, 400, page('Sign-in failed', `<p>${escapeHtml(who.error)}.</p><p><a class="button primary" href="/admin/login">Try again</a></p>`, { door: 'shut', kicker: 'Signal lost' }), clearCookie);
         const admission = await this.accounts.admit(who);
         const actor = admission.ok ? this.accounts.actor(admission.account.id) : undefined;
         if (!admission.ok || !actor || actor.role !== 'admin' || actor.status !== 'active') {

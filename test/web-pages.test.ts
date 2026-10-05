@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import { PAGE_CSP } from '../src/lib/web.ts';
-import { page as webPage } from '../src/page.ts';
+import { handshake, page as webPage } from '../src/page.ts';
 import { LinkFile } from '../src/link/link-file.ts';
 import { startSignIn } from '../src/link/signin.ts';
 import { findChrome, Page } from './browser.ts';
@@ -23,6 +23,21 @@ test('standalone shell escapes its title and local destinations and carries its 
   assert.doesNotMatch(html, /state=private|src="https?:|url\(https?:|<script/i);
   assert.equal((webPage('Existing', '<h1>Existing heading</h1>').match(/<h1>/g) ?? []).length, 1);
   assert.throws(() => webPage('Bad origin', '', { siteUrl: 'javascript:alert(1)' }), /HTTP\(S\)/);
+});
+
+test('door plate, kicker and handshake: decorative, escaped, and only where asked', () => {
+  const open = webPage('Welcome', '<p>Hi.</p>', { door: 'open', kicker: '<It\'s alive!>' });
+  assert.match(open, /<div class="card door open"><div class="door-plate"><svg[^>]*aria-hidden="true"/);
+  assert.match(open, /<p class="kicker">&lt;It&#39;s alive!&gt;<\/p><h1>Welcome<\/h1>/);
+  assert.match(webPage('Expired', '<p>Gone.</p>', { door: 'shut' }), /class="card door shut"/);
+  const plain = webPage('Plain', '<p>No art.</p>');
+  assert.doesNotMatch(plain, /class="door-plate"|class="kicker"/);
+  assert.match(plain, /<div class="card">/);
+  const hs = handshake('<img src=x>');
+  assert.match(hs, /aria-hidden="true"/);
+  assert.match(hs, /&lt;img src=x&gt;/);
+  assert.doesNotMatch(hs, /id="mcp-ht"/, 'the mark\'s halftone id does not collide with the lockup\'s');
+  assert.doesNotMatch(open + hs, /<script|src="https?:/i);
 });
 
 test('browser-facing hosted pages use the brand shell while API errors remain JSON', async () => {

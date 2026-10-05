@@ -85,6 +85,25 @@ function uploadForm(action: string, csrf?: string): string {
 </form>`;
 }
 
+/** The signed-in account page's own pieces, over the shared page style. */
+const ACCOUNT_STYLE = `
+.account-head{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--mp-space-16)}.account-head form{margin:0;flex:none}
+.stats,.rows,.files{list-style:none;padding:0}.stats li,.rows li,.files li{margin:0}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--mp-space-16);margin:var(--mp-space-24) 0}
+.stats li{border:2px solid var(--mp-text-primary);border-radius:var(--mp-radius-card);background:var(--mp-surface-canvas);padding:var(--mp-space-12) var(--mp-space-16);box-shadow:4px 4px 0 var(--mp-brand-brick)}
+.stats li:nth-child(2){box-shadow:4px 4px 0 var(--mp-brand-mustard)}.stats li:nth-child(3){box-shadow:4px 4px 0 var(--mp-brand-teal)}
+.stats b{display:block;font:700 2rem/1.1 var(--mp-font-heading)}.stats span{display:block;line-height:1.3;color:var(--mp-text-secondary);font-size:var(--mp-type-14)}
+.rows{margin:0 0 var(--mp-space-12);border-top:1px solid var(--mp-border-divider)}.rows li{border-bottom:1px solid var(--mp-border-divider)}
+.rows form{justify-content:space-between;flex-wrap:nowrap;margin:0;padding:var(--mp-space-8) 0}.rows .muted{white-space:nowrap}
+.files{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--mp-space-12)}
+.files a{display:block;height:100%;border:2px solid var(--mp-text-primary);border-radius:var(--mp-radius-card);padding:var(--mp-space-12) var(--mp-space-16);color:var(--mp-text-primary);background:var(--mp-surface-canvas);text-decoration:none}
+.files a:hover{box-shadow:4px 4px 0 var(--mp-brand-teal)}.files b{display:block;font-family:var(--mp-font-heading)}.files span{display:block;color:var(--mp-text-secondary);font-size:var(--mp-type-13)}
+.danger-zone{margin-top:var(--mp-space-40);border:2px dashed var(--mp-action-danger);border-radius:var(--mp-radius-card);padding:var(--mp-space-20)}.danger-zone h2{margin-top:0}
+.danger-zone input{width:100%;margin-top:var(--mp-space-8)}
+@media(max-width:480px){.stats{gap:var(--mp-space-8)}.stats b{font-size:1.5rem}.files{grid-template-columns:1fr}.rows form{flex-wrap:wrap}}
+@media(forced-colors:active){.stats li,.files a:hover{box-shadow:none}}
+`;
+
 function sendFile(res: ServerResponse, file: ExportFile): void {
   res.writeHead(200, {
     'content-type': file.contentType,
@@ -96,6 +115,55 @@ function sendFile(res: ServerResponse, file: ExportFile): void {
     'referrer-policy': 'no-referrer',
   });
   res.end(file.body);
+}
+
+/** What the signed-in account page shows. */
+export interface AccountView {
+  login: string;
+  csrf: string;
+  handle?: string | undefined;
+  portals: number;
+  saved: number;
+  clips: number;
+  grants: ReadonlyArray<{ grantId: string; clientName: string; lastUsedAt?: number | null | undefined }>;
+}
+
+/** The signed-in account page: who you are, what you keep, signed-in apps, downloads, import and deletion. */
+export function accountHome(view: AccountView): string {
+  const login = escapeHtml(view.login);
+  const labels: Record<ExportFormat, [string, string]> = {
+    mcportal: ['Everything', 'MCPortal export, JSON'],
+    bookmarks: ['Saved items', 'Bookmarks file'],
+    clips: ['Clips', 'Markdown, .tar.gz'],
+    opml: ['Sources', 'OPML'],
+  };
+  const csrf = `<input type="hidden" name="csrf" value="${escapeHtml(view.csrf)}">`;
+  const stat = (n: number, one: string, many: string) => `<li><b>${n}</b> <span>${n === 1 ? one : many}</span></li>`;
+  return page('Your MCPortal account', `
+<div class="account-head"><div><p class="kicker">Signed in as</p><h1>@${login}</h1></div>
+<form method="post" action="/account/logout">${csrf}<button>Sign out</button></form></div>
+<p>${view.handle ? `Your public profile is <b>@${escapeHtml(view.handle)}</b>.` : 'No public profile. Ask your agent to set one up if you want one.'}</p>
+<ul class="stats" aria-label="What your account holds">${stat(view.portals, 'portal', 'portals')}${stat(view.saved, 'saved item', 'saved items')}${stat(view.clips, 'clip', 'clips')}</ul>
+<h2>Signed-in apps and devices</h2>
+${view.grants.length ? `<ul class="rows">${view.grants.map((g) => `<li><form method="post" action="/account/devices/revoke">
+${csrf}<input type="hidden" name="grant" value="${escapeHtml(g.grantId)}">
+<span><b>${escapeHtml(g.clientName)}</b> <span class="muted">${g.lastUsedAt ? `last used ${new Date(g.lastUsedAt).toISOString().slice(0, 10)}` : ''}</span></span>
+<button>Revoke</button></form></li>`).join('')}</ul>
+<p class="muted">Revoking signs that app or device out at once; it can sign in again.</p>` : '<p class="muted">None right now.</p>'}
+<h2>Download your data</h2>
+<ul class="files">${EXPORT_FORMATS.map((f) => `<li><a href="/account/export/${f}"><b>${labels[f][0]}</b> <span>${labels[f][1]}</span></a></li>`).join('')}</ul>
+<h2>Import</h2>
+<p>Add an MCPortal export from another server or your own machine. It only adds: nothing in your portal is removed or moved.</p>
+${uploadForm('/account/import', view.csrf)}
+<section class="danger-zone" aria-labelledby="delete-heading">
+<h2 id="delete-heading">Delete your account</h2>
+<p>This deletes your room, saved items, clips, public profile, shares and follows, and signs you out everywhere. It can't be undone, so download your data first.</p>
+<form method="post" action="/account/delete">
+${csrf}
+<p><label>Type <code>delete @${login}</code> to confirm:<input name="confirm" autocomplete="off" spellcheck="false"></label></p>
+<p><button class="danger">Delete my account</button></p>
+</form>
+</section>`, { door: 'open', wide: true, style: ACCOUNT_STYLE });
 }
 
 /** What deleting an account needs: every store, and something that can revoke its sign-ins. */
@@ -189,7 +257,7 @@ export class AccountPage {
       const result = await importExport(parseExport(upload.file.toString('utf8')), userId, this.deps);
       this.deps.log?.info('account.import', { portals: result.portalsAdded, saved: result.savedAdded, clips: result.clipsAdded });
       const lines = describeImport(result).split('\n').map((l) => `<p>${escapeHtml(l)}</p>`).join('');
-      sendHtml(res, 200, page('Imported', `<h1>Imported</h1>${lines}<p>In Claude, ask <i>“open my room”</i> to see it.</p>`));
+      sendHtml(res, 200, page('Imported', `${lines}<p>In your agent, ask <i>“open my room”</i> to see it.</p>`, { door: 'open', kicker: 'Materialized!' }));
     } catch (error) {
       if (!isAppError(error) || error.code === 'internal') throw error;
       sendHtml(res, 400, page('Not imported', `<p>${escapeHtml(error.message)}</p><p><a href="${back}">Try another file</a>.</p>`));
@@ -198,35 +266,16 @@ export class AccountPage {
 
   private async home(res: ServerResponse, s: PageSession): Promise<void> {
     const profile = await this.deps.store.get(s.accountId);
-    const clips = this.deps.clips ? (await this.deps.clips.usage(s.accountId)).count : 0;
     const pub = await this.deps.publicProfiles?.get(s.accountId);
-    const grants = await this.deps.oauth.grantsOf(s.accountId);
-    const portals = profile.columns.reduce((n, c) => n + c.panels.length, 0);
-    const login = escapeHtml(s.login);
-    const labels: Record<ExportFormat, string> = { mcportal: 'Everything (MCPortal export, JSON)', bookmarks: 'Saved items (bookmarks file)', clips: 'Clips (Markdown, .tar.gz)', opml: 'Sources (OPML)' };
-    sendHtml(res, 200, page('Your MCPortal account', `
-<h1>Your MCPortal account</h1>
-<p>Signed in as <b>@${login}</b>${pub ? `. Public profile: <b>@${escapeHtml(pub.handle)}</b>` : '. No public profile'}.</p>
-<p class="muted">${portals} portal(s), ${profile.saved.length} saved item(s), ${clips} clip(s).</p>
-<h2 style="font-size:16px">Signed-in apps and devices</h2>
-${grants.length ? `<ul>${grants.map((g) => `<li><form method="post" action="/account/devices/revoke" style="display:flex;gap:8px;align-items:center;margin:0 0 6px">
-  <input type="hidden" name="csrf" value="${escapeHtml(s.csrf)}"><input type="hidden" name="grant" value="${escapeHtml(g.grantId)}">
-  <span><b>${escapeHtml(g.clientName)}</b> <span class="muted">${g.lastUsedAt ? `last used ${new Date(g.lastUsedAt).toISOString().slice(0, 10)}` : ''}</span></span>
-  <button>Revoke</button></form></li>`).join('')}</ul>
-<p class="muted">Revoking signs that app or device out at once; it can sign in again.</p>` : '<p class="muted">None right now.</p>'}
-<h2 style="font-size:16px">Download your data</h2>
-<ul>${EXPORT_FORMATS.map((f) => `<li><a href="/account/export/${f}">${labels[f]}</a></li>`).join('')}</ul>
-<h2 style="font-size:16px">Import</h2>
-<p>Add an MCPortal export from another server or your own machine. It only adds: nothing in your portal is removed or moved.</p>
-${uploadForm('/account/import', s.csrf)}
-<h2 style="font-size:16px">Delete your account</h2>
-<p>This deletes your room, saved items, clips, public profile, shares and follows, and signs you out everywhere. It can't be undone, so download your data first.</p>
-<form method="post" action="/account/delete">
-  <input type="hidden" name="csrf" value="${escapeHtml(s.csrf)}">
-  <p><label>Type <code>delete @${login}</code> to confirm:<br><input name="confirm" autocomplete="off" style="font:inherit;padding:6px 8px;width:100%;box-sizing:border-box;margin-top:6px"></label></p>
-  <p><button class="danger">Delete my account</button></p>
-</form>
-<form method="post" action="/account/logout"><input type="hidden" name="csrf" value="${escapeHtml(s.csrf)}"><button>Sign out</button></form>`));
+    sendHtml(res, 200, accountHome({
+      login: s.login,
+      csrf: s.csrf,
+      handle: pub?.handle,
+      portals: profile.columns.reduce((n, c) => n + c.panels.length, 0),
+      saved: profile.saved.length,
+      clips: this.deps.clips ? (await this.deps.clips.usage(s.accountId)).count : 0,
+      grants: await this.deps.oauth.grantsOf(s.accountId),
+    }));
   }
 
   /** Returns true if it handled the request. */
@@ -239,7 +288,7 @@ ${uploadForm('/account/import', s.csrf)}
       const entry = this.downloads.get(key);
       if (!entry || entry.expiresAt <= this.now() || this.deps.accounts.actor(entry.userId).status !== 'active') {
         this.downloads.delete(key);
-        sendHtml(res, 410, page('Link expired', '<p>This download link has expired or was already used. Ask for a new export, or download from your <a href="/account">account page</a>.</p>'));
+        sendHtml(res, 410, page('Link expired', '<p>This download link has expired or was already used. Ask for a new export, or download from your <a href="/account">account page</a>.</p>', { door: 'shut', kicker: 'This door has closed' }));
         return true;
       }
       const current = this.linkSession(req, res, route, entry);
@@ -254,13 +303,13 @@ ${uploadForm('/account/import', s.csrf)}
       const entry = this.uploads.get(key);
       if (!entry || entry.expiresAt <= this.now() || this.deps.accounts.actor(entry.userId).status !== 'active') {
         this.uploads.delete(key);
-        sendHtml(res, 410, page('Link expired', '<p>This upload link has expired or was already used. Ask Claude for a new one, or import from your <a href="/account">account page</a>.</p>'));
+        sendHtml(res, 410, page('Link expired', '<p>This upload link has expired or was already used. Ask Claude for a new one, or import from your <a href="/account">account page</a>.</p>', { door: 'shut', kicker: 'This door has closed' }));
         return true;
       }
       const current = this.linkSession(req, res, route, entry);
       if (!current) return true;
       if (req.method === 'GET') {
-        sendHtml(res, 200, page('Import into MCPortal', `<h1>Import into MCPortal</h1><p>Pick your MCPortal export file. It only adds to your room: nothing is removed or moved.</p>${uploadForm(route, current.session.csrf)}<p class="muted">This link works once, for 15 minutes.</p>`));
+        sendHtml(res, 200, page('Import into MCPortal', `<h1>Import into MCPortal</h1><p>Pick your MCPortal export file. It only adds to your room: nothing is removed or moved.</p>${uploadForm(route, current.session.csrf)}<p class="muted">This link works once, for 15 minutes.</p>`, { door: 'open', kicker: 'Incoming transmission' }));
         return true;
       }
       if (!sameOrigin(req, this.deps.publicUrl)) return sendHtml(res, 403, page('Refused', '<p>That upload didn\'t come from the import page.</p>')), true;
@@ -284,7 +333,7 @@ ${uploadForm('/account/import', s.csrf)}
       const requested = url.searchParams.get('return') ?? '';
       const back = /^\/(download|upload)\/[A-Za-z0-9_-]{20,64}$/.test(requested) ? requested : '/account';
       this.deps.oauth.beginPageSignIn(req, res, async (who, out, clearCookie) => {
-        if ('error' in who) return sendHtml(out, 400, page('Sign-in failed', `<p>${escapeHtml(who.error)}.</p><p><a href="/account">Try again</a></p>`), clearCookie);
+        if ('error' in who) return sendHtml(out, 400, page('Sign-in failed', `<p>${escapeHtml(who.error)}.</p><p><a class="button primary" href="/account/login">Try again</a></p>`, { door: 'shut', kicker: 'Signal lost' }), clearCookie);
         const account = await this.deps.accounts.forIdentity(who);
         if (!account) return sendHtml(out, 404, page('No account', `<p>@${escapeHtml(who.login)} has no account on this MCPortal server, so there's nothing stored for it.</p>`), clearCookie);
         redirect(out, back, { 'set-cookie': [clearCookie['set-cookie']!, this.sessions.start(account.id, who.login)] });
@@ -295,7 +344,7 @@ ${uploadForm('/account/import', s.csrf)}
     const current = this.sessions.current(req);
     if (route === '/account' && req.method === 'GET') {
       if (!current) {
-        sendHtml(res, 200, page('Your MCPortal account', '<h1>Your MCPortal account</h1><p>Download your data or delete your account.</p><p><a class="button primary" href="/account/login">Sign in with GitHub</a></p>'));
+        sendHtml(res, 200, page('Your MCPortal account', '<p>Sign in to see what MCPortal keeps for you, sign apps and devices out, download your data, or delete your account.</p><p><a class="button primary" href="/account/login">Sign in with GitHub</a></p><p class="muted">MCPortal only learns your GitHub user ID and login.</p>', { door: 'open' }));
       } else await this.home(res, current.session);
       return true;
     }

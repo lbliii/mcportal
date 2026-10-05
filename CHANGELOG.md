@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Standalone pages get a door, and the account page a dashboard
+- **Door plates:** consent, account, invite, import and sign-in pages open with a night-sky plate over the card. The door is lit with the moon in it for a welcome or good news, and dark when a link has expired or sign-in failed (with a brick shadow in place of mustard). A short line over the heading carries the pulp voice where the news is good ("It's alive!", "A door has opened!") and a few words on light failures ("Signal lost"); consent, deletion and account text stay plain.
+- **Consent screen:** the requesting app and MCPortal are joined by an orbit of dots above the text that names them.
+- **Account page:** leads with "Signed in as @you" and sign-out, then tiles for portals, saved items and clips, signed-in apps in rows, each download as a card, and deletion in its own marked-off box. The page is rendered by `accountHome()`, which the design preview also shows at `/account-preview`.
+- Primary buttons are mustard with a brick offset shadow, like the landing page's call to action.
+
 ### Reading, retrieval and privacy
 - Continue Reading brings back recent unfinished articles and docs pages. Docs now resume and record explicit completion, and reading writes settle in navigation order. Inline columns offer five stories plus More, lane navigation and page controls; shelves keep visible navigation.
 - PostgreSQL clips use schema v9 full-text relevance with literal fallback. Docs search includes each account’s fresh cached page bodies within the existing bounded cache; unvisited pages still use their outline.
