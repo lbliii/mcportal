@@ -82,7 +82,8 @@ export async function startSignIn(options: SignInOptions): Promise<PendingSignIn
   const log = options.log ?? silentLogger;
   const reference = requestId();
   const server = hostedOrigin(options.server);
-  const resultPage = (title: string, body: string) => page(title, body, { siteUrl: server });
+  // Good news opens the door; anything else is a failure that says what to do next.
+  const resultPage = (title: string, body: string, ok = false) => page(title, body, ok ? { siteUrl: server, door: 'open', kicker: 'It\'s alive!' } : { siteUrl: server, door: 'shut', kicker: 'Signal lost' });
   const verifier = b64url(randomBytes(32));
   const challenge = b64url(createHash('sha256').update(verifier).digest());
   const state = b64url(randomBytes(24));
@@ -174,7 +175,7 @@ export async function startSignIn(options: SignInOptions): Promise<PendingSignIn
           options.onSyncFailure?.(warning);
           return warning;
         });
-        reply(200, resultPage('This computer is signed in', `<p>MCPortal on this computer now keeps your portal in your hosted account${me.login ? `, as <b>${escapeHtml(me.login)}</b>` : ''}.</p>${note ? `<p>${escapeHtml(note)}</p>` : ''}<p>You can close this tab and go back to your app.</p>`));
+        reply(200, resultPage('This computer is signed in', `<p>MCPortal on this computer now keeps your portal in your hosted account${me.login ? `, as <b>${escapeHtml(me.login)}</b>` : ''}.</p>${note ? `<p>${escapeHtml(note)}</p>` : ''}<p>You can close this tab and go back to your app.</p>`, true));
         settle.resolve(record);
         log.info('signin.completed', { reference });
       } catch (error) {

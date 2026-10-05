@@ -385,7 +385,7 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
     if (url.pathname === API_PATH || url.pathname === API_EXPORT_PATH || url.pathname === API_IMPORT_PATH) return stateApi(req, res, url, reqLog);
     if (url.pathname !== '/mcp') {
       if (req.method === 'GET' && !url.pathname.startsWith('/api/') && req.headers.accept?.includes('text/html')) {
-        return sendHtml(res, 404, page('Page not found', '<p>This doorway does not lead to a page.</p><p><a class="button primary" href="/">Go to MCPortal</a></p>'));
+        return sendHtml(res, 404, page('Page not found', '<p>This doorway does not lead to a page.</p><p><a class="button primary" href="/">Go to MCPortal</a></p>', { door: 'shut', kicker: 'Lost in the ether' }));
       }
       return sendError(res, 404, 'not_found', 'Not found');
     }

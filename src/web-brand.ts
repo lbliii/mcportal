@@ -8,6 +8,12 @@ const lockup = readFileSync(new URL('../brand/lockup-on-dark.svg', import.meta.u
 const icon = readFileSync(new URL('../brand/mark-small.svg', import.meta.url)).toString('base64');
 const font = readFileSync(new URL('../brand/fonts/Jost-Bold.ttf', import.meta.url)).toString('base64');
 const css = readFileSync(new URL('./ui/web-brand.css', import.meta.url), 'utf8');
+const brandSvg = (name: string) => readFileSync(new URL(`../brand/${name}`, import.meta.url), 'utf8').trim();
+
+/** The door plate over a page's card: lit with the moon in it for good news, dark when something failed. Decorative. */
+export const DOOR_ART = { open: brandSvg('door-open.svg'), shut: brandSvg('door-shut.svg') };
+/** The Portal mark, for the consent screen. Its halftone gets its own id so it can sit beside the lockup's. */
+export const WEB_MARK = brandSvg('mark.svg').replaceAll('mcp-ht', 'mcp-ht-mark').replace('<svg ', '<svg class="web-mark" aria-hidden="true" focusable="false" ').replace(' role="img" aria-label="MCPortal"', '');
 
 export const WEB_BRAND_CSS = `@font-face{font-family:"MCPortal Jost";src:url(data:font/ttf;base64,${font}) format("truetype");font-weight:700;font-display:swap}\n${css}`;
 export const WEB_BRAND_ICON = `<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,${icon}">`;

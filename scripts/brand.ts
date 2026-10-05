@@ -222,6 +222,29 @@ function heroArt(): string {
   'A door in the night sky, with an orbit passing through it');
 }
 
+/**
+ * The plate at the top of a standalone page's card (src/page.ts), 560x168: stars, a far
+ * planet, and the portal scene at the right. `open` lights the doorway and puts the moon in
+ * it (a welcome, good news); shut, the doorway is dark (expired links, errors). The sky is
+ * transparent and the art is decorative: the page paints the night behind it.
+ */
+function doorArt(open: boolean): string {
+  const W = 560, H = 168, cx = 450;
+  const door = arch(cx, H, 112, 150), inner = arch(cx, H, 64, 112);
+  const back = ring(cx, 112, 104, 26, -16, 'back'), front = ring(cx, 112, 104, 26, -16, 'front');
+  const id = `mcp-ht-door-${open ? 'open' : 'shut'}`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" class="web-door-art" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMaxYMax meet" aria-hidden="true" focusable="false">`
+    + `<defs>${halftone(id, 7, 1.6, INK.ink)}</defs>`
+    + `<path d="${starfield(open ? 23 : 29, 46, W, H)}" fill="${INK.paper}" fill-opacity=".5"/>`
+    + `<circle cx="84" cy="52" r="17" fill="${INK.mustard}"/><circle cx="84" cy="52" r="17" fill="url(#${id})" fill-opacity=".4"/>`
+    + `<path d="${back}" fill="none" stroke="${INK.mustard}" stroke-width="5" stroke-linecap="round"/>`
+    + `<path d="${door}" fill="${INK.teal}"/><path d="${door}" fill="url(#${id})" fill-opacity=".35"/>`
+    + (open ? `<path d="${inner}" fill="${INK.paper}"/><circle cx="${cx}" cy="94" r="12" fill="${INK.brick}"/>` : `<path d="${inner}" fill="${INK.ink}"/>`)
+    + `<path d="${front}" fill="none" stroke="${INK.mustard}" stroke-width="6" stroke-linecap="round"/>`
+    + `<path d="${door}" fill="none" stroke="${INK.paper}" stroke-width="1.5" stroke-opacity=".5" transform="translate(4 -3)"/>`
+    + '</svg>\n';
+}
+
 // ------------------------------------------------------------------ type
 
 /** SVG path data from a glyph path's commands (opentype.js's own serializer isn't reliable across versions). */
@@ -332,6 +355,8 @@ export function buildBrand(): { text: Record<string, string>; png: Record<string
     'src/site/favicon.svg': svg(64, 64, portalMark()),
     'src/site/lockup-on-dark.svg': lockup(INK.paper, INK.mustard),
     'src/site/hero.svg': heroArt(),
+    'brand/door-open.svg': doorArt(true),
+    'brand/door-shut.svg': doorArt(false),
     // Inlined into the room: colours come from its CSS so they follow the theme.
     'src/ui/brand/mark-line.svg': `<svg class="brand-line" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${lineMark('stroke="currentColor"', 'class="brand-dot"')}</svg>`,
     'src/ui/brand/badge.svg': `<svg class="brand-badge" viewBox="0 0 64 64" aria-hidden="true" focusable="false">${portalMark()}</svg>`,
