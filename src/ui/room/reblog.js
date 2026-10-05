@@ -41,17 +41,13 @@
   /** @param {ReblogTarget} target */
   const markOf = (target) => reblogMarks.get(target.key) ?? { mine: target.mine ?? null, count: target.count };
 
-  /** Whether this server has reblogging on (a lab until it's had real use). */
-  const reblogLab = () => state.labs.includes('reblog');
-
   /**
    * The reblog button for a target, or null when the viewer can't post or there's nothing to
-   * reblog. With the lab off, a story with a link keeps a plain share button instead.
+   * reblog.
    * @param {ReblogTarget} target
    */
   function reblogButton(target) {
     if (!canPost() || (!target.shareId && !target.url)) return null;
-    if (!reblogLab()) return target.item && target.portal && target.portal.source !== 'saved' ? shareStoryButton(target.item, target.portal) : null;
     const button = el('button', { class: 'mi reblog', type: 'button', 'data-reblog-key': target.key, 'aria-haspopup': 'menu', 'aria-expanded': 'false',
       onclick: (/** @type {MouseEvent} */ e) => { e.stopPropagation(); openReblogMenu(button, target); } });
     reblogTargets.set(button, target);
@@ -83,16 +79,6 @@
       const target = reblogTargets.get(button);
       if (target && target.key === key) drawReblogButton(button, target);
     }
-  }
-
-  /** Share a story (no reblog lab): saved first, as every share is, then the composer. @param {Item} item @param {PortalResult} portal */
-  function shareStoryButton(item, portal) {
-    if (!item.url) return null;
-    return el('button', { class: 'mi go', title: 'Share to your space', 'aria-label': 'Share to your space', onclick: async (/** @type {MouseEvent} */ e) => {
-      e.stopPropagation();
-      if (!state.saved.has(item.url ?? '')) await toggleSaved(item, portal.source);
-      if (state.saved.has(item.url ?? '')) openComposer(item);   // saving can fail; toggleSaved says why
-    } }, icon('share'));
   }
 
   // ------------------------------------------------------------ the menu

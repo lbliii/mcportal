@@ -1,6 +1,6 @@
 # Plan: the river, one stream across the room
 
-Status: phases 1–3 built, 2026-10-02. Builds on [room-layouts.md](room-layouts.md) (layout
+Status: phases 1–3 built, 2026-10-02. Out of labs 2026-10-05: offered in every room. Builds on [room-layouts.md](room-layouts.md) (layout
 registry, item forms, editions, portal level) and comes before reblogging. Research:
 [Feed and grid design lessons](../../reports/Feed%20and%20grid%20design%20lessons.md),
 [River and reblog design research](../../reports/River%20and%20reblog%20design%20research.md).

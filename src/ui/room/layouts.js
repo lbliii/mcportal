@@ -190,7 +190,7 @@
   /** @type {Array<Profile['layout']>} */
   const LAYOUT_NAMES = ['columns', 'shelves', 'frontpage', 'river'];
   /** Layouts that are labs: offered while the server has the lab on, and kept for whoever chose one. */
-  const LAB_LAYOUTS = ['frontpage', 'river'];
+  const LAB_LAYOUTS = ['frontpage'];
   /** A layout by name (a toolbar button's), if there is one. @param {string | undefined} name */
   const layoutNamed = (name) => LAYOUT_NAMES.find((l) => l === name);
 

@@ -298,8 +298,14 @@ The hosted end-to-end test (`test/linked.test.ts`): three real accounts over `/m
 with OAuth tokens: share, follow, reblog, see it through a follow, who reblogged,
 detach, undo.
 
-Left: turning it on in production (`MCPORTAL_LABS` on Railway), two weeks of use, then
-removing the gate.
+Done, 2026-10-05: the gate is removed. Reblogging is on for every signed-in MCPortal, and
+`reblog` is no longer a lab (naming it in `MCPORTAL_LABS` does nothing). `share` and
+`set_public_profile` always take the reblog arguments and `share_settings` is always
+listed, which raised the footprint ceilings (hosted-active 4988 → 5166). The room's reblog
+button is on every story, row, lead and shelf card outside Saved (Saved keeps Share), not
+just the river and Following: a story no one has posted is saved, then posted. Why: with
+the gate on a local install whose `MCPORTAL_LABS` was unset, nothing could be reblogged
+and the river wasn't offered, and the author couldn't find the button.
 
 ## Open questions
 

@@ -26,7 +26,7 @@ import { tracksSeen } from '../seen.ts';
 import { AUDIENCES, REBLOG_RULES } from '../social.ts';
 import { SERVER_INFO } from '../mcp.ts';
 import { findTool } from '../tools/index.ts';
-import { labOn, need, type ToolContext } from '../tools/kit.ts';
+import { need, type ToolContext } from '../tools/kit.ts';
 import { CLIP_KINDS } from '../types.ts';
 import { MIN_CLIENT_VERSION, type ApiMethod } from './calls.ts';
 
@@ -53,11 +53,6 @@ const seenOf = (ctx: ToolContext) => need(ctx.seen, 'Seen tracking is not availa
 const handoffsOf = (ctx: ToolContext) => need(ctx.handoffs, 'Handoffs are not available on this server.');
 const editionsOf = (ctx: ToolContext) => need(ctx.editions, 'Editions are not available on this server.');
 const socialOf = (ctx: ToolContext) => need(ctx.social, 'Sharing is not available on this server.');
-/** The social layer for reblogging, which is a lab (MCPORTAL_LABS=reblog) until it's had real use. */
-const reblogging = (ctx: ToolContext) => {
-  if (!labOn(ctx, 'reblog')) throw new AppError('unavailable', "Reblogging isn't on for this MCPortal yet.");
-  return socialOf(ctx);
-};
 const profilesOf = (ctx: ToolContext) => need(ctx.publicProfiles, 'Public profiles are not available on this server.');
 
 const portalsOf = (profile: Profile) => profile.columns.flatMap((c) => c.panels);
@@ -224,16 +219,16 @@ export const API_METHODS: Record<string, ApiMethod> = {
       if (!saved) throw new AppError('invalid_argument', 'Share a saved item (savedUrl) or a clip (clipId).');
       return social.share(ctx.userId, { kind: 'link', title: saved.title, url: saved.url, note: p.note, audience: p.audience, reblogs: p.reblogs });
     }, 'write'),
-  /** A post the server looks up by id, as share does: nothing of the original comes from the request. While reblogging is a lab, only with the lab on. */
+  /** A post the server looks up by id, as share does: nothing of the original comes from the request. */
   'social.reblog': params<{ id: string; note?: string; audience?: string }>(
     { type: 'object', required: ['id'], additionalProperties: false, properties: { id, note: { type: 'string', maxLength: 500 }, audience: { type: 'string', enum: AUDIENCES } } },
-    (p, ctx) => reblogging(ctx).reblog(ctx.userId, p), 'write'),
+    (p, ctx) => socialOf(ctx).reblog(ctx.userId, p), 'write'),
   'social.shareSettings': params<{ id: string; reblogs?: string; detach?: string }>(
     { type: 'object', required: ['id'], additionalProperties: false, properties: { id, reblogs: { type: 'string', enum: REBLOG_RULES }, detach: id } },
-    (p, ctx) => reblogging(ctx).shareSettings(ctx.userId, p.id, { reblogs: p.reblogs, detach: p.detach }), 'write'),
+    (p, ctx) => socialOf(ctx).shareSettings(ctx.userId, p.id, { reblogs: p.reblogs, detach: p.detach }), 'write'),
   'social.reblogsOf': params<{ id: string; query?: { limit?: number; before?: string } }>(
     { type: 'object', required: ['id'], additionalProperties: false, properties: { id, query: pageQuery } },
-    (p, ctx) => reblogging(ctx).reblogsOf(ctx.userId, p.id, p.query)),
+    (p, ctx) => socialOf(ctx).reblogsOf(ctx.userId, p.id, p.query)),
   'social.unshare': params<{ id: string }>({ type: 'object', required: ['id'], additionalProperties: false, properties: { id } },
     (p, ctx) => socialOf(ctx).unshare(ctx.userId, p.id), 'write'),
   'social.get': params<{ id: string }>({ type: 'object', required: ['id'], additionalProperties: false, properties: { id } },
