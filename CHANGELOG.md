@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.8.0 — 2026-10-05
+
 ### The river and reblogging are on for everyone
 - **The river is a regular layout,** beside columns and shelves, no longer behind `MCPORTAL_LABS=river`. The front page stays a lab.
 - **Reblog from anywhere:** every story, row and shelf card has a reblog button, not only the river and Following. A story nobody has posted is saved first, then posted to your Space; one someone you follow posted reblogs their post, so the credit stays theirs. Saved items keep their Share button.
