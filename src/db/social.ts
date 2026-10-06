@@ -4,7 +4,7 @@ import type { PageQuery, Relation, Report, Share, SocialStore } from '../social.
 import { DELETED_ID, DELETED_RESOLUTION, limitOf } from '../social-store.ts';
 import type { Queryable } from './schema.ts';
 
-const RELATION_TABLES: Record<Relation, string> = { follows: 'mcportal_follows', mutes: 'mcportal_mutes', blocks: 'mcportal_blocks' };
+const RELATION_TABLES: Record<Relation, string> = { follows: 'mcportal_follows', mutes: 'mcportal_mutes', blocks: 'mcportal_blocks', intros: 'mcportal_intros', joins: 'mcportal_joins' };
 
 /** Shares, relations and reports in tables. Rules live in Social, not here. */
 export class PgSocialStore implements SocialStore {

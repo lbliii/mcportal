@@ -40,6 +40,11 @@ function fail(error: unknown): CallToolResult {
 
 const handleProp = { type: 'string', description: 'e.g. "@someone"' };
 
+/** A Space's address: /@handle on the server that holds the account (docs/plans/finding-people.md). */
+export function spaceLink(ctx: ToolContext, handle: string): string | undefined {
+  try { return ctx.accountUrl ? new URL(`/@${handle}`, ctx.accountUrl).href : undefined; } catch { return undefined; }
+}
+
 const GRID_POSTS = 60;
 const GRID_IMAGES = 12;
 const GRID_IMAGE_B64 = 270_000;   // ~200 KB of image
@@ -79,10 +84,12 @@ export const SOCIAL_TOOLS: ToolDef[] = [
         const posts = await ctx.social.sharesOf(ctx.userId, profile.accountId, { limit: GRID_POSTS });
         const stats = await ctx.social.stats(ctx.userId, profile.accountId);
         const { accountId: _id, ...pub } = profile;
-        const space = { ...pub, mine, followers: stats.followers, following: stats.following, posts: forGrid(posts), sources: profile.sources ?? [] };
+        const link = spaceLink(ctx, profile.handle);
+        const space = { ...pub, mine, followers: stats.followers, following: stats.following, posts: forGrid(posts), sources: profile.sources ?? [], ...(link ? { link } : {}) };
         const title = profile.spaceTitle ?? `@${profile.handle}`;
         const text = [
-          `Showing ${mine ? 'your space' : `@${profile.handle}'s space`} "${title}" in a card: ${posts.length} post(s)${mine ? '' : ' you can see'}, ${stats.followers} follower(s), ${space.sources.length} featured source(s).${!mine && !stats.following ? ' The user doesn\'t follow them yet.' : ''}`,
+          `Showing ${mine ? 'your space' : `@${profile.handle}'s space`} "${title}" in a card: ${posts.length} post(s)${mine ? '' : ' you can see'}, ${stats.followers} follower(s), ${space.sources.length} featured source(s).${!mine && !stats.following ? ' The user doesn\'t follow them yet.' : ''}`
+            + (link ? ` Link to share it (it also brings friends in): ${link}` : ''),
           untrusted(mine ? 'your space' : `@${profile.handle}'s space`, [
             profile.bio ? `bio: ${profile.bio}` : '',
             ...space.sources.map((s) => `source: ${s.title} (${s.source})`),

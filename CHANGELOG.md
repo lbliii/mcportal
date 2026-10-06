@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Finding people
+- **Every handle opens that person's Space:** in the share reader, the river's "@ana shared" lines, reblog notes and Following rows. Back returns to exactly where you were.
+- **Follow from a post:** a share, and a link someone you follow shared, offer Follow for the first person on it you don't follow yet (the author, the original's author, or who it came via). `get_share` returns `canFollow`.
+- **Space links:** `/@handle` is a bridge page that shows only the handle until you sign in. Signing in there admits a newcomer, and the next time their agent opens their room, it offers to follow the link's owner. The owner hears once that someone joined through their link. Your Space has Copy link, and `open_space` gives the agent the link. Schema v10 adds `mcportal_intros` and `mcportal_joins`.
+
 ### Reader
 - **The reader's row stays flush in a chat:** inline, the row of back, original and save buttons no longer floats a strip below the top, with the article scrolling through the gap.
 - **Reblog from the reader:** the reader's row has the reblog button, beside save. A story someone you follow posted reblogs their post; anything else posts the link.

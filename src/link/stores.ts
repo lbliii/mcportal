@@ -357,6 +357,7 @@ export function remoteSocial(client: StateClient, accountId: string): SocialServ
     async sharesOf(viewer, owner, query = {}) { as(viewer); return client.call('social.sharesOf', { accountId: owner, query: dropUndefined({ ...query }) }); },
     async follow(viewer, handle) { as(viewer); return client.call('social.follow', { handle }); },
     async unfollow(viewer, handle) { as(viewer); return client.call('social.unfollow', { handle }); },
+    async takeIntros(viewer) { as(viewer); return client.call('social.takeIntros', {}); },
     async mute(viewer, handle, on) { as(viewer); return client.call('social.mute', { handle, on }); },
     async block(viewer, handle, on) { as(viewer); return client.call('social.block', { handle, on }); },
     async uses(id) { as(id); return client.call('social.uses'); },

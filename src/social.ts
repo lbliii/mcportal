@@ -78,7 +78,15 @@ export interface Report {
   resolution?: string;
 }
 
-export type Relation = 'follows' | 'mutes' | 'blocks';
+/**
+ * Who follows, mutes and blocks whom, plus two one-time notes from Space links
+ * (docs/plans/finding-people.md): 'intros', a came in through b's link (offer a follow);
+ * 'joins', someone new (b) joined through a's link (tell a once).
+ */
+export type Relation = 'follows' | 'mutes' | 'blocks' | 'intros' | 'joins';
+
+/** What open_room passes on from Space links, once: people to offer a follow of, and newcomers who came in through yours. */
+export interface Intros { offer: string[]; joined: string[] }
 
 export interface PageQuery {
   limit?: number | undefined;
@@ -146,7 +154,7 @@ export interface SocialDeps {
  */
 export type SocialService = Pick<Social,
   'resolve' | 'share' | 'unshare' | 'get' | 'feed' | 'sharesOf' | 'follow' | 'unfollow' | 'mute' | 'block' | 'uses' | 'connections' | 'stats' | 'report'
-  | 'reblog' | 'shareSettings' | 'reblogsOf'>;
+  | 'reblog' | 'shareSettings' | 'reblogsOf' | 'takeIntros'>;
 
 export class Social {
   private store: SocialStore;
@@ -425,7 +433,44 @@ export class Social {
     return target;
   }
 
-  /** Blocking also removes follows both ways. Unblocking doesn't restore them. */
+  /**
+   * Someone opened `handle`'s Space link and signed in: remember to offer them a follow the
+   * next time they open their room, and when the link brought a brand-new account, tell
+   * `handle` once. Nothing to remember for your own link or someone you already follow.
+   */
+  async introduce(viewer: string, handle: string, newAccount: boolean): Promise<'self' | 'following' | 'offered'> {
+    const target = await this.resolve(viewer, handle);
+    if (this.hidden(target.accountId)) throw new SocialError(`No MCPortal profile for @${target.handle}`, 'not_found');
+    if (target.accountId === viewer) return 'self';
+    if (newAccount) await this.store.relate('joins', target.accountId, viewer);
+    if ((await this.store.outgoing('follows', viewer)).includes(target.accountId)) return 'following';
+    await this.store.relate('intros', viewer, target.accountId);
+    return 'offered';
+  }
+
+  /**
+   * The Space-link notes waiting for the viewer, taken (each is said once): handles to offer
+   * a follow of, and newcomers who joined through their link. A newcomer without a handle
+   * yet stays waiting: there's no one to name until they claim one.
+   */
+  async takeIntros(viewer: string): Promise<Intros> {
+    const out: Intros = { offer: [], joined: [] };
+    const following = new Set(await this.store.outgoing('follows', viewer));
+    for (const id of await this.store.outgoing('intros', viewer)) {
+      await this.store.unrelate('intros', viewer, id);
+      const profile = await this.profiles.get(id);
+      if (profile && !this.hidden(id) && !following.has(id) && !(await this.blockedEitherWay(viewer, id))) out.offer.push(profile.handle);
+    }
+    for (const id of await this.store.outgoing('joins', viewer)) {
+      const profile = await this.profiles.get(id);
+      if (!profile) continue;
+      await this.store.unrelate('joins', viewer, id);
+      if (!this.hidden(id) && !(await this.blockedEitherWay(viewer, id))) out.joined.push(profile.handle);
+    }
+    return out;
+  }
+
+  /** Blocking also removes follows (and Space-link notes) both ways. Unblocking doesn't restore them. */
   async block(viewer: string, handle: string, on: boolean): Promise<PublicProfile> {
     const found = await this.profiles.byHandle(handle);
     if (!found) throw new SocialError(`No MCPortal profile for @${clean(handle, 40).replace(/^@/, '')}`, 'not_found');
@@ -433,8 +478,10 @@ export class Social {
     if (target.accountId === viewer) throw new SocialError("You can't block yourself");
     if (on) {
       await this.store.relate('blocks', viewer, target.accountId);
-      await this.store.unrelate('follows', viewer, target.accountId);
-      await this.store.unrelate('follows', target.accountId, viewer);
+      for (const relation of ['follows', 'intros', 'joins'] as const) {
+        await this.store.unrelate(relation, viewer, target.accountId);
+        await this.store.unrelate(relation, target.accountId, viewer);
+      }
     } else await this.store.unrelate('blocks', viewer, target.accountId);
     return target;
   }

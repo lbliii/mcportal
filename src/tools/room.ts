@@ -11,6 +11,7 @@ import { MAX_PACKS, packSummaries, STARTER_PACKS } from '../packs.ts';
 import { SEEN_BATCH, tracksSeen, withNews } from '../seen.ts';
 import { describeDiff, describeLayout, diffProfiles, findPortal, normalizeSourceConfig, offeredLayouts, type Layout, type PortalInput, type Profile, type ProfileDiff } from '../profile.ts';
 import { clipsPortal, clipsQuery, followingPortal, loadPortal, pinnedPortal, savedPortal } from '../sources.ts';
+import type { Intros } from '../social.ts';
 import type { PortalResult } from '../types.ts';
 import { identityOf, labsOf, ok, toolError, toolFailure, untrusted, ROOM_URI, type CallToolResult, type ToolContext, type ToolDef } from './kit.ts';
 import type { ToolResults } from './results.ts';
@@ -76,6 +77,16 @@ async function rearrange(change: Arrangement, ctx: ToolContext): Promise<CallToo
   return ok(`Saved. Changes: ${describeDiff(saved.changes)}.\nLayout now: ${describeLayout(saved.profile)}`, { profile: saved.profile, changes: saved.changes } satisfies ToolResults['arrange_room']);
 }
 
+
+/** What open_room tells the agent about Space links: whom to offer, who joined. Handles are [a-z0-9_] only. */
+function introLines(intros: Intros): string {
+  const names = (handles: string[]) => handles.map((h) => `@${h}`).join(', ');
+  return [
+    intros.offer.length ? `The user came in through ${names(intros.offer)}'s Space link: offer to follow them (relationship). The room shows a Follow button too.` : '',
+    intros.joined.length ? `${names(intros.joined)} joined MCPortal through the user's Space link; the room says so.` : '',
+  ].filter(Boolean).join('\n');
+}
+
 export const ROOM_TOOLS: ToolDef[] = [
   {
     name: 'open_room',
@@ -111,8 +122,11 @@ export const ROOM_TOOLS: ToolDef[] = [
       const portals = await withNews(await Promise.all(specs.map((p) => portalFor(p, profile, ctx))), ctx.userId, ctx.seen);
       const edition = resolveEdition(await ctx.editions?.get(ctx.userId), portals);
       const lead = leadOf(edition, portals);
-      return ok(summarizePortals(profile, portals, notice, edition),
-        { profile, portals, notice, identity, ...(edition ? { edition } : {}), ...(lead ? { lead } : {}), ...(labsOf(ctx).length ? { labs: [...labsOf(ctx)] } : {}), generatedAt: new Date().toISOString() } satisfies ToolResults['open_room']);
+      // Space links (docs/plans/finding-people.md): said once, after setup, so a newcomer meets them in a built room.
+      const intros = ctx.social ? await ctx.social.takeIntros(ctx.userId).catch(() => undefined) : undefined;
+      const said = intros && (intros.offer.length || intros.joined.length) ? intros : undefined;
+      return ok([summarizePortals(profile, portals, notice, edition), ...(said ? [introLines(said)] : [])].join('\n'),
+        { profile, portals, notice, identity, ...(edition ? { edition } : {}), ...(lead ? { lead } : {}), ...(said ? { intros: said } : {}), ...(labsOf(ctx).length ? { labs: [...labsOf(ctx)] } : {}), generatedAt: new Date().toISOString() } satisfies ToolResults['open_room']);
     },
   },
   {

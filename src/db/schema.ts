@@ -47,7 +47,7 @@ export async function connect(url: string, options: { searchPath?: string } = {}
   return pool as unknown as Queryable;
 }
 
-export const SCHEMA_VERSION = '9';
+export const SCHEMA_VERSION = '10';
 
 export async function ensureSchema(db: Queryable): Promise<void> {
   await db.query(`CREATE TABLE IF NOT EXISTS mcportal_meta (key text PRIMARY KEY, value text NOT NULL)`);
@@ -97,7 +97,7 @@ export async function ensureSchema(db: Queryable): Promise<void> {
     hidden_at timestamptz
   )`);
   await db.query(`CREATE INDEX IF NOT EXISTS mcportal_shares_account_created ON mcportal_shares (account_id, created_at DESC)`);
-  for (const relation of ['follows', 'mutes', 'blocks']) {
+  for (const relation of ['follows', 'mutes', 'blocks', 'intros', 'joins']) {
     await db.query(`CREATE TABLE IF NOT EXISTS mcportal_${relation} (a text NOT NULL, b text NOT NULL, created_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY (a, b))`);
     await db.query(`CREATE INDEX IF NOT EXISTS mcportal_${relation}_b ON mcportal_${relation} (b)`);
   }

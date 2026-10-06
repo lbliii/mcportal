@@ -248,6 +248,8 @@ export const API_METHODS: Record<string, ApiMethod> = {
     async (p, ctx) => publicRef(await socialOf(ctx).block(ctx.userId, p.handle, p.on), ctx), 'write'),
   'social.uses': params(NO_PARAMS, (_p, ctx) => socialOf(ctx).uses(ctx.userId)),
   'social.connections': params(NO_PARAMS, (_p, ctx) => socialOf(ctx).connections(ctx.userId)),
+  /** Space-link notes for open_room, each said once. */
+  'social.takeIntros': params(NO_PARAMS, (_p, ctx) => socialOf(ctx).takeIntros(ctx.userId), 'write'),
   'social.stats': params<{ accountId: string }>({ type: 'object', required: ['accountId'], additionalProperties: false, properties: { accountId: id } },
     async (p, ctx) => socialOf(ctx).stats(ctx.userId, await accountOf(p.accountId, ctx))),
   'social.report': params<{ target: { shareId?: string; handle?: string }; reason: string }>(

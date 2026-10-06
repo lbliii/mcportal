@@ -787,3 +787,58 @@ test('browser: a local first run offers signing in from the welcome screen, and 
     await rm(dataDir, { recursive: true, force: true });
   }
 });
+
+test('browser: Space links: the room offers a follow of whoever brought you, says who joined through yours, and your space copies its link', { skip }, async () => {
+  const { identifier } = await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => {
+    const real = window.fetch;
+    window.__calls = [];
+    window.__intros = { offer: ['ana'], joined: ['ben'] };
+    const answer = (result) => new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result }), { status: 200, headers: { 'content-type': 'application/json' } });
+    const now = new Date().toISOString();
+    window.fetch = async (url, init) => {
+      const body = init && typeof init.body === 'string' ? JSON.parse(init.body) : null;
+      const name = body && body.params && body.params.name;
+      const args = body && body.params && body.params.arguments;
+      if (url === '/mcp' && (name === 'relationship' || name === 'open_space')) {
+        window.__calls.push({ name, args });
+        if (name === 'relationship') return answer({ content: [], structuredContent: { handle: args.handle, layoutChanged: false } });
+        return answer({ content: [], structuredContent: { space: { handle: 'reader', mine: true, followers: 0, following: false, posts: [], sources: [], link: 'https://mcportal.example/@reader', createdAt: now, updatedAt: now } } });
+      }
+      const res = await real(url, init);
+      if (name !== 'open_room') return res;
+      const json = await res.json();
+      const room = json.result && json.result.structuredContent;
+      if (room && room.portals) {
+        room.identity = { mode: 'hosted', handle: 'reader' };
+        if (window.__intros) { room.intros = window.__intros; window.__intros = undefined; }   // said once
+      }
+      return new Response(JSON.stringify(json), { status: res.status, headers: { 'content-type': 'application/json' } });
+    };
+  })();` });
+  try {
+    page.problems.length = 0;
+    await page.goto(`${app.base}/preview`);
+    await page.waitFor(`document.querySelector('#intros') && !document.querySelector('.skeleton')`, 'the intro strip');
+    assert.deepEqual(await page.eval(`[...document.querySelectorAll('#intros .intro')].map((n) => n.textContent)`),
+      ["You came in through @ana's Space link.Follow @anaNot now", '@ben joined MCPortal through your Space link.']);
+    await page.eval(`document.querySelector('#intros .btn.follow').click()`);
+    await page.waitFor(`document.querySelector('#intros .btn.follow').getAttribute('aria-pressed') === 'true'`, 'the follow');
+    assert.deepEqual(await page.eval(`window.__calls.at(-1)`), { name: 'relationship', args: { handle: 'ana', action: 'follow' } });
+    await page.eval(`document.querySelector('#intros .link-btn').click()`);
+    assert.equal(await page.eval(`document.querySelectorAll('#intros .intro').length`), 1, 'Not now puts that one away');
+
+    // Opening something hides the strip; the room brings it back.
+    await page.eval(`document.querySelector('#intros .handle').click()`);
+    await page.waitFor(`!document.getElementById('reader').hidden && document.querySelector('#reader .space-head')`, 'a space');
+    assert.equal(await page.eval(`getComputedStyle(document.getElementById('intros')).display`), 'none');
+    assert.ok(await page.eval(`document.querySelector('#reader .space-head').textContent.includes('Copy link to your space')`), 'your own space offers its link');
+    await page.eval(`[...document.querySelectorAll('#reader .space-head .btn')].find((b) => b.textContent.includes('Copy link')).click()`);
+    await page.waitFor(`/mcportal\\.example\\/@reader|Copied your Space link/.test(document.getElementById('toast').textContent)`, 'the link copied or shown');
+    await page.eval(`document.querySelector('#reader .reader-top button').click()`);
+    await page.waitFor(`document.getElementById('reader').hidden`, 'back to the room');
+    assert.notEqual(await page.eval(`getComputedStyle(document.getElementById('intros')).display`), 'none');
+    assert.deepEqual(page.problems, []);
+  } finally {
+    await page.send('Page.removeScriptToEvaluateOnNewDocument', { identifier });
+  }
+});
