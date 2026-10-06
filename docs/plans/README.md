@@ -9,7 +9,7 @@ The loop everything serves: open your room, catch up, read something worthwhile,
 1. **Launch.** Scheduled Postgres backups and a restore drill, external uptime checks, then open sign-up. Reviewer access, hand-testing every host, and listing in Claude's connector directory, then OpenAI's. [Plan](launch.md).
 2. **Find it again.** One search across saved items, clips and reading history, with results that return to the original passage. Lightweight collections, and related saved material that says why it's related.
 3. **Reader quality.** Check the reader-audit articles by hand for complete text, the right figures and correct author credits. Handle paywalled articles clearly.
-4. **Watches.** Follow artists and get shows near you, then a background collector, an inbox and digests that work while the room is closed. [Plan](watches.md).
+4. **Watches.** One engine for following things that aren't feeds ([plan](rally.md)): stores and products first, for new arrivals, sales and restocks ([shops](shops.md)), then artists and venues, for shows near you ([events](events.md)). Then a background collector, an inbox and digests that work while the room is closed.
 5. **Reactions.** One lightweight signal on a post, so Following can surface what people liked.
 6. **A room that feels yours.** Presentation suited to each kind of portal (articles, docs, video, music), appearance preferences that persist, occasional resurfacing of saved material, and discovery through people's Spaces. Decide whether the front page lab graduates.
 7. **MCP 2026-07-28.** Serve the stateless protocol beside today's, still without dependencies, once hosts send it. [Plan](mcp-spec-2026-07-28.md).

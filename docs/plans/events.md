@@ -1,12 +1,19 @@
-# Plan: watches, starting with concerts near you
+# Plan: events, starting with concerts near you
 
 ## Why
 
 Your agent understands you but forgets between chats and can't keep watch. MCPortal remembers and persists but understands nothing. A watch splits the work: in conversation the agent learns you like an artist and adds them to your watches; MCPortal checks for weeks, which no chat can; when a show is announced near you it's waiting the next time the agent looks; the agent judges whether it's worth your evening. What you save or skip sharpens the next round. MCPortal still never calls a model. None of this is built yet.
 
+This is the first event kind on [the rally engine](rally.md), which supplies the generic watch list, `watch`/`unwatch`, collection, the diff and handing back. [Shops](shops.md) is the other planned kind. The storage, fetching and data rules below are written for artists and generalize to every kind.
+
 ## What a watch is
 
-A watch is something you follow that isn't a feed: an artist first, and later an author, a speaker or a repository's releases. MCPortal keeps checking it and shows new findings as items in a portal.
+A watch is something you follow that isn't a feed. MCPortal keeps checking it and shows new findings as items in a portal. Events have two kinds:
+
+- **`artist`:** follow a performer anywhere near you, resolved to a Ticketmaster attraction id (and a MusicBrainz id where known).
+- **`venue`:** follow a place, promoter or organizer, whoever plays, resolved to a calendar it publishes. This catches the small shows big ticketing APIs miss, and needs no location, since the venue is the location.
+
+Both feed one **Shows** portal.
 
 - **The watch list is yours,** per account, like clips: in `~/.mcportal` locally, in Postgres when hosted, included in exports, deleted with the account.
 - **A list, not per-portal config,** because the same list will feed later kinds (a new album, a book).
@@ -20,15 +27,24 @@ A watch is something you follow that isn't a feed: an artist first, and later an
 
 ## Where events come from
 
-| Source | Role |
-|---|---|
-| Ticketmaster Discovery API | The first adapter. Free with a key, broad coverage, searchable by attraction and location. |
-| MusicBrainz | Optional identity enrichment. Not a Ticketmaster id resolver. |
-| Venue calendars (iCal, RSS) | Small shows the big APIs miss, read through the same safe-fetch boundary as feeds. |
-| Bandsintown | Strong per-artist data; read its attribution and use terms first. |
-| Songkick | Not accepting new API partners. Out. |
+Checked 2026-10-06 unless noted. Revalidate limits and terms before turning anything on.
 
-Event data is public, so fetches are cached per artist and area and shared across accounts. Cost grows with distinct artists, not with users.
+| Source | Access | Role |
+|---|---|---|
+| **Ticketmaster Discovery** | Free key; details below | **First artist provider.** Broad coverage, searchable by attraction and location |
+| **SeatGeek** | Free `client_id`; events by performer and by latitude, longitude and range; about 1,000 requests an hour reported | **Second artist provider,** for coverage Ticketmaster misses. Read its terms first |
+| **MusicBrainz** | No key; details below | Optional identity enrichment. Not a Ticketmaster id resolver |
+| **The Events Calendar (WordPress)** | No key: iCal at `/events/?ical=1`, JSON at `/wp-json/tribe/events/v1/events` | **First venue provider.** Very common among small venues |
+| **iCal generally** | No key: Luma calendars, Meetup groups, public Google Calendars | Venue provider through the shared iCal reader. Suits talks and meetups as much as music |
+| **Event data in pages** | schema.org `Event` blocks on venue sites, Eventbrite, Dice and Ticketmaster pages | Venue provider through the shared structured-data reader; the fallback for venues without a calendar |
+| **Eventbrite** | Search across Eventbrite was removed in 2020; the API lists events only by a known organization or venue id | **A venue provider, not a discovery source:** follow one organizer, never "find events near me" |
+| **Bandsintown** | An app id issued per artist; other uses need Bandsintown's written consent | **Out,** unless Bandsintown agrees to this use |
+| **Songkick** | Not accepting new API partners | **Out** |
+| **AXS, Dice** | No public API | Only through event data in their pages |
+
+None of these publishes an official MCP server or an agent-commerce standard like the stores' UCP; the MCP servers that exist for Ticketmaster, Eventbrite and Luma are community wrappers of the same APIs. So events need no agent-facing rung in their resolve ladder yet.
+
+Event data is public, so fetches are cached per artist and area, or per calendar, and shared across accounts. Cost grows with distinct artists and venues, not with users.
 
 ### Provider limits
 
@@ -41,7 +57,7 @@ Checked against the providers' documentation on 2026-10-03. Revalidate before bu
 
 - **Coarse only:** a city, a country, an optional region to tell same-named cities apart, and a radius. Never device coordinates, a home address or travel history.
 - Set in conversation through `account_settings`, kept in its own private record, never public, never in a shared payload.
-- A watch can exist without a location. The Shows portal then says it needs a city and fetches nothing.
+- An artist watch can exist without a location. The Shows portal then says it needs a city and fetches nothing for it. Venue watches never need one.
 
 **Open:** choose a coarse city gazetteer, confirm the city among ambiguous candidates, and derive a city-centre geohash if radius search is promised. Don't filter by exact city while claiming a radius. Radius default and range, units, and any disclosure for external geocoding need deciding.
 
@@ -54,6 +70,18 @@ Concerts are the first items that go stale on a date.
 - **Sorted by date,** soonest first. TBA events go in a separate undated section.
 - **Gone after the date.** Expire after a reliable end instant, or else after the last known local date in the venue's timezone. If no safe boundary exists, mark the date incomplete rather than use the server's timezone. Saved past events stay saved, marked past.
 - **Changes are news.** Cancellation is an explicit status, not a missing search result, and off-sale is different again. A changed date, venue or status on a saved show appears as a change on the next refresh, compared against a small account-owned snapshot. A failed fetch leaves the saved snapshot with a stale notice; it never manufactures a cancellation.
+
+## What counts as news
+
+| Change | Artist watch | Venue watch | On a saved show |
+|---|---|---|---|
+| New show | Yes, if within your radius | Yes | n/a |
+| Date or time change | No | No | Yes |
+| Venue change | No | No | Yes |
+| Cancelled or postponed | No (drops out) | No (drops out) | Yes |
+| Goes on sale | Later, if asked for | Later | Yes |
+
+The same show from Ticketmaster and a venue calendar is matched on venue, date and headliner, and appears once with both links.
 
 ## Tools
 
@@ -86,17 +114,16 @@ Private watches, location, and which artists matched your interests never enter 
 
 ## The return shot: scheduled agent tasks
 
-MCPortal can't wake an agent, and the [2026-07-28 MCP specification](mcp-spec-2026-07-28.md) doesn't change that. Hosts with scheduled tasks can: "every morning, check my room and tell me about anything good."
-
-One gap first: `list_new_items` reports what you haven't seen, and seen marks move only when you view the room, so a daily task would repeat itself. The fix is a **reported** set beside the seen set, moved only when the agent asks for what's new since its last check, through one optional argument on `list_new_items` rather than a new tool. Then a documented prompt to paste into a host's scheduled tasks.
+MCPortal can't wake an agent; hosts with scheduled tasks can. The reported set, `sinceLastCheck` and the scheduled-task recipe are shared by every kind, so they're in [the rally engine](rally.md#handing-back).
 
 ## Sequence
 
 1. **Artist watches and an on-demand Shows portal.** Confirmed watches, coarse location, event items that expire, fetched on explicit refresh. File, Postgres, linked, export and deletion parity in the same step. Describe coverage as "Ticketmaster events retrieved", never "all concerts" and never continuous monitoring.
 2. **Durable collection.** A scheduled worker with item history, retries, deduplication, pause and delete, and an inbox that works on every host. Collection continues while the room is closed; restarts don't duplicate items; missed fetches are visible.
 3. **Reported marks and digests** over that history, then the scheduled-task recipe and optional host notification adapters. A recipe may come earlier only if it says it runs on-demand checks with gaps between them.
-4. **Venue calendars and more kinds:** new releases, books, talks.
-5. **Music services:** Apple Music, then Spotify if its terms allow.
+4. **Venue watches:** The Events Calendar, then any iCal, then event data in pages; Eventbrite organizers. Then SeatGeek as a second artist provider, deduplicated with Ticketmaster.
+5. **More kinds** on the rally engine: new releases, books, talks.
+6. **Music services:** Apple Music, then Spotify if its terms allow.
 
 Before step 1: settle the location resolver and defaults, provider retention and use rights, and where the key runs.
 
