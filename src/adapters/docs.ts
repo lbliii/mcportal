@@ -1,5 +1,5 @@
 /**
- * Docs sites without their front end (docs/plans/docs-portal.md).
+ * Docs sites without their front end (docs/explanation/reading.md).
  *
  * A site's table of contents comes from the first of these that validates:
  *   llms.txt        "## Section" headings over "- [Title](url): description" lines;

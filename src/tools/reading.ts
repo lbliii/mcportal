@@ -1,5 +1,5 @@
 /**
- * Reading history tools: record_reading, get_reading, list_reading (docs/reading-state.md).
+ * Reading history tools: record_reading, get_reading, list_reading (docs/explanation/reading.md).
  * They touch only the caller's own history, and only on explicit signals: seen, opened, read.
  * The room's reader records and resumes reading (record_reading, get_reading are app-only);
  * the model asks what the user was reading (list_reading).

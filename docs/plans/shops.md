@@ -1,6 +1,6 @@
 # Plan: shops, following the brands you like
 
-**Status:** proposed 2026-10-06. Nothing built. Built on [the rally engine](rally.md), which supplies the watch list, `watch`/`unwatch`, collection, the diff and handing back. This plan covers only what's specific to shopping. Proposed as the engine's **first kind** because Shopify needs no key, no location and no provider agreement.
+Built on [the rally engine](rally.md), which supplies the watch list, `watch`/`unwatch`, collection, the diff and handing back. This plan covers only what's specific to shopping, and none of it is built yet. Proposed as the engine's **first kind** because Shopify needs no key, no location and no provider agreement.
 
 ## Two intents, two kinds
 
@@ -71,7 +71,7 @@ Checked 2026-10-06. Shops are ahead of every other kind here: stores now publish
 
 **First choice: the agent already resolved it.** If the user's agent used its own commerce tools, `watch` accepts the identity it found (store origin, product and variant ids) and MCPortal only checks it can collect that store over plain HTTP.
 
-Otherwise, like the [docs portal](docs-portal.md)'s source ladder, MCPortal tries the most standard, most structured source first and stops at the first that works:
+Otherwise, like the [docs portal's source ladder](../explanation/reading.md#the-source-ladder), MCPortal tries the most standard, most structured source first and stops at the first that works:
 
 1. **`/.well-known/ucp`:** the manifest says which platform and capabilities the store has.
 2. **Shopify:** `/products.json` (detected from response headers and its shape).
