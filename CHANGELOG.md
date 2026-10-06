@@ -37,7 +37,7 @@
 - The Ghost mode menu's sign-in button now starts login instead of silently failing when its click event is passed to the sign-in flow. Browser regressions cover both sign-in buttons and hosts that support, omit or decline opening links.
 - Local sign-in pages refer to your app rather than Claude and show the hosted server's failure reason instead of labelling every denied sign-in as cancelled.
 
-### Terms of service and a private security contact ([plan](docs/plans/directory-launch.md))
+### Terms of service and a private security contact ([plan](docs/plans/launch.md))
 - **Terms of service at `/terms`,** with acceptable use, linked from every page and from the sign-in consent screen, which now also asks you to confirm you're at least 13.
 - **A private way to report security problems:** the security page describes what to send, response times (acknowledged within 3 business days), a 90-day disclosure window and safe harbor for good-faith research. `/.well-known/security.txt` (RFC 9116) and `SECURITY.md` point to the same contact.
 - **One contact address:** `MCPORTAL_CONTACT_EMAIL` is where support requests and security reports go, and the support link defaults to it. `MCPORTAL_JURISDICTION` names the law the terms are under.
@@ -46,14 +46,14 @@
 
 ## v0.7.0 — 2026-10-02
 
-### The river (lab, `MCPORTAL_LABS=river`) ([plan](docs/plans/river.md), [research](reports/River%20and%20reblog%20design%20research.md))
+### The river (lab, `MCPORTAL_LABS=river`) ([how it works](docs/explanation/social.md))
 - **One stream across your room:** a fourth layout that merges every portal into one column. Your agent's picks first (only when there's an edition), then what's new, a "You're caught up" divider, then what you've seen. Each portal keeps its own order and portals merge by time; the same link from two portals is one story ("also on Hacker News"). More than three in a row from one portal fold into "N more from X", which opens in place. Docs and pinned portals are named at the end rather than merged.
 - **Stories:** the portal and its age on top (its name opens the portal), the picture across at 1.91:1, a larger title, a four-line summary at reading width, every action, separated by rules. j/k move between stories, o opens, s saves. A `role="feed"` of articles for screen readers.
 - **Pages that end:** ten at a time inline ("10 more", focus moves to a "Stories 11 to 20" separator; "Open the full river" from the third page), twenty in fullscreen, where the next page loads as you near the end, at most twice. Switching modes keeps what's on screen.
 - **Nothing moves while you read:** a refresh or a save updates stories in place; stories new to the river wait behind "N new since you started". Coming back to the page refreshes portals past their freshness, at most every five minutes; nothing polls.
 - **People you follow:** a follow's share of a link in your feeds is that feed's story, lifted to where they shared it, with "@ana shared" above it and their note in their own voice.
 
-### Reblogging (lab, `MCPORTAL_LABS=reblog`) ([plan](docs/plans/reblog.md))
+### Reblogging (lab, `MCPORTAL_LABS=reblog`) ([how it works](docs/explanation/social.md))
 - **Pass someone's post on, with the credit staying theirs:** a reblog references the original rather than copying it, so its note and clip are drawn live, and the count pools on the original. Reblogging a reblog reblogs the original and credits who you saw it through ("via @ben"). One reblog per person per post; `unshare` undoes it.
 - **The author decides:** each post says who may reblog it (anyone, their followers, nobody), with an account default (`set_public_profile`'s `reblogs`). Followers-only posts can't be reblogged at all. Authors can change it later or remove their post from one reblog for good (`share_settings`); the reblog then says its author removed it. A deleted, hidden or suspended original leaves the reblogger's note and the link. Blocks with the original's author hide the reblog; muting someone hides their posts reblogged by others too.
 - **In the room:** a door-shaped reblog button with a menu (Reblog, Reblog with a note, Undo reblog), the moon filling the doorway once you have, a new ink green, and a small print-stamp effect (not with reduced motion). If you haven't opened a story, the menu offers "Read it first?" without getting in the way. In the river, several follows reblogging one post are one card ("@ben and @dee reblogged @cy") with at most two notes: the original's and one reblog's. Your own post's card shows who reblogged it, removes it from one, and sets who can reblog it.
@@ -67,13 +67,13 @@
 
 ## v0.6.1 — 2026-10-02
 
-### Deleting an account leaves nothing behind ([plan](docs/plans/directory-launch.md))
+### Deleting an account leaves nothing behind ([plan](docs/plans/launch.md))
 - **Nothing names you after you delete your account:** the sign-in records of apps only you used (which can carry your computer's name) go with it, the audit log no longer says whose entries were yours, reports you made or that were about you stop naming you (open reports about you are closed), and your handles stay reserved for 30 days without saying whose. In file mode, unreadable copies of your room and an empty clips file go too. A test creates every kind of data, deletes the account, and searches what's left.
 - **Admins can delete an account for you** if you can't sign in any more: `mcportal admin delete <login> --confirm`, recorded in the audit log.
 - **Retention on a schedule:** expired highlights and handoffs, reports resolved more than 180 days ago, invites unused for 90 days, audit entries older than a year and app registrations unused for 180 days are removed every 6 hours, so the privacy policy's "how long" holds on a quiet server too. The policy now states each.
 - Under the hood, the server and the admin CLI open storage the same way (`src/storage.ts`).
 
-### Shipping device linking ([plan](docs/plans/local-hosted-hybrid.md))
+### Shipping device linking ([how it works](docs/explanation/local-and-hosted.md))
 - **Sign in from the welcome screen:** a local MCPortal's first-run screen offers **Already have a portal? Sign in to bring it here**, which starts the same sign-in as the account chip.
 - **Privacy policy:** a section on MCPortal on your own computer: ghost mode sends nothing to the service; signed in, your room is stored by the service while feeds are still fetched from your computer, tokens stay in a file only you can read, and you can revoke a computer from the account page.
 - **Support and README:** organizations that block custom connectors can install MCPortal locally and sign in.
@@ -86,7 +86,7 @@ MCPortal becomes one portal, local or hosted: run it on your computer in ghost m
 ### Releases
 - **One command per release step:** `npm run release -- prepare <x.y.z | patch | minor | major>` sets the version everywhere it's stated (package.json and its lockfile, the plugin, `SERVER_INFO`, then the generated `server.json` and `manifest.json`), moves "Unreleased" under it, runs `npm run check` and opens a release PR. After the merge, `npm run release -- publish` tags it and creates the GitHub release from that version's notes. `--dry-run` previews either step. See CONTRIBUTING.md.
 
-### Ready for directory review ([plan](docs/plans/directory-launch.md))
+### Ready for directory review ([plan](docs/plans/launch.md))
 - **Every tool states what it does:** `readOnlyHint`, `destructiveHint` and `openWorldHint` are set on every tool, and a test keeps them consistent with what each tool does. Open-world means a tool reaches the web or makes something visible to other people (`share`, `relationship`, `set_public_profile`). `build_room` is now marked destructive (it replaces the layout), and `export_data` is no longer read-only (it writes a file, or makes a download link).
 - **The room's content-security policy** (no external origins) is on the `resources/list` entry as well as `resources/read`, so hosts can review it when they connect.
 - **Logs can't name you:** the user reference in logs is a keyed hash whose key is made at startup, so it can't be traced back to an account (an unkeyed hash of a GitHub id could be).
@@ -101,14 +101,14 @@ MCPortal becomes one portal, local or hosted: run it on your computer in ghost m
 ### Fix: forms in real browsers
 - **Signing in and the account page work in a browser again.** Server-rendered pages were sent with `Referrer-Policy: no-referrer`, under which browsers send `Origin: null` with a form POST. Every form is checked for a same-origin Origin, so **Continue with GitHub** on the consent screen and the account page's sign out, import, **Revoke** and delete were refused as "Cross-site request refused". Pages now use `same-origin`, which still sends other sites no referrer. A headless-Chrome test now submits the consent screen and the account page's sign-out the way a person does (`test/ui-forms.test.ts`).
 
-### Room layouts ([plan](docs/plans/room-layouts.md))
+### Room layouts ([how it works](docs/explanation/social.md))
 - **Your agent's picks lead the room:** `show_highlights` now keeps its picks as the room's edition for 24 hours, replacing the last. `open_room` returns the picks still in their feeds, in the agent's order, and what the room leads with: the agent's first pick, else the first new item, else the top item of the first feed. Only the refs and the agent's own words are stored; items are found again in the live feeds, so no site text is kept. Editions aren't exported and are deleted with your account. `show_highlights` is no longer marked read-only. Postgres gains `mcportal_editions` (schema version 7).
 - **Front page (lab, `MCPORTAL_LABS=frontpage`):** a third layout made for the chat column. Your agent's lead story and picks with their reasons, then each portal's top three stories (picks aren't repeated) with "5 more" pages, ending with "You're caught up" or how many new stories wait inside your portals. Nothing in it scrolls on its own; the page grows instead. Without highlights, a button asks your agent to pick them. Offered in the toolbar and to the model only while the lab is on.
 - **Open a portal:** a portal's title opens it to fill the room, in every layout: ten stories at a time inline, all of them fullscreen. The reader opens over it and comes back to it; Back or Escape returns to the room exactly as you left it. Where the browser can, the portal grows into place and a story into the reader (not with reduced motion).
 - **Unseen items read heavier:** titles you haven't had on screen are bolder, beside their **New** mark.
 - Under the hood, columns and shelves are entries in one layout registry and items draw through one component with forms, so new layouts don't touch existing ones. Both render exactly as before.
 
-### One portal, local or hosted ([plan](docs/plans/local-hosted-hybrid.md))
+### One portal, local or hosted ([how it works](docs/explanation/local-and-hosted.md))
 - **Who you are, at a glance:** the room's toolbar ends with an identity chip. Signed in, it shows your handle (or your GitHub login before you claim one) and opens your space. Running without an account, it shows **Ghost mode** with a ghost icon and a dashed outline: your portal stays where MCPortal runs and nothing is shared. The old space button is folded into it.
 - **"Am I signed in?" has an answer:** `account_settings` starts with the mode ("Ghost mode: not signed in…" or "Signed in to the hosted MCPortal as @handle") and returns it as `identity`; `open_room` returns `identity` too, for the toolbar. Sharing and profile tools refused on a local MCPortal now say it's in ghost mode.
 - **Room revisions everywhere:** every profile store (files, memory, Postgres) reports a revision that each write increments and can replace a room only if it's still at a given revision (`versioned`, `replaceIf`); a stale replace is a `conflict`. Profile files keep `rev` beside the room; older files count as revision 1. Tools reach the social layer and public profiles through narrower interfaces (`SocialService`, `ProfileDirectory`) that a linked MCPortal can implement remotely. No behavior change.
@@ -119,9 +119,9 @@ MCPortal becomes one portal, local or hosted: run it on your computer in ghost m
 - **Sign in from a local MCPortal:** ghost mode's chip opens a menu with **Sign in to sync and share** (or say "sign in to MCPortal": `link_account`). You approve on MCPortal's consent screen, which names the computer, and sign in with GitHub. This computer's portal is added to your account (nothing removed), and from then on the same tools run here against your hosted account: your room, clips, reading, sharing and follows, the same on every device. Signed in, the chip shows your handle and offers your space, the account page and **Sign out** (`unlink_account`), which copies your portal back to this computer first. `export_data` and `import_portal` go through the hosted account in one request each (`GET /api/v1/export`, `POST /api/v1/import`).
 - **Offline, when signed in:** if the hosted MCPortal can't be reached, the room shows your portal as last synced, with a notice, and the chip goes dotted; feeds still load (they're fetched on your computer), "new" marks pause, and changes say they need the connection. A newer hosted MCPortal is mentioned once.
 - **Fix:** a one-time notice (such as "your saved layout couldn't be read") is shown on the welcome screen too, instead of being dropped.
-- **The plan for linking:** a local MCPortal will be able to sign in to your hosted account and keep fetching on your machine while your room, clips and shares live on the hosted server. Revised plan in `docs/plans/local-hosted-hybrid.md`.
+- **The plan for linking:** a local MCPortal will be able to sign in to your hosted account and keep fetching on your machine while your room, clips and shares live on the hosted server. Revised plan in `docs/explanation/local-and-hosted.md`.
 
-### Reading with your agent ([plan](docs/plans/attention.md))
+### Reading with your agent ([how it works](docs/explanation/reading.md))
 - **Ask about a passage:** select text in the reader or a docs page and a bar offers **Ask about this** and **Clip quote**. Asking gives your agent the passage (fenced as the site's text, with the page and the nearest heading), then posts a fixed "Let's talk about the passage I just highlighted" in your voice: the site's words never go into your message. Hosts that can't post messages get the passage as context and a nudge to ask; hosts that can't take context offer **Copy quote**. Nothing is sent until you click.
 - **Clip quote** keeps the selection as a quote clip with its page as the source.
 - **What's new since your last visit:** items you haven't had on screen are marked **New**, portal headings say "30 · 7 new", and `open_room` tells your agent "[hn-top] 30 items, 7 new" with the new ones first. The room records what stays on screen for a second (or that you open) with the app-only `mark_seen`, in batches every 10 seconds. A portal's first showing is its baseline, so nothing floods in as new; your own Saved and Clips portals never show "new". Seen sets live apart from reading history (500 items per portal), aren't exported, and are deleted with your account. Postgres gains `mcportal_seen` (schema version 6).
@@ -129,13 +129,13 @@ MCPortal becomes one portal, local or hosted: run it on your computer in ghost m
 - **Send to a new chat:** from the reader's top bar (the whole page) or the passage bar (a selection), MCPortal keeps a pointer to the page, where you were and what you selected under a short code, and shows what to say in a new chat: "Open MCPortal handoff k7q2xm". There `open_handoff` opens the page as a card at that place, with the passage, and gives the agent its text. Send two pages to two chats and keep driving this one. Codes work only in your account, last 7 days (50 at most), aren't exported, and are deleted with your account. Postgres gains `mcportal_handoffs` (schema version 5).
 
 ### A tool surface for the long run (breaking)
-See [the plan](docs/plans/tool-surface.md).
+See [the plan](docs/explanation/architecture.md).
 - **Edit by patch (breaking):** `arrange_room` replaces `update_profile`. It takes only the changes you name (`move`, `width`, `retitle`, `configure`, `name`, `layout`, `openIn`), applies them all or none, and can't touch anything it isn't given, so "never drop a portal you weren't asked to" is a guarantee rather than a rule for the model. `remove_portal` is its own call, marked destructive, so hosts can ask before it runs. Portals are named by id or exact title. `get_profile` is gone: the room and its ids come from `open_room`. The room app's layout switch uses `arrange_room` too.
 - **One `content` for clips (breaking):** `clip` takes the clip as `content` text for every kind but an exchange: a quote, a note in markdown, a markdown table, a link's url, or an image as SVG markup or a data: URI. Exchanges keep `turns` and quotes keep `attribution`. `text`, `markdown`, `table`, `columns`, `rows`, `svg`, `image` and `url` are gone.
 - **Social tools for people who use them:** a hosted account sees the ways in (`open_space`, `relationship`, `report`, `set_public_profile`) until it has a handle or follows, mutes or blocks someone; then the rest. Hosts cache the tool list per conversation, so the rest arrive in the next one, and the result that unlocks them says so.
 - **Budgeted results:** `read_doc_page` returns long pages in parts (`part: 2` for the next), `read_article` gives the model the first part (the reader card has the rest), and `open_room` summarizes each portal's first items.
 - **Shorter definitions:** descriptions and schema prose are rewritten to stand alone when a host's tool search surfaces one tool. Counted as the model sees them (name, description, input schema), about 3,600 tokens local, 4,100 hosted and 4,600 for an active social account (with the reading tools app-only, below), down from 4,700 and 6,000. Each tool has a token ceiling in `test/footprint-ceilings.json`; `npm run footprint -- --exact` asks the Claude API's counter.
-- **The reader records reading:** opening an article in the room's reader records it, scrolling saves the furthest point reached (at most every 15 seconds and on leaving), coming back picks up there, and only "Mark as read" marks it read. `record_reading` and `get_reading` are app-only now; the model asks `list_reading`. See [docs/reading-state.md](docs/reading-state.md).
+- **The reader records reading:** opening an article in the room's reader records it, scrolling saves the furthest point reached (at most every 15 seconds and on leaving), coming back picks up there, and only "Mark as read" marks it read. `record_reading` and `get_reading` are app-only now; the model asks `list_reading`. See [docs/explanation/reading.md](docs/explanation/reading.md).
 - **A frozen eval:** `evals/tool-selection.ts` cases never change; renames are declared in `evals/renames.ts`, runs repeat (`--runs`) and results are recorded (`--record`) and compared (`--compare`).
 
 ### For hosts and agents (interface changes)
@@ -157,18 +157,18 @@ See [the plan](docs/plans/tool-surface.md).
 - **Validated themes:** an exact host adapter repairs unreadable colour pairs, clears stale colours on theme changes, supports partial/reset inputs and follows system preferences until the host selects a scheme. Functional contrast no longer depends on native `contrast-color()`.
 - **Consistent controls:** visible save actions, separate card-opening and metadata controls, shared focus/selection/target sizes, container-aware layouts and user text sizing. Brand artwork and images keep their colours.
 - **A lighter toolbar:** the layout control is a pill switch whose chosen half fills in, and pressed icons get a soft fill instead of an underline. Inline in a chat the header shows only the Portal mark; the wordmark returns in fullscreen or on wide screens.
-- **Regression workflow:** generation drift and contrast/lifecycle tests plus a reusable fixture MCP Apps host with an 80-case browser matrix. See [the guide](docs/design-system.md).
+- **Regression workflow:** generation drift and contrast/lifecycle tests plus a reusable fixture MCP Apps host with an 80-case browser matrix. See [the guide](docs/reference/design-system.md).
 
 ### Host themes
 - **Visible on every host backing:** inline welcome tiles and room content paint their own theme-matched background, fixing dark text disappearing over a black iframe until hover.
 - **Adaptive contrast:** a shared luminance resolver derives readable text, muted text, borders and surface colours when host tokens are absent or inconsistent, with light/dark fallbacks, increased-contrast and forced-colour support. Host tokens cannot overwrite internal room palette or layout variables.
 
 ### Vocabulary
-- **Room and portals:** your whole setup is now your **room**, and each window onto a source is a **portal** (it was called a panel). The app, tool descriptions, server instructions, skill, web pages and README use the new words. "Open my portal" still opens the room. See the glossary and rename plan in [docs/product-map.md](docs/product-map.md).
+- **Room and portals:** your whole setup is now your **room**, and each window onto a source is a **portal** (it was called a panel). The app, tool descriptions, server instructions, skill, web pages and README use the new words. "Open my portal" still opens the room. See the glossary and rename plan in [docs/explanation/architecture.md](docs/explanation/architecture.md).
 - **Renamed tools (breaking):** `open_workspace` → `open_room`, `build_portal` → `build_room`, `add_panel` → `add_portal`, `pin_panel` → `pin_portal`, `refresh_panel` → `refresh_portal`. Parameters `panelId` → `portalId`, `removePanelIds` → `removePortalIds` and `featuredPanelIds` → `featuredPortalIds`; results carry `portals`, `portal` and `portalId` instead of `panels`, `panel` and `panelId`. The old names are gone, with no aliases. Hosts ask you to approve the renamed tools again.
 - **Renamed in the code:** `PanelSpec` → `PortalSpec`, `PanelResult` → `PortalResult`, the app is `src/ui/room.html` at `ui://mcportal/room.html`, and its CSS classes are `.portal*` with `data-portal`.
 - **Stored data unchanged:** profiles still keep each column's portals under `columns[].panels`, and MCPortal exports keep the same format, so existing files, Postgres rows and exports load as they are.
-- **Product map:** [docs/product-map.md](docs/product-map.md) maps every vertical, feature, component, variant and primitive.
+- **Product map:** [docs/explanation/architecture.md](docs/explanation/architecture.md) maps every vertical, feature, component, variant and primitive.
 
 ### Docs
 - **Read any docs site in your room:** ask for "docs.stripe.com", "nextjs.org/docs" or "react.dev docs" and `find_source` offers a docs portal that lists the site's sections. MCPortal reads the site's `llms.txt`, its Sphinx inventory (Python, Django, NumPy, Flask) or its sitemap, and pages as markdown where the site offers it, else through the reader.

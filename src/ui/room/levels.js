@@ -1,4 +1,4 @@
-  // room/levels.js: the room's zoom levels, room → portal → item (docs/plans/room-layouts.md)
+  // room/levels.js: the room's zoom levels, room → portal → item (docs/explanation/social.md)
   // ------------------------------------------------------------ transitions
   // A level change is one animated step where the browser has View Transitions and the
   // user hasn't asked for less motion; otherwise it happens at once. `from` is the element

@@ -1,5 +1,5 @@
 /**
- * The docs tools: open_docs, read_doc_page, search_docs (docs/plans/docs-portal.md).
+ * The docs tools: open_docs, read_doc_page, search_docs (docs/explanation/reading.md).
  * A docs site is named by a docs portal's id, or by its address (a docs URL, a GitHub
  * owner/repo or folder link). Pages are fetched only when they belong to that site,
  * so these tools can't be used to fetch arbitrary URLs; read_article stays that.

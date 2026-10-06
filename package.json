@@ -4,6 +4,7 @@
   "description": "MCPortal: a personal, agent-composed workspace delivered as an MCP server with an MCP Apps UI.",
   "type": "module",
   "private": true,
+  "license": "AGPL-3.0-only",
   "engines": {
     "node": ">=22.18"
   },

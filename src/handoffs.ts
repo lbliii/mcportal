@@ -1,6 +1,6 @@
 /**
  * Handoffs: a page (and maybe a passage) sent from the room to a new chat
- * (docs/plans/attention.md, phase 2). Hosts can't open or message another conversation,
+ * (docs/explanation/reading.md, phase 2). Hosts can't open or message another conversation,
  * so the room stores a pointer under a short code, and the user says "Open MCPortal
  * handoff <code>" in a new chat. Codes are per account: someone else's code opens nothing.
  * Kept for HANDOFF_DAYS, at most HANDOFF_LIMIT per account (the oldest go first); deleted

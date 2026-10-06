@@ -1,6 +1,6 @@
 /**
  * The handoff tools: create_handoff (the room app) and open_handoff (the model, in the
- * new chat). See src/handoffs.ts and docs/plans/attention.md, phase 2.
+ * new chat). See src/handoffs.ts and docs/explanation/reading.md, phase 2.
  */
 import { HANDOFF_DAYS, normalizeCode, type Handoff } from '../handoffs.ts';
 import { DOCS_TOOLS } from './docs.ts';

@@ -1,8 +1,8 @@
 /**
- * Highlights (docs/plans/attention.md, phase 4): list_new_items gives the agent what the
+ * Highlights (docs/explanation/reading.md, phase 4): list_new_items gives the agent what the
  * user hasn't seen, with refs and taste signals; show_highlights shows its picks, but only
  * items the room really has, with the sources' own titles. The picks are kept as the
- * room's edition, which open_room leads with (docs/plans/room-layouts.md, phase 3).
+ * room's edition, which open_room leads with (docs/explanation/social.md, phase 3).
  */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';

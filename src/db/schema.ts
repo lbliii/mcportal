@@ -133,7 +133,7 @@ export async function ensureSchema(db: Queryable): Promise<void> {
     created_at timestamptz NOT NULL,
     expires_at timestamptz NOT NULL
   )`);
-  // v8: reblogs (docs/plans/reblog.md). A reblog's original, for counting and finding them;
+  // v8: reblogs (docs/explanation/social.md). A reblog's original, for counting and finding them;
   // at most one reblog per account per original.
   await db.query(`ALTER TABLE mcportal_shares ADD COLUMN IF NOT EXISTS root_id text`);
   await db.query(`UPDATE mcportal_shares SET root_id = data->'reblogOf'->>'root' WHERE root_id IS NULL AND data ? 'reblogOf'`);
