@@ -46,9 +46,9 @@
    * reblog.
    * @param {ReblogTarget} target
    */
-  function reblogButton(target) {
+  function reblogButton(target, cls = 'mi reblog') {
     if (!canPost() || (!target.shareId && !target.url)) return null;
-    const button = el('button', { class: 'mi reblog', type: 'button', 'data-reblog-key': target.key, 'aria-haspopup': 'menu', 'aria-expanded': 'false',
+    const button = el('button', { class: cls, type: 'button', 'data-reblog-key': target.key, 'aria-haspopup': 'menu', 'aria-expanded': 'false',
       onclick: (/** @type {MouseEvent} */ e) => { e.stopPropagation(); openReblogMenu(button, target); } });
     reblogTargets.set(button, target);
     drawReblogButton(button, target);
@@ -121,9 +121,9 @@
     openMenu = { menu, button };
     button.setAttribute('aria-expanded', 'true');
     $first('[role="menuitem"]', menu)?.focus();
-    // Read it first? Only a nudge, never a gate: the reader opens if they take it.
+    // Read it first? Only a nudge, never a gate: the reader opens if they take it. Not in the reader itself.
     const { url, item: story, portal } = target;
-    if (!mine && url && story && portal && isHttpUrl(url)) {
+    if (!mine && url && story && portal && isHttpUrl(url) && $('reader').hidden) {
       callTool('get_reading', { url }).then((result) => {
         if (result.structuredContent?.reading || openMenu?.menu !== menu) return;
         menu.prepend(el('div', { class: 'reblog-nudge' }, "You haven't read this yet. ",
