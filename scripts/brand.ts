@@ -190,12 +190,13 @@ const ICONS = ${JSON.stringify(icons())};
 `;
 }
 
-/** Stars as one path: `count` dots scattered over w x h by a fixed seed, so re-runs match. */
-function starfield(seed: number, count: number, w: number, h: number): string {
+/** Stars as one path: `count` dots scattered over w x h by a fixed seed, so re-runs match. `clear` keeps a box [x, y, w, h] free for text. */
+function starfield(seed: number, count: number, w: number, h: number, clear?: [number, number, number, number]): string {
   const rand = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
   let d = '';
   for (let i = 0; i < count; i++) {
     const x = rand() * w, y = rand() * h, rad = 0.8 + rand() * 2.2;
+    if (clear && x > clear[0] && x < clear[0] + clear[2] && y > clear[1] && y < clear[1] + clear[3]) continue;
     d += `M${r2(x - rad)} ${r2(y)}a${r2(rad)} ${r2(rad)} 0 1 0 ${r2(2 * rad)} 0a${r2(rad)} ${r2(rad)} 0 1 0 ${r2(-2 * rad)} 0`;
   }
   return d;
@@ -340,6 +341,49 @@ export function buildBrand(): { text: Record<string, string>; png: Record<string
     'MCPortal: your liminal webspace.');
   })();
 
+  // README hero, 1280x640 (also GitHub's social preview size): the paperback-cover night sky,
+  // lockup and tagline on the left, and through the open door a glimpse of a room's columns.
+  const readmeHero = (() => {
+    const W = 1280, H = 640, cx = 960;
+    const door = arch(cx, H, 330, 540), inner = arch(cx, H, 196, 430);
+    const back = ring(cx, 450, 420, 88, -14, 'back'), front = ring(cx, 450, 420, 88, -14, 'front');
+    // Three columns of cards behind the door, each led by one of the house inks.
+    const colW = 54, gap = 8, x0 = cx - (3 * colW + 2 * gap) / 2;
+    let room = '';
+    [INK.teal, INK.brick, INK.mustard].forEach((lead, c) => {
+      const x = x0 + c * (colW + gap);
+      let y = 318 + c * 6;
+      room += `<rect x="${r2(x)}" y="${y}" width="${colW}" height="7" rx="2" fill="${lead}"/>`;
+      y += 15;
+      for (let i = 0; y < H; i++) {
+        const thumb = (i + c) % 3 === 2 ? 0 : 26 + ((i * 7 + c * 5) % 3) * 6;
+        if (thumb) room += `<rect x="${r2(x)}" y="${y}" width="${colW}" height="${thumb}" rx="2" fill="${lead}"/><rect x="${r2(x)}" y="${y}" width="${colW}" height="${thumb}" rx="2" fill="url(#mcp-ht-room)" fill-opacity=".3"/>`;
+        y += thumb ? thumb + 6 : 0;
+        room += `<rect x="${r2(x)}" y="${y}" width="${colW - 6}" height="4" rx="2" fill="${INK.ink}" fill-opacity=".7"/>`
+          + `<rect x="${r2(x)}" y="${y + 8}" width="${colW - 20 - ((i + c) % 2) * 10}" height="4" rx="2" fill="${INK.ink}" fill-opacity=".35"/>`;
+        y += 24;
+      }
+    });
+    const cap = 50, markSize = cap * 2.4, lx = 88, ly = 150;
+    const tag = setText(medium, 'Your liminal webspace.', 34, 0);
+    const lines = ['A reading room inside your agent: portals onto', 'feeds, docs, Hacker News and GitHub.'].map((t) => setText(medium, t, 17, 0.01));
+    return svg(W, H, `<defs>${halftone('mcp-ht-readme', 14, 3.2, INK.ink)}${halftone('mcp-ht-room', 5, 1.1, INK.ink)}${halftone('mcp-ht-readme-planet', 9, 2.4, INK.ink)}`
+      + `<clipPath id="mcp-readme-doorway"><path d="${inner}"/></clipPath></defs>`
+      + `<rect width="${W}" height="${H}" fill="${INK.ink}"/><path d="${starfield(17, 90, W, H, [lx - 12, ly + markSize + 40, 560, 160])}" fill="${INK.paper}" fill-opacity=".55"/>`
+      + `<circle cx="1190" cy="92" r="44" fill="${INK.mustard}"/><circle cx="1190" cy="92" r="44" fill="url(#mcp-ht-readme-planet)" fill-opacity=".4"/>`
+      + `<path d="${back}" fill="none" stroke="${INK.mustard}" stroke-width="12" stroke-linecap="round"/>`
+      + `<path d="${door}" fill="${INK.teal}"/><path d="${door}" fill="url(#mcp-ht-readme)" fill-opacity=".35"/>`
+      + `<g clip-path="url(#mcp-readme-doorway)"><path d="${inner}" fill="${INK.paper}"/>${room}</g>`
+      + `<circle cx="${cx}" cy="262" r="26" fill="${INK.brick}"/>`
+      + `<path d="${front}" fill="none" stroke="${INK.mustard}" stroke-width="14" stroke-linecap="round"/>`
+      + `<path d="${door}" fill="none" stroke="${INK.paper}" stroke-width="3" stroke-opacity=".5" transform="translate(9 -6)"/>`
+      + `<svg x="${lx}" y="${ly}" width="${r2(markSize)}" height="${r2(markSize)}" viewBox="0 0 64 64">${portalMark({ detail: true })}</svg>`
+      + `<g transform="translate(${r2(lx + markSize + cap * 0.9)} ${r2(ly + (markSize - cap) / 2 + cap)}) scale(${cap / 100})"><path d="${wm.mc}" fill="${INK.paper}"/><path d="${wm.portal}" fill="${INK.mustard}"/></g>`
+      + `<g transform="translate(${lx} ${ly + markSize + 92})"><path d="${tag.d}" fill="${INK.paper}"/></g>`
+      + lines.map((l, i) => `<g transform="translate(${lx} ${ly + markSize + 150 + i * 32})"><path d="${l.d}" fill="${INK.paper}" fill-opacity=".78"/></g>`).join(''),
+    'MCPortal: your liminal webspace. A reading room inside your agent.');
+  })();
+
   const lineInk = lineMark(`stroke="${INK.ink}"`, `fill="${INK.brick}"`);
   const text: Record<string, string> = {
     'brand/mark.svg': svg(64, 64, portalMark({ detail: true })),
@@ -352,6 +396,7 @@ export function buildBrand(): { text: Record<string, string>; png: Record<string
     'brand/lockup-on-dark.svg': lockup(INK.paper, INK.mustard),
     'brand/lockup-stacked.svg': stacked,
     'brand/social-card.svg': social,
+    'brand/readme-hero.svg': readmeHero,
     'src/site/favicon.svg': svg(64, 64, portalMark()),
     'src/site/lockup-on-dark.svg': lockup(INK.paper, INK.mustard),
     'src/site/hero.svg': heroArt(),
@@ -368,6 +413,7 @@ export function buildBrand(): { text: Record<string, string>; png: Record<string
     'src/site/apple-touch-icon.png': [{ from: 'brand/app-icon.svg', width: 180 }],
     'src/site/icon-512.png': [{ from: 'brand/app-icon.svg', width: 512 }],
     'src/site/og.png': [{ from: 'brand/social-card.svg', width: 1200 }],
+    'brand/readme-hero.png': [{ from: 'brand/readme-hero.svg', width: 1280 }],
   };
   return { text, png };
 }

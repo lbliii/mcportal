@@ -1,13 +1,11 @@
-# <picture><source media="(prefers-color-scheme: dark)" srcset="brand/lockup-on-dark.svg"><img src="brand/lockup.svg" alt="MCPortal" height="56"></picture>
+<p align="center"><img src="brand/readme-hero.svg" alt="MCPortal: your liminal webspace. A reading room inside your agent." width="100%"></p>
 
-*Your liminal webspace.*
+**A reading room that lives in your agent.** MCPortal is a personal, agent-composed room: live portals onto sources you choose (Hacker News, GitHub, YouTube channels, subreddits, Bluesky, Mastodon, documentation sites, and any site with a feed), laid out the way you ask, with a clean reader view and no ads. Save links, clip things from the conversation, share what you read from your own Space, and follow other readers.
 
-**A reading platform that lives in your agent.** MCPortal is a personal, agent-composed room: live portals onto sources you choose (Hacker News, GitHub, YouTube channels, subreddits, Bluesky, Mastodon, and any site with a feed), laid out the way you ask, with a clean reader view and no ads. It ships as an MCP server with an [MCP Apps](https://modelcontextprotocol.io/extensions/apps/overview) UI, so it renders inline in the agent hosts you already use.
+It ships as an MCP server with an [MCP Apps](https://modelcontextprotocol.io/extensions/apps/overview) UI, so the room renders inline in the agent you already use: Claude (desktop, web and Claude Code), Codex, or any MCP host that supports apps. Run it on your own computer with nothing to sign up for, sign in with GitHub to keep the same room on every device, or host your own.
 
-- **v0.1 (M1):** plugin daily driver: MCP server, workspace app, `/portal`, Railway config.
-- **v0.2 (toward M1.5):** hardened after an adversarial review, plus **OAuth 2.1 with GitHub sign-in and per-user profiles**, so a hosted deployment can be added to Claude as a custom connector.
-- **v0.3 (M1.5, invite-only beta):** a chat-native workspace (columns lane, picture shelves, reader cards), **add anything** (MCPortal finds the feed), **thumbnails**, **starter packs** and **OPML import**, **saved items**, and a hosted service with **Postgres**, **usage limits**, **accounts, invites and an admin page**.
-- **v0.6:** **one portal, local or hosted** (ghost mode, or sign in to sync across devices), **sharing, Spaces and handles**, **room layouts** led by your agent's picks, a **tool surface reworked for the long run**, and readiness for directory review. See [CHANGELOG.md](CHANGELOG.md).
+- **Get started:** [install the plugin](#install-as-a-plugin-local-stdio), then type `/portal` or ask your agent to "open my room".
+- **What changed:** [CHANGELOG.md](CHANGELOG.md). **Contributing:** [CONTRIBUTING.md](CONTRIBUTING.md). **Security:** [SECURITY.md](SECURITY.md).
 
 ```
 you: /portal put GitHub on the left and add Simon Willison's blog
@@ -43,7 +41,7 @@ Node **22.18+** (or any Node 24). Node runs the `.ts` files directly: no build s
 ## Try it locally
 
 ```bash
-cd ~/Developer/mcportal
+git clone https://github.com/lbliii/mcportal && cd mcportal
 npm test                 # offline test suite
 npm run smoke            # live check against HN, GitHub and an RSS feed (needs network)
 npm start                # http://127.0.0.1:8787/preview  (bound to 127.0.0.1, no auth)
@@ -57,11 +55,11 @@ To develop against Claude desktop (the room renders inline in chat, no deploymen
 **Claude Code**, inside a session:
 
 ```
-/plugin marketplace add ~/Developer/mcportal
+/plugin marketplace add lbliii/mcportal
 /plugin install mcportal@mcportal
 ```
 
-**Cowork:** add `~/Developer/mcportal` as a plugin marketplace from Cowork's plugin settings and install `mcportal`.
+**Cowork:** add `lbliii/mcportal` as a plugin marketplace from Cowork's plugin settings and install `mcportal`.
 
 **Updates:** a plugin marketplace you add yourself doesn't update automatically. Turn it on in `/plugin` → **Marketplaces** → `mcportal` → **Enable auto-update**, or update by hand with `claude plugin update mcportal@mcportal`. New releases arrive in your next session.
 
@@ -69,12 +67,12 @@ Then `/portal`, or ask "open my room" ("open my portal" works too). Your profile
 
 **Ghost mode, or signed in.** A local MCPortal starts in ghost mode: no account, everything in `~/.mcportal`, nothing shared. To keep the same portal on every device and to share and follow, say "sign in to MCPortal", click **Ghost mode → Sign in** in the room, or **Already have a portal?** on the welcome screen. You sign in with GitHub in your browser; this computer's portal is added to your hosted account (nothing is removed), and from then on MCPortal still runs and fetches on this computer while your room, clips and shares live in the account. **Sign out** copies the portal back to this computer first. This is also the way in when your organization blocks custom connectors: install locally, then sign in. `MCPORTAL_HOSTED_URL` picks the hosted MCPortal (default: the public one). See [the plan](docs/plans/local-hosted-hybrid.md) for how it works.
 
-**Codex** (stdio), in `~/.codex/config.toml`:
+**Codex** (stdio): clone the repo (Node 22.18+, no `npm install` needed), then add to `~/.codex/config.toml`:
 
 ```toml
 [mcp_servers.mcportal]
 command = "node"
-args = ["/Users/llane/Developer/mcportal/bin/mcportal.mjs", "--stdio"]
+args = ["/path/to/mcportal/bin/mcportal.mjs", "--stdio"]
 ```
 
 ## Host it on Railway (remote connector)
