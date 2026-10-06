@@ -81,12 +81,12 @@ Most of the work isn't per kind. It's a few readers that many kinds share. Each 
 - **Page structured data (schema.org JSON-LD):** `Event`, `Product` and `Offer` blocks embedded in pages. Ticketmaster, Eventbrite, Dice and most shop platforms include them. One reader gives venue events and single-product watches on almost any site. Builds on the existing reader extraction.
 - **iCal:** a dependency-free reader for venue calendars, Luma, Meetup and public Google Calendars.
 - **Platform detection:** given a URL, recognize Shopify, WooCommerce or The Events Calendar and use the cheapest structured endpoint instead of the page. This extends `find_source`, which already turns a site into a feed.
-- **Agent-facing surfaces:** where a site publishes them, `/.well-known/ucp`, a site's own MCP server, `llms.txt` and `agents.md` come first in resolve. MCPortal calls them server-to-server like any provider. Today they matter for shops ([shops.md](shops.md)); events have no equivalent standard and no official MCP servers from Ticketmaster, Eventbrite or Luma.
+- **Agent-facing surfaces:** `/.well-known/ucp`, a site's own MCP server, `llms.txt` and `agents.md`. A site's MCP server belongs to the user's agent, which is the shopper's (or concert-goer's) agent those servers are built for; it resolves and rechecks there and hands MCPortal the identity. MCPortal reads only the public manifests and `llms.txt`, and only when the agent has no such tools. Today they matter for shops ([shops.md](shops.md)); events have no equivalent standard and no official MCP servers from Ticketmaster, Eventbrite or Luma.
 - **Keyed provider clients:** Ticketmaster, SeatGeek, Etsy. Operator keys live server-side and are scrubbed from cache keys, provenance, errors and logs, as the contract requires.
 
 All of them go through the existing safe-fetch boundary, send the identifiable user agent, and respect robots.txt for page readers.
 
-**Other agents' tools don't replace this.** A store's MCP server, or a ticketing MCP, answers "what's true right now" for whichever agent asks. None of them remembers what you care about or notices change over weeks. That's MCPortal's half of the rally; those servers are good providers for it.
+**Other services' agent tools are the agent's half of the rally.** A store's MCP server answers "what's true right now" for the person's own agent. None of them remembers what you care about or notices change over weeks. So the agent uses them to resolve a watch and to recheck a finding live before telling you; MCPortal watches in between with cheap public reads. Where the agent already resolved an identity with its own tools, `watch` accepts it instead of re-resolving.
 
 ## Noticing change
 

@@ -59,16 +59,22 @@ Checked 2026-10-06. Shops are ahead of every other kind here: stores now publish
 | **WooCommerce MCP** (10.9) | Store owners managing their own products and orders, behind their login | **Not for following a store.** Its public Store API is the right surface |
 | **Etsy Dev MCP** | Explains Etsy's API; reads no shops | Not a data source |
 
-**What this changes, and what it doesn't.** A store's MCP answers "what's in stock right now" for any agent. It can't remember that you care, check for weeks, or notice a price drop. That's MCPortal's half of the rally, so these surfaces make shops easier to resolve but leave the plan's shape alone. The user's own agent may already reach the same catalogues; it hands MCPortal the store, and MCPortal holds the watch.
+**The user's agent is the shopper's agent.** These surfaces exist for exactly the agent the user is already talking to. So the rally splits cleanly:
 
-**MCPortal as an MCP client:** resolve may call a store's MCP or UCP catalog server-to-server. Daily collection stays on plain HTTP (`/products.json`, the Store API): those agent tools are built for shoppers' sessions, sit behind bot protection, and their terms for a recurring service are unreviewed. Calls go through the safe-fetch boundary, and tool results are third-party text, fenced like any page.
+- **The agent shops.** When its host gives it commerce tools (a store's MCP, Shopify's catalog, UCP), the agent finds the store and product, checks live stock and price, and hands MCPortal a confirmed identity: the store origin, the product and variant ids, the UCP manifest it used. That is the legitimate use those servers are built for: a person's agent, in that person's session.
+- **MCPortal watches.** A store's MCP answers "what's true right now" but can't remember that you care, check for weeks, or notice a price drop. MCPortal does that with cheap, polite plain-HTTP reads (`/products.json`, the Store API), shared across users.
+- **The agent confirms.** When MCPortal reports a finding, the agent can recheck it live through the store's own tools before telling you ("back in M at $315, confirmed just now"), and take you to the store. MCPortal's snapshot is a lead; the store's agent surface is the source of truth at the moment it matters.
+
+**MCPortal never pretends to be a shopper's agent.** It doesn't call store MCP servers for collection: those tools are built for shoppers' sessions, sit behind bot protection, and their terms for a recurring service are unreviewed. It may read the public `/.well-known/ucp` manifest and `llms.txt` while resolving, when the user's agent has no commerce tools of its own. Any store text, through either path, is third-party and fenced like any page.
 
 ## Resolving a store: the ladder
 
-Like the [docs portal](docs-portal.md)'s source ladder, resolve tries the most standard, most structured source first and stops at the first that works:
+**First choice: the agent already resolved it.** If the user's agent used its own commerce tools, `watch` accepts the identity it found (store origin, product and variant ids) and MCPortal only checks it can collect that store over plain HTTP.
 
-1. **`/.well-known/ucp`**, then the store's UCP catalog.
-2. **Shopify:** `/products.json` (detected from response headers and its shape), with `/api/mcp` for search during preview.
+Otherwise, like the [docs portal](docs-portal.md)'s source ladder, MCPortal tries the most standard, most structured source first and stops at the first that works:
+
+1. **`/.well-known/ucp`:** the manifest says which platform and capabilities the store has.
+2. **Shopify:** `/products.json` (detected from response headers and its shape).
 3. **WooCommerce:** the Store API under `/wp-json/wc/store/v1/`.
 4. **`llms.txt` / `llms-full.txt`:** name, policies and links; a catalogue when nothing above exists.
 5. **Product data in pages.**
@@ -112,7 +118,7 @@ Stores drop dozens of products at once. Following the engine's grouping rule:
 
 | Phase | What ships | Size |
 |---|---|---|
-| 1 | Store watches on Shopify (resolve via UCP, Storefront MCP and `llms.txt`; collect via `/products.json`), the Shop portal, `offer` items, baseline and grouping (with [rally.md](rally.md) phase 0) | small to medium |
+| 1 | Store watches on Shopify (the agent's commerce tools resolve when it has them, else the ladder; collect via `/products.json`), the Shop portal, `offer` items, baseline and grouping (with [rally.md](rally.md) phase 0) | small to medium |
 | 2 | Product watches: Shopify products first, then any site through page data; price thresholds and sizes | small to medium |
 | 3 | WooCommerce stores, and any store with a UCP catalog | small |
 | 4 | Etsy shops, after its terms are reviewed | small |
@@ -124,5 +130,5 @@ Stores drop dozens of products at once. Following the engine's grouping rule:
 3. **Sharing a product:** reblogging "look what's on sale". Default: works like any saved item; no price claims beyond what the card shows, with the time it was seen.
 4. **How often to check:** Default: daily for stores, every few hours for product watches with a threshold. Revisit with real usage and budgets.
 5. **Newsletters and launch announcements:** many brands announce drops by email first. Default: out of scope; a store's blog feed (Shopify serves one at `/blogs/<handle>.atom`) can be a normal RSS portal.
-6. **Should collection use UCP catalogs too?** Default: not until a provider's terms allow a recurring service to call them; plain HTTP first.
-7. **Shopify Catalog MCP for brand names:** Default: use it in resolve only if its access terms allow MCPortal; otherwise the user's agent finds the store URL.
+6. **Should MCPortal ever call store MCP or UCP catalogs itself?** Default: no. The user's agent does the shopping; MCPortal reads plain HTTP. Revisit only if a provider offers terms for a recurring service.
+7. **Hosts without commerce tools:** Default: the agent finds the store URL by web search and MCPortal's ladder resolves it. The live recheck is skipped and the card says when MCPortal last saw the price.
