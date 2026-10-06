@@ -76,14 +76,17 @@ interface WatchKind<Subject, Obs> {
 
 ## Shared readers: build once, every kind uses them
 
-Most of the work isn't per kind. It's a few readers that many kinds share:
+Most of the work isn't per kind. It's a few readers that many kinds share. Each kind resolves through a **ladder**, like the [docs portal](docs-portal.md)'s: the most standard, most structured source first, stopping at the first that works. The rung that worked is saved with the watch.
 
 - **Page structured data (schema.org JSON-LD):** `Event`, `Product` and `Offer` blocks embedded in pages. Ticketmaster, Eventbrite, Dice and most shop platforms include them. One reader gives venue events and single-product watches on almost any site. Builds on the existing reader extraction.
 - **iCal:** a dependency-free reader for venue calendars, Luma, Meetup and public Google Calendars.
 - **Platform detection:** given a URL, recognize Shopify, WooCommerce or The Events Calendar and use the cheapest structured endpoint instead of the page. This extends `find_source`, which already turns a site into a feed.
+- **Agent-facing surfaces:** where a site publishes them, `/.well-known/ucp`, a site's own MCP server, `llms.txt` and `agents.md` come first in resolve. MCPortal calls them server-to-server like any provider. Today they matter for shops ([shops.md](shops.md)); events have no equivalent standard and no official MCP servers from Ticketmaster, Eventbrite or Luma.
 - **Keyed provider clients:** Ticketmaster, SeatGeek, Etsy. Operator keys live server-side and are scrubbed from cache keys, provenance, errors and logs, as the contract requires.
 
 All of them go through the existing safe-fetch boundary, send the identifiable user agent, and respect robots.txt for page readers.
+
+**Other agents' tools don't replace this.** A store's MCP server, or a ticketing MCP, answers "what's true right now" for whichever agent asks. None of them remembers what you care about or notices change over weeks. That's MCPortal's half of the rally; those servers are good providers for it.
 
 ## Noticing change
 
