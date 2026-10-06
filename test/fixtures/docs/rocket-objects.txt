@@ -1,5 +1,5 @@
 # Sphinx inventory version 2
-# Project: NemoClaw
+# Project: Rocket
 # Version: 1
 # The remainder of this file is compressed using zlib.
 latest/index std:doc -1 latest/index.html Overview
