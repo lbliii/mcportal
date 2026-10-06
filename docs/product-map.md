@@ -70,7 +70,7 @@ The core: live content from sources you chose, laid out your way, read cleanly.
 | | Portal art: generated vintage sci-fi print scenes when an item has no picture, one style per source | ✅ |
 | **Provenance** | "Show your work": every portal says its source, endpoint, fetch time, cache state and freshness | ✅ |
 | **Freshness** | Refresh one portal or all; per-source cache (HN 2 min, GitHub 5 min, RSS 10 min, reader 1 h, pictures 1 day) | ✅ |
-| **Intelligence** | Standing intents: scheduled checks and digests; first, watches (artists → concerts near you) ([plan](plans/watches.md)) | 🗺 |
+| **Intelligence** | Standing intents: scheduled checks and digests; watches through one engine ([plan](plans/rally.md)): stores and products ([shops](plans/shops.md)), artists and venues → shows near you ([events](plans/events.md)) | 🗺 |
 | | Views of your own reading (what you read and save, by topic and source) | 🗺 |
 
 ### 3.2 Collecting

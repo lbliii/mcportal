@@ -4,7 +4,7 @@ Status: proposed prerequisite contract, assessed **2026-10-03** against primary 
 
 ## One sequence for both plans
 
-[Watches](plans/watches.md) supplies the artist/Shows example; [delivery roadmap Release 3](plans/delivery-roadmap.md) supplies the durable collection and inbox promise. Their phases currently imply different infrastructure: an on-demand Shows portal does not keep checking between chats, and a reported set alone does not collect anything.
+[Events](plans/events.md) (formerly the watches plan) supplies the artist/Shows example, and [the rally engine](plans/rally.md) generalizes this contract to every watch kind; [delivery roadmap Release 3](plans/delivery-roadmap.md) supplies the durable collection and inbox promise. Their phases currently imply different infrastructure: an on-demand Shows portal does not keep checking between chats, and a reported set alone does not collect anything.
 
 1. Resolve the operator and product decisions below, retaining the watches plan's dependency order: linking, onboarding, reblogging.
 2. Ship **phase 1: confirmed artist watches and an on-demand Shows source**. Persist watches and coarse location; fetch on explicit room refresh/tool calls; render event dates, save, expire, and display changes discovered during those refreshes. Include file, Postgres, linked-account, export and deletion parity in this milestone. Describe coverage as retrieved Ticketmaster events, never all concerts or continuous monitoring.
