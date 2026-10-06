@@ -1,4 +1,4 @@
-/** Bounded live qualification. Run: node scripts/reader-audit.ts --only holdout --output reports/reader-qualification-live.json */
+/** Bounded live qualification. Run: node scripts/reader-audit.ts --only holdout --output reader-qualification-live.json */
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -75,7 +75,7 @@ async function samples(): Promise<Sample[]> {
   const only = option('--only') ?? 'all';
   if (!['all', 'original', 'holdout'].includes(only)) throw new Error('--only must be all, original or holdout');
   if (only === 'holdout') return HOLDOUTS;
-  const input: unknown = JSON.parse(await readFile(new URL('../reports/reader-audit-2026-10-03/sample-summary.json', import.meta.url), 'utf8'));
+  const input: unknown = JSON.parse(await readFile(new URL('data/reader-audit-sample.json', import.meta.url), 'utf8'));
   if (!Array.isArray(input)) throw new Error('Expected audit sample array');
   const original: Sample[] = input.map((row: unknown) => {
     if (!row || typeof row !== 'object' || !('source' in row) || typeof row.source !== 'string' || !('url' in row) || typeof row.url !== 'string') throw new Error('Invalid audit sample');
