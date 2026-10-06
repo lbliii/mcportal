@@ -167,19 +167,19 @@ test('resolve: Sphinx local inventory wins over a broad ancestor llms.txt', asyn
   assert.equal(calls.length, 2);
 });
 
-test('resolve: NemoClaw ancestor catalog cannot replace its documentation', async () => {
-  const site = await resolveDocs('https://docs.nvidia.com/nemoclaw/latest/', mapFetcher({
-    'https://docs.nvidia.com/llms.txt': { body: await fixture('parent-llms.txt') },
-    'https://docs.nvidia.com/nemoclaw/objects.inv': { body: await inventory('nemoclaw-objects.txt') },
+test('resolve: Rocket ancestor catalog cannot replace its documentation', async () => {
+  const site = await resolveDocs('https://docs.acme.dev/rocket/latest/', mapFetcher({
+    'https://docs.acme.dev/llms.txt': { body: await fixture('parent-llms.txt') },
+    'https://docs.acme.dev/rocket/objects.inv': { body: await inventory('rocket-objects.txt') },
   }));
-  assert.deepEqual(site.toc, { kind: 'sphinx', url: 'https://docs.nvidia.com/nemoclaw/objects.inv' });
-  assert.equal(site.title, 'NemoClaw');
-  assert.ok(site.sections.flatMap((section) => section.pages).every((page) => page.url.startsWith('https://docs.nvidia.com/nemoclaw/')));
+  assert.deepEqual(site.toc, { kind: 'sphinx', url: 'https://docs.acme.dev/rocket/objects.inv' });
+  assert.equal(site.title, 'Rocket');
+  assert.ok(site.sections.flatMap((section) => section.pages).every((page) => page.url.startsWith('https://docs.acme.dev/rocket/')));
 });
 
 test('resolve: unrelated ancestor llms.txt is rejected, even with one matching project link', async () => {
-  await assert.rejects(resolveDocs('https://docs.nvidia.com/nemoclaw/latest/', mapFetcher({
-    'https://docs.nvidia.com/llms.txt': { body: await fixture('parent-llms.txt') },
+  await assert.rejects(resolveDocs('https://docs.acme.dev/rocket/latest/', mapFetcher({
+    'https://docs.acme.dev/llms.txt': { body: await fixture('parent-llms.txt') },
   })), /No docs index found/);
 });
 

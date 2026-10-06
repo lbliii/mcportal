@@ -1,6 +1,6 @@
-# NVIDIA documentation
+# Acme documentation
 
 ## Products
-- [NemoClaw](/nemoclaw/latest/llms.txt)
-- [CUDA](/cuda/intro)
-- [TensorRT](/tensorrt/intro)
+- [Rocket](/rocket/latest/llms.txt)
+- [Anvil](/anvil/intro)
+- [Magnet](/magnet/intro)
