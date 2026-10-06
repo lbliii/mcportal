@@ -183,13 +183,13 @@
     return el('time', { datetime: value }, `${label}${new Date(value).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' })}`);
   }
 
-  /** @param {Article} a @param {string | null} via @param {boolean} withBack @param {LinkHandler} [onLink] */
-  function articleNodes(a, via, withBack, onLink) {
+  /** @param {Article} a @param {string | null} via @param {boolean} withBack @param {LinkHandler} [onLink] @param {ReblogTarget} [reblog] */
+  function articleNodes(a, via, withBack, onLink, reblog) {
     const body = passageSource(blockNodes(a.blocks, onLink), a.url, a.title, 'Use read_article on that URL for the rest of the page.');
     let site = a.siteName;
     if (!site) { try { site = new URL(a.url).hostname.replace(/^www\./, ''); } catch { site = ''; } }
     const metadata = present([a.byline, site && site !== a.byline ? site : null, articleDate(a.publishedAt, ''), a.updatedAt !== a.publishedAt ? articleDate(a.updatedAt, 'Updated ') : null, `${Math.max(1, Math.round(a.wordCount / 230))} min read`]);
-    const top = readerTop(a.url, withBack, a.title);
+    const top = readerTop(a.url, withBack, a.title, reblog);
     const heads = logicalBlocks(body).filter((node) => /^H[23]$/.test(node.tagName));
     if (a.wordCount >= 800 && heads.length >= 3) {
       const outline = el('details', { class: 'reader-outline' });
@@ -248,7 +248,8 @@
       const result = await callTool('read_article', { url: item.url });
       if (generation !== readerGeneration) return;
       const a = result.structuredContent.article;
-      const nodes = articleNodes(a, portal.title, true);
+      // A follow's story reblogs their post; anything else posts the link.
+      const nodes = articleNodes(a, portal.title, true, undefined, reblogTarget(item, portal, item.share));
       if (item.share) nodes.splice(3, 0, sharedBy(item, item.share));   // after the title and byline: who passed it to you
       reader.replaceChildren(...nodes);
       trackReading(a.url, a.title, reader);

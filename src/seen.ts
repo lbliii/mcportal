@@ -1,6 +1,6 @@
 /**
  * What the user has seen in each portal, so "new" means new to them
- * (docs/plans/attention.md, phase 3). Kept apart from reading history: that holds 1,000
+ * (docs/explanation/reading.md, phase 3). Kept apart from reading history: that holds 1,000
  * records an account, and feed items would push real reading out within days.
  *
  * A portal's seen set is its items' ids, hashed (12 hex characters), at most

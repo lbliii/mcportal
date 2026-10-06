@@ -56,7 +56,7 @@ export async function distributionFiles(): Promise<Record<string, string>> {
     tools: local.tools.map((t) => ({ name: t.name, description: t.description.split(/(?<=\.)\s/)[0] })),
     tools_generated: false,
     keywords: plugin.keywords,
-    license: 'UNLICENSED',
+    license: 'AGPL-3.0-only',
     privacy_policies: [`${HOSTED}/privacy`],
     // MCPortal runs its .ts files directly, which needs Node 22.18 or later.
     compatibility: { platforms: ['darwin', 'win32', 'linux'], runtimes: { node: pkg.engines.node } },

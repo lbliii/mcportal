@@ -247,7 +247,7 @@
   }
 
   /**
-   * Every handle is a door (docs/plans/finding-people.md): "@ana" anywhere opens her space.
+   * Every handle is a door (docs/plans/finding-people.md): "@ana" anywhere opens their space.
    * @param {string} handle @param {string} [className]
    */
   function handleButton(handle, className = '') {

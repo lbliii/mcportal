@@ -1,4 +1,4 @@
-  // room/river.js: the river, every portal merged into one stream (docs/plans/river.md)
+  // room/river.js: the river, every portal merged into one stream (docs/explanation/social.md)
   // ------------------------------------------------------------ river
   // The agent's picks, then what's new, then what you've seen. Each portal keeps its own
   // order and the portals merge by time; the same link from two portals is one story

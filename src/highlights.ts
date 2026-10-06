@@ -1,5 +1,5 @@
 /**
- * Highlights (docs/plans/attention.md, phase 4): the agent picks what's worth the user's
+ * Highlights (docs/explanation/reading.md, phase 4): the agent picks what's worth the user's
  * time from what's new in their room. MCPortal never ranks or summarizes; it gives the
  * agent compact candidates and taste signals (list_new_items), and shows the agent's picks
  * with the sources' own titles and links (show_highlights). Refs name an item by portal and

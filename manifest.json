@@ -155,7 +155,7 @@
     "reader",
     "mcp-apps"
   ],
-  "license": "UNLICENSED",
+  "license": "AGPL-3.0-only",
   "privacy_policies": [
     "https://mcportal-production.up.railway.app/privacy"
   ],

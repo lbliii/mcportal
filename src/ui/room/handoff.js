@@ -1,5 +1,5 @@
   // room/handoff.js: send the page you're reading to a new chat, and open one sent here
-  // ------------------------------------------------------------ handoffs (docs/plans/attention.md, phase 2)
+  // ------------------------------------------------------------ handoffs (docs/explanation/reading.md, phase 2)
   // Hosts can't open or message another conversation, so the page goes through MCPortal:
   // create_handoff stores a pointer (the page, where you were, any passage you selected)
   // under a short code, and the room shows what to say in a new chat. There the agent

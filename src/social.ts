@@ -12,7 +12,7 @@
  *           blocking removes follows both ways.
  *   report  a share or a profile, for admins to look at. Admins can hide a share.
  *   reblog  pass someone's post on to your followers, with an optional note
- *           (docs/plans/reblog.md). A reblog references the original, never copies
+ *           (docs/explanation/social.md). A reblog references the original, never copies
  *           its note or clip, so the original's author keeps control: deleting it,
  *           hiding it, or detaching it from one reblog leaves a tombstone there.
  *           Reblogging a reblog reblogs the original, crediting the one you saw (via).

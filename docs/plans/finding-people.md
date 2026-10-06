@@ -1,6 +1,6 @@
 # Plan: finding people
 
-**Status:** proposed 2026-10-06; phase 1 built 2026-10-06. Builds on the social layer (`src/social.ts`), public profiles (`src/public-profiles.ts`), reblogging ([reblog.md](reblog.md)) and the river ([river.md](river.md)). It's the "optional discovery through people's Spaces" item in [delivery-roadmap.md](delivery-roadmap.md), stage 4.
+**Status:** proposed 2026-10-06; phase 1 built 2026-10-06. Builds on the social layer (`src/social.ts`), public profiles (`src/public-profiles.ts`), [reblogs](../explanation/social.md#reblogs) and [the river](../explanation/social.md#the-river). It's the "discovery through people's Spaces" part of the [roadmap](README.md).
 
 ## Where we are
 
@@ -29,11 +29,11 @@ MCPortal still never calls a model. Matching is set overlap and text search. The
 
 1. **Every handle is a door.** Anywhere a person appears, one tap opens their Space with Follow on it. This costs nothing and does most of the work in a small community.
 2. **Being findable is opt-in.** Claiming a handle makes a Space. Being **listed** (showing up in search, suggestions and the Lobby) is a separate, explicit choice. Being unlisted still lets people who have your handle or link find you.
-3. **Suggestions come with reasons, or not at all.** Every suggestion says why, using things the suggested person chose to make public. No "people you may know" black box. (Roadmap release criterion: "Recommendations have understandable reasons.")
+3. **Suggestions come with reasons, or not at all.** Every suggestion says why, using things the suggested person chose to make public. No "people you may know" black box.
 4. **The follow graph stays private.** We never reveal who follows whom, so there's no "followed by people you follow." Signals come only from a person's own public choices.
 5. **Introductions, not feeds of strangers.** The agent offers people when asked, or at natural moments (building a room, adding a source). It never pushes suggestions on its own. The room gets one quiet surface (the Lobby), and only if the user adds it.
 6. **Native, not the open web.** Space links work for people signed in to MCPortal. No SEO pages, and no public profile visible to logged-out visitors.
-7. **Two new model tools.** Discovery is `find_people` and `suggest_people`, the same candidates-then-picks pair as `list_new_items` and `show_highlights`, plus fields on tools we already have (see [tool-surface.md](tool-surface.md)).
+7. **Two new model tools.** Discovery is `find_people` and `suggest_people`, the same candidates-then-picks pair as `list_new_items` and `show_highlights`, plus fields on tools we already have (see [designing the tool surface](../explanation/architecture.md#designing-the-tool-surface)).
 
 ## The surfaces
 
@@ -93,13 +93,13 @@ A portal (a new house source kind, `people`) where your agent's suggestions of w
 > Plays World of Warcraft: raid guides, patch notes, and long notes about the lore. Features Wowhead and the WoW subreddit.
 > [Follow] [Open Space] [Not for me]
 
-**How it fills: the same pattern as highlights** ([attention.md](attention.md) §4):
+**How it fills: the same pattern as highlights** ([highlights](../explanation/reading.md#highlights-and-editions) §4):
 
 1. The agent calls `find_people` and gets candidates, with evidence.
 2. It judges them with what it knows about the user, and picks a few, best first.
 3. It calls **`suggest_people`** (new model tool) with each pick's handle and a one-line **why** of up to 200 characters, in its own words. MCPortal stores the picks in the People portal and renders them as a card in the chat too.
 
-The agent writes the summary and MCPortal writes nothing. That keeps principle 1 of the attention plan: MCPortal never calls a model.
+The agent writes the summary and MCPortal writes nothing. That keeps [the agent thinks; MCPortal supplies](../explanation/reading.md#the-agent-thinks-mcportal-supplies): MCPortal never calls a model.
 
 **When it fills.** The agent can't act on its own, so the portal fills when:
 - the user asks ("who should I follow?", "find me people into synths"),
@@ -131,7 +131,7 @@ An empty People portal says "Ask your agent who you might like to follow."
 A new house source kind, `lobby`: posts shared with **everyone on MCPortal** by listed people, newest first, minus muted and blocked. It gives the "everyone" audience its meaning: everyone who looks in the Lobby.
 
 - **Opt-in in two places.** The author picks "everyone" per post and is listed. The reader adds a Lobby portal; it's never in a room by default and never in starter packs.
-- **Reblogs stay one hop** ([reblog.md](reblog.md) principle 3). The Lobby shows original posts and reblogs whose author is listed, never a reblog of a reblog.
+- **Reblogs stay one hop** (as [reblogs](../explanation/social.md#reblogs) already are). The Lobby shows original posts and reblogs whose author is listed, never a reblog of a reblog.
 - **Per-author cap:** at most 3 posts per person per day, so one prolific person can't fill it.
 - In the river, a Lobby item from someone you don't follow reads "@ana · not followed", and the handle is a door.
 
@@ -141,7 +141,7 @@ A new house source kind, `lobby`: posts shared with **everyone on MCPortal** by 
 
 - **GitHub.** Everyone signs in with GitHub. With the user's go-ahead, MCPortal reads their public GitHub following list (public API, no new scope) and finds listed people among those accounts who also turned on **Findable by my GitHub account**. Both sides opt in. This is the cold-start answer for a developer-heavy audience. Phase 5, after the basics show what people use.
 - **Curators in starter packs.** A pack can name a listed person whose Space it came from ("Pack curated by @ana"). This seeds the network around the founder and early curators.
-- **Federation.** Handles go through one resolver (`Social.resolve`) today. Keep it that way so `@ana@other.instance` can slot in later ([open-source.md](open-source.md)).
+- **Federation.** Handles go through one resolver (`Social.resolve`) today. Keep it that way so `@ana@other.instance` can slot in later ([federation.md](federation.md)).
 
 ## Tools
 

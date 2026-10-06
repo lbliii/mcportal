@@ -69,6 +69,8 @@
   @container (max-width: 560px) { .who { padding: 0; width: var(--mp-control-minimum); justify-content: center; } .who-name { display: none; } }
   .sep { width: 1px; height: 16px; background: var(--mp-border-divider); margin: 0 3px; }
   :root.article-view .room-only, :root.welcome-view .room-only { display: none !important; }
+  /* reading a story: the room's controls act on a room you can't see, so the reader's own row stands alone */
+  :root:has(#reader:not([hidden])) .room-only { display: none !important; }
 
   /* columns: a lane of fixed-width columns that scrolls sideways; each column scrolls its own items */
   :root { --mp-lane-height: 560px; }
@@ -145,7 +147,7 @@
   /* zooming between levels (View Transitions): the portal or story grows into the next level */
   ::view-transition-group(mp-zoom) { animation-duration: 300ms; animation-timing-function: ease-in-out; }
   ::view-transition-old(root), ::view-transition-new(root) { animation-duration: 200ms; }
-  /* front page (docs/plans/room-layouts.md): one column of sections that grows with its content; nothing scrolls inside it */
+  /* front page (docs/explanation/social.md): one column of sections that grows with its content; nothing scrolls inside it */
   .grid.frontpage { display: block; height: auto; overflow: visible; padding: var(--mp-space-12) var(--mp-space-12) var(--mp-space-4); }
   .fp-head { padding: 0 var(--mp-space-2) var(--mp-space-10); margin-bottom: var(--mp-space-12); border-bottom: 2px solid var(--mp-text-primary); }
   .fp-kicker, .fp-label { color: var(--mp-text-secondary); font-size: var(--mp-type-11); font-weight: var(--mp-weight-strong); text-transform: uppercase; letter-spacing: 0.06em; }
@@ -160,7 +162,7 @@
   .fp-end { margin: var(--mp-space-16) 0 var(--mp-space-8); padding-top: var(--mp-space-10); border-top: 1px solid var(--mp-border-divider); color: var(--mp-text-secondary); text-align: center; font-size: var(--mp-type-12-5); }
   @container (min-width: 600px) { .fp-top.has-picks { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); } .fp-blocks { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   @container (min-width: 1100px) { .fp-blocks { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-  /* river (docs/plans/river.md): one reading column of stories separated by rules; nothing scrolls inside it */
+  /* river (docs/explanation/social.md): one reading column of stories separated by rules; nothing scrolls inside it */
   .grid.river { display: block; height: auto; overflow: visible; padding: var(--mp-space-12) var(--mp-space-12) var(--mp-space-4); }
   .river-col { max-width: 640px; margin: 0 auto; }
   .river-head { padding: 0 var(--mp-space-8) var(--mp-space-8); border-bottom: 2px solid var(--mp-text-primary); }
@@ -176,11 +178,12 @@
   .story-portal:hover { text-decoration: underline; text-underline-offset: 2px; }
   .story-also::before, .story-when::before { content: '·'; margin-right: var(--mp-space-6); }
   .story-context { color: var(--mp-text-secondary); font-size: var(--mp-type-11-5); padding-bottom: var(--mp-space-4); }
-  /* reblog (docs/plans/reblog.md): a menu button; the moon fills the doorway once reblogged */
+  /* reblog (docs/explanation/social.md): a menu button; the moon fills the doorway once reblogged */
   .mi.reblog { gap: 3px; }
-  .mi.reblog.on { color: var(--mp-action-reblogged); }
-  .mi.reblog:disabled { opacity: 0.45; cursor: not-allowed; }
-  .mi.reblog:disabled:hover { color: inherit; background: none; }
+  .ib.reblog { width: auto; min-width: var(--mp-control-height); gap: 3px; padding: 0 var(--mp-space-4); }
+  .reblog.on { color: var(--mp-action-reblogged); }
+  .reblog:disabled { opacity: 0.45; cursor: not-allowed; }
+  .reblog:disabled:hover { color: inherit; background: none; }
   .reblog-label { display: none; }
   @container (min-width: 600px) { .story .reblog-label, .share-actions .reblog-label { display: inline; } }
   :root.fullscreen .story .reblog-label { display: inline; }
@@ -190,7 +193,7 @@
   .share-actions .mi.reblog svg { width: var(--mp-icon-normal); height: var(--mp-icon-normal); }
   /* the stamp: the icon lands like a print stamp, a little off register, then settles */
   @keyframes mp-stamp { 0% { transform: scale(1.35) rotate(-8deg); filter: drop-shadow(1.5px 1px 0 var(--mp-brand-brick)); } 55% { transform: scale(0.92); filter: drop-shadow(1px 0.5px 0 var(--mp-brand-brick)); } 100% { transform: none; filter: none; } }
-  @media (prefers-reduced-motion: no-preference) { .mi.reblog.stamp svg { animation: mp-stamp 420ms var(--mp-ease-standard); } }
+  @media (prefers-reduced-motion: no-preference) { .reblog.stamp svg { animation: mp-stamp 420ms var(--mp-ease-standard); } }
   .reblog-menu { position: absolute; z-index: var(--mp-layer-toast); min-width: 13rem; max-width: 18rem; padding: var(--mp-space-4); background: var(--mp-surface-raised); color: var(--mp-text-primary); border: 1px solid var(--mp-border-divider); border-radius: var(--mp-radius-control); box-shadow: 0 6px 20px rgb(0 0 0 / 0.16); }
   .reblog-menu > [role="menuitem"] { display: block; width: 100%; min-height: 32px; padding: var(--mp-space-6) var(--mp-space-10); border: 0; border-radius: var(--mp-radius-sm); background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
   .reblog-menu > [role="menuitem"]:hover, .reblog-menu [role="menuitem"]:focus-visible { background: var(--mp-surface-hover); outline: none; }
@@ -272,7 +275,7 @@
   .card.media .thumb { height: 118px; border-radius: 0; }
   .card-body { display: flex; flex-direction: column; gap: var(--mp-space-4); flex: 1; min-height: 0; padding: var(--mp-space-8) 11px 9px; }
   .card.media .item-title { -webkit-line-clamp: 2; }
-  /* unseen items read heavier than ones already seen, beside their New mark (docs/plans/room-layouts.md) */
+  /* unseen items read heavier than ones already seen, beside their New mark (docs/explanation/social.md) */
   .item.new .item-title { font-weight: var(--mp-weight-strong); }
   .card.new .item-title { font-weight: var(--mp-weight-heading); }
   .card.media .item-summary { display: none; }
@@ -306,10 +309,12 @@
   .error { color: var(--mp-status-error); }
   .skeleton { height: 12px; margin: 12px; border-radius: var(--mp-radius-xs); background: var(--mp-surface-hover); }
 
-  .reader { max-width: 740px; margin: 0 auto; padding: var(--mp-space-16) var(--mp-space-20) var(--mp-space-40); }
+  .reader { --mp-reader-pad-top: var(--mp-space-16); max-width: 740px; margin: 0 auto; padding: var(--mp-reader-pad-top) var(--mp-space-20) var(--mp-space-40); }
   .reader[hidden] { display: none; }
   :root:not(.fullscreen) .reader { max-height: 640px; overflow-y: auto; }
   .reader-top { display: flex; gap: var(--mp-space-2); align-items: center; margin: -6px 0 10px -6px; position: sticky; top: 0; z-index: 2; background: var(--mp-surface-canvas); border-bottom: 1px solid var(--mp-border-divider); padding: var(--mp-space-4) 0; }
+  /* inline, the reader is its own scroller and sticky stops at its padding: pin the row to the very top instead */
+  :root:not(.fullscreen) .reader-top { top: calc(-1 * var(--mp-reader-pad-top)); }
   :root.fullscreen .reader-top { top: var(--mp-reader-bar-height, 38px); }
   :root.fullscreen .reader .body [data-reader-block] { scroll-margin-top: calc(var(--mp-reader-bar-height, 38px) + 66px); }
   .reader h1 { font-size: 24px; line-height: 1.25; margin: 6px 0 6px; letter-spacing: -0.01em; }
@@ -374,7 +379,7 @@
   .reader.space { max-width: 1120px; }
   /* docs viewer: contents | page | on this page */
   :root { --mp-text-link: var(--mp-action-primary); }
-  .reader.docs { max-width: 1240px; padding-top: 10px; }
+  .reader.docs { --mp-reader-pad-top: 10px; max-width: 1240px; }
   :root:not(.fullscreen) .reader.docs { max-height: 860px; }
   .docs-grid { display: grid; grid-template-columns: 236px minmax(0, 1fr) 184px; gap: 28px; align-items: start; }
   .docs-toc, .docs-otp { position: sticky; top: 0; max-height: 820px; overflow-y: auto; font-size: var(--mp-type-13); padding: var(--mp-space-2) var(--mp-space-2) var(--mp-space-24); }

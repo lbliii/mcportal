@@ -1,4 +1,4 @@
-  // room/items.js: one item, drawn in a form (docs/plans/room-layouts.md)
+  // room/items.js: one item, drawn in a form (docs/explanation/social.md)
   // ------------------------------------------------------------ item forms
   // Every layout draws items through renderItem. A form is how much room an item gets:
   // row (a line in a portal list), tile (a card in a shelf), lead (the front page's

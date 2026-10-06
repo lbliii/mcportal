@@ -1,4 +1,4 @@
-  // room/layouts.js: the room's layouts, one renderer each (docs/plans/room-layouts.md)
+  // room/layouts.js: the room's layouts, one renderer each (docs/explanation/social.md)
   // ------------------------------------------------------------ layouts
   // A layout draws the same room (the profile's ordered columns of portals) its own way.
   // Adding one never changes another: each says what class the grid gets, how the whole
