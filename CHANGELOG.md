@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Reader
+- **The reader's row stays flush in a chat:** inline, the row of back, original and save buttons no longer floats a strip below the top, with the article scrolling through the gap.
+- **Reblog from the reader:** the reader's row has the reblog button, beside save. A story someone you follow posted reblogs their post; anything else posts the link.
+- **Reading hides the room's controls:** with a story open, the top bar drops layouts, add, sources, refresh and the account, which act on the room behind it.
+
 ## v0.8.0 — 2026-10-05
 
 ### The river and reblogging are on for everyone
