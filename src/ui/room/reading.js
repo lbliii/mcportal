@@ -7,7 +7,7 @@
   // missed; positions are only sent once the stored one is known (so they never overwrite
   // it blind), and after the open is recorded (so the two writes can't cross). Only the
   // "Mark as read" button marks it read; progress never implies read. The model reads
-  // this back with list_reading and never records reading itself (docs/reading-state.md).
+  // this back with list_reading and never records reading itself (docs/explanation/reading.md).
   const POSITION_EVERY = 15000;
   const MEASURE_AFTER = 250;
   /** Saves the open article's position, if it moved, and stops watching it. @type {(() => void) | null} */

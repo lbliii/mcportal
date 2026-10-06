@@ -8,7 +8,7 @@
  *       After that PR is merged: tags main's head as v<version> and creates the GitHub
  *       release, with that version's changelog section as its notes.
  *
- * Deploying is separate (see CONTRIBUTING.md). Plugin users only receive a release
+ * Deploying is separate (see docs/how-to/operate.md). Plugin users only receive a release
  * when the version changes, which is what this is for. MIN_CLIENT_VERSION
  * (src/api/calls.ts) is never raised here: that's a decision of its own.
  */

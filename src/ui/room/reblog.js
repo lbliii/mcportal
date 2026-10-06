@@ -1,4 +1,4 @@
-  // room/reblog.js: reblogging from the room (docs/plans/reblog.md, phase 3)
+  // room/reblog.js: reblogging from the room (docs/explanation/social.md, phase 3)
   // ------------------------------------------------------------ reblog
   // One button with a menu: Reblog, Reblog with a note, Undo reblog. A story someone you
   // follow posted reblogs their post (the credit stays theirs); a story no one has posted

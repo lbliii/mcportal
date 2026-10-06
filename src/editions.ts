@@ -1,6 +1,6 @@
 /**
  * The room's edition: the agent's latest highlights, kept so the room can lead with them
- * (docs/plans/room-layouts.md, phase 3). show_highlights stores one per account,
+ * (docs/explanation/social.md, phase 3). show_highlights stores one per account,
  * replacing the last; it lasts EDITION_HOURS. Only the agent's own words are kept (title,
  * intro, a reason per pick) and refs to items: open_room finds each pick among the room's
  * current items and drops the ones that have left their feed, so no site text is stored.

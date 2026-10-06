@@ -1,5 +1,5 @@
 /**
- * A selected passage in the reader (docs/plans/attention.md, phase 1), in a real browser
+ * A selected passage in the reader (docs/explanation/reading.md, phase 1), in a real browser
  * inside a fixture MCP Apps host that records what the room sends it. The host's
  * capabilities come from the page's query string, so each test plays a different host.
  * Skips when no Chrome is installed (set CHROME_PATH to point at one).

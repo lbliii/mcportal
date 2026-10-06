@@ -145,7 +145,7 @@
   /* zooming between levels (View Transitions): the portal or story grows into the next level */
   ::view-transition-group(mp-zoom) { animation-duration: 300ms; animation-timing-function: ease-in-out; }
   ::view-transition-old(root), ::view-transition-new(root) { animation-duration: 200ms; }
-  /* front page (docs/plans/room-layouts.md): one column of sections that grows with its content; nothing scrolls inside it */
+  /* front page (docs/explanation/social.md): one column of sections that grows with its content; nothing scrolls inside it */
   .grid.frontpage { display: block; height: auto; overflow: visible; padding: var(--mp-space-12) var(--mp-space-12) var(--mp-space-4); }
   .fp-head { padding: 0 var(--mp-space-2) var(--mp-space-10); margin-bottom: var(--mp-space-12); border-bottom: 2px solid var(--mp-text-primary); }
   .fp-kicker, .fp-label { color: var(--mp-text-secondary); font-size: var(--mp-type-11); font-weight: var(--mp-weight-strong); text-transform: uppercase; letter-spacing: 0.06em; }
@@ -160,7 +160,7 @@
   .fp-end { margin: var(--mp-space-16) 0 var(--mp-space-8); padding-top: var(--mp-space-10); border-top: 1px solid var(--mp-border-divider); color: var(--mp-text-secondary); text-align: center; font-size: var(--mp-type-12-5); }
   @container (min-width: 600px) { .fp-top.has-picks { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); } .fp-blocks { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   @container (min-width: 1100px) { .fp-blocks { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-  /* river (docs/plans/river.md): one reading column of stories separated by rules; nothing scrolls inside it */
+  /* river (docs/explanation/social.md): one reading column of stories separated by rules; nothing scrolls inside it */
   .grid.river { display: block; height: auto; overflow: visible; padding: var(--mp-space-12) var(--mp-space-12) var(--mp-space-4); }
   .river-col { max-width: 640px; margin: 0 auto; }
   .river-head { padding: 0 var(--mp-space-8) var(--mp-space-8); border-bottom: 2px solid var(--mp-text-primary); }
@@ -176,7 +176,7 @@
   .story-portal:hover { text-decoration: underline; text-underline-offset: 2px; }
   .story-also::before, .story-when::before { content: '·'; margin-right: var(--mp-space-6); }
   .story-context { color: var(--mp-text-secondary); font-size: var(--mp-type-11-5); padding-bottom: var(--mp-space-4); }
-  /* reblog (docs/plans/reblog.md): a menu button; the moon fills the doorway once reblogged */
+  /* reblog (docs/explanation/social.md): a menu button; the moon fills the doorway once reblogged */
   .mi.reblog { gap: 3px; }
   .mi.reblog.on { color: var(--mp-action-reblogged); }
   .mi.reblog:disabled { opacity: 0.45; cursor: not-allowed; }
@@ -270,7 +270,7 @@
   .card.media .thumb { height: 118px; border-radius: 0; }
   .card-body { display: flex; flex-direction: column; gap: var(--mp-space-4); flex: 1; min-height: 0; padding: var(--mp-space-8) 11px 9px; }
   .card.media .item-title { -webkit-line-clamp: 2; }
-  /* unseen items read heavier than ones already seen, beside their New mark (docs/plans/room-layouts.md) */
+  /* unseen items read heavier than ones already seen, beside their New mark (docs/explanation/social.md) */
   .item.new .item-title { font-weight: var(--mp-weight-strong); }
   .card.new .item-title { font-weight: var(--mp-weight-heading); }
   .card.media .item-summary { display: none; }

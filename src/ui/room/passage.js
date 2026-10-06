@@ -1,5 +1,5 @@
   // room/passage.js: a passage selected in the reader or docs viewer: ask the agent about it, or clip it
-  // ------------------------------------------------------------ passages (docs/plans/attention.md, phase 1)
+  // ------------------------------------------------------------ passages (docs/explanation/reading.md, phase 1)
   // Selecting text in an article or docs page shows a small bar. "Ask about this" gives the
   // model the passage as context, fenced as the site's text, then posts a fixed message in
   // the user's voice: site text never goes into the user's message. "Clip quote" keeps it.
