@@ -655,6 +655,8 @@ test('browser: every handle is a door: @names open their space and come back to 
         window.__calls.push({ name, args });
         if (name === 'open_space') return answer({ content: [], structuredContent: { space: { handle: args.handle, displayName: args.handle.toUpperCase(), mine: false, followers: 2, following: false, posts: [], sources: [], createdAt: now, updatedAt: now } } });
         if (name === 'relationship') return answer({ content: [], structuredContent: { handle: args.handle, layoutChanged: false } });
+        if (args.id === 's_ben') return answer({ content: [], structuredContent: { share: { id: 's_ben', kind: 'link', title: 'A post by cy', url: 'https://example.com/cy', audience: 'mcportal', createdAt: now,
+          author: { handle: 'ben' }, mine: false, reblogCount: 1, canReblog: true, reblogOf: { root: 's_cy' }, original: { id: 's_cy', author: { handle: 'cy' }, note: "Cy's own words." }, canFollow: ['cy'] } } });
         return answer({ content: [], structuredContent: { share: { id: 's_fay', kind: 'clip', title: 'Just for fay', clip: { kind: 'quote', data: { kind: 'quote', text: 'Cats are liquid.' } }, note: 'Worth a look.', audience: 'mcportal', createdAt: now,
           author: { handle: 'fay' }, mine: false, reblogCount: 0, canReblog: true, canFollow: ['fay'] } } });
       }
@@ -706,6 +708,16 @@ test('browser: every handle is a door: @names open their space and come back to 
     await page.waitFor(`document.querySelector('#reader h1')?.textContent === 'Just for fay'`, 'back to the share');
     assert.equal(await page.eval(`document.querySelector('#reader .btn.follow').textContent`), 'Following @fay', 'the share comes back as you left it');
     assert.equal(await page.eval(`document.getElementById('reader').classList.contains('space')`), false);
+
+    // A shared link opens in the reader, which still says who passed it on, with Follow for the original's author.
+    await page.eval(`document.querySelector('#reader .reader-top button').click()`);
+    await page.waitFor(`document.getElementById('reader').hidden`, 'back to the river');
+    await page.eval(`${find('A post by cy')}.querySelector('.item-main').click()`);
+    await page.waitFor(`document.querySelector('#reader .shared-by .btn.follow')`, 'the reader with who shared it');
+    assert.equal(await page.eval(`document.querySelector('#reader .shared-by .byline').textContent`), "@ben reblogged @cy's link");
+    assert.deepEqual(await page.eval(`[...document.querySelectorAll('#reader .shared-by .story-note')].map((n) => n.textContent)`), ["@cyCy's own words."]);
+    assert.equal(await page.eval(`document.querySelector('#reader .shared-by .btn.follow').textContent`), 'Follow @cy');
+    assert.deepEqual(await page.eval(`window.__calls.at(-1)`), { name: 'get_share', args: { id: 's_ben' } });
 
     // A Following portal's rows name their people as buttons too.
     await page.eval(`document.querySelector('#reader .reader-top button').click()`);

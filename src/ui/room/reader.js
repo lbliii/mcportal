@@ -248,7 +248,9 @@
       const result = await callTool('read_article', { url: item.url });
       if (generation !== readerGeneration) return;
       const a = result.structuredContent.article;
-      reader.replaceChildren(...articleNodes(a, portal.title, true));
+      const nodes = articleNodes(a, portal.title, true);
+      if (item.share) nodes.splice(3, 0, sharedBy(item, item.share));   // after the title and byline: who passed it to you
+      reader.replaceChildren(...nodes);
       trackReading(a.url, a.title, reader);
       if (!DEV) {
         const safeTitle = String(a.title).replace(/[\u0000-\u001f\u007f\u2028\u2029"]/g, ' ').slice(0, 160);
@@ -259,7 +261,7 @@
       }
     } catch (error) {
       if (generation !== readerGeneration) return;
-      reader.replaceChildren(readerTop(item.url, true), el('h1', null, item.title),
+      reader.replaceChildren(readerTop(item.url, true), el('h1', null, item.title), ...(item.share ? [sharedBy(item, item.share)] : []),
         el('div', { class: 'error' }, `Reader view isn't available for this page (${errorText(error)}).`),
         el('button', { class: 'btn', onclick: () => openLink(item.url) }, 'Open the original'));
     }

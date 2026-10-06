@@ -276,6 +276,26 @@
     return button;
   }
 
+  /**
+   * A shared link opened in the reader keeps who shared it: their handle (a door), the
+   * original's author for a reblog, the notes, and Follow for whoever on it you don't
+   * follow yet (get_share knows; the Following portal's item doesn't).
+   * @param {Item} item an item of a Following portal @param {NonNullable<Item['share']>} share its share
+   */
+  function sharedBy(item, share) {
+    const author = item.meta.find((m) => /^@[a-z0-9_]{2,30}$/.test(m))?.slice(1);
+    const by = share.reblog?.by;
+    const actions = el('div', { class: 'share-actions' });
+    callTool('get_share', { id: share.id })
+      .then((result) => { const follow = followButton(result.structuredContent.share); if (follow) actions.append(follow); })
+      .catch(() => {});   // the reader works without it
+    return el('section', { class: 'shared-by', 'aria-label': 'Shared with you' },
+      el('div', { class: 'byline' }, author ? handleButton(author) : 'Someone', ...(by ? [' reblogged ', handleButton(by), "'s link"] : [' shared this link'])),
+      by && share.reblog?.note ? el('p', { class: 'story-note' }, handleButton(by, 'story-note-by'), share.reblog.note) : null,
+      item.summary ? el('p', { class: by ? 'story-note' : 'share-note' }, by && author ? handleButton(author, 'story-note-by') : null, item.summary) : null,
+      actions);
+  }
+
   // ------------------------------------------------------------ shares
   // Other people's words: built as text like everything else, and labeled with who wrote them.
   // A reblog shows its original live (author, note, clip) above the reblogger's note: two

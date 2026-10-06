@@ -43,7 +43,7 @@ From cheapest to richest. Each one stands on its own.
 
 - Every `@handle` in the room opens that Space (`loadSpace`), with a back button to where you were: share reader bylines, notes, `via`, river context rows ("@ana shared"), Following items and reblog chains.
 - The share reader gets a **Follow @ana** button next to Reblog when you don't follow the author. Seeing a good post is the moment you want to follow.
-- **Built, with one gap:** a shared *link* from the Following portal opens in the article reader, which doesn't say who shared it, so Follow isn't there yet. Shared clips, Space posts and `get_share` cards have it. The article reader should get a "shared by @ana" line with Follow.
+- **Built:** a shared link opened from the Following portal keeps a "@ben reblogged @cy's link" line, the notes, and Follow in the article reader.
 - `get_share`, `list_new_items` and `open_space` results already name handles. Server instructions tell the agent it can offer to follow ("Want @ana's posts in your Following portal?") when the user reacts well to something someone shared.
 
 ### 2. Space links and invites
