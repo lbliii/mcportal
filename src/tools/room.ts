@@ -10,11 +10,11 @@ import { ACTIVE_LABS } from '../labs.ts';
 import { MAX_PACKS, packSummaries, STARTER_PACKS } from '../packs.ts';
 import { SEEN_BATCH, tracksSeen, withNews } from '../seen.ts';
 import { describeDiff, describeLayout, diffProfiles, findPortal, normalizeSourceConfig, offeredLayouts, type Layout, type PortalInput, type Profile, type ProfileDiff } from '../profile.ts';
-import { clipsPortal, clipsQuery, followingPortal, loadPortal, pinnedPortal, savedPortal } from '../sources.ts';
+import { clipsPortal, clipsQuery, followingPortal, loadPortal, peoplePortal, pinnedPortal, savedPortal } from '../sources.ts';
 import type { Intros } from '../social.ts';
 import type { PortalResult } from '../types.ts';
 import { identityOf, labsOf, ok, toolError, toolFailure, untrusted, ROOM_URI, type CallToolResult, type ToolContext, type ToolDef } from './kit.ts';
-import { featuredBy } from './social.ts';
+import { featuredBy, suggestedPeople } from './social.ts';
 import type { ToolResults } from './results.ts';
 
 /** Any portal's current items: profile-backed ones from the profile and stores, the rest fetched (cached unless `force`). */
@@ -22,6 +22,7 @@ export async function portalFor(spec: PortalInput, profile: Profile, ctx: ToolCo
   if (spec.source === 'saved') return savedPortal(spec, profile.saved);
   if (spec.source === 'pinned') return pinnedPortal(spec, profile.pins);
   if (spec.source === 'clips') return clipsPortal(spec, ctx.clips ? await ctx.clips.list(ctx.userId, clipsQuery(spec)) : []);
+  if (spec.source === 'people') return peoplePortal(spec, await suggestedPeople(profile, ctx));
   if (spec.source === 'following') {
     const { limit } = normalizeSourceConfig('following', spec.config, spec.id);
     return followingPortal(spec, ctx.social ? await ctx.social.feed(ctx.userId, { limit }) : []);

@@ -189,6 +189,7 @@
    * @param {number} style
    */
   function sourceColor(source, style) {
+    if (source === 'people') return 'var(--mp-source-following)';
     return HOUSE_SOURCES.has(source) ? `var(--mp-source-${source})` : `color-mix(in srgb, ${portalArt.leadOf(style)} var(--mp-source-lead-mix), var(--mp-brand-paper))`;
   }
   /** The colour a source outside the layout (a search result, someone's featured feed) would get. */

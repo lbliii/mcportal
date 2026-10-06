@@ -98,6 +98,7 @@
       else if (data && data.share && data.share.id) { gotInitialResult = true; if (Array.isArray(data.labs)) state.labs = data.labs; showShareCard(data.share, data.rebloggers); }
       else if (data && data.clip && data.clip.data) { gotInitialResult = true; showClipCard(data.clip); }
       else if (data && data.highlights && Array.isArray(data.highlights.picks)) { gotInitialResult = true; showHighlightsCard(data.highlights); }
+      else if (data && data.suggested && data.suggested.portal) { gotInitialResult = true; showPeopleCard(data.suggested.portal); }
       else if (data && data.article) { gotInitialResult = true; showArticleCard(data.article, data.saved); }
       else if (data && data.profile && data.portals) { gotInitialResult = true; renderRoom(data); }
       else {

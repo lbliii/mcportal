@@ -15,7 +15,7 @@
   /** Coming back to the river checks for new stories at most this often, and only in portals past their freshness. */
   const RIVER_RECHECK_MS = 5 * 60 * 1000;
   /** Portals that aren't streams of stories (tables of contents, the agent's data): named at the end instead. */
-  const OFF_RIVER = new Set(['docs', 'pinned']);
+  const OFF_RIVER = new Set(['docs', 'pinned', 'people']);
 
   /** Someone you follow who shared or reblogged a story: their note, and the post (for reblogging it). @typedef {{ handle: string, note?: string | undefined, share?: Item['share'] }} Sharer */
   /** @typedef {{ key: string, portal: PortalResult, item: Item, also: PortalResult[], shared: Sharer[], why?: string | undefined }} Story */

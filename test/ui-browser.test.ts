@@ -847,3 +847,67 @@ test('browser: Space links: the room offers a follow of whoever brought you, say
     await page.send('Page.removeScriptToEvaluateOnNewDocument', { identifier });
   }
 });
+
+test('browser: the People portal: suggested people with the agent\'s reason, Follow, Not for me, and their Space on click; never in the river', { skip }, async () => {
+  const { identifier } = await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => {
+    const real = window.fetch;
+    window.__calls = [];
+    const answer = (result) => new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result }), { status: 200, headers: { 'content-type': 'application/json' } });
+    const now = new Date().toISOString();
+    window.fetch = async (url, init) => {
+      const body = init && typeof init.body === 'string' ? JSON.parse(init.body) : null;
+      const name = body && body.params && body.params.name;
+      const args = body && body.params && body.params.arguments;
+      if (url === '/mcp' && ['relationship', 'pass_person', 'open_space'].includes(name)) {
+        window.__calls.push({ name, args });
+        if (name === 'relationship') return answer({ content: [], structuredContent: { handle: args.handle, layoutChanged: false } });
+        if (name === 'pass_person') return answer({ content: [], structuredContent: { profile: {} } });
+        return answer({ content: [], structuredContent: { space: { handle: args.handle, displayName: args.handle.toUpperCase(), mine: false, followers: 3, following: false, posts: [], sources: [], createdAt: now, updatedAt: now } } });
+      }
+      const res = await real(url, init);
+      if (name !== 'open_room') return res;
+      const json = await res.json();
+      const room = json.result && json.result.structuredContent;
+      if (room && room.portals) {
+        room.identity = { mode: 'hosted', handle: 'reader' };
+        room.profile.columns.push({ width: 1, panels: [{ id: 'people', source: 'people', title: 'People', config: {} }] });
+        room.portals.push({ portalId: 'people', source: 'people', title: 'People', provenance: { source: 'people', endpoint: "your agent's suggestions", fetchedAt: now, cached: false, ttlSeconds: 0 }, items: [
+          { id: 'person:ana', title: '@ana', summary: 'Posts mostly about cat behavior research.', meta: ['Cat Physics Quarterly', '3 followers'], publishedAt: now, person: { handle: 'ana', following: false } },
+          { id: 'person:ben', title: 'Ben (@ben)', summary: 'Plays World of Warcraft: raid guides and lore.', meta: ['12 followers'], publishedAt: now, person: { handle: 'ben', following: false } },
+        ] });
+      }
+      return new Response(JSON.stringify(json), { status: res.status, headers: { 'content-type': 'application/json' } });
+    };
+  })();` });
+  const people = `[...document.querySelectorAll('#grid .item')].filter((n) => n.querySelector('.person-act'))`;
+  try {
+    page.problems.length = 0;
+    await page.goto(`${app.base}/preview`);
+    await page.waitFor(`${people}.length === 2 && !document.querySelector('.skeleton')`, 'the People portal');
+    assert.deepEqual(await page.eval(`${people}.map((n) => [n.querySelector('.item-title').textContent, n.querySelector('.item-summary').textContent, [...n.querySelectorAll('.person-act')].map((b) => b.textContent)])`), [
+      ['@ana', 'Posts mostly about cat behavior research.', ['Follow', 'Not for me']],
+      ['Ben (@ben)', 'Plays World of Warcraft: raid guides and lore.', ['Follow', 'Not for me']]]);
+    assert.equal(await page.eval(`${people}.some((n) => n.querySelector('.mi.save, .mi.reblog'))`), false, 'nothing to save or reblog');
+
+    await page.eval(`${people}[0].querySelector('.person-act.follow').click()`);
+    await page.waitFor(`${people}[0].querySelector('.person-act.follow').textContent === 'Following'`, 'the follow');
+    assert.deepEqual(await page.eval(`window.__calls.at(-1)`), { name: 'relationship', args: { handle: 'ana', action: 'follow' } });
+
+    await page.eval(`[...${people}[1].querySelectorAll('.person-act')].find((b) => b.textContent === 'Not for me').click()`);
+    await page.waitFor(`${people}.length === 1`, 'ben passed on');
+    assert.deepEqual(await page.eval(`window.__calls.at(-1)`), { name: 'pass_person', args: { handle: 'ben' } });
+
+    await page.eval(`${people}[0].querySelector('.item-main').click()`);
+    await page.waitFor(`!document.getElementById('reader').hidden && document.querySelector('#reader .space-head h1')?.textContent === 'ANA'`, "ana's space");
+    await page.eval(`document.querySelector('#reader .reader-top button').click()`);
+    await page.waitFor(`document.getElementById('reader').hidden`, 'back to the room');
+
+    await page.eval(`document.querySelector('[data-layout="river"]').click()`);
+    await page.waitFor(`document.querySelector('#grid.river .river-feed article')`, 'the river');
+    assert.equal(await page.eval(`document.querySelectorAll('#grid.river .person-act').length`), 0, 'people stay out of the river');
+    assert.deepEqual(page.problems, []);
+  } finally {
+    await page.send('Page.removeScriptToEvaluateOnNewDocument', { identifier });
+    await profiles.put('default', room());
+  }
+});

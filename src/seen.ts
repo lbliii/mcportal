@@ -22,7 +22,7 @@ export const SEEN_PER_PORTAL = 500;
 export const SEEN_BATCH = { portals: 40, items: 100 };
 
 /** Your own portals (what you saved or clipped) have nothing new to tell you. */
-const UNTRACKED: ReadonlySet<SourceKind> = new Set(['saved', 'clips']);
+const UNTRACKED: ReadonlySet<SourceKind> = new Set(['saved', 'clips', 'people']);
 export const tracksSeen = (source: SourceKind) => !UNTRACKED.has(source);
 
 /** An item id as stored: short, and nothing the site wrote. */

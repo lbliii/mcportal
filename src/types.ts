@@ -5,9 +5,10 @@ import type { ErrorCode } from './lib/errors.ts';
  * another tool (Jira, Slack, …): both live in the profile and are never fetched.
  * 'clips' come from the clip store (src/clips.ts) and 'following' from shares of
  * people the user follows (src/social.ts); neither is fetched. 'docs' is a docs
- * site's table of contents (src/adapters/docs.ts).
+ * site's table of contents (src/adapters/docs.ts). 'people' is the agent's suggestions of
+ * whom to follow, kept in the profile (docs/plans/finding-people.md).
  */
-export type SourceKind = 'hn' | 'rss' | 'github' | 'docs' | 'saved' | 'pinned' | 'clips' | 'following';
+export type SourceKind = 'hn' | 'rss' | 'github' | 'docs' | 'saved' | 'pinned' | 'clips' | 'following' | 'people';
 
 export const CLIP_KINDS = ['quote', 'exchange', 'note', 'table', 'image', 'link'] as const;
 export type ClipKind = (typeof CLIP_KINDS)[number];
@@ -44,6 +45,8 @@ export interface Item {
     /** Whether the viewer may reblog it now. */
     canReblog?: boolean;
   };
+  /** Items of a people portal: someone the agent suggested following; the summary is its reason. */
+  person?: { handle: string; following: boolean };
   /** Not yet seen by this user (src/seen.ts). */
   new?: true;
 }
