@@ -1,6 +1,6 @@
 # Plan: finding people
 
-**Status:** proposed 2026-10-06; phases 1 and 2 built 2026-10-06. Builds on the social layer (`src/social.ts`), public profiles (`src/public-profiles.ts`), [reblogs](../explanation/social.md#reblogs) and [the river](../explanation/social.md#the-river). It's the "discovery through people's Spaces" part of the [roadmap](README.md).
+**Status:** proposed 2026-10-06; phases 1–3 built 2026-10-06. Builds on the social layer (`src/social.ts`), public profiles (`src/public-profiles.ts`), [reblogs](../explanation/social.md#reblogs) and [the river](../explanation/social.md#the-river). It's the "discovery through people's Spaces" part of the [roadmap](README.md).
 
 ## Where we are
 
@@ -54,32 +54,23 @@ From cheapest to richest. Each one stands on its own.
 - **This is the invite.** With open sign-up, "invite a friend" just means sharing your Space link. When the link brings a brand-new account, @ana's room says "@ben joined MCPortal through your Space link" once (a `joins` relation). It waits until @ben has claimed a handle, since until then there's no one to name. A block removes both notes.
 - **Copy link to your space** sits in your own Space view, which is one click from the toolbar's Your space. `open_space` gives the agent the link, so "share my space" works in chat.
 
-### 3. Listing and `find_people`
+### 3. Listing and `find_people` (built)
 
-**Listing.** `set_public_profile` gains `listed: boolean`. The handle-claim flow asks plainly: "List me so people with similar sources can find me." Existing profiles start unlisted.
+**Listing.** `set_public_profile` takes `listed: boolean`. The handle-claim form asks with an unchecked box, "List me, so people with similar sources can find me", and your own Space shows a toggle. Existing profiles start unlisted. The profile description says listed or unlisted.
 
-**The index.** For listed profiles, MCPortal keeps:
-- **Featured sources by key.** It normalizes each featured source to a key (feed URL, `github:owner/repo`, `hn:front`), the same normalization `add_portal` dedupes with. This is the strongest signal: the person chose to recommend it.
-- **Domains and titles** of their posts shared with everyone (not followers-only).
-- **Text:** handle, display name, Space title and bio.
+**Matching** (`src/people.ts`, pure: no model, no network). It reads only what listed people made public:
+- **Featured sources** match loosely: www, http(s) and a trailing slash don't matter, and GitHub repos match case-insensitively. A rarer shared source counts for more, so everyone featuring Hacker News says little.
+- **The same site** (a different feed from it) is a weaker signal. Sites where every channel lives (Reddit, YouTube, GitHub, Medium, Substack) don't count.
+- **Posts shared with everyone** from sites the user cares about.
+- **Words** in their Space (bio, titles, featured titles) count more than words in their posts.
 
-The index is built from data we already store. Postgres needs one table (`profile_source_keys`) plus a text index; the local store computes it in memory.
+There's no new table. Public profiles are already one document, so listed people are filtered from it, and posts are read per person only when the query has sites or words to match.
 
-**`find_people` (new model tool, scoped to `socialEntry`).** Arguments, any combination:
-- `about`: topics or words, which the agent distills from the conversation.
-- `sources`: URLs or feeds the user cares about. Each one resolves to a key the way `find_source` does.
-- `like`: a handle, to find people with overlapping featured sources.
-- No arguments: matches against **the user's own room**, comparing their portals' keys to everyone's featured keys.
+**`find_people`** (model tool, `socialEntry`, cost 2) takes `about` (topics), `sources` (sites, feeds or owner/repo, nothing fetched), `like` (a handle: their featured sources and post sites), or nothing (the user's room). It returns up to 12 people, each with reasons ("features 2 of your sources: …", "their Space mentions warcraft"), a follower count, featured titles and their last 5 posts shared with everyone. The reasons and evidence are fenced as third-party text. It never returns the user, anyone they follow, mute or block (or who blocks them), anyone suspended or anyone unlisted. Results are capped and there's no paging. The same matching is served over the state API (`social.findPeople`) for linked computers.
 
-It returns at most 12 candidates, ranked by overlap: shared featured sources weigh most, then shared post domains, then text. Each candidate comes with:
-- `reasons[]`: human-readable and built from public data only.
-- **Evidence for the agent:** bio, featured source titles, and the titles and notes of their 5 most recent posts shared with everyone, fenced as third-party text.
-- Their follower count.
-- Whether the user passed on them before (see the People portal below).
+**Passive hints:** `add_portal` ("On MCPortal, @ana also features it"), `build_room` ("@ana (3), @ben (2) also feature some of these sources"), and `open_space` ("in the user's room too: …"). The first two name handles only, never titles, and each suggests offering an introduction.
 
-It excludes the user, people they already follow, muted and blocked (both ways), suspended accounts and unlisted profiles. It's rate-limited per account, and there's no way to page through the whole directory.
-
-On its own, `find_people` is for "who's into X?" and answers in conversation. The People portal is for keeping suggestions around.
+**Not yet:** whether the user passed on someone before. That comes with the People portal's Not for me.
 
 ### 3b. The People portal: your agent's suggestions, kept in the room
 

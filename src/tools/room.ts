@@ -14,6 +14,7 @@ import { clipsPortal, clipsQuery, followingPortal, loadPortal, pinnedPortal, sav
 import type { Intros } from '../social.ts';
 import type { PortalResult } from '../types.ts';
 import { identityOf, labsOf, ok, toolError, toolFailure, untrusted, ROOM_URI, type CallToolResult, type ToolContext, type ToolDef } from './kit.ts';
+import { featuredBy } from './social.ts';
 import type { ToolResults } from './results.ts';
 
 /** Any portal's current items: profile-backed ones from the profile and stores, the rest fetched (cached unless `force`). */
@@ -164,7 +165,8 @@ export const ROOM_TOOLS: ToolDef[] = [
         return { profile: built, result: built };
       });
       const labels = ids.map((id) => STARTER_PACKS.find((p) => p.id === id)!.label);
-      return ok(`Built the room from ${labels.join(', ')}: ${sources.length} sources, ${layout} layout. Saved items kept (${profile.saved.length}).`, { profile } satisfies ToolResults['build_room']);
+      const hint = await featuredBy(ctx, sources, 'some of these sources');
+      return ok(`Built the room from ${labels.join(', ')}: ${sources.length} sources, ${layout} layout. Saved items kept (${profile.saved.length}).${hint ? `\n${hint}` : ''}`, { profile } satisfies ToolResults['build_room']);
     },
   },
   {

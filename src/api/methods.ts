@@ -24,6 +24,7 @@ import { httpUrl, validateProfile, type Profile } from '../profile.ts';
 import { validateReadingUpdate, type ReadingUpdate } from '../reading.ts';
 import { tracksSeen } from '../seen.ts';
 import { AUDIENCES, REBLOG_RULES } from '../social.ts';
+import type { Wanted } from '../people.ts';
 import { SERVER_INFO } from '../mcp.ts';
 import { findTool } from '../tools/index.ts';
 import { need, type ToolContext } from '../tools/kit.ts';
@@ -248,6 +249,17 @@ export const API_METHODS: Record<string, ApiMethod> = {
     async (p, ctx) => publicRef(await socialOf(ctx).block(ctx.userId, p.handle, p.on), ctx), 'write'),
   'social.uses': params(NO_PARAMS, (_p, ctx) => socialOf(ctx).uses(ctx.userId)),
   'social.connections': params(NO_PARAMS, (_p, ctx) => socialOf(ctx).connections(ctx.userId)),
+  /** find_people's matching: what to look for comes from the caller's own room and words. */
+  'social.findPeople': params<{ wanted: Wanted; options?: { limit?: number; except?: string } }>({
+    type: 'object', required: ['wanted'], additionalProperties: false, properties: {
+      wanted: { type: 'object', required: ['sources', 'hosts', 'terms'], additionalProperties: false, properties: {
+        sources: { type: 'array', maxItems: 80, items: { type: 'object', required: ['key', 'title'], additionalProperties: false, properties: { key: { type: 'string', maxLength: 600 }, site: { type: 'string', maxLength: 255 }, title: { type: 'string', maxLength: 200 } } } },
+        hosts: { type: 'array', maxItems: 80, items: { type: 'string', maxLength: 255 } },
+        terms: { type: 'array', maxItems: 12, items: { type: 'string', maxLength: 60 } },
+      } },
+      options: { type: 'object', additionalProperties: false, properties: { limit: { type: 'integer', minimum: 1, maximum: 12 }, except: { type: 'string', maxLength: 40 } } },
+    } },
+    (p, ctx) => socialOf(ctx).findPeople(ctx.userId, p.wanted, p.options)),
   /** Space-link notes for open_room, each said once. */
   'social.takeIntros': params(NO_PARAMS, (_p, ctx) => socialOf(ctx).takeIntros(ctx.userId), 'write'),
   'social.stats': params<{ accountId: string }>({ type: 'object', required: ['accountId'], additionalProperties: false, properties: { accountId: id } },

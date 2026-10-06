@@ -114,12 +114,14 @@
     const input = el('input', { type: 'text', value: /^[a-z0-9_]{2,30}$/.test(login) ? login : '', placeholder: 'yourname', maxlength: '31', autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false', 'aria-label': 'Handle' });
     const problem = el('p', { class: 'who-error', role: 'alert', hidden: true });
     const claim = el('button', { class: 'btn primary', type: 'button' }, 'Claim');
+    // Being findable is its own choice, asked plainly and off by default (docs/plans/finding-people.md).
+    const listed = el('input', { type: 'checkbox' });
     const submit = async () => {
       const handle = input.value.trim().replace(/^@/, '');
       if (!handle) { input.focus(); return; }
       claim.disabled = true; input.disabled = true; problem.hidden = true;
       try {
-        const { profile } = (await callTool('set_public_profile', { handle })).structuredContent;
+        const { profile } = (await callTool('set_public_profile', { handle, listed: listed.checked })).structuredContent;
         if (state.identity && state.identity.mode !== 'ghost') drawIdentity({ ...state.identity, handle: profile.handle });
         toast(`You're @${profile.handle}.`);
         loadSpace('', false);
@@ -137,6 +139,7 @@
       el('p', null, 'Your handle is how people on MCPortal find you, follow you and see what you share. It makes a public profile and your Space; the rest of your room stays private.'),
       el('label', { class: 'who-claim' }, el('span', { 'aria-hidden': 'true' }, '@'), input),
       el('p', { class: 'muted' }, '2 to 30 letters, digits or underscores. You can change it later.'),
+      el('label', { class: 'who-list' }, listed, 'List me, so people with similar sources can find me'),
       problem,
       el('div', { class: 'who-actions' },
         el('button', { class: 'btn', type: 'button', onclick: () => drawWhoMenu() }, 'Back'),

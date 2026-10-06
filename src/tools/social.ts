@@ -7,7 +7,8 @@
 import { clean } from '../lib/text.ts';
 import { httpUrl } from '../profile.ts';
 import { clipText, type ClipData } from '../clips.ts';
-import { AUDIENCES, REBLOG_RULES, type Reblogger, type SharedItem } from '../social.ts';
+import { AUDIENCES, REBLOG_RULES, type PersonMatch, type Reblogger, type SharedItem } from '../social.ts';
+import { hostOf, namedSignal, sourceSignal, termsOf, type Wanted } from '../people.ts';
 import { isAppError } from '../lib/errors.ts';
 import { ensurePortal } from '../layout.ts';
 import { HOSTED_ONLY, labsOf, socialActive, socialEntry, ok, toolError, untrusted, ROOM_URI, type CallToolResult, type ToolContext, type ToolDef } from './kit.ts';
@@ -39,6 +40,67 @@ function fail(error: unknown): CallToolResult {
 }
 
 const handleProp = { type: 'string', description: 'e.g. "@someone"' };
+
+/**
+ * What find_people looks for, from its arguments, else the user's room; and how the reasons
+ * name the sources ("of your sources", "of the sources you named", "of @ana's sources").
+ */
+async function wantedFrom(args: Record<string, unknown>, ctx: ToolContext): Promise<{ wanted: Wanted; basis: string; except?: string }> {
+  const wanted: Wanted = { sources: [], hosts: [], terms: typeof args.about === 'string' ? termsOf(args.about) : [] };
+  const named = Array.isArray(args.sources) ? args.sources.map(String).slice(0, 10) : [];
+  for (const raw of named) {
+    const { source, host } = namedSignal(raw);
+    if (source) wanted.sources.push(source);
+    if (host) wanted.hosts.push(host);
+  }
+  if (named.length) return { wanted, basis: 'of the sources you named' };
+  const like = typeof args.like === 'string' && args.like.trim() ? args.like : undefined;
+  if (like && ctx.social) {
+    const them = await ctx.social.resolve(ctx.userId, like);
+    for (const f of them.sources ?? []) { const s = sourceSignal(f.source, f.config, f.title); if (s) wanted.sources.push(s); }
+    for (const post of await ctx.social.sharesOf(ctx.userId, them.accountId, { limit: 20 })) { const h = post.url ? hostOf(post.url) : undefined; if (h && !wanted.hosts.includes(h)) wanted.hosts.push(h); }
+    return { wanted, basis: `of @${them.handle}'s sources`, except: them.handle };
+  }
+  if (!wanted.terms.length) {
+    for (const p of (await ctx.store.get(ctx.userId)).columns.flatMap((c) => c.panels)) {
+      const s = sourceSignal(p.source, p.config, p.title ?? p.id);
+      if (!s) continue;
+      wanted.sources.push(s);
+      if (s.site && !wanted.hosts.includes(s.site)) wanted.hosts.push(s.site);
+    }
+  }
+  return { wanted, basis: 'of your sources' };
+}
+
+/** A match's reasons as short clauses. Source titles are the other person's words: they stay inside the fence. */
+function reasonsOf(p: PersonMatch, basis: string): string[] {
+  const list = (xs: string[]) => (xs.length <= 3 ? xs.join(', ') : `${xs.slice(0, 3).join(', ')} and ${xs.length - 3} more`);
+  return [
+    p.sources.length ? `features ${p.sources.length === 1 ? 'one' : p.sources.length} ${basis}: ${list(p.sources)}` : '',
+    p.sites.length ? `features other feeds from ${list(p.sites)}` : '',
+    p.hosts.length ? `shared ${list(p.hosts.map((h) => `${h.count} post${h.count === 1 ? '' : 's'} from ${h.host}`))}` : '',
+    p.terms.space.length ? `their Space mentions ${list(p.terms.space)}` : '',
+    p.terms.posts.length ? `their posts mention ${list(p.terms.posts)}` : '',
+  ].filter(Boolean);
+}
+
+/**
+ * Listed people who feature some of these sources: a passing hint for add_portal and
+ * build_room ("@ana features 3 of these"). Handles only, never their titles; '' if none.
+ */
+export async function featuredBy(ctx: ToolContext, sources: Array<{ source: string; config: unknown; title?: string | undefined }>, what: string): Promise<string> {
+  if (!ctx.social) return '';
+  const signals = sources.map((s) => sourceSignal(s.source, s.config, s.title ?? s.source)).filter((s) => s !== undefined);
+  if (!signals.length) return '';
+  try {
+    const people = (await ctx.social.findPeople(ctx.userId, { sources: signals, hosts: [], terms: [] }, { limit: 3 })).filter((p) => p.sources.length);
+    if (!people.length) return '';
+    const named = people.map((p) => (signals.length > 1 ? `@${p.handle} (${p.sources.length})` : `@${p.handle}`)).join(', ');
+    return `On MCPortal, ${named} also feature${people.length === 1 ? 's' : ''} ${what}. If the user might like to follow people with their taste, offer to introduce them (find_people says why).`;
+  } catch {
+    return '';   // a hint, never a failure
+  }
+}
 
 /** A Space's address: /@handle on the server that holds the account (docs/plans/finding-people.md). */
 export function spaceLink(ctx: ToolContext, handle: string): string | undefined {
@@ -87,11 +149,15 @@ export const SOCIAL_TOOLS: ToolDef[] = [
         const link = spaceLink(ctx, profile.handle);
         const space = { ...pub, mine, followers: stats.followers, following: stats.following, posts: forGrid(posts), sources: profile.sources ?? [], ...(link ? { link } : {}) };
         const title = profile.spaceTitle ?? `@${profile.handle}`;
+        // What they feature that's in the user's room too: the user's own data, said only to them.
+        const room = new Set(mine ? [] : (await ctx.store.get(ctx.userId)).columns.flatMap((c) => c.panels).map((p) => sourceSignal(p.source, p.config, p.title ?? p.id)?.key).filter((k) => k !== undefined));
+        const shared = space.sources.filter((s) => room.has(sourceSignal(s.source, s.config, s.title)?.key ?? '')).map((s) => s.title);
         const text = [
           `Showing ${mine ? 'your space' : `@${profile.handle}'s space`} "${title}" in a card: ${posts.length} post(s)${mine ? '' : ' you can see'}, ${stats.followers} follower(s), ${space.sources.length} featured source(s).${!mine && !stats.following ? ' The user doesn\'t follow them yet.' : ''}`
             + (link ? ` Link to share it (it also brings friends in): ${link}` : ''),
           untrusted(mine ? 'your space' : `@${profile.handle}'s space`, [
             profile.bio ? `bio: ${profile.bio}` : '',
+            shared.length ? `in the user's room too: ${shared.join(', ')}` : '',
             ...space.sources.map((s) => `source: ${s.title} (${s.source})`),
             ...posts.slice(0, 10).map(shareLine),
           ].filter(Boolean).join('\n')),
@@ -276,6 +342,46 @@ export const SOCIAL_TOOLS: ToolDef[] = [
           default:
             return toolError('action must be follow, unfollow, mute, unmute, block or unblock.');
         }
+      } catch (error) {
+        return fail(error);
+      }
+    },
+  },
+  {
+    name: 'find_people',
+    title: 'Find people to follow',
+    access: 'read',
+    cost: 2,
+    available: socialEntry,
+    description: "Find people on MCPortal who share the user's interests, by topics (about), sites (sources) or someone like them (like); with none, by their room. Pass topics, not the conversation. Introduce one or two with the reasons.",
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        about: { type: 'string', maxLength: 200 },
+        sources: { type: 'array', maxItems: 10, items: { type: 'string' }, description: 'sites, feeds or owner/repo' },
+        like: handleProp,
+      },
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+    async handler(args, ctx) {
+      if (!ctx.social) return toolError(HOSTED_ONLY.sharing, 'unavailable');
+      try {
+        const { wanted, basis, except } = await wantedFrom(args, ctx);
+        const people = await ctx.social.findPeople(ctx.userId, wanted, except ? { except } : {});
+        const found = people.map((p) => ({ ...p, reasons: reasonsOf(p, basis) }));
+        if (!found.length) {
+          return ok(`Nobody listed on MCPortal matches yet. Only people who chose to be findable show up, and there aren't many so far. ${basis === 'of your sources' ? 'Try topics (about) or sites (sources).' : ''}`.trim(), { people: [] } satisfies ToolResults['find_people']);
+        }
+        const body = found.map((p) => [
+          `@${p.handle}${p.displayName ? ` (${p.displayName})` : ''}${p.spaceTitle ? `, "${p.spaceTitle}"` : ''} · ${p.followers} follower(s)`,
+          `  why: ${p.reasons.join('; ')}`,
+          p.bio ? `  bio: ${p.bio}` : '',
+          p.featured.length ? `  features: ${p.featured.join(', ')}` : '',
+          ...p.posts.map((post) => `  - ${post.title}${post.url ? ` <${post.url}>` : ''}${post.note ? ` — ${clean(post.note, 200)}` : ''}`),
+        ].filter(Boolean).join('\n')).join('\n');
+        return ok(`${found.length} listed ${found.length === 1 ? 'person matches' : 'people match'}, best first. Introduce one or two in your own words from what's below, then offer to follow (relationship) or open their Space (open_space). Say only what they made public.\n${untrusted('people on MCPortal', body)}`,
+          { people: found } satisfies ToolResults['find_people']);
       } catch (error) {
         return fail(error);
       }
