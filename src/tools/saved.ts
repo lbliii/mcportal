@@ -21,7 +21,7 @@ export const SAVED_TOOLS: ToolDef[] = [
     name: 'save_item',
     title: 'Save to MCPortal',
     access: 'write',
-    description: "Save a link for later (a bookmark), or change the title or note of one already saved. The first save adds a Saved portal to the room; say so.",
+    description: "Save or edit a bookmark with optional source description and thumbnail. Keep source text separate from the user's note. The first save adds a Saved portal; say so.",
     inputSchema: {
       type: 'object',
       required: ['url'],
@@ -30,6 +30,8 @@ export const SAVED_TOOLS: ToolDef[] = [
         url: { type: 'string', description: 'http(s) URL' },
         title: { type: 'string', description: 'Short title; defaults to the site name' },
         note: { type: 'string', description: "Optional note in the user's words" },
+        description: { type: 'string', description: 'Source description' },
+        imageUrl: { type: 'string', maxLength: 2000, description: 'http(s) content thumbnail' },
         source: { type: 'string', description: 'Where it came from, e.g. hn, rss, github' },
       },
     },
@@ -44,6 +46,8 @@ export const SAVED_TOOLS: ToolDef[] = [
           url,
           title: args.title ?? existing?.title,
           note: args.note ?? existing?.note,
+          description: args.description ?? existing?.description,
+          image: args.imageUrl !== undefined ? { url: args.imageUrl, kind: 'thumb' } : existing?.image,
           source: args.source ?? existing?.source,
           savedAt: existing?.savedAt ?? new Date().toISOString(),
         };

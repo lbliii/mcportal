@@ -17,6 +17,12 @@ export type ClipKind = (typeof CLIP_KINDS)[number];
 /** Largest picture get_thumbnails will fetch. Feed adapters use it to skip renditions they know are bigger. */
 export const MAX_THUMB_BYTES = 350_000;
 
+/** Source-provided context for a link, kept separately from personal commentary. */
+export interface LinkPreview {
+  description?: string;
+  image?: { url: string; kind: 'thumb' };
+}
+
 /** One row in a portal. Everything here is untrusted data from a source. */
 export interface Item {
   id: string;
@@ -36,6 +42,8 @@ export interface Item {
   /** Items of a following portal: open with get_share. */
   share?: {
     id: string;
+    /** Source description; summary remains the sharer's personal note. */
+    description?: string;
     cover?: import('./space-design.ts').Cover;
     kind: 'link' | 'clip';
     /** A reblog: its original's id, the original's author and note (absent once it's gone, then why), and whose reblog it came through. */

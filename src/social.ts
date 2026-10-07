@@ -29,6 +29,8 @@ import { randomBytes } from 'node:crypto';
 import { ClipError, cleanText, type Clip } from './clips.ts';
 import { AppError, type AppErrorOptions, type ErrorCode } from './lib/errors.ts';
 import { clean } from './lib/text.ts';
+import { normalizeLinkPreview } from './profile.ts';
+import type { LinkPreview } from './types.ts';
 import type { Cover, SpaceStamp } from './space-design.ts';
 import type { PublicProfileInput, PublicProfile, PublicProfiles } from './public-profiles.ts';
 import { limitOf, type SocialStore } from './social-store.ts';
@@ -49,7 +51,7 @@ export const LOBBY_PER_DAY = 3;
 
 export const SOCIAL_LIMITS = { note: 500, sharesPerUser: 1000, follows: 2000, reason: 500, openReportsPerUser: 50 } as const;
 
-export interface Share {
+export interface Share extends LinkPreview {
   id: string;
   accountId: string;
   kind: 'link' | 'clip';
@@ -131,11 +133,11 @@ const newId = (prefix: string) => `${prefix}${randomBytes(6).toString('hex')}`;
 export interface Author { handle: string; displayName?: string; cover?: Cover }
 
 /**
- * The original of a reblog as the viewer may see it, drawn live: its author, note and clip.
+ * The original of a reblog as the viewer may see it, drawn live: its author, link preview, note and clip.
  * Or why it's gone: deleted, hidden or private ('removed'), or detached by its author.
  */
 export type Original =
-  | { id: string; author: Author; title: string; url?: string; note?: string; clip?: Clip; kind: 'link' | 'clip'; createdAt: string }
+  | (LinkPreview & { id: string; author: Author; title: string; url?: string; note?: string; clip?: Clip; kind: 'link' | 'clip'; createdAt: string })
   | { removed: 'removed' | 'detached' };
 
 /** A share as another user sees it: the author by handle, never by account id. */
@@ -258,6 +260,7 @@ export class Social {
     const author = await this.authorOf(root.accountId);
     if (!author) return { removed: 'removed' };
     return { id: root.id, author, title: root.title, kind: root.kind, createdAt: root.createdAt,
+      ...normalizeLinkPreview(root),
       ...(root.url ? { url: root.url } : {}), ...(root.note ? { note: root.note } : {}), ...(root.clip ? { clip: root.clip } : {}) };
   }
 
@@ -308,7 +311,7 @@ export class Social {
     return (await this.present(author, [share]))[0]!;
   }
 
-  async share(author: string, input: { kind: 'link' | 'clip'; title: string; url?: string | undefined; clip?: Clip | undefined; note?: unknown; audience?: unknown; reblogs?: unknown }): Promise<SharedItem> {
+  async share(author: string, input: { kind: 'link' | 'clip'; title: string; url?: string | undefined; clip?: Clip | undefined; description?: string | undefined; image?: LinkPreview['image'] | undefined; note?: unknown; audience?: unknown; reblogs?: unknown }): Promise<SharedItem> {
     // Who may reblog it: what the post says, else the author's default (absent: anyone).
     const reblogs = (REBLOG_RULES as readonly unknown[]).includes(input.reblogs) ? input.reblogs as ReblogRule : (await this.profiles.get(author))?.reblogs;
     return this.post(author, input, {
@@ -316,6 +319,7 @@ export class Social {
       title: clean(input.title, 200) || 'Untitled',
       ...(input.url ? { url: input.url } : {}),
       ...(input.clip ? { clip: input.clip } : {}),
+      ...(input.kind === 'link' ? normalizeLinkPreview(input) : {}),
       ...(reblogs && reblogs !== 'anyone' ? { reblogs } : {}),
     });
   }

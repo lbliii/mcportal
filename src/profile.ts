@@ -9,7 +9,7 @@ import { REPO_PATTERN, type GithubConfig } from './adapters/github.ts';
 import type { RssConfig } from './adapters/rss.ts';
 import { AppError, type AppErrorOptions, type ErrorCode } from './lib/errors.ts';
 import { clean } from './lib/text.ts';
-import { CLIP_KINDS, type ClipKind, type Item, type SourceKind } from './types.ts';
+import { CLIP_KINDS, type ClipKind, type Item, type LinkPreview, type SourceKind } from './types.ts';
 
 /** A portal as stored: its config is the validated settings of its source. */
 export interface PortalOf<S extends SourceKind> {
@@ -60,7 +60,7 @@ export const OPEN_IN = ['card', 'chat'] as const;
 export type OpenIn = (typeof OPEN_IN)[number];
 
 /** A bookmark. Title and note may come from third-party pages: untrusted, plain text. */
-export interface SavedItem {
+export interface SavedItem extends LinkPreview {
   url: string;
   title: string;
   source?: string;
@@ -398,6 +398,19 @@ export function httpUrl(value: unknown): string | null {
   }
 }
 
+/** Plain, bounded source descriptions and http(s) content thumbnails only. */
+export function normalizeLinkPreview(raw: unknown): LinkPreview {
+  if (!isRecord(raw)) return {};
+  const preview: LinkPreview = {};
+  const description = clean(raw.description, 500);
+  if (description) preview.description = description;
+  if (isRecord(raw.image) && raw.image.kind === 'thumb') {
+    const url = httpUrl(raw.image.url);
+    if (url) preview.image = { url, kind: 'thumb' };
+  }
+  return preview;
+}
+
 /** Keep valid http(s) bookmarks, newest first, one per URL, capped. */
 export function normalizeSaved(raw: unknown, now = new Date()): SavedItem[] {
   if (!Array.isArray(raw)) return [];
@@ -409,7 +422,7 @@ export function normalizeSaved(raw: unknown, now = new Date()): SavedItem[] {
     if (!url || seen.has(url)) continue;
     seen.add(url);
     const savedAt = typeof entry.savedAt === 'string' && !Number.isNaN(Date.parse(entry.savedAt)) ? new Date(entry.savedAt).toISOString() : now.toISOString();
-    const item: SavedItem = { url, title: clean(entry.title, 200) || new URL(url).hostname, savedAt };
+    const item: SavedItem = { url, title: clean(entry.title, 200) || new URL(url).hostname, savedAt, ...normalizeLinkPreview(entry) };
     const source = clean(entry.source, 20);
     const note = clean(entry.note, 280);
     if (source) item.source = source;

@@ -38,7 +38,13 @@ const spaceFormat = (() => {
       const clip = tombstone ? undefined : original?.clip || post.clip;
       const href = tombstone ? '' : url(original?.url || post.url);
       const postTitle = tombstone ? 'A post for MCPortal members' : (original?.title || post.title);
+      const preview = tombstone ? undefined : original || post;
       let text = '';
+      const image = url(preview?.image?.url);
+      if (image) text += publicView
+        ? `<img class="space-link-image" alt="" loading="lazy" src="/@${h(space.handle)}/image/${h(post.id)}">`
+        : `<div class="space-link-preview" data-img="${h(image)}"><img class="space-link-image" alt="" decoding="async"></div>`;
+      if (preview?.description) text += `<p class="space-description">${h(preview.description)}</p>`;
       if (clip?.data.kind === 'quote') text = `<blockquote>${h(clip.data.text.slice(0, publicView ? 400 : 1200))}</blockquote>`;
       else if (clip) {
         if (publicView) text = `<a href="${signin}">Sign in to see this clip</a>`;

@@ -61,7 +61,7 @@ Source types: `hn`, `rss`, `github`, `docs`, `saved`, `clips`, `following`, `lob
 
 | Tool | Hints | What it does | Inputs |
 |---|---|---|---|
-| `save_item` | — | Saves a link for later, or edits a saved link's title or note. The first save adds a Saved portal. | `url*`, `title`, `note`, `source` |
+| `save_item` | — | Saves a link for later with an optional source description and thumbnail, or edits a saved link. The personal note stays separate. The first save adds a Saved portal. | `url*`, `title`, `note`, `source`, `description`, `imageUrl` |
 | `remove_saved` | `D` | Removes one saved link. | `url*` |
 
 ## Clips

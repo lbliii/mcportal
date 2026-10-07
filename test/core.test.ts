@@ -238,6 +238,28 @@ test('saving: save_item adds a Saved portal once, dedupes, fences titles; layout
   assert.equal((await call(c, 'save_item', { url: 'javascript:alert(1)' })).isError, true);
 });
 
+test('saving: source previews survive note edits and profile round-trips; unsafe pictures and avatars are omitted', async () => {
+  const c = ctx();
+  const image = { url: 'https://example.com/cover.png', kind: 'thumb' };
+  const saved = await call(c, 'save_item', { url: 'https://example.com/story', title: 'A story', description: 'From the publisher', imageUrl: image.url });
+  assert.equal(saved.structuredContent.saved[0].description, 'From the publisher');
+  assert.deepEqual(saved.structuredContent.portal.items[0].image, image);
+  assert.equal(saved.structuredContent.portal.items[0].summary, 'From the publisher');
+  const edited = await call(c, 'save_item', { url: 'https://example.com/story', note: 'My own note' });
+  const bookmark = validateProfile(edited.structuredContent.profile).saved[0]!;
+  assert.equal(bookmark.description, 'From the publisher');
+  assert.equal(bookmark.note, 'My own note');
+  assert.deepEqual(bookmark.image, image);
+  const malformed = validateProfile({ ...defaultProfile(), saved: [
+    { url: 'https://example.com/unsafe', description: 'x'.repeat(600), image: { url: 'javascript:alert(1)', kind: 'thumb' } },
+    { url: 'https://example.com/avatar', image: { url: image.url, kind: 'avatar' } },
+    { url: 'https://example.com/old', title: 'An old bookmark' },
+  ] }).saved;
+  assert.equal(malformed[0]!.description!.length, 500);
+  assert.ok(malformed.every((item) => !item.image));
+  assert.equal(malformed[2]!.description, undefined);
+});
+
 test('pinning: pin_portal adds a portal from another tool, refreshes it by id, and layout edits keep its items', async () => {
   const c = ctx();
   const recipe = 'jira_search with jql: assignee = currentUser() AND resolution = Unresolved';

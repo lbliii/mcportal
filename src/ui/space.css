@@ -13,6 +13,7 @@
 @media(forced-colors:active){.space-cover,.space-avatar{display:none}.space-sheet{--space-bg:Canvas;--space-fg:CanvasText;--space-muted:CanvasText}.space-pinned{box-shadow:none}.space-sheet h1{text-shadow:none}.space-sheet .btn.primary{background:Canvas;color:CanvasText}}
 
 .space-clip-image{max-width:100%;max-height:280px;object-fit:contain}.space-table{overflow-x:auto}.space-table table{border-collapse:collapse}.space-table :is(td,th){border:1px solid var(--space-muted);padding:6px}
+.space-link-image{display:block;max-width:100%;max-height:280px;object-fit:contain;border-radius:6px;margin-bottom:12px}.space-link-image:not([src]){display:none}.space-link-preview{min-height:80px}.space-link-preview.gone{display:none}.space-sheet .space-description{color:var(--space-muted);font-size:14px}
 
 .space-sheet .who{display:block;width:auto;height:auto;max-width:none;border:0;border-radius:0;padding:0;margin:0;background:none;font:inherit;font-size:13px;cursor:default;white-space:normal}
 .space-avatar .art,.space-cover .art{--mp-art-paper:var(--mp-art-ink-p);--mp-art-ink:var(--mp-art-ink-c)}
