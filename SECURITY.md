@@ -2,7 +2,7 @@
 
 ## Reporting a vulnerability
 
-Please report security problems privately, not in a public issue. The address is on the hosted service's [security page](https://mcportal-production.up.railway.app/security), and in machine-readable form at [`/.well-known/security.txt`](https://mcportal-production.up.railway.app/.well-known/security.txt). Put "security" in the subject.
+Please report security problems privately, not in a public issue. The address is on the hosted service's [security page](https://mcportal.lol/security), and in machine-readable form at [`/.well-known/security.txt`](https://mcportal.lol/.well-known/security.txt). Put "security" in the subject.
 
 Include what you found, how to reproduce it, and what someone could do with it. Don't include real tokens or other people's data.
 

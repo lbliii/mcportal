@@ -80,13 +80,13 @@ Use this in hosts that let you add a custom connector by URL, such as Claude on 
 1. Add a custom connector with this URL:
 
    ```text
-   https://mcportal-production.up.railway.app/mcp
+   https://mcportal.lol/mcp
    ```
 
 2. Your host sends you to MCPortal's consent screen, then to GitHub to sign in.
 3. Ask "open my room".
 
-The hosted service may be invite-only. If sign-in says your account isn't allowed, ask for an invite on the service's [support page](https://mcportal-production.up.railway.app/support).
+The hosted service may be invite-only. If sign-in says your account isn't allowed, ask for an invite on the service's [support page](https://mcportal.lol/support).
 
 If your organization blocks custom connectors, install locally and [sign in](#ghost-mode-or-signed-in) from there.
 

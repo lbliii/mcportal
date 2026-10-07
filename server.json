@@ -7,11 +7,11 @@
     "url": "https://github.com/lbliii/mcportal",
     "source": "github"
   },
-  "websiteUrl": "https://mcportal-production.up.railway.app",
+  "websiteUrl": "https://mcportal.lol",
   "remotes": [
     {
       "type": "streamable-http",
-      "url": "https://mcportal-production.up.railway.app/mcp"
+      "url": "https://mcportal.lol/mcp"
     }
   ]
 }

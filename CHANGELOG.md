@@ -5,7 +5,7 @@
 ### Fixes
 - **A linked MCPortal whose hosted side is down still starts:** `initialize` and `tools/list` answer at once (the listing waits at most 3 seconds for the account), and a request that fails gets an error reply instead of leaving the host waiting until it gives up on MCPortal. Tools that need the account return `upstream_unreachable`.
 - **A sign-in that's gone says so:** a refused refresh, or a hosted MCPortal that has moved (421 or a redirect), returns `unauthenticated` with "sign in again" (`unlink_account`, then `link_account`) instead of "can't reach". Tokens are never sent on to a redirect's target.
-- **`link_account` signs in to https://mcportal.lol** by default, where the hosted MCPortal now lives (`MCPORTAL_HOSTED_URL` still overrides it).
+- **`link_account` signs in to https://mcportal.lol** by default, where the hosted MCPortal now lives (`MCPORTAL_HOSTED_URL` still overrides it). The install guide, security policy, manifest and registry listing point there too.
 
 ## v0.9.0 — 2026-10-07
 

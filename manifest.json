@@ -9,7 +9,7 @@
     "name": "Lawrence Lane",
     "url": "https://github.com/lbliii/mcportal"
   },
-  "homepage": "https://mcportal-production.up.railway.app",
+  "homepage": "https://mcportal.lol",
   "repository": {
     "type": "git",
     "url": "https://github.com/lbliii/mcportal.git"
@@ -157,7 +157,7 @@
   ],
   "license": "AGPL-3.0-only",
   "privacy_policies": [
-    "https://mcportal-production.up.railway.app/privacy"
+    "https://mcportal.lol/privacy"
   ],
   "compatibility": {
     "platforms": [
