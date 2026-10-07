@@ -124,7 +124,8 @@
     const box = selection.getRangeAt(0).getBoundingClientRect();
     const height = passageBar.offsetHeight || 40;
     const below = box.bottom + 8;
-    const top = below + height < window.innerHeight - 8 ? below : Math.max(8, box.top - height - 8);
+    const preferred = below + height < window.innerHeight - 8 ? below : box.top - height - 8;
+    const top = Math.max(8, Math.min(preferred, window.innerHeight - height - 8));
     const width = passageBar.offsetWidth || 240;
     passageBar.style.top = `${Math.round(top)}px`;
     passageBar.style.left = `${Math.round(Math.min(Math.max(8, box.left + box.width / 2 - width / 2), window.innerWidth - width - 8))}px`;
@@ -157,7 +158,7 @@
     passageTimer = window.setTimeout(showPassageBar, 120);
   });
   document.addEventListener('scroll', () => { if (passageBar) placePassageBar(); }, { capture: true, passive: true });
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && passageBar) { hidePassageBar(); document.getSelection()?.removeAllRanges(); } });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && passageBar) { e.preventDefault(); hidePassageBar(); document.getSelection()?.removeAllRanges(); } });
 
   /** The passage as model context: the site's text, fenced so it can't pass for instructions. @param {Passage} p */
   function passageContext(p) {

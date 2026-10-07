@@ -146,6 +146,47 @@ test('reader UI: short articles suppress the outline and invalid dates do not en
   assert.deepEqual(page.problems, []);
 });
 
+test('reader UI: every code example copies exact text and clipboard denial selects a usable fallback', { skip }, async () => {
+  const text = 'echo "hello"\n  preserve indentation\n';
+  await open({ width: 360, article: { ...article, blocks: [
+    { type: 'pre', text },
+    { type: 'pre', text: 'second example', lang: 'shell', label: 'a-very-long-file-name-that-must-fit-on-a-small-screen.sh' },
+    { type: 'table', text: '', columns: ['Option', 'Description'], rows: [['long-option-'.repeat(30), 'A wide table.']] },
+  ] } });
+  await page.eval(`Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async text => { window.__copied = text; } } })`);
+  await page.click('.body .code .copy');
+  await page.waitFor(`window.__copied !== undefined`, 'code copy');
+  assert.equal(await page.eval(`window.__copied`), text);
+  await page.eval(`navigator.clipboard.writeText = async () => { throw new Error('clipboard denied'); }`);
+  await page.click('.body .code .copy');
+  await page.waitFor(`getSelection().rangeCount && getSelection().getRangeAt(0).toString() === ${JSON.stringify(text)}`, 'the full source range to be selected after clipboard rejection');
+  assert.match(await page.eval<string>(`document.getElementById('toast').textContent`), /Text selected/);
+  await page.eval(`document.querySelector('.table-wrap').focus()`);
+  assert.equal(await page.eval(`document.activeElement.getAttribute('aria-label')`), 'Scrollable table');
+  assert.ok(await page.eval<boolean>(`[...document.querySelectorAll('th')].every(n => n.scope === 'col')`));
+  assert.ok(await page.eval<boolean>(`document.documentElement.scrollWidth <= innerWidth`), 'code labels and wide tables stay inside the narrow reader');
+  assert.deepEqual(page.problems, []);
+});
+
+test('reader UI: Escape dismisses passage and outline before leaving, headings scale with text preferences', { skip }, async () => {
+  await open({ width: 380 });
+  await page.click('.reader-outline summary');
+  await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape' });
+  assert.equal(await page.eval(`document.querySelector('.reader-outline').open`), false);
+  assert.equal(await page.eval(`document.getElementById('reader').hidden`), false);
+  await page.eval(`(() => { const p = document.querySelector('.body p'); const r = document.createRange(); r.selectNodeContents(p); getSelection().removeAllRanges(); getSelection().addRange(r); })()`);
+  await page.waitFor(`document.querySelector('.passage-bar')`, 'selected passage controls');
+  assert.ok(await page.eval<boolean>(`(() => { const r = document.querySelector('.passage-bar').getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth; })()`));
+  await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape' });
+  assert.equal(await page.eval(`document.querySelector('.passage-bar')`), null);
+  assert.equal(await page.eval(`document.getElementById('reader').hidden`), false);
+  await page.eval(`document.documentElement.style.fontSize = '200%'`);
+  assert.ok(await page.eval<boolean>(`parseFloat(getComputedStyle(document.querySelector('.reader h1')).fontSize) > parseFloat(getComputedStyle(document.querySelector('.body p')).fontSize)`));
+  assert.ok(await page.eval<boolean>(`parseFloat(getComputedStyle(document.querySelector('.body h2')).fontSize) > parseFloat(getComputedStyle(document.querySelector('.body p')).fontSize)`));
+  assert.ok(await page.eval<boolean>(`document.documentElement.scrollWidth <= innerWidth`));
+  assert.deepEqual(page.problems, []);
+});
+
 test('reader UI: multi-paragraph list items and nested parent tails retain order, grouping and passage identity', { skip }, async () => {
   await open({ article: continuationArticle });
   assert.equal(await page.eval(`document.querySelectorAll('.body > ol').length`), 2, 'a parent continuation does not split the numbered group');

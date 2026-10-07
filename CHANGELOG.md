@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Refine article and documentation reading with clearer typography, Copy on every code block, narrow-view heading navigation, focused Contents controls, and keyboard-friendly section jumps and overflow.
+
 ## v0.10.1 — 2026-10-07
 
 ### Room layouts

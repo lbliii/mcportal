@@ -378,6 +378,35 @@ test('browser: docs anchors stay below the reader controls and contents do not o
   }
 });
 
+test('browser: narrow docs keep heading navigation and Contents brings search into view without leaving the reader', { skip }, async () => {
+  try {
+    await openRoom();
+    await page.click('[data-portal="docs"] .item-main');
+    await page.waitFor(`document.querySelector('.docs-toc a[data-url="${DOCS}/deploy.md"]')`, 'docs contents');
+    await page.eval(`document.querySelector('.docs-toc a[data-url="${DOCS}/deploy.md"]').click()`);
+    await page.waitFor(`document.querySelectorAll('.docs-page .body h2').length === 45`, 'long docs page');
+    assert.equal(await page.eval(`document.querySelector('.docs-toc a.current').getAttribute('aria-current')`), 'page');
+    for (const width of [900, 360]) {
+      await page.send('Emulation.setDeviceMetricsOverride', { width, height: 850, deviceScaleFactor: 1, mobile: false });
+      await page.click('.docs-outline summary');
+      await page.click('.docs-outline a:last-child');
+      await page.waitFor(`document.activeElement.textContent === 'Step 45'`, 'the outline destination to receive focus');
+      assert.ok(await page.eval<boolean>(`document.querySelector('.body h2:last-of-type').getBoundingClientRect().top >= document.querySelector('.reader-top').getBoundingClientRect().bottom - 1`));
+    }
+    await page.click('.docs-toggle');
+    assert.equal(await page.eval(`document.querySelector('.docs-toggle').getAttribute('aria-expanded')`), 'true');
+    assert.equal(await page.eval(`document.activeElement.className`), 'docs-search');
+    assert.ok(await page.eval<boolean>(`(() => { const r = document.activeElement.getBoundingClientRect(); return r.top >= 0 && r.bottom < innerHeight; })()`));
+    await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape' });
+    assert.equal(await page.eval(`document.getElementById('reader').hidden`), false);
+    assert.equal(await page.eval(`document.querySelector('.docs-toggle').getAttribute('aria-expanded')`), 'false');
+    assert.equal(await page.eval(`document.activeElement.className`), 'btn docs-toggle');
+    assert.deepEqual(page.problems, []);
+  } finally {
+    await page.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+  }
+});
+
 test('browser: the reader records opening and position, resumes there, and marks read only when asked', { skip }, async () => {
   await readings.deleteAll('default');
   const openArticle = async () => {
