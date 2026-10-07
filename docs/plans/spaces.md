@@ -1,6 +1,6 @@
 # Plan: Spaces that feel like someone's
 
-**Status:** proposed 2026-10-07; public read-only Spaces decided 2026-10-07. Mockups: [`design/mockups/space-covers.html`](../../design/mockups/space-covers.html), which needs a local static server because it loads `src/ui/art.js` and the brand fonts. This is the "A room that feels yours" item on the [roadmap](README.md), applied to Spaces. It builds on public profiles (`src/public-profiles.ts`), the Space view (`src/ui/room/social.js`), Space links (`src/space-links.ts`) and the paperback art engine (`src/ui/art.js`).
+**Status:** proposed 2026-10-07. Decided the same day: public read-only Spaces, public by default, no search indexing, prerendered link previews, and an RSS feed per public Space. Mockups: [`design/mockups/space-covers.html`](../../design/mockups/space-covers.html), which needs a local static server because it loads `src/ui/art.js` and the brand fonts. This is the "A room that feels yours" item on the [roadmap](README.md), applied to Spaces. It builds on public profiles (`src/public-profiles.ts`), the Space view (`src/ui/room/social.js`), Space links (`src/space-links.ts`) and the paperback art engine (`src/ui/art.js`).
 
 ## Where we are
 
@@ -34,7 +34,7 @@ Three **formats** draw the same Space. The owner picks one:
 6. **Status without scoreboards.** Like pooled reblog credit, a Space shows no rankings and no per-post leaderboards. Stamps mark what someone did ("Brought 3 aboard"), not how they compare. Owner-only stats stay owner-only.
 7. **The agent can dress it.** "Make my Space feel like a 70s Moebius comic" is a normal request. The agent maps it to options through `set_public_profile` and says what it chose. It never writes a bio or a "transmitting on" line the user hasn't approved, the same rule as share notes.
 8. **Read anywhere, publish only through an agent.** A Space can be public, readable by anyone on the web with no account (see [public Spaces](#5-public-spaces-and-link-previews)). Writing never leaves the agent: there's no web composer, no web sign-in to post, and no form that publishes. The agent and the GitHub sign-in stay the only way in, which keeps spam, impersonation and moderation small.
-9. **The owner decides what's public.** A Space is public only if its owner says so, and followers-only posts never are. MCPortal has no users yet, so this is a clean start, not a change to anyone's existing posts.
+9. **Public by default, the owner's call.** A new Space is public unless its owner unchecks the box, and followers-only posts never are. MCPortal has no users yet, so this is a clean start, not a change to anyone's existing posts.
 
 ## The data
 
@@ -55,8 +55,8 @@ interface PublicProfile {
   travelers?: string[];
   /** Stamps the owner chose to hide. Stamps themselves are computed, never stored. */
   hiddenStamps?: StampName[];
-  /** Readable by anyone on the web at /@handle. Absent: signed-in MCPortal users only. */
-  public?: true;
+  /** Kept from the web: readable only by signed-in MCPortal users. Absent: public (the default). */
+  private?: true;
 }
 ```
 
@@ -114,8 +114,8 @@ More stamps come only with a reason, and each one gets this table's test: is it 
 
 **Decided:** Spaces can be public and read-only. Anyone can read one at `/@handle` without an account. Publishing still happens only through an agent.
 
-**Opting in.**
-- **A Space switch:** "Public Space: anyone on the web can read it." The handle-claim form asks, and the print shop and `set_public_profile` (`public: true`) change it later.
+**Public by default.**
+- **A Space switch:** "Public Space: anyone on the web can read it." It's **checked** on the handle-claim form, and the print shop and `set_public_profile` (`public: false`) change it later. Being listed in `find_people` stays a separate, unchecked box: a public Space can be read by anyone with the link, but MCPortal doesn't suggest it to anyone.
 - **Audiences stay two:** followers, and **everyone**. "Everyone" means whoever can see your Space: anyone on the web if it's public, people signed in to MCPortal if not. Followers-only posts are never public. There are no users yet, so the existing `mcportal` audience can simply become `everyone`, with no third audience and no migration of anyone's posts.
 - Turning the Space off takes it down at once. The switch says plainly that copies others made while it was public (archives, screenshots) can't be recalled.
 
@@ -129,21 +129,19 @@ More stamps come only with a reason, and each one gets this table's test: is it 
 
 **Every reader action leads to the agent.** Follow, Add a source and Reblog on the public page go through the existing Space-link sign-in (`/@handle/signin`). Your agent then offers the follow, as it does today. The public Space *is* the bridge page, and the logged-out page that shows only the handle goes away.
 
-**Search engines:** `noindex` by default, as today. Letting a Space be indexed is a separate opt-in, and an open question.
+**No search indexing.** Every public Space page and feed sends `X-Robots-Tag: noindex, nofollow`, as the Space link page does today, and owners can't change it. People find a Space through its owner, a link or their agent, not through a search engine. Some crawlers ignore `noindex`; the switch's wording doesn't promise otherwise.
 
 **One renderer, two places.** The room draws a Space in the browser. The public page is HTML from the server, with no scripts. To avoid writing each format twice, a format is a plain function from Space data to escaped markup, in a plain script the room inlines and the server loads with `vm`, the way `art.js` already works. The room then attaches its buttons to that markup. **This shapes phase 1:** the paperback format gets built this way from the start.
 
 **Running it.** A public Space is the first page that reads the database for anyone on the internet. Rendered pages are cached briefly (about a minute, cleared on any change to the Space or its posts), and requests are rate-limited per IP. There's no analytics or tracking on the page.
 
-**The preview.** Slack, Discord, iMessage and X need a PNG `og:image`, and they don't render SVG. Options:
+**The preview.** Slack, Discord, iMessage and X need a PNG `og:image`, and they don't render SVG. **Decided: a prerendered set.** A dev-only script renders 40 PNGs (8 inks × 5 motifs, 1200×630) once, from `art.js` with one fixed composition each, and they ship in `src/site/`. A Space's preview is the PNG for its ink and motif, and its handle and title go in `og:title`. The server stays dependency-free. Rasterizing each Space's exact cover (with `@resvg/resvg-js`, say) can come later and only changes the image URL. A private Space's preview is its cover and handle only.
 
-| Option | Cost | Preview |
-|---|---|---|
-| **A. Prerendered set** (recommended) | 40 PNGs (8 inks × 5 motifs), rendered once at build time by a dev-only script and shipped in `src/site/` | The owner's ink and motif in one fixed composition. The handle and title appear in `og:title`, not in the image |
-| B. Rasterize per Space | A runtime dependency (`@resvg/resvg-js`, native/wasm), plus caching | Exact cover, title plate in the image |
-| C. Our own rasterizer | A small SVG-to-PNG renderer for the shapes `art.js` uses | Exact cover; real code to maintain |
-
-A keeps the server dependency-free and gets 90% of the effect. Moving to B later changes only the image URL. A Space that isn't public gets a preview with its cover and handle only.
+**An RSS feed.** **Decided: yes.** Each public Space has a feed at `/@handle/feed`, so any feed reader can follow a tastemaker, and an MCPortal user can too, as an ordinary RSS portal.
+- **It's the public page as a feed:** the same posts (posts for everyone, newest first, the last 50), the same rules for clips and reblogs, the note as the item's text, and the item linking to the original story. Nothing is in the feed that isn't on the page.
+- **RSS 2.0**, the format everything reads, with autodiscovery (`<link rel="alternate">`) on the public page and a feed link beside the follow button.
+- Same cache, rate limit and `noindex` as the page. A private Space, or one that stops being public, returns 404 from then on. The switch's wording says feed readers may keep what they've already fetched.
+- This reverses the earlier "no outward feeds" call for public Spaces only. Posting still happens only through an agent, and nothing else in a room has a feed.
 
 ## What this doesn't do
 
@@ -157,14 +155,11 @@ A keeps the server dependency-free and gets 90% of the effect. Moving to B later
 - [Social](../explanation/social.md): the Spaces section gets covers, formats, the print shop, travelers and stamps.
 - [Tools](../reference/tools.md): `set_public_profile` and `open_space`.
 - [Data](../reference/data.md): the new profile fields and the export version.
+- [Configuration](../reference/configuration.md), if the feed or page cache gets settings.
 - The privacy page and terms (`/privacy` and `/terms`, in `src/site.ts`): public Spaces. The [social](../explanation/social.md#publishing-is-native) section "Publishing is native" becomes "Read anywhere, publish through your agent".
 
 ## Open questions
 
-1. **Public by default?** The handle-claim box for a public Space: checked or unchecked? Listing is unchecked; a public Space is a separate, smaller step (readable by link, not suggested to anyone).
-2. **Search engines:** may an owner let search engines index their public Space, or does it stay `noindex` for everyone?
-3. **Link previews:** prerendered set (A), a rasterizer dependency (B) or our own (C)?
-4. **Travelers and discovery:** may `find_people` say "featured by @ana" when the user follows @ana? It's the owner's public choice, but it's the first signal that passes through who someone follows.
-5. **Avatars without a Space:** someone with a handle has a cover, but a ghost-mode or handle-less account doesn't appear socially, so nothing is needed today. Confirm once federation or groups arrive.
-6. **More inks or motifs later:** adding sets is cheap, but each needs the contrast test and keeps covers recognisably MCPortal. Who curates them, and how often?
-7. **A feed for public Spaces:** an RSS/Atom feed of a public Space's posts would let any reader follow a tastemaker. It's reading, not publishing, but it reverses the earlier "no outward feeds" call. Yes, no or later?
+1. **Travelers and discovery:** may `find_people` say "featured by @ana" when the user follows @ana? It's the owner's public choice, but it's the first signal that passes through who someone follows.
+2. **Avatars without a Space:** someone with a handle has a cover, but a ghost-mode or handle-less account doesn't appear socially, so nothing is needed today. Confirm once federation or groups arrive.
+3. **More inks or motifs later:** adding sets is cheap, but each needs the contrast test and keeps covers recognisably MCPortal. Who curates them, and how often?
