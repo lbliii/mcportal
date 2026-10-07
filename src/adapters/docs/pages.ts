@@ -120,7 +120,7 @@ export async function fetchDocPage(url: string, fetcher: Fetcher, options: { tit
         if (res && (/html|xml/i.test(res.contentType) || HTMLISH.test(res.text))) html = { text: res.text, url: res.url || url };
       }
       if (html) {
-        const article = extractArticle(html.text, html.url, MARKDOWN_LIMITS);
+        const article = extractArticle(html.text, html.url, MARKDOWN_LIMITS, { mode: 'docs' });
         const title = options.title ?? article.title;
         const blocks = article.blocks[0]?.type === 'h' && article.blocks[0].level === 1 && article.blocks[0].text === title ? article.blocks.slice(1) : article.blocks;
         if (blocks.length) return done('html', html.url, { title, blocks });

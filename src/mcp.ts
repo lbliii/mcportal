@@ -17,7 +17,7 @@ import { hasSocial, labsOf, publicToolList, reachOf, schemaFor, toolError, ROOM_
 
 export { TOOLS };
 
-export const SERVER_INFO = { name: 'mcportal', title: 'MCPortal', version: '0.7.0' };
+export const SERVER_INFO = { name: 'mcportal', title: 'MCPortal', version: '0.9.2' };
 export const SUPPORTED_PROTOCOL_VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05'];
 export const MCP_APP_MIME = 'text/html;profile=mcp-app';
 
@@ -55,7 +55,7 @@ const INSTRUCTIONS = [
 ];
 
 /** Only where sharing exists (hosted). */
-const SOCIAL_INSTRUCTIONS = 'People share saved links and clips (share), follow each other (relationship), and have a Space (open_space). Only share when the user asks, and get their approval of the note\'s exact words first.';
+const SOCIAL_INSTRUCTIONS = 'People share saved links and clips (share), follow each other (relationship), and have a Space (open_space). Only share when the user asks, and get their approval of the note\'s exact words first. Offer to follow people whose shares they like. For who to follow: find_people, then suggest_people.';
 
 function instructions(ctx: ToolContext): string {
   return [...INSTRUCTIONS, ...(hasSocial(ctx) ? [SOCIAL_INSTRUCTIONS] : [])].join(' ');

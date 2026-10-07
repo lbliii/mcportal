@@ -21,6 +21,7 @@ function describeProfile(p: PublicProfile): string {
     p.spaceTitle ? `space: ${p.spaceTitle}` : '',
     p.sources?.length ? `featured sources: ${p.sources.map((s) => s.title).join(', ')}` : '',
     p.reblogs ? `new posts can be reblogged by: ${p.reblogs === 'nobody' ? 'nobody' : 'followers only'}` : '',
+    p.listed ? 'listed: people with similar sources can find them (find_people)' : 'unlisted: found only by handle or Space link',
   ].filter(Boolean).join('\n');
 }
 
@@ -58,7 +59,7 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
     title: 'Set your public profile and space',
     access: 'write',
     available: socialEntry,
-    description: "Create or change the user's public profile and Space, only when they ask: handle, name, bio, Space title, accent colour and featured portals ('Sources I read'). It's how other MCPortal users find them; nothing else in their room becomes public. An old handle keeps pointing to them for 30 days.",
+    description: "Create or change the user's public profile and Space, only when they ask: handle, name, bio, Space title, accent colour, featured portals ('Sources I read') and who may reblog their posts by default. It's how other MCPortal users find them; nothing else in their room becomes public. An old handle keeps pointing to them for 30 days.",
     inputSchema: {
       type: 'object',
       additionalProperties: false,
@@ -69,12 +70,9 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
         spaceTitle: { type: 'string', maxLength: 60 },
         accent: { type: 'string', enum: [...ACCENTS, ''] },
         featuredPortalIds: { type: 'array', maxItems: MAX_FEATURED, items: { type: 'string' }, description: 'Ids (from open_room) of feed, Hacker News or GitHub portals to recommend; [] clears' },
+        reblogs: { type: 'string', enum: ['anyone', 'followers', 'nobody'] },
+        listed: { type: 'boolean', description: 'findable via find_people' },
       },
-    },
-    lab: {
-      name: 'reblog',
-      properties: { reblogs: { type: 'string', enum: ['anyone', 'followers', 'nobody'] } },
-      description: "Create or change the user's public profile and Space, only when they ask: handle, name, bio, Space title, accent colour, featured portals ('Sources I read') and who may reblog their posts by default. It's how other MCPortal users find them; nothing else in their room becomes public. An old handle keeps pointing to them for 30 days.",
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     async handler(args, ctx) {
@@ -96,6 +94,7 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
           accent: typeof args.accent === 'string' ? args.accent : undefined,
           sources,
           reblogs: typeof args.reblogs === 'string' ? args.reblogs : undefined,
+          listed: typeof args.listed === 'boolean' ? args.listed : undefined,
         });
         const skipped = sources ? sources.length - (profile.sources?.length ?? 0) : 0;
         const head = created ? `Created your public profile as @${profile.handle}. ${UNLOCKS}` : released ? `Changed your handle from @${released} to @${profile.handle}. @${released} points to you for 30 days.` : 'Updated your public profile.';

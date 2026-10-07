@@ -5,9 +5,11 @@ import type { ErrorCode } from './lib/errors.ts';
  * another tool (Jira, Slack, …): both live in the profile and are never fetched.
  * 'clips' come from the clip store (src/clips.ts) and 'following' from shares of
  * people the user follows (src/social.ts); neither is fetched. 'docs' is a docs
- * site's table of contents (src/adapters/docs.ts).
+ * site's table of contents (src/adapters/docs.ts). 'people' is the agent's suggestions of
+ * whom to follow, kept in the profile, and 'lobby' posts shared with everyone by listed
+ * people (docs/plans/finding-people.md).
  */
-export type SourceKind = 'hn' | 'rss' | 'github' | 'docs' | 'saved' | 'pinned' | 'clips' | 'following';
+export type SourceKind = 'hn' | 'rss' | 'github' | 'docs' | 'saved' | 'pinned' | 'clips' | 'following' | 'people' | 'lobby';
 
 export const CLIP_KINDS = ['quote', 'exchange', 'note', 'table', 'image', 'link'] as const;
 export type ClipKind = (typeof CLIP_KINDS)[number];
@@ -44,6 +46,8 @@ export interface Item {
     /** Whether the viewer may reblog it now. */
     canReblog?: boolean;
   };
+  /** Items of a people portal: someone the agent suggested following; the summary is its reason. */
+  person?: { handle: string; following: boolean };
   /** Not yet seen by this user (src/seen.ts). */
   new?: true;
 }
@@ -73,12 +77,15 @@ export interface PortalResult {
   newCount?: number;
 }
 
-/** A run of inline text: plain, a link (http(s), or "#anchor" within the page), code, or strong. */
+/** A run of inline text, with composable safe marks and an optional authored line break. */
 export interface Span {
   text: string;
   href?: string;
   code?: true;
   strong?: true;
+  em?: true;
+  /** Start this run on a new line; text remains the single-line plain-text fallback. */
+  breakBefore?: true;
 }
 
 export const CALLOUT_TONES = ['note', 'tip', 'warning', 'danger'] as const;
@@ -97,6 +104,16 @@ export interface ArticleBlock {
   id?: string;
   /** li: a numbered item. */
   ordered?: true;
+  /** li: identity of its authored list, so adjacent lists can restart independently. */
+  listId?: string;
+  /** One source list item across its text, media and continuation blocks. */
+  listItemId?: string;
+  /** li: the authored ordered-list start, including zero or negative values. */
+  listStart?: number;
+  /** li: an explicit value attribute on this item. */
+  value?: number;
+  /** quote: only paragraphs of the same source quotation share this identity. */
+  quoteId?: string;
   /** pre: language, e.g. "bash". */
   lang?: string;
   /** pre: file or tab name. callout: its title. */
@@ -108,6 +125,17 @@ export interface ArticleBlock {
   /** table */
   columns?: string[];
   rows?: string[][];
+  /** p: a figure, with text/spans retained as a readable fallback for older views. */
+  figure?: {
+    url: string;
+    alt?: string;
+    caption?: string;
+    credit?: string;
+    width?: number;
+    height?: number;
+  };
+  /** p: an omitted embed represented by a validated source link, never executable HTML. */
+  media?: { url: string; kind: 'video' | 'audio'; label?: string };
 }
 
 export interface Article {
@@ -115,6 +143,9 @@ export interface Article {
   title: string;
   siteName?: string;
   byline?: string;
+  /** Validated publication/update times, normalized to ISO 8601. */
+  publishedAt?: string;
+  updatedAt?: string;
   blocks: ArticleBlock[];
   wordCount: number;
   provenance: Provenance;

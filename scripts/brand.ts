@@ -5,9 +5,10 @@
  *
  *   node scripts/brand.ts          write everything
  *
- * brand/            masters: marks, wordmark, lockups, social card (SVG), usage notes
+ * brand/            masters: marks, wordmark, lockups, social card (SVG), usage notes, and
+ *                   the art the pages inline (the landing hero, the door plates)
  * src/site/         what the public pages serve: favicon, app icon, social card, lockup,
- *                   hero art, and Jost Bold for headings
+ *                   and Jost Bold for headings
  * src/ui/brand/     marks inlined into the room (colours from its CSS)
  * src/brand-icons.ts   the icons the MCP server advertises (data: URIs)
  *
@@ -190,36 +191,72 @@ const ICONS = ${JSON.stringify(icons())};
 `;
 }
 
-/** Stars as one path: `count` dots scattered over w x h by a fixed seed, so re-runs match. */
-function starfield(seed: number, count: number, w: number, h: number): string {
+/** Star dots as path data, one per star: `count` dots scattered over w x h by a fixed seed, so re-runs match. `clear` keeps a box [x, y, w, h] free for text. */
+function stars(seed: number, count: number, w: number, h: number, clear?: [number, number, number, number]): string[] {
   const rand = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
-  let d = '';
+  const dots: string[] = [];
   for (let i = 0; i < count; i++) {
     const x = rand() * w, y = rand() * h, rad = 0.8 + rand() * 2.2;
-    d += `M${r2(x - rad)} ${r2(y)}a${r2(rad)} ${r2(rad)} 0 1 0 ${r2(2 * rad)} 0a${r2(rad)} ${r2(rad)} 0 1 0 ${r2(-2 * rad)} 0`;
+    if (clear && x > clear[0] && x < clear[0] + clear[2] && y > clear[1] && y < clear[1] + clear[3]) continue;
+    dots.push(`M${r2(x - rad)} ${r2(y)}a${r2(rad)} ${r2(rad)} 0 1 0 ${r2(2 * rad)} 0a${r2(rad)} ${r2(rad)} 0 1 0 ${r2(-2 * rad)} 0`);
   }
-  return d;
+  return dots;
 }
+
+/** Stars as one path. */
+const starfield = (...args: Parameters<typeof stars>) => stars(...args).join('');
 
 /**
  * The landing page's night sky, 1500x640: stars, a halftone planet, and the portal scene
- * standing on the bottom edge at the right. The page pins it to the bottom-right of the hero
- * band at the band's height, so the scene keeps clear of the headline on the left. The sky
- * is transparent: the band behind it is ink in light mode and a darker night in dark mode.
+ * standing on the bottom edge at the right. The page inlines it and pins it to the
+ * bottom-right of the hero band, so the scene keeps clear of the headline on the left. The
+ * sky is transparent: the band behind it is ink in light mode and a darker night in dark mode.
+ *
+ * The classes are hooks for the page's opening (src/site.ts): the planet and the door land
+ * like printing plates, the orbit halves draw themselves (pathLength="1"), the keyline settles
+ * just off register, and the door leaf swings open on the moon. The leaf is invisible until
+ * the page animates it, so without motion the door stands open, as drawn.
  */
 function heroArt(): string {
   const W = 1500, H = 640, cx = 1160;
   const door = arch(cx, H, 300, 470), inner = arch(cx, H, 172, 372);
   const back = ring(cx, 470, 300, 80, -16, 'back'), front = ring(cx, 470, 300, 80, -16, 'front');
-  return svg(W, H, `<defs>${halftone('mcp-ht-hero', 14, 3.2, INK.ink)}${halftone('mcp-ht-planet', 9, 2.4, INK.ink)}</defs>`
-    + `<path d="${starfield(11, 130, W, H)}" fill="${INK.paper}" fill-opacity=".5"/>`
-    + `<circle cx="1400" cy="120" r="56" fill="${INK.mustard}"/><circle cx="1400" cy="120" r="56" fill="url(#mcp-ht-planet)" fill-opacity=".4"/>`
-    + `<path d="${back}" fill="none" stroke="${INK.mustard}" stroke-width="12" stroke-linecap="round"/>`
-    + `<path d="${door}" fill="${INK.teal}"/><path d="${door}" fill="url(#mcp-ht-hero)" fill-opacity=".35"/>`
-    + `<path d="${inner}" fill="${INK.paper}"/><circle cx="${cx}" cy="370" r="34" fill="${INK.brick}"/>`
-    + `<path d="${front}" fill="none" stroke="${INK.mustard}" stroke-width="14" stroke-linecap="round"/>`
-    + `<path d="${door}" fill="none" stroke="${INK.paper}" stroke-width="3" stroke-opacity=".5" transform="translate(9 -6)"/>`,
-  'A door in the night sky, with an orbit passing through it');
+  const dots = stars(11, 130, W, H);
+  const sky = [0, 1, 2].map((n) => `<path class="stars stars-${n + 1}" d="${dots.filter((_, i) => i % 3 === n).join('')}" fill="${INK.paper}" fill-opacity=".5"/>`).join('');
+  return `<svg xmlns="http://www.w3.org/2000/svg" class="art" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMaxYMax slice" aria-hidden="true" focusable="false">`
+    + `<defs>${halftone('mcp-ht-hero', 14, 3.2, INK.ink)}${halftone('mcp-ht-planet', 9, 2.4, INK.ink)}</defs>`
+    + sky
+    + `<g class="planet"><circle cx="1400" cy="120" r="56" fill="${INK.mustard}"/><circle cx="1400" cy="120" r="56" fill="url(#mcp-ht-planet)" fill-opacity=".4"/></g>`
+    + `<path class="orbit orbit-back" d="${back}" pathLength="1" fill="none" stroke="${INK.mustard}" stroke-width="12" stroke-linecap="round"/>`
+    + `<g class="door"><path d="${door}" fill="${INK.teal}"/><path d="${door}" fill="url(#mcp-ht-hero)" fill-opacity=".35"/></g>`
+    + `<path d="${inner}" fill="${INK.paper}"/><circle class="moon" cx="${cx}" cy="370" r="34" fill="${INK.brick}"/>`
+    + `<path class="leaf" d="${inner}" fill="${INK.ink}" opacity="0"/>`
+    + `<path class="orbit orbit-front" d="${front}" pathLength="1" fill="none" stroke="${INK.mustard}" stroke-width="14" stroke-linecap="round"/>`
+    + `<g class="keyline"><path d="${door}" fill="none" stroke="${INK.paper}" stroke-width="3" stroke-opacity=".5" transform="translate(9 -6)"/></g>`
+    + '</svg>\n';
+}
+
+/**
+ * The plate at the top of a standalone page's card (src/page.ts), 560x168: stars, a far
+ * planet, and the portal scene at the right. `open` lights the doorway and puts the moon in
+ * it (a welcome, good news); shut, the doorway is dark (expired links, errors). The sky is
+ * transparent and the art is decorative: the page paints the night behind it.
+ */
+function doorArt(open: boolean): string {
+  const W = 560, H = 168, cx = 450;
+  const door = arch(cx, H, 112, 150), inner = arch(cx, H, 64, 112);
+  const back = ring(cx, 112, 104, 26, -16, 'back'), front = ring(cx, 112, 104, 26, -16, 'front');
+  const id = `mcp-ht-door-${open ? 'open' : 'shut'}`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" class="web-door-art" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMaxYMax meet" aria-hidden="true" focusable="false">`
+    + `<defs>${halftone(id, 7, 1.6, INK.ink)}</defs>`
+    + `<path d="${starfield(open ? 23 : 29, 46, W, H)}" fill="${INK.paper}" fill-opacity=".5"/>`
+    + `<circle cx="84" cy="52" r="17" fill="${INK.mustard}"/><circle cx="84" cy="52" r="17" fill="url(#${id})" fill-opacity=".4"/>`
+    + `<path d="${back}" fill="none" stroke="${INK.mustard}" stroke-width="5" stroke-linecap="round"/>`
+    + `<path d="${door}" fill="${INK.teal}"/><path d="${door}" fill="url(#${id})" fill-opacity=".35"/>`
+    + (open ? `<path d="${inner}" fill="${INK.paper}"/><circle cx="${cx}" cy="94" r="12" fill="${INK.brick}"/>` : `<path d="${inner}" fill="${INK.ink}"/>`)
+    + `<path d="${front}" fill="none" stroke="${INK.mustard}" stroke-width="6" stroke-linecap="round"/>`
+    + `<path d="${door}" fill="none" stroke="${INK.paper}" stroke-width="1.5" stroke-opacity=".5" transform="translate(4 -3)"/>`
+    + '</svg>\n';
 }
 
 // ------------------------------------------------------------------ type
@@ -317,6 +354,49 @@ export function buildBrand(): { text: Record<string, string>; png: Record<string
     'MCPortal: your liminal webspace.');
   })();
 
+  // README hero, 1280x640 (also GitHub's social preview size): the paperback-cover night sky,
+  // lockup and tagline on the left, and through the open door a glimpse of a room's columns.
+  const readmeHero = (() => {
+    const W = 1280, H = 640, cx = 960;
+    const door = arch(cx, H, 330, 540), inner = arch(cx, H, 196, 430);
+    const back = ring(cx, 450, 420, 88, -14, 'back'), front = ring(cx, 450, 420, 88, -14, 'front');
+    // Three columns of cards behind the door, each led by one of the house inks.
+    const colW = 54, gap = 8, x0 = cx - (3 * colW + 2 * gap) / 2;
+    let room = '';
+    [INK.teal, INK.brick, INK.mustard].forEach((lead, c) => {
+      const x = x0 + c * (colW + gap);
+      let y = 318 + c * 6;
+      room += `<rect x="${r2(x)}" y="${y}" width="${colW}" height="7" rx="2" fill="${lead}"/>`;
+      y += 15;
+      for (let i = 0; y < H; i++) {
+        const thumb = (i + c) % 3 === 2 ? 0 : 26 + ((i * 7 + c * 5) % 3) * 6;
+        if (thumb) room += `<rect x="${r2(x)}" y="${y}" width="${colW}" height="${thumb}" rx="2" fill="${lead}"/><rect x="${r2(x)}" y="${y}" width="${colW}" height="${thumb}" rx="2" fill="url(#mcp-ht-room)" fill-opacity=".3"/>`;
+        y += thumb ? thumb + 6 : 0;
+        room += `<rect x="${r2(x)}" y="${y}" width="${colW - 6}" height="4" rx="2" fill="${INK.ink}" fill-opacity=".7"/>`
+          + `<rect x="${r2(x)}" y="${y + 8}" width="${colW - 20 - ((i + c) % 2) * 10}" height="4" rx="2" fill="${INK.ink}" fill-opacity=".35"/>`;
+        y += 24;
+      }
+    });
+    const cap = 50, markSize = cap * 2.4, lx = 88, ly = 150;
+    const tag = setText(medium, 'Your liminal webspace.', 34, 0);
+    const lines = ['A reading room inside your agent: portals onto', 'feeds, docs, Hacker News and GitHub.'].map((t) => setText(medium, t, 17, 0.01));
+    return svg(W, H, `<defs>${halftone('mcp-ht-readme', 14, 3.2, INK.ink)}${halftone('mcp-ht-room', 5, 1.1, INK.ink)}${halftone('mcp-ht-readme-planet', 9, 2.4, INK.ink)}`
+      + `<clipPath id="mcp-readme-doorway"><path d="${inner}"/></clipPath></defs>`
+      + `<rect width="${W}" height="${H}" fill="${INK.ink}"/><path d="${starfield(17, 90, W, H, [lx - 12, ly + markSize + 40, 560, 160])}" fill="${INK.paper}" fill-opacity=".55"/>`
+      + `<circle cx="1190" cy="92" r="44" fill="${INK.mustard}"/><circle cx="1190" cy="92" r="44" fill="url(#mcp-ht-readme-planet)" fill-opacity=".4"/>`
+      + `<path d="${back}" fill="none" stroke="${INK.mustard}" stroke-width="12" stroke-linecap="round"/>`
+      + `<path d="${door}" fill="${INK.teal}"/><path d="${door}" fill="url(#mcp-ht-readme)" fill-opacity=".35"/>`
+      + `<g clip-path="url(#mcp-readme-doorway)"><path d="${inner}" fill="${INK.paper}"/>${room}</g>`
+      + `<circle cx="${cx}" cy="262" r="26" fill="${INK.brick}"/>`
+      + `<path d="${front}" fill="none" stroke="${INK.mustard}" stroke-width="14" stroke-linecap="round"/>`
+      + `<path d="${door}" fill="none" stroke="${INK.paper}" stroke-width="3" stroke-opacity=".5" transform="translate(9 -6)"/>`
+      + `<svg x="${lx}" y="${ly}" width="${r2(markSize)}" height="${r2(markSize)}" viewBox="0 0 64 64">${portalMark({ detail: true })}</svg>`
+      + `<g transform="translate(${r2(lx + markSize + cap * 0.9)} ${r2(ly + (markSize - cap) / 2 + cap)}) scale(${cap / 100})"><path d="${wm.mc}" fill="${INK.paper}"/><path d="${wm.portal}" fill="${INK.mustard}"/></g>`
+      + `<g transform="translate(${lx} ${ly + markSize + 92})"><path d="${tag.d}" fill="${INK.paper}"/></g>`
+      + lines.map((l, i) => `<g transform="translate(${lx} ${ly + markSize + 150 + i * 32})"><path d="${l.d}" fill="${INK.paper}" fill-opacity=".78"/></g>`).join(''),
+    'MCPortal: your liminal webspace. A reading room inside your agent.');
+  })();
+
   const lineInk = lineMark(`stroke="${INK.ink}"`, `fill="${INK.brick}"`);
   const text: Record<string, string> = {
     'brand/mark.svg': svg(64, 64, portalMark({ detail: true })),
@@ -329,9 +409,12 @@ export function buildBrand(): { text: Record<string, string>; png: Record<string
     'brand/lockup-on-dark.svg': lockup(INK.paper, INK.mustard),
     'brand/lockup-stacked.svg': stacked,
     'brand/social-card.svg': social,
+    'brand/readme-hero.svg': readmeHero,
     'src/site/favicon.svg': svg(64, 64, portalMark()),
     'src/site/lockup-on-dark.svg': lockup(INK.paper, INK.mustard),
-    'src/site/hero.svg': heroArt(),
+    'brand/hero.svg': heroArt(),
+    'brand/door-open.svg': doorArt(true),
+    'brand/door-shut.svg': doorArt(false),
     // Inlined into the room: colours come from its CSS so they follow the theme.
     'src/ui/brand/mark-line.svg': `<svg class="brand-line" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${lineMark('stroke="currentColor"', 'class="brand-dot"')}</svg>`,
     'src/ui/brand/badge.svg': `<svg class="brand-badge" viewBox="0 0 64 64" aria-hidden="true" focusable="false">${portalMark()}</svg>`,
@@ -343,6 +426,7 @@ export function buildBrand(): { text: Record<string, string>; png: Record<string
     'src/site/apple-touch-icon.png': [{ from: 'brand/app-icon.svg', width: 180 }],
     'src/site/icon-512.png': [{ from: 'brand/app-icon.svg', width: 512 }],
     'src/site/og.png': [{ from: 'brand/social-card.svg', width: 1200 }],
+    'brand/readme-hero.png': [{ from: 'brand/readme-hero.svg', width: 1280 }],
   };
   return { text, png };
 }

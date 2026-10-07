@@ -1,5 +1,5 @@
   // room/passage.js: a passage selected in the reader or docs viewer: ask the agent about it, or clip it
-  // ------------------------------------------------------------ passages (docs/plans/attention.md, phase 1)
+  // ------------------------------------------------------------ passages (docs/explanation/reading.md, phase 1)
   // Selecting text in an article or docs page shows a small bar. "Ask about this" gives the
   // model the passage as context, fenced as the site's text, then posts a fixed message in
   // the user's voice: site text never goes into the user's message. "Clip quote" keeps it.
@@ -25,6 +25,47 @@
     return body;
   }
 
+  /** Logical content units, independent of semantic list/quote containers.
+   * Older clip/card bodies use direct children, so they remain selectable.
+   * @param {Element} body @returns {HTMLElement[]}
+   */
+  function logicalBlocks(body) {
+    const nodes = [...body.querySelectorAll('[data-reader-block]')];
+    // blockNodes writes these attributes only on HTML content elements.
+    return /** @type {HTMLElement[]} */ (nodes.length ? nodes : [...body.children]);
+  }
+
+  /** Prefer text/heading identity to obsolete numeric offsets; legacy offsets are best effort.
+   * @param {HTMLElement} body @param {{ block?: number, heading?: string } | undefined | null} anchor
+   * @param {string} [text] @returns {number}
+   */
+  function resolveBlock(body, anchor, text) {
+    const nodes = logicalBlocks(body);
+    const normalize = (/** @type {string} */ value) => value.replace(/\s+/g, ' ').trim();
+    if (text) {
+      const passageText = normalize(text);
+      const found = nodes.findIndex((node, i) => {
+        // A selection may span several blocks; preserve its start without guessing
+        // from a short prefix that could appear in several sections.
+        const joined = nodes.slice(i, i + 20).map((n) => normalize(n.textContent || '')).join(' ');
+        const offset = joined.indexOf(passageText);
+        return offset >= 0 && offset < normalize(node.textContent || '').length;
+      });
+      if (found >= 0) return found;
+    }
+    if (anchor?.heading) {
+      const found = nodes.findIndex((node) => /^H[1-6]$/.test(node.tagName) && (node.dataset.anchor === anchor.heading || normalize(node.textContent || '') === normalize(anchor.heading || '')));
+      if (found >= 0) {
+        // Keep precise resume on an unchanged page only while its numeric offset
+        // still belongs to the identified section. A shifted/stale section wins.
+        const numeric = anchor.block;
+        if (typeof numeric === 'number' && Number.isInteger(numeric) && numeric >= found && numeric < nodes.length && !nodes.slice(found + 1, numeric + 1).some((node) => /^H[1-6]$/.test(node.tagName))) return numeric;
+        return found;
+      }
+    }
+    return Math.max(0, Math.min(Number.isFinite(anchor?.block) ? Math.trunc(anchor?.block || 0) : 0, nodes.length - 1));
+  }
+
   /** The selected passage, if it lies within one marked page body. @returns {Passage | null} */
   function selectedPassage() {
     const selection = document.getSelection();
@@ -37,17 +78,38 @@
     if (!start || !body || !end || !body.contains(end)) return null;
     const text = selection.toString().replace(/[\u0000-\u0008\u000b-\u001f\u007f\u2028\u2029]/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
     if (text.length < 3) return null;
-    const first = start.closest('[data-passage-url] > *');
-    const block = first ? [...body.children].indexOf(first) : 0;
+    const nodes = logicalBlocks(body);
+    const block = Math.max(0, nodes.findIndex((node) => node === start || node.contains(start)));
     return { text: text.slice(0, PASSAGE_CHARS), url: body.dataset.passageUrl ?? '', title: body.dataset.passageTitle ?? '', heading: headingAt(body, block), block, hint: body.dataset.passageHint ?? '' };
   }
 
   /** The nearest heading at or before a block of a page body, for "the part about …". @param {Element} body @param {number} index */
   function headingAt(body, index) {
-    for (let node = body.children.item(index); node; node = node.previousElementSibling) {
-      if (/^H[1-6]$/.test(node.tagName)) return (node.textContent ?? '').trim().slice(0, 200);
+    const nodes = logicalBlocks(body);
+    for (let i = Math.min(index, nodes.length - 1); i >= 0; i--) {
+      const node = nodes[i];
+      if (node && /^H[1-6]$/.test(node.tagName)) return (node.textContent ?? '').trim().slice(0, 200);
     }
     return '';
+  }
+
+  /** Stable heading identity for history/handoffs; prose context still uses headingAt.
+   * @param {Element} body @param {number} index
+   */
+  function headingAnchorAt(body, index) {
+    const nodes = logicalBlocks(body);
+    for (let i = Math.min(index, nodes.length - 1); i >= 0; i--) {
+      const node = nodes[i];
+      if (node && /^H[1-6]$/.test(node.tagName)) return node.dataset.anchor || (node.textContent || '').trim().slice(0, 200);
+    }
+    return '';
+  }
+
+  /** The visible reading edge below persistent actions, in inline and fullscreen views.
+   * @param {HTMLElement} reader
+   */
+  function readerVisibleTop(reader) {
+    return Math.max(0, reader.getBoundingClientRect().top, $first('.reader-top', reader)?.getBoundingClientRect().bottom || 0);
   }
 
   function hidePassageBar() {

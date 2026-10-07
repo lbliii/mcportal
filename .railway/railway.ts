@@ -5,7 +5,7 @@
 //   - Variable values. The names below are preserve(): their values stay in Railway
 //     and never enter source. See .env.example for what each one does.
 //   - The public domain. MCPortal derives its public URL and Host allowlist from
-//     RAILWAY_PUBLIC_DOMAIN.
+//     RAILWAY_PUBLIC_DOMAIN, unless MCPORTAL_PUBLIC_URL pins them (below).
 //   - Postgres and its PITR backups (owned by the Postgres service, not this repo).
 import { defineRailway, preserve, project, service, volume } from "railway/iac";
 
@@ -32,6 +32,10 @@ export default defineRailway(() => {
       MCPORTAL_ALLOWED_GITHUB_USERS: preserve(),
       // Public sign-up is an explicit operator setting, never enabled by a deploy.
       MCPORTAL_OPEN_SIGNUP: preserve(),
+      // Pins the public URL. Adding a custom domain changes RAILWAY_PUBLIC_DOMAIN, and a server
+      // that boots as a domain whose DNS isn't live refuses every other host (2026-10-07).
+      MCPORTAL_PUBLIC_URL: preserve(),
+      MCPORTAL_ALLOWED_HOSTS: preserve(),
       MCPORTAL_LABS: preserve(),
       MCPORTAL_LIMIT_PER_MINUTE: preserve(),
       MCPORTAL_LIMIT_PER_DAY: preserve(),

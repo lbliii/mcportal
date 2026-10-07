@@ -187,16 +187,19 @@ export async function loadGithubDocs(tocUrl: string, fetcher: Fetcher): Promise<
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key)!.push(f);
   }
+  /** The folders between a page's section and the page: "projects" for concepts/projects/workspaces.md. */
+  const below = (f: string) => rel(f).split('/').slice(1, -1).join('/');
   let count = 0;
   const sections: DocSection[] = [...groups.entries()]
     .sort((a, b) => (a[0] === '' ? -1 : b[0] === '' ? 1 : natural(a[0], b[0])))
     .slice(0, DOCS_LIMITS.sections)
     .map(([key, group]) => {
+      // The section's own pages first, then each deeper folder together, led by its index.
       const sorted = group.sort((a, b) => {
-        const depth = a.split('/').length - b.split('/').length;
+        const da = below(a), db = below(b);
         const ai = isIndex(a.split('/').pop()!) ? 0 : 1;
         const bi = isIndex(b.split('/').pop()!) ? 0 : 1;
-        return depth || ai - bi || natural(a, b);
+        return Number(Boolean(da)) - Number(Boolean(db)) || natural(da, db) || ai - bi || natural(a, b);
       });
       const pages: DocPageRef[] = [];
       for (const f of sorted) {
@@ -204,7 +207,12 @@ export async function loadGithubDocs(tocUrl: string, fetcher: Fetcher): Promise<
         const parts = f.split('/');
         const name = parts.pop()!;
         const folder = parts.pop();
-        pages.push({ title: isIndex(name) ? (key ? 'Overview' : folder && folder !== path.split('/').pop() ? fileTitle(folder) : 'Introduction') : fileTitle(name), url: githubRawUrl(site, f) });
+        // A page in a deeper folder names it, "Projects › Workspaces", so two folders' "Overview"s differ.
+        const sub = below(f).split('/').filter(Boolean).map(fileTitle);
+        const own = isIndex(name)
+          ? (sub.length ? undefined : key ? 'Overview' : folder && folder !== path.split('/').pop() ? fileTitle(folder) : 'Introduction')
+          : fileTitle(name);
+        pages.push({ title: [...sub, ...(own ? [own] : [])].join(' › '), url: githubRawUrl(site, f) });
         count++;
       }
       const section: DocSection = { title: key ? fileTitle(key) : title, pages };

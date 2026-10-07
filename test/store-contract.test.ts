@@ -241,6 +241,11 @@ for (const b of BACKENDS) {
     assert.equal(await store.updateShare('nope', { reblogs: 'nobody' }), false);
 
     await store.relate('follows', alice, bob);
+    // Space-link notes are relations too, kept and forgotten the same way.
+    assert.equal(await store.relate('intros', bob, alice), true);
+    assert.equal(await store.relate('joins', alice, bob), true);
+    assert.deepEqual(await store.outgoing('intros', bob), [alice]);
+    assert.deepEqual(await store.outgoing('joins', alice), [bob]);
     // Reports about bob (his profile, one of his shares) and an open one he filed.
     await store.addShare({ ...share(500), id: `${bob}-s1`, accountId: bob });
     const aboutHim = { id: `${alice}-r2`, reporterId: alice, targetKind: 'profile' as const, targetId: bob, reason: 'rude', status: 'open' as const, createdAt: at(302) };
@@ -249,6 +254,7 @@ for (const b of BACKENDS) {
     for (const r of [aboutHim, aboutHisShare, openByHim]) await store.addReport(r);
     await store.forget(bob, at(400));
     assert.deepEqual(await store.incoming('follows', bob), [], "a forgotten account's relations go");
+    assert.deepEqual([await store.outgoing('intros', bob), await store.outgoing('joins', alice)], [[], []], 'Space-link notes included');
     assert.equal(await store.getShare(`${bob}-s1`), undefined, 'and its shares');
     const byId = new Map((await store.reports()).map((r) => [r.id, r]));
     const resolvedByHim = byId.get(report.id)!;

@@ -95,12 +95,14 @@
     state.portals = new Map(data.portals.map((p) => [p.portalId, p]));
     for (const portal of data.portals) portalLoadedAt.set(portal.portalId, Date.now());
     state.edition = data.edition; state.lead = data.lead; state.labs = data.labs ?? [];
+    state.alsoShared = new Map((data.alsoShared ?? []).map((a) => [storyKey(a.url), a.handle]));   // "also shared by", keyed as the river keys stories
     $('roomName').textContent = data.profile.name;
     drawIdentity(data.identity);
     drawLayout();
     refreshContinueReading();
     setUpdated(data.generatedAt);
     if (data.notice) toast(data.notice);
+    if (data.intros) drawIntros(data.intros);
   }
 
   // ------------------------------------------------------------ pictures
@@ -188,6 +190,7 @@
    * @param {number} style
    */
   function sourceColor(source, style) {
+    if (source === 'people' || source === 'lobby') return 'var(--mp-source-following)';   // people's posts and suggestions share the Following ink
     return HOUSE_SOURCES.has(source) ? `var(--mp-source-${source})` : `color-mix(in srgb, ${portalArt.leadOf(style)} var(--mp-source-lead-mix), var(--mp-brand-paper))`;
   }
   /** The colour a source outside the layout (a search result, someone's featured feed) would get. */

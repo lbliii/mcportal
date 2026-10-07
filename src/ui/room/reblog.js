@@ -1,4 +1,4 @@
-  // room/reblog.js: reblogging from the room (docs/plans/reblog.md, phase 3)
+  // room/reblog.js: reblogging from the room (docs/explanation/social.md, phase 3)
   // ------------------------------------------------------------ reblog
   // One button with a menu: Reblog, Reblog with a note, Undo reblog. A story someone you
   // follow posted reblogs their post (the credit stays theirs); a story no one has posted
@@ -41,18 +41,14 @@
   /** @param {ReblogTarget} target */
   const markOf = (target) => reblogMarks.get(target.key) ?? { mine: target.mine ?? null, count: target.count };
 
-  /** Whether this server has reblogging on (a lab until it's had real use). */
-  const reblogLab = () => state.labs.includes('reblog');
-
   /**
    * The reblog button for a target, or null when the viewer can't post or there's nothing to
-   * reblog. With the lab off, a story with a link keeps a plain share button instead.
+   * reblog.
    * @param {ReblogTarget} target
    */
-  function reblogButton(target) {
+  function reblogButton(target, cls = 'mi reblog') {
     if (!canPost() || (!target.shareId && !target.url)) return null;
-    if (!reblogLab()) return target.item && target.portal && target.portal.source !== 'saved' ? shareStoryButton(target.item, target.portal) : null;
-    const button = el('button', { class: 'mi reblog', type: 'button', 'data-reblog-key': target.key, 'aria-haspopup': 'menu', 'aria-expanded': 'false',
+    const button = el('button', { class: cls, type: 'button', 'data-reblog-key': target.key, 'aria-haspopup': 'menu', 'aria-expanded': 'false',
       onclick: (/** @type {MouseEvent} */ e) => { e.stopPropagation(); openReblogMenu(button, target); } });
     reblogTargets.set(button, target);
     drawReblogButton(button, target);
@@ -83,16 +79,6 @@
       const target = reblogTargets.get(button);
       if (target && target.key === key) drawReblogButton(button, target);
     }
-  }
-
-  /** Share a story (no reblog lab): saved first, as every share is, then the composer. @param {Item} item @param {PortalResult} portal */
-  function shareStoryButton(item, portal) {
-    if (!item.url) return null;
-    return el('button', { class: 'mi go', title: 'Share to your space', 'aria-label': 'Share to your space', onclick: async (/** @type {MouseEvent} */ e) => {
-      e.stopPropagation();
-      if (!state.saved.has(item.url ?? '')) await toggleSaved(item, portal.source);
-      if (state.saved.has(item.url ?? '')) openComposer(item);   // saving can fail; toggleSaved says why
-    } }, icon('share'));
   }
 
   // ------------------------------------------------------------ the menu
@@ -135,9 +121,9 @@
     openMenu = { menu, button };
     button.setAttribute('aria-expanded', 'true');
     $first('[role="menuitem"]', menu)?.focus();
-    // Read it first? Only a nudge, never a gate: the reader opens if they take it.
+    // Read it first? Only a nudge, never a gate: the reader opens if they take it. Not in the reader itself.
     const { url, item: story, portal } = target;
-    if (!mine && url && story && portal && isHttpUrl(url)) {
+    if (!mine && url && story && portal && isHttpUrl(url) && $('reader').hidden) {
       callTool('get_reading', { url }).then((result) => {
         if (result.structuredContent?.reading || openMenu?.menu !== menu) return;
         menu.prepend(el('div', { class: 'reblog-nudge' }, "You haven't read this yet. ",

@@ -92,6 +92,15 @@ export const TOOL_CASES: ToolCase[] = [
   { prompt: 'from now on only my followers can reblog what I post', tool: 'set_public_profile', args: { reblogs: 'followers' }, where: 'labs' },
   { prompt: 'who reblogged my post s_7e8f9a0b1c2d?', tool: 'get_share', args: { id: 's_7e8f9a0b1c2d' }, where: 'labs' },
 
+  // Finding people (docs/plans/finding-people.md)
+  { prompt: 'who should I follow on MCPortal?', tool: 'find_people' },
+  { prompt: 'is anyone on MCPortal into modular synths?', tool: 'find_people', args: { about: 'synth' } },
+  { prompt: 'find people who read simonwillison.net', tool: 'find_people', args: { sources: ['simonwillison.net'] } },
+  { prompt: 'who else is like @ada?', tool: 'find_people', args: { like: 'ada' } },
+  { prompt: 'let people with similar sources find me', tool: 'set_public_profile', args: { listed: true } },
+  { prompt: 'find me a few people to follow and keep them in my room', tool: 'find_people' },
+  { prompt: 'add the Lobby to my room', tool: 'add_portal', args: { source: 'lobby' } },
+
   // Not for MCPortal
   { prompt: "what's 17 times 23?", tool: null },
   { prompt: 'write me a haiku about autumn', tool: null },

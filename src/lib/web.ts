@@ -71,13 +71,16 @@ export function sendJsonError(res: ServerResponse, status: number, code: string,
   sendJson(res, status, { error: code, error_description: message }, extra);
 }
 
+/** Self-contained brand images and heading font; scripts/network resources remain blocked. */
+export const PAGE_CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; frame-ancestors 'none'; base-uri 'none'";
+
 export function sendHtml(res: ServerResponse, status: number, html: string, extra: Record<string, string | string[]> = {}): void {
   res.writeHead(status, {
     'content-type': 'text/html; charset=utf-8',
     'cache-control': 'no-store',
     'x-frame-options': 'DENY',
     // No form-action: Chrome applies it to the post-submit redirect (to GitHub or back to the client).
-    'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'",
+    'content-security-policy': PAGE_CSP,
     // Not no-referrer: under it a browser sends `Origin: null` with a form POST, and every
     // form here is checked for a same-origin Origin. same-origin still sends other sites nothing.
     'referrer-policy': 'same-origin',

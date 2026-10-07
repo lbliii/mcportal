@@ -190,7 +190,10 @@
         el('div', { class: 'who' }, [`@${space.handle}`, space.spaceTitle && space.displayName ? space.displayName : null].filter(Boolean).join(' · ')),
         space.bio ? el('p', { class: 'bio' }, space.bio) : null,
         el('div', { class: 'row' }, follow, el('span', null, `${space.followers} follower${space.followers === 1 ? '' : 's'}`), el('span', null, `· ${space.posts.length} post${space.posts.length === 1 ? '' : 's'}`),
-          space.mine ? el('span', null, '· this is what visitors see (followers-only posts show only to followers)') : null)),
+          space.mine ? el('span', null, '· this is what visitors see (followers-only posts show only to followers)') : null),
+        space.mine ? el('div', { class: 'row' },
+          space.link ? el('button', { class: 'btn', type: 'button', onclick: () => copySpaceLink(space.link ?? '') }, icon('share'), ' Copy link to your space') : null,
+          listingButton(space, withBack, back)) : null),
       space.sources.length ? el('h2', null, 'Sources I read') : null,
       space.sources.length ? el('div', { class: 'sources' }, sources) : null,
       el('h2', null, 'Posts'),
@@ -217,16 +220,187 @@
     showSpace(space, false);
   }
 
-  /** @param {string} handle '' for your own space @param {boolean} asCard */
-  async function loadSpace(handle, asCard) {
+  /** @param {string} handle '' for your own space @param {boolean} asCard @param {(e: MouseEvent) => void} [back] */
+  async function loadSpace(handle, asCard, back) {
     setStatus('Stand by…');
     try {
       const space = (await callTool('open_space', handle ? { handle } : {})).structuredContent.space;
-      asCard ? showSpaceCard(space) : showSpace(space, true);
+      asCard ? showSpaceCard(space) : showSpace(space, true, back);
     } catch (error) {
       setStatus('');
       toast(errorText(error));
     }
+  }
+
+  /**
+   * Open someone's space from wherever their handle is, and come back to exactly that: the
+   * room (closeReader restores it) or what the reader was showing, at its scroll position.
+   * @param {string} handle
+   */
+  function openSpaceFrom(handle) {
+    const reader = $('reader');
+    if (reader.hidden) { rememberRoomNavigation(); void loadSpace(handle, false); return; }
+    const was = { nodes: [...reader.childNodes], scroll: reader.scrollTop, className: reader.className, accent: reader.style.getPropertyValue('--mp-space-accent') };
+    void loadSpace(handle, false, () => {
+      reader.className = was.className;
+      reader.style.setProperty('--mp-space-accent', was.accent);
+      reader.replaceChildren(...was.nodes);
+      reader.scrollTop = was.scroll;
+    });
+  }
+
+  /**
+   * Every handle is a door (docs/plans/finding-people.md): "@ana" anywhere opens their space.
+   * @param {string} handle @param {string} [className]
+   */
+  function handleButton(handle, className = '') {
+    return el('button', { class: `handle ${className}`.trim(), type: 'button', title: `Open @${handle}'s space`,
+      onclick: (/** @type {MouseEvent} */ e) => { e.stopPropagation(); openSpaceFrom(handle); } }, `@${handle}`);
+  }
+
+  /**
+   * Follow the first person on a post you don't follow yet (its author, then the original's
+   * author, then who it came via): the moment you liked what they shared.
+   * @param {SharedItem} share
+   */
+  function followButton(share) {
+    const handle = share.canFollow?.[0];
+    if (!handle) return null;
+    const button = el('button', { class: 'btn follow', type: 'button', 'aria-pressed': 'false' }, `Follow @${handle}`);
+    button.addEventListener('click', async () => {
+      button.disabled = true;
+      try {
+        await callTool('relationship', { handle, action: 'follow' });
+        button.setAttribute('aria-pressed', 'true');
+        button.textContent = `Following @${handle}`;
+        toast(`Following @${handle}. Their posts will arrive in your Following portal.`);
+      } catch (error) { toast(errorText(error)); button.disabled = false; }
+    });
+    return button;
+  }
+
+  /**
+   * A shared link opened in the reader keeps who shared it: their handle (a door), the
+   * original's author for a reblog, the notes, and Follow for whoever on it you don't
+   * follow yet (get_share knows; the Following portal's item doesn't).
+   * @param {Item} item an item of a Following portal @param {NonNullable<Item['share']>} share its share
+   */
+  function sharedBy(item, share) {
+    const author = item.meta.find((m) => /^@[a-z0-9_]{2,30}$/.test(m))?.slice(1);
+    const by = share.reblog?.by;
+    const actions = el('div', { class: 'share-actions' });
+    callTool('get_share', { id: share.id })
+      .then((result) => { const follow = followButton(result.structuredContent.share); if (follow) actions.append(follow); })
+      .catch(() => {});   // the reader works without it
+    return el('section', { class: 'shared-by', 'aria-label': 'Shared with you' },
+      el('div', { class: 'byline' }, author ? handleButton(author) : 'Someone', ...(by ? [' reblogged ', handleButton(by), "'s link"] : [' shared this link'])),
+      by && share.reblog?.note ? el('p', { class: 'story-note' }, handleButton(by, 'story-note-by'), share.reblog.note) : null,
+      item.summary ? el('p', { class: by ? 'story-note' : 'share-note' }, by && author ? handleButton(author, 'story-note-by') : null, item.summary) : null,
+      actions);
+  }
+
+  /**
+   * What Space links left for this room, said once (open_room's intros): a Follow for the
+   * people whose link brought the user here, and who joined through the user's own link.
+   * @param {ToolResults['open_room']['intros']} intros
+   */
+  function drawIntros(intros) {
+    document.getElementById('intros')?.remove();
+    if (!intros || (!intros.offer.length && !intros.joined.length)) return;
+    const strip = el('section', { id: 'intros', class: 'intros', 'aria-label': 'From Space links' });
+    for (const handle of intros.offer) {
+      const follow = el('button', { class: 'btn follow', type: 'button', 'aria-pressed': 'false' }, `Follow @${handle}`);
+      const row = el('div', { class: 'intro' }, el('span', null, 'You came in through ', handleButton(handle), "'s Space link."), follow,
+        el('button', { class: 'link-btn', type: 'button', onclick: () => { row.remove(); if (!strip.children.length) strip.remove(); } }, 'Not now'));
+      follow.addEventListener('click', async () => {
+        follow.disabled = true;
+        try {
+          const result = (await callTool('relationship', { handle, action: 'follow' })).structuredContent;
+          follow.setAttribute('aria-pressed', 'true');
+          follow.textContent = `Following @${handle}`;
+          if (result.layoutChanged) void loadRoom();   // the Following portal was just added
+        } catch (error) { toast(errorText(error)); follow.disabled = false; }
+      });
+      strip.append(row);
+    }
+    if (intros.joined.length) {
+      strip.append(el('div', { class: 'intro' }, el('span', null, ...intros.joined.flatMap((h, i) => [i ? ', ' : '', handleButton(h)]), ` joined MCPortal through your Space link.`)));
+    }
+    $('grid').before(strip);
+  }
+
+  /**
+   * Your Space says whether people with similar sources can find you, and switches it.
+   * @param {Space} space @param {boolean} withBack @param {(e: MouseEvent) => void} [back]
+   */
+  function listingButton(space, withBack, back) {
+    const button = el('button', { class: 'btn', type: 'button', 'aria-pressed': String(Boolean(space.listed)) }, space.listed ? 'Listed: people with similar sources can find you' : 'Unlisted: list me');
+    button.addEventListener('click', async () => {
+      button.disabled = true;
+      try {
+        const { profile } = (await callTool('set_public_profile', { listed: !space.listed })).structuredContent;
+        space.listed = profile.listed;
+        toast(profile.listed ? 'Listed. People with similar sources can find you.' : 'Unlisted. Only people with your handle or link can find you.');
+        showSpace(space, withBack, back);
+      } catch (error) { toast(errorText(error)); button.disabled = false; }
+    });
+    return button;
+  }
+
+  /**
+   * A suggested person's buttons (the People portal, docs/plans/finding-people.md): Follow,
+   * and Not for me, which takes them out of the portal and tells find_people next time.
+   * @param {Item} item @param {PortalResult} portal
+   */
+  function personActions(item, portal) {
+    const person = item.person;
+    if (!person) return [];
+    const follow = el('button', { class: 'mi person-act follow', type: 'button', 'aria-pressed': String(person.following), disabled: person.following }, person.following ? 'Following' : 'Follow');
+    follow.addEventListener('click', async (/** @type {MouseEvent} */ e) => {
+      e.stopPropagation();
+      follow.disabled = true;
+      try {
+        const result = (await callTool('relationship', { handle: person.handle, action: 'follow' })).structuredContent;
+        person.following = true;
+        follow.setAttribute('aria-pressed', 'true');
+        follow.textContent = 'Following';
+        toast(`Following @${person.handle}. Their posts will arrive in your Following portal.`);
+        if (result.layoutChanged && !$('grid').hidden) void loadRoom();   // the Following portal was just added
+      } catch (error) { toast(errorText(error)); follow.disabled = false; }
+    });
+    const pass = el('button', { class: 'mi person-act', type: 'button' }, 'Not for me');
+    pass.addEventListener('click', async (/** @type {MouseEvent} */ e) => {
+      e.stopPropagation();
+      pass.disabled = true;
+      try {
+        await callTool('pass_person', { handle: person.handle });
+        portal.items = portal.items.filter((i) => i !== item);
+        pass.closest('.item, .card')?.remove();
+        toast(`Passed on @${person.handle}. Your agent will know next time it looks for people.`);
+      } catch (error) { toast(errorText(error)); pass.disabled = false; }
+    });
+    return [follow, pass];
+  }
+
+  // This view belongs to a suggest_people call: the agent's picks as a card.
+  /** @param {PortalResult} portal */
+  function showPeopleCard(portal) {
+    root.classList.add('article-view');
+    $('roomName').textContent = 'people';
+    $('welcome').hidden = true;
+    $('grid').hidden = true;
+    const reader = $('reader');
+    reader.hidden = false; reader.scrollTop = 0;
+    reader.replaceChildren(readerTop('', false), el('h1', null, 'People you might follow'),
+      el('div', { class: 'byline' }, "Your agent's picks, from what they chose to share. They're kept in your People portal."),
+      portal.items.length ? el('div', { class: 'people-card' }, portal.items.map((item) => renderItem(item, portal))) : el('div', { class: 'empty' }, 'Nobody to suggest right now.'));
+    setStatus('');
+  }
+
+  /** Copy a Space's link; where the clipboard is off limits, show it to copy by hand. @param {string} link */
+  async function copySpaceLink(link) {
+    try { await navigator.clipboard.writeText(link); toast('Copied your Space link. Anyone who signs in through it is offered a follow of you.'); }
+    catch { toast(`Your Space link: ${link}`); }
   }
 
   // ------------------------------------------------------------ shares
@@ -235,7 +409,6 @@
   // voices at most. Your own post shows who reblogged it and your controls over that.
   /** @param {SharedItem} share @param {boolean} withBack @param {Reblogger[]} [rebloggers] */
   function shareNodes(share, withBack, rebloggers = []) {
-    const who = share.mine ? 'You' : `@${share.author.handle}`;
     const to = share.audience === 'mcportal' ? 'everyone on MCPortal' : 'followers';
     const original = share.original && 'author' in share.original ? share.original : undefined;
     const top = el('div', { class: 'reader-top' },
@@ -244,19 +417,21 @@
     const clip = original?.clip ?? share.clip;
     const body = clip ? clipBody(clip.data)
       : share.url && isHttpUrl(share.url) ? [el('p', null, el('button', { class: 'btn', onclick: () => openLink(share.url ?? '') }, share.url))] : [];  // checked just before
+    const by = share.mine ? 'You' : handleButton(share.author.handle);
     const did = share.reblogOf
-      ? `${who} reblogged ${original ? `@${original.author.handle}'s ${share.kind === 'clip' ? (clip ? clip.kind : 'clip') : 'link'}` : 'a post'}${share.via ? ` via @${share.via}` : ''}`
-      : `${who} shared ${share.kind === 'clip' ? `a ${share.clip ? share.clip.kind : 'clip'}` : 'a link'}`;
+      ? [by, ' reblogged ', ...(original ? [handleButton(original.author.handle), `'s ${share.kind === 'clip' ? (clip ? clip.kind : 'clip') : 'link'}`] : ['a post']), ...(share.via ? [' via ', handleButton(share.via)] : [])]
+      : [by, ` shared ${share.kind === 'clip' ? `a ${share.clip ? share.clip.kind : 'clip'}` : 'a link'}`];
     const removed = share.original && 'removed' in share.original
       ? (share.original.removed === 'detached' ? 'Its author removed the original post from this reblog.' : 'The original post was removed.') : '';
     const reblog = share.mine && !share.reblogOf ? null : reblogButton(shareTarget(share));
+    const follow = followButton(share);
     return present([top, el('h1', null, share.title),
-      el('div', { class: 'byline' }, [did, `with ${to}`, ago(share.createdAt)].join(' · ')),
+      el('div', { class: 'byline' }, did, ` · with ${to} · ${ago(share.createdAt)}`),
       removed ? el('p', { class: 'story-removed' }, removed) : null,
-      original?.note ? el('p', { class: 'story-note' }, el('span', { class: 'story-note-by' }, `@${original.author.handle}`), original.note) : null,
-      share.note ? el('p', { class: share.reblogOf ? 'story-note' : 'share-note' }, share.reblogOf ? el('span', { class: 'story-note-by' }, share.mine ? 'You' : `@${share.author.handle}`) : null, share.note) : null,
+      original?.note ? el('p', { class: 'story-note' }, handleButton(original.author.handle, 'story-note-by'), original.note) : null,
+      share.note ? el('p', { class: share.reblogOf ? 'story-note' : 'share-note' }, share.reblogOf ? (share.mine ? el('span', { class: 'story-note-by' }, 'You') : handleButton(share.author.handle, 'story-note-by')) : null, share.note) : null,
       el('div', { class: 'body' }, body),
-      reblog ? el('div', { class: 'share-actions' }, reblog) : null,
+      reblog || follow ? el('div', { class: 'share-actions' }, reblog, follow) : null,
       share.mine && !share.reblogOf ? reblogControls(share, rebloggers) : null,
       el('div', { class: 'prov' }, share.hiddenAt ? 'An admin hid this share; only you can see it.' : `Shared on MCPortal. ${share.mine ? '' : 'Written by another user.'}`)]);
   }
@@ -286,7 +461,7 @@
           cut.replaceWith(el('span', { class: 'pm' }, 'removed from this reblog'));
         } catch (error) { toast(errorText(error)); }
       });
-      return el('li', null, el('button', { class: 'link-btn', type: 'button', onclick: () => loadSpace(r.handle, false) }, `@${r.handle}`), ' · ', cut);
+      return el('li', null, handleButton(r.handle), ' · ', cut);
     });
     return el('section', { class: 'share-reblogs', 'aria-label': 'Reblogs' },
       el('h2', null, share.reblogCount ? `${share.reblogCount} reblog${share.reblogCount === 1 ? '' : 's'}` : 'No reblogs yet'),

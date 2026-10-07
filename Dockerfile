@@ -7,6 +7,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 COPY bin ./bin
 COPY src ./src
+COPY brand ./brand
 COPY test/fixtures ./test/fixtures
 
 # HOST=0.0.0.0 makes the server reachable from outside the container. It refuses

@@ -11,7 +11,7 @@ import { handleMessage } from '../src/mcp.ts';
 import { MemoryProfileStore } from '../src/store.ts';
 import { createFixtureFetcher } from '../src/lib/fixture-fetch.ts';
 import { TtlCache } from '../src/lib/cache.ts';
-import { defaultProfile, offeredLayouts, validateProfile, type Profile } from '../src/profile.ts';
+import { defaultProfile, diffProfiles, offeredLayouts, validateProfile, type Profile } from '../src/profile.ts';
 
 /** Three columns: HN | GitHub, a blog | a pinned list. */
 function room(): Profile {
@@ -33,6 +33,19 @@ const refused = (change: Arrangement, code: string, message: RegExp) =>
 test('arrange: "put GitHub on the left" moves only GitHub, to the top of column 1', () => {
   const p = arrange(room(), { move: [{ portal: 'GitHub', column: 1, position: 1 }] });
   assert.deepEqual(layout(p), [['gh', 'hn'], ['blog'], ['bugs']]);
+});
+
+test('diff: "moved" names what moved, not what shifted around it', () => {
+  // One column each; GitHub to the top of column 1 and the blog to the top of column 2. The first
+  // and second columns gain a portal above theirs, and column 4 becomes 3 as 3 closes up: not moves.
+  const five = validateProfile({ ...room(), columns: ['a', 'b', 'gh', 'c', 'blog'].map((id) => ({ width: 1, panels: [{ id, source: 'rss', title: id, config: { url: `https://example.com/${id}` } }] })), pins: {} });
+  const moved = arrange(five, { move: [{ portal: 'gh', column: 1, position: 1 }, { portal: 'blog', column: 2, position: 1 }] });
+  assert.deepEqual(layout(moved), [['gh', 'a'], ['blog', 'b'], ['c']]);
+  assert.deepEqual(diffProfiles(five, moved).moved, ['gh (column 3 → 1)', 'blog (column 5 → 2)']);
+  // Order unchanged, but GitHub leaves HN's column for the blog's: GitHub moved, the blog didn't.
+  const split = arrange(room(), { move: [{ portal: 'GitHub', column: 1, position: 2 }] });
+  assert.deepEqual(diffProfiles(room(), split).moved, ['gh (column 2 → 1)']);
+  assert.deepEqual(diffProfiles(room(), arrange(room(), { layout: 'river' })).moved, []);
 });
 
 test('arrange: "make GitHub wider" sets its column width, nothing else', () => {
@@ -96,8 +109,7 @@ test('layouts: river is always offered; front page still needs its lab, and exis
   assert.deepEqual(labsFrom(undefined), []);
   assert.deepEqual(offeredLayouts([]), ['columns', 'shelves', 'river']);
   assert.deepEqual(offeredLayouts(['frontpage']), ['columns', 'shelves', 'frontpage', 'river']);
-  assert.deepEqual(offeredLayouts(['river']), ['columns', 'shelves', 'river']);
-  assert.deepEqual(labsFrom('frontpage,river'), ['frontpage'], 'the old river flag is no longer needed');
+  assert.deepEqual(labsFrom('frontpage,river,reblog'), ['frontpage'], 'graduated labs are ignored');
   assert.equal(validateProfile({ ...defaultProfile(), layout: 'frontpage' }).layout, 'frontpage');
   assert.equal(validateProfile({ ...defaultProfile(), layout: 'river' }).layout, 'river');
   const before = { ...room(), saved: [{ url: 'https://example.com/saved', title: 'Saved', savedAt: '2026-01-01T00:00:00.000Z' }] };

@@ -24,9 +24,10 @@ import { httpUrl, validateProfile, type Profile } from '../profile.ts';
 import { validateReadingUpdate, type ReadingUpdate } from '../reading.ts';
 import { tracksSeen } from '../seen.ts';
 import { AUDIENCES, REBLOG_RULES } from '../social.ts';
+import type { Wanted } from '../people.ts';
 import { SERVER_INFO } from '../mcp.ts';
 import { findTool } from '../tools/index.ts';
-import { labOn, need, type ToolContext } from '../tools/kit.ts';
+import { need, type ToolContext } from '../tools/kit.ts';
 import { CLIP_KINDS } from '../types.ts';
 import { MIN_CLIENT_VERSION, type ApiMethod } from './calls.ts';
 
@@ -53,11 +54,6 @@ const seenOf = (ctx: ToolContext) => need(ctx.seen, 'Seen tracking is not availa
 const handoffsOf = (ctx: ToolContext) => need(ctx.handoffs, 'Handoffs are not available on this server.');
 const editionsOf = (ctx: ToolContext) => need(ctx.editions, 'Editions are not available on this server.');
 const socialOf = (ctx: ToolContext) => need(ctx.social, 'Sharing is not available on this server.');
-/** The social layer for reblogging, which is a lab (MCPORTAL_LABS=reblog) until it's had real use. */
-const reblogging = (ctx: ToolContext) => {
-  if (!labOn(ctx, 'reblog')) throw new AppError('unavailable', "Reblogging isn't on for this MCPortal yet.");
-  return socialOf(ctx);
-};
 const profilesOf = (ctx: ToolContext) => need(ctx.publicProfiles, 'Public profiles are not available on this server.');
 
 const portalsOf = (profile: Profile) => profile.columns.flatMap((c) => c.panels);
@@ -224,16 +220,16 @@ export const API_METHODS: Record<string, ApiMethod> = {
       if (!saved) throw new AppError('invalid_argument', 'Share a saved item (savedUrl) or a clip (clipId).');
       return social.share(ctx.userId, { kind: 'link', title: saved.title, url: saved.url, note: p.note, audience: p.audience, reblogs: p.reblogs });
     }, 'write'),
-  /** A post the server looks up by id, as share does: nothing of the original comes from the request. While reblogging is a lab, only with the lab on. */
+  /** A post the server looks up by id, as share does: nothing of the original comes from the request. */
   'social.reblog': params<{ id: string; note?: string; audience?: string }>(
     { type: 'object', required: ['id'], additionalProperties: false, properties: { id, note: { type: 'string', maxLength: 500 }, audience: { type: 'string', enum: AUDIENCES } } },
-    (p, ctx) => reblogging(ctx).reblog(ctx.userId, p), 'write'),
+    (p, ctx) => socialOf(ctx).reblog(ctx.userId, p), 'write'),
   'social.shareSettings': params<{ id: string; reblogs?: string; detach?: string }>(
     { type: 'object', required: ['id'], additionalProperties: false, properties: { id, reblogs: { type: 'string', enum: REBLOG_RULES }, detach: id } },
-    (p, ctx) => reblogging(ctx).shareSettings(ctx.userId, p.id, { reblogs: p.reblogs, detach: p.detach }), 'write'),
+    (p, ctx) => socialOf(ctx).shareSettings(ctx.userId, p.id, { reblogs: p.reblogs, detach: p.detach }), 'write'),
   'social.reblogsOf': params<{ id: string; query?: { limit?: number; before?: string } }>(
     { type: 'object', required: ['id'], additionalProperties: false, properties: { id, query: pageQuery } },
-    (p, ctx) => reblogging(ctx).reblogsOf(ctx.userId, p.id, p.query)),
+    (p, ctx) => socialOf(ctx).reblogsOf(ctx.userId, p.id, p.query)),
   'social.unshare': params<{ id: string }>({ type: 'object', required: ['id'], additionalProperties: false, properties: { id } },
     (p, ctx) => socialOf(ctx).unshare(ctx.userId, p.id), 'write'),
   'social.get': params<{ id: string }>({ type: 'object', required: ['id'], additionalProperties: false, properties: { id } },
@@ -253,6 +249,23 @@ export const API_METHODS: Record<string, ApiMethod> = {
     async (p, ctx) => publicRef(await socialOf(ctx).block(ctx.userId, p.handle, p.on), ctx), 'write'),
   'social.uses': params(NO_PARAMS, (_p, ctx) => socialOf(ctx).uses(ctx.userId)),
   'social.connections': params(NO_PARAMS, (_p, ctx) => socialOf(ctx).connections(ctx.userId)),
+  /** find_people's matching: what to look for comes from the caller's own room and words. */
+  'social.findPeople': params<{ wanted: Wanted; options?: { limit?: number; except?: string } }>({
+    type: 'object', required: ['wanted'], additionalProperties: false, properties: {
+      wanted: { type: 'object', required: ['sources', 'hosts', 'terms'], additionalProperties: false, properties: {
+        sources: { type: 'array', maxItems: 80, items: { type: 'object', required: ['key', 'title'], additionalProperties: false, properties: { key: { type: 'string', maxLength: 600 }, site: { type: 'string', maxLength: 255 }, title: { type: 'string', maxLength: 200 } } } },
+        hosts: { type: 'array', maxItems: 80, items: { type: 'string', maxLength: 255 } },
+        terms: { type: 'array', maxItems: 12, items: { type: 'string', maxLength: 60 } },
+      } },
+      options: { type: 'object', additionalProperties: false, properties: { limit: { type: 'integer', minimum: 1, maximum: 12 }, except: { type: 'string', maxLength: 40 } } },
+    } },
+    (p, ctx) => socialOf(ctx).findPeople(ctx.userId, p.wanted, p.options)),
+  /** The Lobby, and with unfollowedOnly, the posts "also shared by" draws on. */
+  'social.lobby': params<{ query?: { limit?: number; before?: string }; options?: { unfollowedOnly?: boolean } }>({
+    type: 'object', additionalProperties: false, properties: { query: pageQuery, options: { type: 'object', additionalProperties: false, properties: { unfollowedOnly: { type: 'boolean' } } } } },
+    (p, ctx) => socialOf(ctx).lobby(ctx.userId, p.query, p.options)),
+  /** Space-link notes for open_room, each said once. */
+  'social.takeIntros': params(NO_PARAMS, (_p, ctx) => socialOf(ctx).takeIntros(ctx.userId), 'write'),
   'social.stats': params<{ accountId: string }>({ type: 'object', required: ['accountId'], additionalProperties: false, properties: { accountId: id } },
     async (p, ctx) => socialOf(ctx).stats(ctx.userId, await accountOf(p.accountId, ctx))),
   'social.report': params<{ target: { shareId?: string; handle?: string }; reason: string }>(

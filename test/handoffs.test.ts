@@ -1,5 +1,5 @@
 /**
- * Handoffs (docs/plans/attention.md, phase 2): the room stores a page under a code with
+ * Handoffs (docs/explanation/reading.md, phase 2): the room stores a page under a code with
  * create_handoff; open_handoff, in a new chat, opens it where the user was.
  */
 import assert from 'node:assert/strict';

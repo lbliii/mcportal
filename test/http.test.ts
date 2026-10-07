@@ -167,10 +167,13 @@ test('public pages: landing, privacy and support render without scripts; images 
     assert.match(terms, /at least 13/);
     assert.match(terms, /run by A &lt;b&gt;Person&lt;\/b&gt;/);
     assert.match((await raw(app.port, { path: '/' })).body, /http:\/\/localhost\/mcp/);
-    assert.equal((await raw(app.port, { path: '/site/columns.png' })).status, 200);
+    assert.equal((await raw(app.port, { path: '/site/chat-room.png' })).status, 200);
     const landing = (await raw(app.port, { path: '/' })).body;
-    assert.match(landing, /<h1>Your liminal <span>webspace\.<\/span><\/h1>/);
-    assert.match(landing, /<img class="art" src="\/site\/hero\.svg" alt=""/, 'the hero art is decorative');
+    assert.match(landing, /<h1 data-text="Your liminal webspace\.">Your liminal <span>webspace\.<\/span><\/h1>/);
+    assert.match(landing, /<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg" class="art"[^>]* aria-hidden="true" focusable="false">/, 'the hero art is inlined and decorative');
+    assert.match(landing, /content:attr\(data-text\)\/""/, "the headline's keyline plate is hidden from screen readers");
+    assert.match(landing, /@media \(prefers-reduced-motion:no-preference\)\{/, 'the page only moves for people who want motion');
+    assert.doesNotMatch(landing, /<script/, 'the landing page runs no scripts');
     assert.doesNotMatch(landing, /https:\/\/fonts\.|@import|url\(http/, 'fonts come from this server, not a CDN');
     assert.match(landing, /src:url\(\/site\/jost-bold\.ttf\)/);
     assert.match(landing, /<meta property="og:image" content="http:\/\/localhost\/site\/og\.png">/, 'link previews get an absolute image URL');
@@ -181,7 +184,8 @@ test('public pages: landing, privacy and support render without scripts; images 
     const types: Record<string, RegExp> = {
       '/favicon.ico': /^image\/x-icon$/, '/favicon.svg': /^image\/svg\+xml$/, '/apple-touch-icon.png': /^image\/png$/,
       '/site/og.png': /^image\/png$/, '/site/icon-512.png': /^image\/png$/, '/site/lockup-on-dark.svg': /^image\/svg\+xml$/,
-      '/site/hero.svg': /^image\/svg\+xml$/, '/site/jost-bold.ttf': /^font\/ttf$/,
+      '/site/jost-bold.ttf': /^font\/ttf$/,
+      '/site/launch.mp4': /^video\/mp4$/, '/site/launch.jpg': /^image\/jpeg$/,
     };
     for (const [path, type] of Object.entries(types)) {
       const file = await raw(app.port, { path });
@@ -190,6 +194,20 @@ test('public pages: landing, privacy and support render without scripts; images 
       assert.match(file.headers['content-security-policy'] as string, /default-src 'none'/, `${path} can't run anything`);
     }
     assert.ok((await raw(app.port, { path: '/favicon.ico' })).body.startsWith('\0\0\u0001\0'), 'an ICO header');
+    assert.match(landing, /<video src="\/site\/launch\.mp4" poster="\/site\/launch\.jpg" controls playsinline preload="none"/, 'the launch video waits to be played');
+    assert.doesNotMatch(landing, /autoplay/);
+    const video = await raw(app.port, { path: '/site/launch.mp4' });
+    assert.match(video.headers['content-security-policy'] as string, /media-src 'self'/);
+    assert.equal(video.headers['accept-ranges'], 'bytes');
+    const size = Number(video.headers['content-length']);
+    const head = await raw(app.port, { path: '/site/launch.mp4', headers: { range: 'bytes=0-7' } });
+    assert.equal(head.status, 206, 'Safari plays video only from ranges');
+    assert.equal(head.headers['content-range'], `bytes 0-7/${size}`);
+    assert.equal(head.headers['content-length'], '8');
+    assert.match(head.body, /ftyp/, 'an MP4 starts with its ftyp box');
+    assert.equal((await raw(app.port, { path: '/site/launch.mp4', headers: { range: 'bytes=-4' } })).headers['content-range'], `bytes ${size - 4}-${size - 1}/${size}`);
+    assert.equal((await raw(app.port, { path: '/site/launch.mp4', headers: { range: `bytes=${size}-` } })).status, 416);
+    assert.equal((await raw(app.port, { path: '/site/launch.mp4', headers: { range: 'items=0-1' } })).status, 200, 'unknown range units get the whole file');
     assert.equal((await raw(app.port, { path: '/site/favicon.svg' })).status, 404, 'each file has exactly one URL');
     assert.equal((await raw(app.port, { path: '/site/toString' })).status, 404);
     assert.equal((await raw(app.port, { path: '/site/..%2Fhttp.ts' })).status, 404);

@@ -26,7 +26,8 @@ import { errorCode, errorMessage, errorStack, isAppError } from './lib/errors.ts
 import { safeEqual } from './lib/ids.ts';
 import { createLogger, requestId, type Logger } from './lib/log.ts';
 import { ToolMetrics } from './lib/metrics.ts';
-import { readBody } from './lib/web.ts';
+import { readBody, sendHtml } from './lib/web.ts';
+import { page } from './page.ts';
 import { handleMessage, RPC, rpcError, SERVER_INFO, roomHtml, type JsonRpcResponse } from './mcp.ts';
 import { API_EXPORT_PATH, API_IMPORT_PATH, API_PATH, CLIENT_HEADER, handleCalls, MIN_CLIENT_VERSION, versionAtLeast } from './api/calls.ts';
 import { API_METHODS } from './api/methods.ts';
@@ -365,13 +366,13 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
     if (admin && (await admin.handle(req, res, url))) return;
     if (account && (await account.handle(req, res, url))) return;
 
-    if (req.method === 'GET' && (await serveSite(res, url.pathname, site))) return;
+    if (req.method === 'GET' && (await serveSite(res, url.pathname, site, req.headers.range))) return;
 
     if (url.pathname === '/preview' && req.method === 'GET') {
       // The page itself holds no secrets. With a static token, the page asks for it
       // (kept in sessionStorage), so it never lands in a URL, history or logs.
       if (!config.allowUnauthenticated && !config.staticToken) {
-        return send(res, 404, 'The preview is available locally or with MCPORTAL_TOKEN set.', 'text/plain; charset=utf-8');
+        return sendHtml(res, 404, page('Preview unavailable', '<p>The preview is available locally or with MCPORTAL_TOKEN set.</p><p><a href="/">Go to MCPortal</a></p>'));
       }
       const html = await roomHtml({ dev: true, needsToken: !config.allowUnauthenticated });
       return send(res, 200, html, 'text/html; charset=utf-8', {
@@ -382,7 +383,12 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
     }
 
     if (url.pathname === API_PATH || url.pathname === API_EXPORT_PATH || url.pathname === API_IMPORT_PATH) return stateApi(req, res, url, reqLog);
-    if (url.pathname !== '/mcp') return sendError(res, 404, 'not_found', 'Not found');
+    if (url.pathname !== '/mcp') {
+      if (req.method === 'GET' && !url.pathname.startsWith('/api/') && req.headers.accept?.includes('text/html')) {
+        return sendHtml(res, 404, page('Page not found', '<p>This doorway does not lead to a page.</p><p><a class="button primary" href="/">Go to MCPortal</a></p>', { door: 'shut', kicker: 'Lost in the ether' }));
+      }
+      return sendError(res, 404, 'not_found', 'Not found');
+    }
     const userId = await authenticate(req);
     if (!userId) return unauthorized(res);
     if (req.method !== 'POST') {

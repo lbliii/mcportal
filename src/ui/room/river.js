@@ -1,4 +1,4 @@
-  // room/river.js: the river, every portal merged into one stream (docs/plans/river.md)
+  // room/river.js: the river, every portal merged into one stream (docs/explanation/social.md)
   // ------------------------------------------------------------ river
   // The agent's picks, then what's new, then what you've seen. Each portal keeps its own
   // order and the portals merge by time; the same link from two portals is one story
@@ -15,9 +15,11 @@
   /** Coming back to the river checks for new stories at most this often, and only in portals past their freshness. */
   const RIVER_RECHECK_MS = 5 * 60 * 1000;
   /** Portals that aren't streams of stories (tables of contents, the agent's data): named at the end instead. */
-  const OFF_RIVER = new Set(['docs', 'pinned']);
+  const OFF_RIVER = new Set(['docs', 'pinned', 'people']);
+  /** Portals of people's posts: their stories join the feeds' copies, credited to who shared them. */
+  const SHARE_PORTALS = new Set(['following', 'lobby']);
 
-  /** Someone you follow who shared or reblogged a story: their note, and the post (for reblogging it). @typedef {{ handle: string, note?: string | undefined, share?: Item['share'] }} Sharer */
+  /** Someone who shared or reblogged a story: their note, the post (for reblogging it), and whether you follow them (Lobby posts may be strangers'). @typedef {{ handle: string, note?: string | undefined, share?: Item['share'], followed: boolean }} Sharer */
   /** @typedef {{ key: string, portal: PortalResult, item: Item, also: PortalResult[], shared: Sharer[], why?: string | undefined }} Story */
   /** @typedef {{ picks: Story[], fresh: Story[], seen: Story[] }} RiverStories */
   /** @typedef {{ story: Story } | { fold: Story[], key: string } | { divider: true }} RiverUnit */
@@ -49,10 +51,10 @@
   }
   /** @param {Story} story */
   const storyId = (story) => `${story.portal.portalId}\n${story.item.id}`;
-  /** Who shared an item of a Following portal (its first meta is "@handle"), with their note (its summary). @param {PortalResult} portal @param {Item} item @returns {Sharer | null} */
+  /** Who shared an item of a Following or Lobby portal (its first meta is "@handle"), with their note (its summary). @param {PortalResult} portal @param {Item} item @returns {Sharer | null} */
   function sharerOf(portal, item) {
     const handle = item.meta[0] ?? '';
-    return portal.source === 'following' && handle.startsWith('@') ? { handle: handle.slice(1), note: item.summary, share: item.share } : null;
+    return SHARE_PORTALS.has(portal.source) && handle.startsWith('@') ? { handle: handle.slice(1), note: item.summary, share: item.share, followed: !item.meta.includes('not followed') } : null;
   }
 
   /**
@@ -75,7 +77,7 @@
       if (known) {
         if (sharer) { if (!known.shared.some((s) => s.handle === sharer.handle)) known.shared.push(sharer); }
         // A shared story belongs to its source: the feed's copy takes it over where the share put it.
-        else if (known.portal.source === 'following') Object.assign(known, { portal, item });
+        else if (SHARE_PORTALS.has(known.portal.source)) Object.assign(known, { portal, item });
         else if (known.portal.portalId !== portal.portalId && !known.also.some((p) => p.portalId === portal.portalId)) known.also.push(portal);
         return null;
       }
@@ -222,7 +224,7 @@
     let pos = 0;
     /** @param {Story} story */
     const article = (story) => {
-      const node = watchNew(renderItem(story.item, story.portal, 'story', { color: portalColor(story.portal), why: story.why ?? '', also: story.also.map((p) => p.title), shared: story.shared }), story.item, story.portal);
+      const node = watchNew(renderItem(story.item, story.portal, 'story', { color: portalColor(story.portal), why: story.why ?? '', also: story.also.map((p) => p.title), shared: story.shared, alsoBy: story.shared.length ? '' : state.alsoShared.get(story.key) ?? '' }), story.item, story.portal);
       node.dataset.story = storyId(story);
       node.setAttribute('aria-posinset', String(++pos));
       node.setAttribute('aria-setsize', '-1');

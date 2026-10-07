@@ -103,6 +103,8 @@ export interface SourceConfigs {
   pinned: PinnedConfig;
   clips: ClipsConfig;
   following: LimitConfig;
+  people: LimitConfig;
+  lobby: LimitConfig;
 }
 
 export type SourceConfig = SourceConfigs[SourceKind];
@@ -119,12 +121,24 @@ export interface Profile {
   pins: Record<string, PinnedData>;
   /** False only for a brand-new user who hasn't set up their room yet (shows the welcome). */
   onboarded: boolean;
+  /** The People portal's suggestions and who the user passed on (docs/plans/finding-people.md). Only suggest_people and pass_person change it. */
+  people?: PeopleData;
   updatedAt: string;
 }
 
+/** Someone the agent suggested, in its words: the reason is the agent's, from what they made public. */
+export interface PersonPick { handle: string; why: string; at: string }
+export interface PeopleData {
+  /** Newest first; a suggestion lasts 30 days. */
+  picks: PersonPick[];
+  /** "Not for me", remembered 90 days so find_people can say so. */
+  passed: Array<{ handle: string; at: string }>;
+}
+export const PEOPLE = { picks: 12, passed: 200, why: 200, pickDays: 30, passDays: 90 } as const;
+
 /** Columns scroll sideways, so there can be more than fit on screen. */
 export const LIMITS = { columns: 8, portalsPerColumn: 4, items: 30, saved: 200 } as const;
-export const SOURCES: SourceKind[] = ['hn', 'rss', 'github', 'docs', 'saved', 'pinned', 'clips', 'following'];
+export const SOURCES: SourceKind[] = ['hn', 'rss', 'github', 'docs', 'saved', 'pinned', 'clips', 'following', 'people', 'lobby'];
 
 /** A profile, layout or source config that fails validation. Defaults to invalid_argument; pass a code when it's something else. */
 export class ProfileError extends AppError {
@@ -195,6 +209,8 @@ const fetchLimit = (config: Record<string, unknown>) => clampInt(config.limit, 1
 const NORMALIZERS: { [S in SourceKind]: Normalizer<S> } = {
   saved: itemsLimit,
   following: itemsLimit,
+  people: itemsLimit,
+  lobby: itemsLimit,
   clips(config, where) {
     if (config.kind !== undefined && !(CLIP_KINDS as readonly unknown[]).includes(config.kind)) throw new ProfileError(`${where}: clips kind must be one of ${CLIP_KINDS.join(', ')}`);
     const tag = typeof config.tag === 'string' ? config.tag.toLowerCase().replace(/^#/, '').replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 30) : '';
@@ -306,7 +322,33 @@ export function validateProfile(input: unknown, now = new Date()): Profile {
   const onboarded = input.onboarded !== false;
   const pinnedIds = columns.flatMap((c) => c.panels).filter((p) => p.source === 'pinned').map((p) => p.id);
   const pins = normalizePins(input.pins, pinnedIds, now);
-  return { version: 1, name, layout, openIn, columns, saved: normalizeSaved(input.saved, now), pins, onboarded, updatedAt: now.toISOString() };
+  const people = normalizePeople(input.people, now);
+  return { version: 1, name, layout, openIn, columns, saved: normalizeSaved(input.saved, now), pins, onboarded, ...(people ? { people } : {}), updatedAt: now.toISOString() };
+}
+
+/** Suggestions and passes: valid handles only, the reason cleaned, expired ones dropped, one per handle, capped. */
+export function normalizePeople(raw: unknown, now = new Date()): PeopleData | undefined {
+  if (!isRecord(raw)) return undefined;
+  const day = 86_400_000;
+  const when = (v: unknown) => (typeof v === 'string' && !Number.isNaN(Date.parse(v)) ? new Date(v) : undefined);
+  const handleOf = (v: unknown) => (typeof v === 'string' && /^[a-z0-9_]{2,30}$/.test(v) ? v : undefined);
+  const picks: PersonPick[] = [];
+  for (const e of Array.isArray(raw.picks) ? raw.picks : []) {
+    if (!isRecord(e)) continue;
+    const handle = handleOf(e.handle), at = when(e.at), why = clean(e.why, PEOPLE.why);
+    if (!handle || !at || !why || now.getTime() - at.getTime() > PEOPLE.pickDays * day || picks.some((p) => p.handle === handle)) continue;
+    picks.push({ handle, why, at: at.toISOString() });
+    if (picks.length >= PEOPLE.picks) break;
+  }
+  const passed: PeopleData['passed'] = [];
+  for (const e of Array.isArray(raw.passed) ? raw.passed : []) {
+    if (!isRecord(e)) continue;
+    const handle = handleOf(e.handle), at = when(e.at);
+    if (!handle || !at || now.getTime() - at.getTime() > PEOPLE.passDays * day || passed.some((p) => p.handle === handle)) continue;
+    passed.push({ handle, at: at.toISOString() });
+    if (passed.length >= PEOPLE.passed) break;
+  }
+  return picks.length || passed.length ? { picks, passed } : undefined;
 }
 
 /** Keep pinned items only for pinned portals that exist; an unknown id gets none. */
@@ -409,6 +451,41 @@ function locate(profile: Profile): Map<string, { column: number; index: number; 
   return map;
 }
 
+/**
+ * The portals that moved, as a person would say it: the fewest portals whose moving explains the
+ * new layout. Portals that only shifted because others were added, removed or moved around them,
+ * or because an emptied column closed up, didn't move. Read every column top to bottom, left to
+ * right: the portals that keep their order (the longest run in common, preferring portals still in
+ * their old column) stayed put; the rest moved. Of two neighbours that stayed in order but are now
+ * split into, or joined in, one column, the one whose column number changed moved.
+ */
+function movedPortals(before: Profile, after: Profile, a: ReturnType<typeof locate>, b: ReturnType<typeof locate>): Set<string> {
+  const order = (p: Profile, other: ReturnType<typeof locate>) => p.columns.flatMap((c) => c.panels.map((portal) => portal.id)).filter((id) => other.has(id));
+  const was = order(before, b);
+  const now = order(after, a);
+  const weight = (id: string) => (a.get(id)!.column === b.get(id)!.column ? 2 : 1);
+  // Heaviest common subsequence: best[i][j] for was[i..] and now[j..].
+  const best = Array.from({ length: was.length + 1 }, () => new Array<number>(now.length + 1).fill(0));
+  for (let i = was.length - 1; i >= 0; i--) {
+    for (let j = now.length - 1; j >= 0; j--) {
+      best[i]![j] = was[i] === now[j] ? weight(was[i]!) + best[i + 1]![j + 1]! : Math.max(best[i + 1]![j]!, best[i]![j + 1]!);
+    }
+  }
+  const kept: string[] = [];
+  for (let i = 0, j = 0; i < was.length && j < now.length;) {
+    if (was[i] === now[j]) { kept.push(was[i]!); i++; j++; }
+    else if (best[i + 1]![j]! >= best[i]![j + 1]!) i++;
+    else j++;
+  }
+  const moved = new Set(was.filter((id) => !kept.includes(id)));
+  for (let k = 1; k < kept.length; k++) {
+    const [x, y] = [kept[k - 1]!, kept[k]!];
+    const together = (m: ReturnType<typeof locate>) => m.get(x)!.column === m.get(y)!.column;
+    if (together(a) !== together(b)) moved.add(a.get(y)!.column !== b.get(y)!.column ? y : x);
+  }
+  return moved;
+}
+
 /** What changed between two layouts, by portal id. */
 export function diffProfiles(before: Profile, after: Profile): ProfileDiff {
   const a = locate(before);
@@ -421,13 +498,14 @@ export function diffProfiles(before: Profile, after: Profile): ProfileDiff {
     const was = before.columns[i];
     if (was && was.width !== c.width) diff.settings.push(`column ${i + 1} width ${was.width} → ${c.width}`);
   });
+  const moved = movedPortals(before, after, a, b);
   for (const [id, was] of a) {
     const now = b.get(id);
     if (!now) {
       diff.removed.push(id);
       continue;
     }
-    if (was.column !== now.column || was.index !== now.index) diff.moved.push(`${id} (column ${was.column + 1} → ${now.column + 1})`);
+    if (moved.has(id)) diff.moved.push(`${id} (column ${was.column + 1} → ${now.column + 1})`);
     if ((was.portal.title ?? '') !== (now.portal.title ?? '')) diff.retitled.push(id);
     if (JSON.stringify(was.portal.config) !== JSON.stringify(now.portal.config) || was.portal.source !== now.portal.source) diff.reconfigured.push(id);
   }

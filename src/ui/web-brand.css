@@ -1,0 +1,33 @@
+/* Standalone web identity. Same paper, ink, outlined lockup and type as the site. */
+:root,:root[data-theme],:root:not([data-theme]) {
+  --mp-surface-canvas: var(--mp-web-canvas);
+  --mp-surface-card: var(--mp-web-card);
+  --mp-text-primary: var(--mp-web-text);
+  --mp-text-secondary: var(--mp-web-secondary);
+  --mp-text-link: var(--mp-web-link);
+}
+html { color-scheme: light dark; }
+body.web-page { margin: 0; min-height: 100vh; min-height: 100svh; display: flex; flex-direction: column; background: var(--mp-surface-canvas); color: var(--mp-text-primary); font: var(--mp-type-16)/var(--mp-line-body) var(--mp-font-ui); }
+.web-wrap { width: 100%; max-width: 1080px; margin: 0 auto; padding: 0 var(--mp-space-24); }
+.web-masthead { flex: none; background: var(--mp-web-night); color: var(--mp-brand-paper); border-bottom: 4px solid var(--mp-brand-teal); }
+.web-masthead .web-wrap { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--mp-space-16); padding-top: var(--mp-space-24); padding-bottom: var(--mp-space-24); }
+.web-logo { display: inline-flex; padding: var(--mp-space-8); margin: -8px; border-radius: var(--mp-radius-control); }
+.web-logo:focus-visible { outline-color: var(--mp-brand-mustard) !important; }
+.web-logo svg { display: block; width: 180px; height: auto; max-width: 100%; }
+.web-tagline { font: 700 var(--mp-type-16)/1.3 var(--mp-font-heading); }
+.web-footer { flex: none; color: var(--mp-text-secondary); border-top: 1px solid var(--mp-border-divider); font-size: var(--mp-type-13); }
+.web-footer .web-wrap { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--mp-space-16); padding-top: var(--mp-space-20); padding-bottom: var(--mp-space-20); }
+.web-footer nav { display: flex; flex-wrap: wrap; gap: var(--mp-space-16); }
+.web-footer a { display: inline-flex; align-items: center; min-height: var(--mp-control-height); }
+.web-main { flex: 1; width: 100%; }
+@media (max-width: 480px) {
+  .web-wrap { padding-left: var(--mp-space-20); padding-right: var(--mp-space-20); }
+  .web-masthead .web-wrap { gap: var(--mp-space-8); }
+  .web-logo svg { width: 156px; }
+  .web-tagline { font-size: var(--mp-type-13); }
+}
+@media (forced-colors: active) {
+  .web-masthead { background: Canvas; color: CanvasText; border-color: CanvasText; }
+  .web-logo { background: #1F2A36; forced-color-adjust: none; }
+  .web-logo:focus-visible { outline-color: Highlight !important; }
+}

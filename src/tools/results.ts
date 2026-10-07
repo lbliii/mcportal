@@ -10,7 +10,7 @@ import type { Clip, ClipSummary } from '../clips.ts';
 import type { FetchedSource, SourceCandidate } from '../discover.ts';
 import type { Profile, ProfileDiff, SourceSettings } from '../profile.ts';
 import type { FeaturedSource, PublicProfile } from '../public-profiles.ts';
-import type { Reblogger, SharedItem } from '../social.ts';
+import type { Intros, PersonMatch, Reblogger, SharedItem } from '../social.ts';
 import type { Handoff } from '../handoffs.ts';
 import type { Candidate, HighlightPick, Lead, RoomEdition } from '../highlights.ts';
 import type { ReadingState } from '../reading.ts';
@@ -35,6 +35,10 @@ export type RoomResult = {
   lead?: Lead;
   /** Labs this server has on (src/labs.ts), so the room can offer them. */
   labs?: string[];
+  /** Space links, said once: people to offer a follow of, and newcomers who joined through the user's link. */
+  intros?: Intros;
+  /** Stories in the room that a listed person the user doesn't follow shared with everyone: one handle per story's link. */
+  alsoShared?: Array<{ url: string; handle: string }>;
 };
 
 /** After a save or unsave: the saved list, the room, and the Saved portal redrawn. */
@@ -60,7 +64,7 @@ export type DocsPageResult = {
 
 /** Someone's space: their public profile, their posts and the sources they recommend. */
 export type SpaceResult = {
-  space: Omit<PublicProfile, 'accountId'> & { mine: boolean; followers: number; following: boolean; posts: SharedItem[]; sources: FeaturedSource[] };
+  space: Omit<PublicProfile, 'accountId'> & { mine: boolean; followers: number; following: boolean; posts: SharedItem[]; sources: FeaturedSource[]; link?: string };
 };
 
 export type ToolResults = {
@@ -88,6 +92,9 @@ export type ToolResults = {
   clip: { clip: ClipSummary; profile: Profile; layoutChanged: boolean; portals: PortalResult[] };
   open_space: SpaceResult;
   /** labs: the server's, so a card offers what the room would. */
+  find_people: { people: Array<PersonMatch & { reasons: string[]; passed?: true }> };
+  suggest_people: { suggested: { portal: PortalResult }; profile: Profile; layoutChanged: boolean };
+  pass_person: { profile: Profile };
   get_share: { share: SharedItem; rebloggers?: Reblogger[]; labs?: string[] };
   share: { share: SharedItem };
   share_settings: { share: SharedItem };

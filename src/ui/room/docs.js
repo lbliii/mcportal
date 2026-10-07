@@ -190,12 +190,16 @@
     setStatus('');
   }
 
-  /** @param {string} url @param {boolean} withBack @param {string} [title] */
-  function readerTop(url, withBack, title) {
+  /**
+   * The reader's own row: back, the original, save, reblog, a new chat.
+   * @param {string} url @param {boolean} withBack @param {string} [title] @param {ReblogTarget} [reblog] the post behind a story, else its link
+   */
+  function readerTop(url, withBack, title, reblog) {
     const toolbar = el('div', { class: 'reader-top', role: 'group', 'aria-label': 'Reader controls' },
       iconButton('back', withBack ? 'Back to your room' : 'Open your room', closeReader, 'ib'),
       url ? iconButton('external', 'Open the original', () => openLink(url), 'ib') : null,
       title ? saveButton({ url, title }, 'reader', 'ib save') : null,
+      title && url ? reblogButton(reblog ?? { key: `url:${url}`, url, title, item: { id: url, url, title, meta: [] }, count: 0, canReblog: true }, 'ib reblog') : null,
       title && (DEV || hostCapabilities.serverTools) ? iconButton('chat', 'Send to a new chat', () => sendToNewChat(null), 'ib') : null);
     trackReaderToolbar(toolbar);
     return toolbar;

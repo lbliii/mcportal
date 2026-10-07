@@ -26,7 +26,7 @@ export interface SocialStore {
   reblogsBy(accountId: string, rootIds: string[]): Promise<Map<string, string>>;
   /** Set (or with null, clear) a post's reblog rule or detached time. False when there's no such post. */
   updateShare(id: string, change: { reblogs?: Share['reblogs'] | null; detachedAt?: string | null }): Promise<boolean>;
-  /** a follows/mutes/blocks b. */
+  /** a follows/mutes/blocks b, or a Space-link note (Relation). */
   relate(relation: Relation, a: string, b: string): Promise<boolean>;
   unrelate(relation: Relation, a: string, b: string): Promise<boolean>;
   /** Everyone a follows/mutes/blocks. */
@@ -70,7 +70,7 @@ export class DocumentSocialStore implements SocialStore {
   constructor(persistence: AuthPersistence = memoryPersistence()) {
     this.doc = new SharedDocument<Doc>(persistence, 'social', (d) => ({
       shares: d.shares ?? [],
-      relations: { follows: [], mutes: [], blocks: [], ...d.relations },
+      relations: { follows: [], mutes: [], blocks: [], intros: [], joins: [], ...d.relations },
       reports: d.reports ?? [],
     }), { maxAgeMs: DOCUMENT_MAX_AGE_MS });
   }
