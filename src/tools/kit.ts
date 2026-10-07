@@ -7,11 +7,12 @@
  * coded tool error and anything else into `internal`, logged with its stack.
  */
 import { randomBytes } from 'node:crypto';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { ACTIVE_LABS } from '../labs.ts';
 import type { Action, Actor } from '../access.ts';
 import type { ClipStore } from '../clips.ts';
 import type { UsageBudget } from '../lib/budget.ts';
-import { AppError, ERROR_CODES, isAppError, type ErrorCode } from '../lib/errors.ts';
+import { AppError, ERROR_CODES, errorCode, isAppError, type ErrorCode } from '../lib/errors.ts';
 import type { Logger } from '../lib/log.ts';
 import type { ToolMetrics } from '../lib/metrics.ts';
 import { clean } from '../lib/text.ts';
@@ -167,13 +168,31 @@ export interface Reach {
 
 export const hasSocial = (ctx: ToolContext): boolean => Boolean(ctx.social && ctx.publicProfiles);
 
-/** The caller's reach (one profile read and, for an account without a handle, one relations read). */
+/** How long tools/list waits for a linked MCPortal's hosted account before listing everything. */
+const LINKED_REACH_MS = 3_000;
+
+/**
+ * The caller's reach (one profile read and, for an account without a handle, one
+ * relations read). A linked MCPortal reads it from the hosted account, which may be
+ * down, slow or signed out: then every tool is listed, and a call says what's wrong,
+ * rather than the host getting no tools at all.
+ */
 export async function reachOf(ctx: ToolContext): Promise<Reach> {
   const link = !ctx.link ? 'none' : ctx.link.linked ? 'linked' : 'unlinked';
   const labs = labsOf(ctx);
   if (!ctx.social || !ctx.publicProfiles) return { social: 'none', link, labs };
-  if (await ctx.publicProfiles.get(ctx.userId)) return { social: 'active', link, labs };
-  return { social: (await ctx.social.uses(ctx.userId)) ? 'active' : 'new', link, labs };
+  if (link !== 'linked') return { social: await socialReach(ctx), link, labs };
+  const read = socialReach(ctx).catch((error: unknown) => {
+    ctx.log?.warn('link.reach_failed', { code: errorCode(error) });
+    return 'active' as const;
+  });
+  const social = await Promise.race([read, sleep(LINKED_REACH_MS, 'active' as const, { ref: false })]);
+  return { social, link, labs };
+}
+
+async function socialReach(ctx: ToolContext): Promise<'active' | 'new'> {
+  if (await ctx.publicProfiles!.get(ctx.userId)) return 'active';
+  return (await ctx.social!.uses(ctx.userId)) ? 'active' : 'new';
 }
 
 /**

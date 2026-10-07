@@ -14,7 +14,7 @@ import { open, readFile, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { AppError } from '../lib/errors.ts';
 import { atomicWrite } from '../lib/files.ts';
-import type { LinkAuth } from './client.ts';
+import { MOVED, moved, SIGNED_OUT, type LinkAuth } from './client.ts';
 
 export interface LinkRecord {
   version: 1;
@@ -120,6 +120,12 @@ export class FileLinkAuth implements LinkAuth {
     const record = await this.link.read();
     if (!record) throw new AppError('unauthenticated', 'This MCPortal is not signed in.');
     if (record.expiresAt - this.now() > EARLY_MS) return record.accessToken;
+    // An expired token with a refused refresh would only be refused again.
+    if (record.expiresAt <= this.now()) {
+      const fresh = await this.refresh(record.accessToken);
+      if (!fresh) throw new AppError('unauthenticated', SIGNED_OUT);
+      return fresh;
+    }
     return (await this.refresh(record.accessToken)) ?? record.accessToken;
   }
 
@@ -136,11 +142,12 @@ export class FileLinkAuth implements LinkAuth {
           method: 'POST',
           headers: { 'content-type': 'application/x-www-form-urlencoded' },
           body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: record.refreshToken, client_id: record.clientId }).toString(),
-          redirect: 'error', signal: AbortSignal.timeout(15_000),
+          redirect: 'manual', signal: AbortSignal.timeout(15_000),
         });
       } catch (error) {
         throw new AppError('upstream_unreachable', "Can't reach your hosted MCPortal right now, so nothing was changed. Check the connection and try again.", { cause: error });
       }
+      if (moved(res.status)) throw new AppError('unauthenticated', MOVED);
       if (!res.ok) return undefined;
       const tokens = await res.json() as { access_token?: unknown; refresh_token?: unknown; expires_in?: unknown };
       if (typeof tokens.access_token !== 'string' || typeof tokens.refresh_token !== 'string') return undefined;
