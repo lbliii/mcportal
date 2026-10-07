@@ -9,7 +9,9 @@ import { DESIGN_CSS, PRIMITIVES_CSS } from './design/generated.ts';
  * The privacy policy describes what this software stores and sends. It applies to
  * whoever runs the server; MCPORTAL_OPERATOR names them on the pages.
  */
-import { readFile } from 'node:fs/promises';
+import { stat } from 'node:fs/promises';
+import { createReadStream } from 'node:fs';
+import { pipeline } from 'node:stream/promises';
 import type { ServerResponse } from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { escapeHtml } from './lib/web.ts';
@@ -442,20 +444,21 @@ export async function serveSite(res: ServerResponse, pathname: string, site: Sit
   }
   const asset = Object.hasOwn(FILES, pathname) ? FILES[pathname] : undefined;
   if (asset) {
-    const data = await readFile(IMAGE_DIR + asset.file).catch(() => undefined);
-    if (!data) return false;
+    // Stream from disk rather than reading the whole file: a video player asks for many small ranges.
+    const path = IMAGE_DIR + asset.file;
+    const size = await stat(path).then((s) => s.size, () => undefined);
+    if (size === undefined) return false;
     const headers = { 'content-type': asset.type, 'cache-control': `public, max-age=${asset.maxAge}`, 'accept-ranges': 'bytes', ...HEADERS };
-    const bytes = range === undefined ? undefined : byteRange(range, data.length);
+    const bytes = range === undefined ? undefined : byteRange(range, size);
     if (bytes === null) {
-      res.writeHead(416, { ...headers, 'content-range': `bytes */${data.length}` });
+      res.writeHead(416, { ...headers, 'content-range': `bytes */${size}` });
       res.end();
-    } else if (bytes) {
-      res.writeHead(206, { ...headers, 'content-range': `bytes ${bytes.start}-${bytes.end}/${data.length}`, 'content-length': bytes.end - bytes.start + 1 });
-      res.end(data.subarray(bytes.start, bytes.end + 1));
-    } else {
-      res.writeHead(200, { ...headers, 'content-length': data.length });
-      res.end(data);
+      return true;
     }
+    const { start, end } = bytes ?? { start: 0, end: size - 1 };
+    res.writeHead(bytes ? 206 : 200, { ...headers, 'content-length': end - start + 1, ...(bytes && { 'content-range': `bytes ${start}-${end}/${size}` }) });
+    if (size === 0) { res.end(); return true; }
+    await pipeline(createReadStream(path, { start, end }), res).catch(() => res.destroy());
     return true;
   }
   return false;
