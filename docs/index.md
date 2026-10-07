@@ -6,7 +6,7 @@ Pick the kind of page that fits what you're doing: learning, getting a task done
 
 For newcomers who want to see MCPortal work.
 
-- [Getting started](tutorials/getting-started.md): install the plugin, build a room, read, save and clip.
+- [Getting started](tutorials/getting-started.md): install the plugin, build a room, read, save and clip, and open a project's docs.
 
 ## How-to guides: get a task done
 

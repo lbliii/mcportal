@@ -167,7 +167,7 @@ test('public pages: landing, privacy and support render without scripts; images 
     assert.match(terms, /at least 13/);
     assert.match(terms, /run by A &lt;b&gt;Person&lt;\/b&gt;/);
     assert.match((await raw(app.port, { path: '/' })).body, /http:\/\/localhost\/mcp/);
-    assert.equal((await raw(app.port, { path: '/site/columns.png' })).status, 200);
+    assert.equal((await raw(app.port, { path: '/site/chat-room.png' })).status, 200);
     const landing = (await raw(app.port, { path: '/' })).body;
     assert.match(landing, /<h1>Your liminal <span>webspace\.<\/span><\/h1>/);
     assert.match(landing, /<img class="art" src="\/site\/hero\.svg" alt=""/, 'the hero art is decorative');

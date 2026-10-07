@@ -94,6 +94,7 @@ The [architecture explanation](docs/explanation/architecture.md) covers how the 
 - **Avoid new runtime dependencies.** Locally MCPortal has none; the hosted server adds only `pg`. Raise a new one in an issue first.
 - **The tool interface is a public contract.** Read the [compatibility policy](docs/how-to/release.md#compatibility) before renaming or changing a tool.
 - **The fetch and OAuth boundaries** stay consistent with the [security model](docs/explanation/security.md).
+- **Screenshots** on the landing page and in the README come from `node scripts/screenshots.ts`: each is a chat turn with the real room in an MCP Apps frame, captured by headless Chrome. It fetches feeds and docs live, so retake them when the UI changes visibly, and check that each agent reply still matches the page it shows. `--serve` lets you look before capturing.
 
 ## Before you open a pull request
 

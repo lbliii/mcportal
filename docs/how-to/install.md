@@ -86,7 +86,9 @@ Use this in hosts that let you add a custom connector by URL, such as Claude on 
 2. Your host sends you to MCPortal's consent screen, then to GitHub to sign in.
 3. Ask "open my room".
 
-The hosted service may be invite-only. If sign-in says your account isn't allowed, ask for an invite on the service's [support page](https://mcportal.lol/support).
+Anyone with a GitHub account can sign in. A [self-hosted](self-host.md) server may be invite-only; if sign-in there says your account isn't allowed, ask whoever runs it for an invite.
+
+Some networks' DNS filters block newly registered domains, `mcportal.lol` among them. If your host can't reach the URL, ask your network admin to allow it, or install locally in the meantime.
 
 If your organization blocks custom connectors, install locally and [sign in](#ghost-mode-or-signed-in) from there.
 

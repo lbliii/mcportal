@@ -5,7 +5,19 @@
 ### Fixes
 - **A linked MCPortal whose hosted side is down still starts:** `initialize` and `tools/list` answer at once (the listing waits at most 3 seconds for the account), and a request that fails gets an error reply instead of leaving the host waiting until it gives up on MCPortal. Tools that need the account return `upstream_unreachable`.
 - **A sign-in that's gone says so:** a refused refresh, or a hosted MCPortal that has moved (421 or a redirect), returns `unauthenticated` with "sign in again" (`unlink_account`, then `link_account`) instead of "can't reach". Tokens are never sent on to a redirect's target.
-- **`link_account` signs in to https://mcportal.lol** by default, where the hosted MCPortal now lives (`MCPORTAL_HOSTED_URL` still overrides it). The install guide, security policy, manifest and registry listing point there too.
+
+### Docs from a repo
+- **Nested docs folders read as one:** in a GitHub docs folder without an outline file, pages in deeper folders stay together inside their section, each folder led by its index, and their titles name the folder ("Projects › Workspaces"). Before, every folder's index was a bare "Overview" and the folders' pages were mixed. File names like `cli.md` and `http.md` read as "CLI" and "HTTP".
+
+### Arranging
+- **"Changes:" names only what moved:** `arrange_room`'s reply (and its `changes.moved`) lists the portals that were moved, not the ones that only shifted because others moved above them or an emptied column closed up. "Put GitHub on the left" now reports `moved: gh (column 3 → 1)` alone.
+
+### The hosted service is at mcportal.lol
+- `link_account` signs a local MCPortal in to `https://mcportal.lol` by default (`MCPORTAL_HOSTED_URL`); the old `mcportal-production.up.railway.app` address answers 421. The directory listing (`server.json`, `manifest.json`), security policy and install guide use the new address.
+
+### Landing page, README and docs
+- New screenshots show MCPortal in a chat: building a room by asking, reading and clipping an article, reading the uv docs straight from GitHub, and reblogging in the river. `scripts/screenshots.ts` takes them from the real room UI with live feeds; the old columns, shelves and reader shots are gone.
+- The landing page has sections for docs and for sharing (Spaces, follows, reblogs, finding people). The tutorial adds a step for opening a project's docs and says what signing in adds. The tool reference covers `find_people`, `suggest_people`, `pass_person`, `listed` and the Lobby source. Docs no longer say the hosted service is invite-only.
 
 ## v0.9.0 — 2026-10-07
 
