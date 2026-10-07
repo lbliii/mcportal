@@ -61,9 +61,16 @@ function runStdio(contextFor: () => Promise<ToolContext>): void {
           return;
         }
         const lineCtx = { ...base, log: log.child({ req: requestId() }), toolsChanged: stdioToolsChanged };
+        // Every request gets an answer: a host left waiting gives up on the whole server.
+        const answer = (m: unknown) => handleMessage(m, lineCtx).catch((error: unknown) => {
+          const ref = requestId();
+          lineCtx.log.error('stdio.message_failed', { ref, error: errorStack(error) });
+          const id = typeof m === 'object' && m !== null && 'id' in m ? (m as { id: string | number | null }).id : undefined;
+          return id === undefined ? null : rpcError(id, RPC.internal, `MCPortal couldn't answer that (reference ${ref}); see the logs.`);
+        });
         response = Array.isArray(payload)
-          ? (await Promise.all(payload.slice(0, 20).map((m) => handleMessage(m, lineCtx)))).filter((r): r is JsonRpcResponse => r !== null)
-          : await handleMessage(payload, lineCtx);
+          ? (await Promise.all(payload.slice(0, 20).map(answer))).filter((r): r is JsonRpcResponse => r !== null)
+          : await answer(payload);
       }
       if (response && (!Array.isArray(response) || response.length)) process.stdout.write(`${JSON.stringify(response)}\n`);
     })();

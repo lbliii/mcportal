@@ -21,7 +21,7 @@ export interface LinkAuth {
 }
 
 export interface StateClientOptions {
-  /** The hosted MCPortal, e.g. https://mcportal-production.up.railway.app */
+  /** The hosted MCPortal, e.g. https://mcportal.lol */
   server: string;
   auth: LinkAuth;
   /** Defaults to the global fetch (keep-alive). */
@@ -36,6 +36,13 @@ type Pending = { method: string; params: Record<string, unknown>; resolve: (valu
 type Result = { id: number; result?: unknown; error?: { code: string; message: string; details?: Record<string, string | number | boolean> } };
 
 const UNREACHABLE = "Can't reach your hosted MCPortal right now, so nothing was changed. Check the connection and try again.";
+/** The grant is gone (revoked, signed out elsewhere, refresh refused). */
+export const SIGNED_OUT = 'This computer is no longer signed in to your hosted MCPortal. Sign in again to keep using it: unlink_account, then link_account.';
+/** The host in link.json no longer serves MCPortal (it moved): 421, or a redirect, which a token never follows. */
+export const MOVED = 'Your hosted MCPortal has moved, so this computer\'s sign-in no longer works. Sign in again to keep using it: unlink_account, then link_account.';
+
+/** The server at this origin isn't the MCPortal this computer signed in to any more. */
+export const moved = (status: number): boolean => status === 421 || (status >= 300 && status < 400);
 
 export class StateClient {
   private queue: Pending[] = [];
@@ -110,7 +117,7 @@ export class StateClient {
         res = await this.fetch(new URL(pathAndQuery, this.options.server), {
           ...init,
           headers: { ...init.headers, authorization: `Bearer ${token}`, [CLIENT_HEADER]: this.options.version ?? SERVER_INFO.version },
-          redirect: 'error', signal: AbortSignal.timeout(timeoutMs),
+          redirect: 'manual', signal: AbortSignal.timeout(timeoutMs),
         });
       } catch (error) {
         throw new AppError('upstream_unreachable', UNREACHABLE, { cause: error });
@@ -122,7 +129,8 @@ export class StateClient {
       }
       if (res.ok) return res;
       const json = await res.json().catch(() => ({})) as { error?: string; error_description?: string };
-      if (res.status === 401) throw new AppError('unauthenticated', 'This computer is no longer signed in to your hosted MCPortal. Sign in again to keep using it.');
+      if (res.status === 401) throw new AppError('unauthenticated', SIGNED_OUT);
+      if (moved(res.status)) throw new AppError('unauthenticated', MOVED);
       if (res.status === 426) throw new AppError('unavailable', clean(json.error_description) ?? 'Update MCPortal to keep using your linked portal.');
       if (res.status === 429) throw new AppError('rate_limited', 'Your hosted MCPortal is busy; try again in a minute.');
       if (res.status === 400 && json.error && Object.hasOwn(ERROR_CODES, json.error)) throw new AppError(knownCode(json.error), clean(json.error_description) ?? 'Your hosted MCPortal refused that.');

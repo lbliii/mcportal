@@ -113,7 +113,7 @@ test('refresh-token redirects fail before credentials reach another endpoint', a
   try {
     const link = new LinkFile(dir);
     await link.write({ version: 1, server: `http://127.0.0.1:${(source.address() as AddressInfo).port}`, accountId: 'alice', clientId: 'client', accessToken: 'access', refreshToken: 'private-refresh', expiresAt: 0, linkedAt: '' });
-    await assert.rejects(new FileLinkAuth(link).refresh('access'), /Can't reach/);
+    await assert.rejects(new FileLinkAuth(link).refresh('access'), /has moved.*Sign in again/);
     assert.equal(redirectedCalls, 0, 'the refresh request and credentials never follow the redirect');
     assert.equal((await link.read())?.refreshToken, 'private-refresh', 'failed refresh preserves the link');
   } finally {

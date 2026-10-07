@@ -28,7 +28,7 @@ import { signInFailure, type SignInFailure } from './signin-errors.ts';
 import { linkedStores } from './stores.ts';
 
 /** The hosted MCPortal a local one signs in to (MCPORTAL_HOSTED_URL to use another). */
-export const DEFAULT_HOSTED_URL = 'https://mcportal-production.up.railway.app';
+export const DEFAULT_HOSTED_URL = 'https://mcportal.lol';
 
 /** What tools see of the link (ctx.link): whether this MCPortal is signed in, and the two actions. */
 export interface LinkControl {
