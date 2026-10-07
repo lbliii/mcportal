@@ -165,6 +165,8 @@
       const minutes = Math.max(1, Math.round((page.wordCount || 0) / 230));
       const how = docsState.key.portalId ? `portalId "${docsState.key.portalId}"` : `docs "${String(docsState.key.docs).slice(0, 300)}"`;
       const body = passageSource(blockNodes(page.blocks, onLink), page.url, page.title, `Use read_doc_page with that url and ${how} for the rest of the page.`);
+      const title = el('h1', null, page.title);
+      readerTools(top, body, title);
       const heads = logicalBlocks(body).filter((node) => /^H[234]$/.test(node.tagName));
       if (heads.length > 1) {
         const outline = readerOutline(heads, body);
@@ -173,7 +175,7 @@
       }
       column.replaceChildren(top,
         el('div', { class: 'docs-crumb' }, [docsState.site.title, section].filter(Boolean).join(' › ')),
-        el('h1', null, page.title),
+        title,
         el('div', { class: 'byline' }, `${minutes} min read`),
         body,
         pager,
@@ -219,6 +221,7 @@
    * @param {string} url @param {boolean} withBack @param {string} [title] @param {ReblogTarget} [reblog] the post behind a story, else its link
    */
   function readerTop(url, withBack, title, reblog) {
+    $('reader').style.removeProperty('--mp-reader-width');
     const toolbar = el('div', { class: 'reader-top', role: 'group', 'aria-label': 'Reader controls' },
       iconButton('back', withBack ? 'Back to your room' : 'Open your room', closeReader, 'ib'),
       url ? iconButton('external', 'Open the original', () => openLink(url), 'ib') : null,

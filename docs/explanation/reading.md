@@ -17,6 +17,10 @@ Two more rules follow:
 
 `read_article` turns a page into clean blocks: headings with levels and anchors, paragraphs, nested and numbered lists, code with its language, tables, callouts, quotes, figures with captions, and links and emphasis as inline spans. The output is data, not HTML, so the room builds it with text nodes and the agent treats it as content.
 
+Articles and docs pages share two reading controls. **Find** searches the title and rendered page text, including code and table cells. It shows the match count; Previous/Next and Enter/Shift+Enter move through matches. Ctrl+F or Command+F opens it when focus is inside the reader. Escape closes it and returns focus to Find. Docs index search remains a separate search of page titles and symbols.
+
+**Reading** offers Standard, Large and Larger text, with Comfortable or Focused line widths and Reset. Choices carry across article and docs navigation within the current open card or preview session; a newly opened card starts at the defaults. Settings and find queries stay in the view and are not sent to tools or saved in the profile. Changing typography keeps the visible content block in place where the scroll range permits.
+
 Getting there takes a few bounded passes over the page:
 
 1. **Tokenize** with a linear-time HTML tokenizer. Hostile input costs O(n), never O(n²). Named entities are decoded with a bounded table.

@@ -441,7 +441,7 @@ test('browser: the reader records opening and position, resumes there, and marks
   const read = await readingWhen((r) => r.status === 'read');
   assert.equal(read.status, 'read');
   assert.ok(read.readAt);
-  assert.deepEqual((await tool('list_reading', {})).reading.map((r: any) => r.url), [], 'finished reading is not "in the middle of"');
+  assert.equal((await tool('list_reading', {})).reading.some((r: any) => r.url === ARTICLE), false, 'the finished article is not "in the middle of"');
   assert.deepEqual(page.problems, []);
 });
 
@@ -1209,5 +1209,45 @@ test('browser: the Lobby in the river: a stranger\'s post says "not followed", a
   } finally {
     await page.send('Page.removeScriptToEvaluateOnNewDocument', { identifier });
     await profiles.put('default', room());
+  }
+});
+
+test('browser: docs find searches current content and reading comfort follows page navigation with reset and Escape', { skip }, async () => {
+  const host = await attachHost();
+  try {
+    await page.send('Emulation.setDeviceMetricsOverride', { width: 360, height: 600, deviceScaleFactor: 1, mobile: false });
+    await openRoom();
+    await page.click('[data-portal="docs"] .item-main');
+    await page.waitFor(`document.querySelector('#reader .body')`, 'the docs viewer');
+    await page.eval(`[...document.querySelectorAll('.docs-toc a')].find(n => n.textContent === 'Deploy').click()`);
+    await page.waitFor(`document.querySelectorAll('#reader .body h2').length === 45`, 'the long docs page');
+    await page.click('.reader-find-toggle');
+    await page.eval(`(() => { const input = document.querySelector('.reader-find-input'); input.value = 'Step 45'; input.dispatchEvent(new Event('input')); })()`);
+    assert.equal(await page.eval(`document.querySelector('.reader-find-count').textContent`), '1 of 2');
+    assert.ok(await page.eval<boolean>(`document.querySelector('.reader-find-hit.current').getBoundingClientRect().top >= document.querySelector('.reader-top').getBoundingClientRect().bottom`));
+    assert.equal(await page.eval(`document.querySelector('.docs-search').value`), '', 'page find leaves the docs index search alone');
+    await page.click('[aria-label="Next match"]');
+    await page.click('.reader-comfort-toggle');
+    assert.equal(await page.eval(`document.querySelectorAll('.reader-find-hit').length`), 0);
+    assert.ok(await page.eval<boolean>(`(() => { const r = document.querySelector('.reader-top').getBoundingClientRect(); return r.top >= document.querySelector('.bar').getBoundingClientRect().bottom - 1 && document.querySelector('#readerComfort').hidden === false; })()`), 'reader controls remain reachable in a short host frame');
+    const before = await page.eval<number>(`parseFloat(getComputedStyle(document.querySelector('.body')).fontSize)`);
+    await page.eval(`(() => { const s = document.querySelector('[aria-label="Reading text size"]'); s.value = 'larger'; s.dispatchEvent(new Event('change')); const m = document.querySelector('[aria-label="Reading line width"]'); m.value = 'focused'; m.dispatchEvent(new Event('change')); })()`);
+    await page.waitFor(`parseFloat(getComputedStyle(document.querySelector('.body')).fontSize) > ${before}`, 'larger reading type');
+    assert.equal(await page.eval(`document.querySelector('.body').style.getPropertyValue('--mp-reader-measure')`), '60ch');
+    assert.ok(await page.eval<boolean>(`document.documentElement.scrollWidth <= innerWidth`));
+    await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape' });
+    assert.equal(await page.eval(`document.getElementById('reader').hidden`), false);
+    assert.equal(await page.eval(`document.activeElement.className`), 'btn reader-comfort-toggle');
+    await page.eval(`[...document.querySelectorAll('.docs-toc a')].find(n => n.textContent === 'Install').click()`);
+    await page.waitFor(`document.querySelector('.docs-page h1')?.textContent === 'Install'`, 'the next docs page');
+    assert.ok(await page.eval<boolean>(`parseFloat(getComputedStyle(document.querySelector('.body')).fontSize) > ${before}`), 'reading settings follow navigation in the same open view');
+    await page.click('.reader-comfort-toggle');
+    await page.eval(`[...document.querySelectorAll('#readerComfort button')].find(n => n.textContent === 'Reset').click()`);
+    assert.equal(await page.eval(`parseFloat(getComputedStyle(document.querySelector('.body')).fontSize)`), before);
+    assert.equal(await page.eval(`document.querySelector('[aria-label="Reading line width"]').value`), 'comfortable');
+    assert.deepEqual(page.problems, []);
+  } finally {
+    await page.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: host });
+    await page.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
   }
 });

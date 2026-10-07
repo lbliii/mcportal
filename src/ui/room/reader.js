@@ -224,12 +224,14 @@
     if (!site) { try { site = new URL(a.url).hostname.replace(/^www\./, ''); } catch { site = ''; } }
     const metadata = present([a.byline, site && site !== a.byline ? site : null, articleDate(a.publishedAt, ''), a.updatedAt !== a.publishedAt ? articleDate(a.updatedAt, 'Updated ') : null, `${Math.max(1, Math.round(a.wordCount / 230))} min read`]);
     const top = readerTop(a.url, withBack, a.title, reblog);
+    const title = el('h1', null, a.title);
+    readerTools(top, body, title);
     const heads = logicalBlocks(body).filter((node) => /^H[23]$/.test(node.tagName));
     if (a.wordCount >= 800 && heads.length >= 3) {
       top.append(readerOutline(heads, body));
     }
     const p = a.provenance;
-    return [top, el('h1', null, a.title), el('div', { class: 'byline article-meta' }, metadata.map((part) => el('span', null, part))), body,
+    return [top, title, el('div', { class: 'byline article-meta' }, metadata.map((part) => el('span', null, part))), body,
       el('div', { class: 'prov' }, `Reader view of ${p.endpoint}${via ? ` · via ${via}` : ''}${provenanceTime(p)}. Publisher scripts and trackers are not loaded; media opens at its source.`)];
   }
 

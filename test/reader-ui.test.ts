@@ -221,3 +221,49 @@ test('reader UI: media-first items retain list identity without placeholders or 
   assert.equal(await page.eval(`document.querySelector('[data-reader-block="14"]').parentElement.className`), 'body');
   assert.deepEqual(page.problems, []);
 });
+
+test('reader UI: page find matches literal text across formatting without changing authored content or passage identity', { skip }, async () => {
+  const blocks: Article['blocks'] = [
+    { type: 'p', text: 'Literal [a+b] and Mixed formatting.', spans: [{ text: 'Literal [a+b] and ' }, { text: 'Mixed ', strong: true }, { text: 'formatting.', em: true }] },
+    { type: 'pre', text: '[a+b] in code' },
+    { type: 'table', text: '', columns: ['Option', 'Description'], rows: [['one', 'two']] },
+    ...Array.from({ length: 30 }, (_, i) => ({ type: 'p' as const, text: `Paragraph ${i}: enough content to scroll through the current page.` })),
+    { type: 'p', text: 'Last [a+b] match.' },
+  ];
+  await open({ width: 360, article: { ...article, title: 'Finding things', blocks } });
+  const before = await page.eval(`document.querySelector('.body').textContent`);
+  await page.click('.reader-find-toggle');
+  assert.equal(await page.eval(`document.activeElement.getAttribute('aria-label')`), 'Find in this page');
+  const search = async (query: string) => page.eval(`(() => { const input = document.querySelector('.reader-find-input'); input.value = ${JSON.stringify(query)}; input.dispatchEvent(new Event('input')); })()`);
+  await search('[a+b]');
+  assert.equal(await page.eval(`document.querySelector('.reader-find-count').textContent`), '1 of 3');
+  await page.click('[aria-label="Previous match"]');
+  assert.equal(await page.eval(`document.querySelector('.reader-find-count').textContent`), '3 of 3');
+  assert.ok(await page.eval<boolean>(`(() => { const match = document.querySelector('.reader-find-hit.current').getBoundingClientRect(); const top = document.querySelector('.reader-top').getBoundingClientRect(); return match.top >= top.bottom && match.bottom <= innerHeight; })()`), 'the active match stays below the expanded controls');
+  await search('mixed formatting');
+  assert.equal(await page.eval(`document.querySelector('.reader-find-count').textContent`), '1 of 1');
+  assert.equal(await page.eval(`document.querySelectorAll('.reader-find-hit.current').length`), 2, 'one match spans strong and emphasis');
+  assert.equal(await page.eval(`document.querySelector('.body strong').textContent`), 'Mixed ');
+  await search('Copy');
+  assert.equal(await page.eval(`document.querySelector('.reader-find-count').textContent`), 'No matches', 'code controls are not authored text');
+  await search('OptionDescription');
+  assert.equal(await page.eval(`document.querySelector('.reader-find-count').textContent`), 'No matches', 'table cell boundaries do not create fake phrases');
+  await search('[a+b]');
+  await page.eval(`document.querySelector('.reader-find-input').focus()`);
+  await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter' });
+  assert.equal(await page.eval(`document.querySelector('.reader-find-count').textContent`), '2 of 3');
+  await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', modifiers: 8 });
+  assert.equal(await page.eval(`document.querySelector('.reader-find-count').textContent`), '1 of 3');
+  assert.equal(await page.eval(`document.querySelector('.body').textContent`), before);
+  assert.deepEqual(await page.eval(`Array.from(document.querySelectorAll('.body [data-reader-block]')).map(n => Number(n.dataset.readerBlock))`), blocks.map((_, i) => i));
+  await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape' });
+  assert.equal(await page.eval(`document.querySelectorAll('.reader-find-hit').length`), 0);
+  assert.equal(await page.eval(`document.querySelector('.body').textContent`), before);
+  assert.equal(await page.eval(`document.activeElement.className`), 'btn reader-find-toggle');
+  assert.equal(await page.eval(`document.getElementById('reader').hidden`), false);
+  await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'f', code: 'KeyF', modifiers: 2 });
+  assert.equal(await page.eval(`document.getElementById('readerFind').hidden`), false, 'Ctrl+F opens page find within the reader');
+  assert.ok(await page.eval<boolean>(`document.documentElement.scrollWidth <= innerWidth`));
+  assert.equal(await page.eval(`window.__calls.some(c => JSON.stringify(c).includes('[a+b]'))`), false, 'find queries remain local');
+  assert.deepEqual(page.problems, []);
+});
