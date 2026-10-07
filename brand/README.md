@@ -21,10 +21,11 @@ MCPortal looks like a mid-century sci-fi paperback: flat inks on cream paper, ha
 | `lockup-stacked.svg` | Mark above wordmark, for square spaces |
 | `social-card.svg` | The 1200×630 link preview (served as `/site/og.png`) |
 | `readme-hero.svg`, `readme-hero.png` | The 1280×640 README banner; the PNG is the GitHub social preview (Settings → Social preview) |
+| `hero.svg` | The landing page's night sky, inlined into the page. Its classes are hooks for the page's opening animation; the door leaf stays invisible unless the page animates it |
 | `door-open.svg`, `door-shut.svg` | The decorative plate over a standalone page's card: a lit door with the moon in it for welcomes and good news, a dark one for errors and expired links |
 | `fonts/` | Jost Bold and Medium (SIL Open Font License, `fonts/OFL.txt`), used to draw outlines |
 
-The script also writes what the public pages serve (`src/site/`): the favicon and app icons, the social card as a PNG, the lockup for dark backgrounds, `hero.svg` (the landing page's night sky) and a copy of Jost Bold. It also draws the workspace icons (`src/ui/brand/icons.js`).
+The script also writes what the public pages serve (`src/site/`): the favicon and app icons, the social card as a PNG, the lockup for dark backgrounds and a copy of Jost Bold. It also draws the workspace icons (`src/ui/brand/icons.js`).
 
 ## Marks
 

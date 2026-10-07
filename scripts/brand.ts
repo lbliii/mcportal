@@ -5,9 +5,10 @@
  *
  *   node scripts/brand.ts          write everything
  *
- * brand/            masters: marks, wordmark, lockups, social card (SVG), usage notes
+ * brand/            masters: marks, wordmark, lockups, social card (SVG), usage notes, and
+ *                   the art the pages inline (the landing hero, the door plates)
  * src/site/         what the public pages serve: favicon, app icon, social card, lockup,
- *                   hero art, and Jost Bold for headings
+ *                   and Jost Bold for headings
  * src/ui/brand/     marks inlined into the room (colours from its CSS)
  * src/brand-icons.ts   the icons the MCP server advertises (data: URIs)
  *
@@ -190,37 +191,49 @@ const ICONS = ${JSON.stringify(icons())};
 `;
 }
 
-/** Stars as one path: `count` dots scattered over w x h by a fixed seed, so re-runs match. `clear` keeps a box [x, y, w, h] free for text. */
-function starfield(seed: number, count: number, w: number, h: number, clear?: [number, number, number, number]): string {
+/** Star dots as path data, one per star: `count` dots scattered over w x h by a fixed seed, so re-runs match. `clear` keeps a box [x, y, w, h] free for text. */
+function stars(seed: number, count: number, w: number, h: number, clear?: [number, number, number, number]): string[] {
   const rand = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
-  let d = '';
+  const dots: string[] = [];
   for (let i = 0; i < count; i++) {
     const x = rand() * w, y = rand() * h, rad = 0.8 + rand() * 2.2;
     if (clear && x > clear[0] && x < clear[0] + clear[2] && y > clear[1] && y < clear[1] + clear[3]) continue;
-    d += `M${r2(x - rad)} ${r2(y)}a${r2(rad)} ${r2(rad)} 0 1 0 ${r2(2 * rad)} 0a${r2(rad)} ${r2(rad)} 0 1 0 ${r2(-2 * rad)} 0`;
+    dots.push(`M${r2(x - rad)} ${r2(y)}a${r2(rad)} ${r2(rad)} 0 1 0 ${r2(2 * rad)} 0a${r2(rad)} ${r2(rad)} 0 1 0 ${r2(-2 * rad)} 0`);
   }
-  return d;
+  return dots;
 }
+
+/** Stars as one path. */
+const starfield = (...args: Parameters<typeof stars>) => stars(...args).join('');
 
 /**
  * The landing page's night sky, 1500x640: stars, a halftone planet, and the portal scene
- * standing on the bottom edge at the right. The page pins it to the bottom-right of the hero
- * band at the band's height, so the scene keeps clear of the headline on the left. The sky
- * is transparent: the band behind it is ink in light mode and a darker night in dark mode.
+ * standing on the bottom edge at the right. The page inlines it and pins it to the
+ * bottom-right of the hero band, so the scene keeps clear of the headline on the left. The
+ * sky is transparent: the band behind it is ink in light mode and a darker night in dark mode.
+ *
+ * The classes are hooks for the page's opening (src/site.ts): the planet and the door land
+ * like printing plates, the orbit halves draw themselves (pathLength="1"), the keyline settles
+ * just off register, and the door leaf swings open on the moon. The leaf is invisible until
+ * the page animates it, so without motion the door stands open, as drawn.
  */
 function heroArt(): string {
   const W = 1500, H = 640, cx = 1160;
   const door = arch(cx, H, 300, 470), inner = arch(cx, H, 172, 372);
   const back = ring(cx, 470, 300, 80, -16, 'back'), front = ring(cx, 470, 300, 80, -16, 'front');
-  return svg(W, H, `<defs>${halftone('mcp-ht-hero', 14, 3.2, INK.ink)}${halftone('mcp-ht-planet', 9, 2.4, INK.ink)}</defs>`
-    + `<path d="${starfield(11, 130, W, H)}" fill="${INK.paper}" fill-opacity=".5"/>`
-    + `<circle cx="1400" cy="120" r="56" fill="${INK.mustard}"/><circle cx="1400" cy="120" r="56" fill="url(#mcp-ht-planet)" fill-opacity=".4"/>`
-    + `<path d="${back}" fill="none" stroke="${INK.mustard}" stroke-width="12" stroke-linecap="round"/>`
-    + `<path d="${door}" fill="${INK.teal}"/><path d="${door}" fill="url(#mcp-ht-hero)" fill-opacity=".35"/>`
-    + `<path d="${inner}" fill="${INK.paper}"/><circle cx="${cx}" cy="370" r="34" fill="${INK.brick}"/>`
-    + `<path d="${front}" fill="none" stroke="${INK.mustard}" stroke-width="14" stroke-linecap="round"/>`
-    + `<path d="${door}" fill="none" stroke="${INK.paper}" stroke-width="3" stroke-opacity=".5" transform="translate(9 -6)"/>`,
-  'A door in the night sky, with an orbit passing through it');
+  const dots = stars(11, 130, W, H);
+  const sky = [0, 1, 2].map((n) => `<path class="stars stars-${n + 1}" d="${dots.filter((_, i) => i % 3 === n).join('')}" fill="${INK.paper}" fill-opacity=".5"/>`).join('');
+  return `<svg xmlns="http://www.w3.org/2000/svg" class="art" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMaxYMax slice" aria-hidden="true" focusable="false">`
+    + `<defs>${halftone('mcp-ht-hero', 14, 3.2, INK.ink)}${halftone('mcp-ht-planet', 9, 2.4, INK.ink)}</defs>`
+    + sky
+    + `<g class="planet"><circle cx="1400" cy="120" r="56" fill="${INK.mustard}"/><circle cx="1400" cy="120" r="56" fill="url(#mcp-ht-planet)" fill-opacity=".4"/></g>`
+    + `<path class="orbit orbit-back" d="${back}" pathLength="1" fill="none" stroke="${INK.mustard}" stroke-width="12" stroke-linecap="round"/>`
+    + `<g class="door"><path d="${door}" fill="${INK.teal}"/><path d="${door}" fill="url(#mcp-ht-hero)" fill-opacity=".35"/></g>`
+    + `<path d="${inner}" fill="${INK.paper}"/><circle class="moon" cx="${cx}" cy="370" r="34" fill="${INK.brick}"/>`
+    + `<path class="leaf" d="${inner}" fill="${INK.ink}" opacity="0"/>`
+    + `<path class="orbit orbit-front" d="${front}" pathLength="1" fill="none" stroke="${INK.mustard}" stroke-width="14" stroke-linecap="round"/>`
+    + `<g class="keyline"><path d="${door}" fill="none" stroke="${INK.paper}" stroke-width="3" stroke-opacity=".5" transform="translate(9 -6)"/></g>`
+    + '</svg>\n';
 }
 
 /**
@@ -399,7 +412,7 @@ export function buildBrand(): { text: Record<string, string>; png: Record<string
     'brand/readme-hero.svg': readmeHero,
     'src/site/favicon.svg': svg(64, 64, portalMark()),
     'src/site/lockup-on-dark.svg': lockup(INK.paper, INK.mustard),
-    'src/site/hero.svg': heroArt(),
+    'brand/hero.svg': heroArt(),
     'brand/door-open.svg': doorArt(true),
     'brand/door-shut.svg': doorArt(false),
     // Inlined into the room: colours come from its CSS so they follow the theme.
