@@ -14,7 +14,7 @@ What MCPortal stores, where, and for how long; how to export it and delete it; a
 | Seen marks | Per portal, 12-character hashes of item ids | Until the portal or account goes |
 | Highlights | The agent's latest picks and reasons | 24 hours, until replaced |
 | Handoffs | Link, title, place and selected passage sent to a new chat | 7 days, 50 at most |
-| Public profile | Handle, name, bio, Space title, accent, featured portals, reblog default | Until removed. A handle given up stays reserved for 30 days |
+| Public profile | Handle, name, bio, Space title, cover (ink, motif, random seed), format, topics, pinned post, chosen travelers, hidden stamps, web visibility, listing, brought-aboard aggregate, featured portals, reblog default | Until removed. A handle given up stays reserved for 30 days |
 | Shares | A copy of the shared link or clip, the note and the audience | Until removed |
 | Follows, mutes, blocks | Pairs of account ids | Until changed |
 | Reports | Who reported what, why, and when | 180 days after resolution |
@@ -102,3 +102,9 @@ Logs go to stderr ([`src/lib/log.ts`](../../src/lib/log.ts)), as text or JSON (`
 | Error stacks for crashes | Room contents, what was read, or third-party text |
 
 The user reference is an HMAC of the user id under a key generated at startup. It correlates one process's lines and changes on every restart. An error message can occasionally name a site that failed to load. The hosting platform keeps its own request logs separately.
+
+## Space portability and public copies
+
+MCPortal exports use version 2 and include every Space field. Version 1 exports remain readable; an old `accent` maps to the nearest named ink set at import. Import restores a validated cover and format onto an existing Space. It does not claim a handle, change its visibility or discovery setting, publish text, re-post shares, feature travelers or trust exported stamp claims. Other exported social data is retained for your own records.
+
+Space profiles remain one document; these optional fields require no database migration. Stamps are computed from account creation, share weeks and Space age. Only the anonymous brought-aboard count is retained after join notes are consumed. Public HTML is cached in memory for at most a minute, with fresh visibility checks before reuse. Public pages and feeds expose only the owner's chosen public fields and everyone posts; private switches, moderation and removal affect subsequent requests. Copies already made outside MCPortal may persist.

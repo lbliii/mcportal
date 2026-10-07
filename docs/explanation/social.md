@@ -2,19 +2,27 @@
 
 MCPortal is a reader first, with a light social layer for passing finds between people. This page explains Spaces and handles, shares and reblogs, follows and safety, and the room layouts that show it all, including the river. For the tools, see the [tool reference](../reference/tools.md).
 
-## Publishing is native
+## Read anywhere, publish through your agent
 
-Everything social happens inside MCPortal. A share is seen by signed-in people in their Following portal, their river or your Space. It isn't published to the open web as a feed or a public page.
+Publishing happens through your agent. People signed in to MCPortal read shares in Following, the river and Spaces; anyone with a public Space's link can read its page and RSS feed on the web. Followers-only posts stay within followers. Ghost mode has no social layer, and an account has no Space until its owner claims a handle.
 
-That keeps the rules in one place. MCPortal decides who can see a post, honors blocks and removals everywhere the post appears, and never has to chase copies across the internet. It also keeps the stakes low: you're filing a find onto a shelf where your followers look, not broadcasting.
-
-Everything is opt-in. A local install in ghost mode has no social layer at all. A hosted account is private until you claim a handle.
+A newly claimed Space is **public by default**. Uncheck “Public Space” when claiming the handle, in the print shop, or use `set_public_profile` with `public: false` to keep it within signed-in MCPortal. Listing for discovery is a separate choice, unchecked by default. Copies, screenshots and feed caches made while public cannot be recalled.
 
 ## Spaces and handles
 
-A **Space** is your public page inside MCPortal. It holds a title, a bio, an accent color, "Sources I read" (up to 12 portals from your room that visitors can add with one click), and your posts as a grid. `open_space` shows anyone's Space, or yours, as a card in the chat.
+A **Space** is your own MCPortal publication. Choose **paperback**, with a cover band and a side column; **magazine**, with a masthead and cover story; or **patch**, with a round mission patch and section tabs. Visitors see your format. Switching formats keeps every field and post. The room's card and script-free web page use the same renderer, with container queries for narrow cards and ink colors for light, dark and forced-colors modes.
 
-A **Space link** is a Space's address, `/@handle`. The room's Space view copies yours, and `open_space` gives it to the agent. The room lives in the agent, not in a browser, so the link is a bridge page (`src/space-links.ts`) that shows only the handle until you sign in. If you already use MCPortal, it tells you what to ask your agent. If you're new, it lets you sign in with GitHub. Signing in there leaves a one-time note. The next time your agent opens your room, it offers to follow the link's owner, and the room shows a Follow button. If the link brought a new account, its owner's room says so once the newcomer has a handle. Both notes are relations (`intros`, `joins`) stored beside follows. Each is said once, and a block removes both.
+The **print shop** on your own Space saves named plates: eight ink sets, five motifs, a format and Re-roll. A random cover seed is stored when you claim your handle; renaming it keeps your cover. Re-roll changes only the composition. Your patch avatar appears where you are the subject, including People, Lobby, Following, river context rows and Space-link introductions.
+
+**Now transmitting** pins one of your own posts; unsharing it unpins it. **Transmitting on** holds up to four topics of 24 characters each. Your agent saves bio and topic wording only after you approve it. **Fellow travelers** are up to six listed people you chose, in your order. They are never drawn from your follows; unlisting, suspension or a block removes them from view. Featured sources are still copies of up to twelve RSS, Hacker News or GitHub portals from your room, never access to the room itself.
+
+**Stamps** mark facts, with no rankings: Charter traveler for accounts made before October 7, 2026; Brought 1, 3 or 10 aboard; Signal keeper for posting in ten different weeks; and a volume for years since the Space was created. Owners can hide each stamp. The brought-aboard aggregate survives the one-time join notes and stores no newcomer identities.
+
+A **Space link** is `/@handle`. The room copies yours and `open_space` gives it to your agent. Public pages show cover, identity, topics, pinned post, sources, listed travelers, stamps and posts for everyone. Link posts include an outward link and note; quotes are limited to 400 characters, and other clips show a title and sign-in link. A reblog whose original is private, removed or hidden shows only a members-only placeholder and the reblogger's own commentary. Public pages omit follower and reblog counts. Follow, Add and Reblog lead through `/@handle/signin` to your agent; there is no web composer.
+
+Each public Space has an RSS 2.0 feed at `/@handle/feed`, containing the latest fifty visible posts with the same clip and reblog rules. Private Spaces return 404 for feeds and show only their handle and cover preview on the web. Every Space page and feed sends `noindex, nofollow`; some crawlers ignore it. The forty link-preview PNGs are prerendered from the cover engine. Pages are cached for a minute, rechecked for current visibility on every request, and rate-limited to 120 requests per IP per minute. No page tracking is added.
+
+Signing in through a Space link leaves a one-time note: your room offers a Follow of the link's owner, and their room names a newcomer once the newcomer has a handle. The `intros` and `joins` relations live beside follows, are said once, and disappear on a block.
 
 **Listing** is opt-in, and it's separate from having a handle. A listed person can be suggested by `find_people`, which matches only what they made public: their featured sources (a rarer shared source counts for more than Hacker News), feeds from the same site, posts they shared with everyone, and words in their Space or posts. It never suggests the user, people they follow, mute or block (or who block them), suspended accounts or unlisted profiles. Matching (`src/people.ts`) is set overlap and word search with no model, and the agent introduces people in its own words from the reasons it's given. When you add a source someone listed features, or build a room from packs, `add_portal` and `build_room` mention them by handle. `open_space` says which of their sources are in your room too.
 
@@ -29,7 +37,7 @@ A **handle** is how people find you. It's 2 to 30 letters, digits or underscores
 A **post** is anything in a Space. A **share** is a post about a saved link or a clip, with a note.
 
 - **You approve the words.** The agent shares only when you ask, and asks you to approve any note it writes.
-- **You pick the audience:** your followers (the default) or everyone signed in to MCPortal.
+- **You pick the audience:** your followers (the default) or everyone who can see your Space.
 - **The server looks everything up.** A share names a saved item or clip by ID; the title, link and content come from your own store, never from the request. The content is copied at share time, so later edits to the clip don't change the post.
 - **`unshare`** removes a post.
 

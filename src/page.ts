@@ -4,6 +4,8 @@ import { escapeHtml } from './lib/web.ts';
 import { DOOR_ART, WEB_BRAND_CSS, WEB_BRAND_ICON, WEB_MARK, webHeader, webFooter } from './web-brand.ts';
 
 export interface PageOptions {
+  /** Server-built, escaped metadata. */
+  head?: string;
   /** Local callback pages link to the hosted origin rather than nonexistent local routes. */
   siteUrl?: string;
   /**
@@ -30,7 +32,7 @@ export function page(title: string, body: string, options: PageOptions = {}): st
   const kicker = options.kicker ? `<p class="kicker">${escapeHtml(options.kicker)}</p>` : '';
   const card = ['card', options.door ? `door ${options.door}` : ''].filter(Boolean).join(' ');
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)} · MCPortal</title>
-<meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#1F2A36">${WEB_BRAND_ICON}
+<meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#1F2A36">${WEB_BRAND_ICON}${options.head ?? ''}
 <style>${DESIGN_CSS}\n${PRIMITIVES_CSS}\n${WEB_BRAND_CSS}
 .web-main{max-width:680px;margin:0 auto;padding:clamp(32px,7vh,72px) var(--mp-space-24) var(--mp-space-40)}
 .card{min-width:0;border:2px solid var(--mp-text-primary);border-radius:var(--mp-radius-lg);padding:clamp(24px,4vw,40px);background:var(--mp-surface-card);box-shadow:6px 6px 0 var(--mp-brand-mustard);overflow-wrap:anywhere}

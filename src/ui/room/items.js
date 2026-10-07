@@ -10,7 +10,7 @@
    * names its portal (outside one), the agent's reason for picking it (its own words), the
    * other portals that have the same story, and the people you follow who shared it.
    * Also: a listed person you don't follow who shared it with everyone (one name; "also shared by").
-   * @typedef {{ color?: string, media?: boolean, from?: boolean, why?: string, also?: string[], shared?: Array<{ handle: string, note?: string | undefined, share?: Item['share'], followed?: boolean }>, alsoBy?: string }} ItemLook
+   * @typedef {{ color?: string, media?: boolean, from?: boolean, why?: string, also?: string[], shared?: Array<{ handle: string, note?: string | undefined, share?: Item['share'], followed?: boolean }>, alsoBy?: NonNullable<ToolResults['open_room']['alsoShared']>[number] | undefined }} ItemLook
    */
 
   /** @param {Item} item @param {PortalResult} portal @param {ItemForm} [form] @param {ItemLook} [look] */
@@ -79,6 +79,7 @@
     if (reblogs.length > 2) context = ['Reblogged by ', ...sharerNames(reblogs.map((s) => s.handle))];
     else if (reblogs.length) context = [...sharerNames(reblogs.map((s) => s.handle)), ' reblogged ', original?.by ? handleButton(original.by) : 'a removed post'];
     else if (shared.length) context = [...sharerNames(shared.map((s) => s.handle)), ' shared'];
+    if (context.length) context.unshift(...present([patchAvatar(shared[0]?.share?.cover)]));
     if (context.length && shared.every((s) => s.followed === false)) context.push(' · not followed');   // a Lobby post: someone new
     /** @type {Array<{ by: string, note: string }>} */
     const trail = [];
@@ -116,7 +117,7 @@
       const { out, byline } = itemActions(item, portal);
       const text = [itemTitle(item), item.summary ? el('span', { class: 'item-summary' }, item.summary) : null];
       const main = el('button', { class: 'item-main', type: 'button', title: byline, onclick: (/** @type {MouseEvent} */ e) => openFrom(e, item, portal) },
-        item.image && item.image.kind === 'thumb' ? el('span', { class: 'item-row' }, thumbBox(item, portal), el('span', { class: 'item-text' }, text)) : text);
+        patchAvatar(item.person?.cover || item.share?.cover), item.image && item.image.kind === 'thumb' ? el('span', { class: 'item-row' }, thumbBox(item, portal), el('span', { class: 'item-text' }, text)) : text);
       return el('div', { class: 'item', onclick: openOnClick(item, portal) }, from ? itemFrom(portal, color) : null, main,
         out.length ? el('div', { class: 'item-meta' }, out) : null, why ? itemWhy(why) : null);
     },
@@ -125,7 +126,7 @@
     lead(item, portal, { color = '', why = '' }) {
       const { out, byline } = itemActions(item, portal);
       const main = el('button', { class: 'item-main', type: 'button', title: byline, onclick: (/** @type {MouseEvent} */ e) => openFrom(e, item, portal) },
-        item.image && item.image.kind === 'thumb' ? thumbBox(item, portal) : null,
+        patchAvatar(item.person?.cover || item.share?.cover), item.image && item.image.kind === 'thumb' ? thumbBox(item, portal) : null,
         itemTitle(item), item.summary ? el('span', { class: 'item-summary' }, item.summary) : null);
       return el('div', { class: 'item lead', style: `--mp-source-color:${color}`, onclick: openOnClick(item, portal) }, itemFrom(portal, color), main,
         out.length ? el('div', { class: 'item-meta' }, out) : null, why ? itemWhy(why) : null);
@@ -136,7 +137,7 @@
      * picture across, a larger title, a sharer's note in their own voice, every action. The
      * portal's name opens the portal.
      */
-    story(item, portal, { color = '', why = '', also = [], shared = [], alsoBy = '' }) {
+    story(item, portal, { color = '', why = '', also = [], shared = [], alsoBy }) {
       // A Following item's meta is "@handle", "reblogged @x" and its kind, and its summary is the
       // note: the context row and the trail say those, so they aren't repeated.
       const following = portal.source === 'following' || portal.source === 'lobby';
@@ -150,7 +151,7 @@
         itemTitle(item), item.summary && !following ? el('span', { class: 'item-summary' }, item.summary) : null);
       return el('article', { class: 'item story', style: `--mp-source-color:${color}`, onclick: openOnClick(item, portal) },
         context.length ? el('div', { class: 'story-context' }, context)
-          : alsoBy ? el('div', { class: 'story-context' }, 'also shared by ', handleButton(alsoBy)) : null,
+          : alsoBy ? el('div', { class: 'story-context' }, 'also shared by ', patchAvatar(alsoBy.cover), handleButton(alsoBy.handle)) : null,
         el('div', { class: 'item-from' }, el('span', { class: 'dot', style: `background:${color}` }),
           el('button', { class: 'story-portal', type: 'button', title: `Open ${portal.title}`, onclick: () => openPortal(portal.portalId) }, portal.title),
           also.length ? el('span', { class: 'story-also' }, `also on ${also.join(', ')}`) : null,
@@ -171,7 +172,7 @@
       if (reblog) meta.push(reblog);
       const content = [itemTitle(item), media ? null : item.summary ? el('span', { class: 'item-summary' }, item.summary) : null];
       const main = el('button', { class: 'card-main', type: 'button', title: item.title, onclick: (/** @type {MouseEvent} */ e) => openFrom(e, item, portal) },
-        media ? [thumbBox(item.image && item.image.kind === 'thumb' ? item : { ...item, image: undefined }, portal), el('span', { class: 'card-body' }, content)] : content);
+        patchAvatar(item.person?.cover || item.share?.cover), media ? [thumbBox(item.image && item.image.kind === 'thumb' ? item : { ...item, image: undefined }, portal), el('span', { class: 'card-body' }, content)] : content);
       return el('div', { class: media ? 'card media' : 'card', style: `--mp-source-color:${color}`, onclick: openOnClick(item, portal) }, main,
         meta.length ? el('div', { class: 'item-meta' }, meta) : null);
     },

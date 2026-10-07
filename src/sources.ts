@@ -130,7 +130,7 @@ function sharesPortal(portal: PortalInput, shares: SharedItem[], source: 'follow
       ...(s.note ? { summary: clean(s.note, 280) } : {}),
       meta: [`@${s.author.handle}`, ...(reblog ? [reblog.by ? `reblogged @${reblog.by}` : 'reblogged a removed post'] : []), kind, ...(s.canFollow?.includes(s.author.handle) ? ['not followed'] : [])],
       publishedAt: s.createdAt,
-      share: { id: s.id, kind: s.kind, ...(reblog ? { reblog } : {}), ...(s.reblogCount ? { reblogs: s.reblogCount } : {}), ...(s.myReblog ? { mine: s.myReblog } : {}), canReblog: s.canReblog },
+      share: { ...(s.author.cover ? { cover: s.author.cover } : {}), id: s.id, kind: s.kind, ...(reblog ? { reblog } : {}), ...(s.reblogCount ? { reblogs: s.reblogCount } : {}), ...(s.myReblog ? { mine: s.myReblog } : {}), canReblog: s.canReblog },
     };
   });
   return {
@@ -166,7 +166,7 @@ export function docsQuery(query: string): string | null {
 }
 
 /** A person the agent suggested, as the People portal shows them: resolved by the caller (who's still there, and whether the user follows them). */
-export interface SuggestedPerson { handle: string; why: string; at: string; displayName?: string | undefined; spaceTitle?: string | undefined; followers: number; following: boolean }
+export interface SuggestedPerson { cover?: import('./space-design.ts').Cover | undefined; handle: string; why: string; at: string; displayName?: string | undefined; spaceTitle?: string | undefined; followers: number; following: boolean }
 
 /** The People portal: the agent's suggestions, kept in the profile. */
 export function peoplePortal(portal: PortalInput, people: SuggestedPerson[]): PortalResult {
@@ -177,7 +177,7 @@ export function peoplePortal(portal: PortalInput, people: SuggestedPerson[]): Po
     summary: p.why,
     meta: [...(p.spaceTitle ? [p.spaceTitle] : []), `${p.followers} follower${p.followers === 1 ? '' : 's'}`, ...(p.following ? ['following'] : [])],
     publishedAt: p.at,
-    person: { handle: p.handle, following: p.following },
+    person: { handle: p.handle, following: p.following, ...(p.cover ? { cover: p.cover } : {}) },
   }));
   return {
     portalId: portal.id,

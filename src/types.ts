@@ -36,6 +36,7 @@ export interface Item {
   /** Items of a following portal: open with get_share. */
   share?: {
     id: string;
+    cover?: import('./space-design.ts').Cover;
     kind: 'link' | 'clip';
     /** A reblog: its original's id, the original's author and note (absent once it's gone, then why), and whose reblog it came through. */
     reblog?: { root: string; by?: string; note?: string; removed?: 'removed' | 'detached'; via?: string };
@@ -47,7 +48,7 @@ export interface Item {
     canReblog?: boolean;
   };
   /** Items of a people portal: someone the agent suggested following; the summary is its reason. */
-  person?: { handle: string; following: boolean };
+  person?: { handle: string; following: boolean; cover?: import('./space-design.ts').Cover };
   /** Not yet seen by this user (src/seen.ts). */
   new?: true;
 }

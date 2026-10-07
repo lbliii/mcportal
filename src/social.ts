@@ -5,7 +5,7 @@
  *
  *   share   a saved link or a clip with a note. The content is copied at share
  *           time, so the share doesn't change if the clip does. Audience:
- *           'followers' (default) or 'mcportal' (anyone signed in).
+ *           'followers' (default) or 'everyone' (anyone signed in).
  *   follow  open for anyone with a public profile.
  *   mute    their shares disappear from your Following portal.
  *   block   they can't follow you or see your shares, and you don't see theirs;
@@ -29,12 +29,13 @@ import { randomBytes } from 'node:crypto';
 import { ClipError, cleanText, type Clip } from './clips.ts';
 import { AppError, type AppErrorOptions, type ErrorCode } from './lib/errors.ts';
 import { clean } from './lib/text.ts';
-import type { PublicProfile, PublicProfiles } from './public-profiles.ts';
+import type { Cover, SpaceStamp } from './space-design.ts';
+import type { PublicProfileInput, PublicProfile, PublicProfiles } from './public-profiles.ts';
 import { limitOf, type SocialStore } from './social-store.ts';
 
 export { DocumentSocialStore, type SocialStore } from './social-store.ts';
 
-export const AUDIENCES = ['followers', 'mcportal'] as const;
+export const AUDIENCES = ['followers', 'everyone'] as const;
 export type Audience = (typeof AUDIENCES)[number];
 /** Who may reblog a post: anyone signed in, people who follow its author, or nobody. */
 export const REBLOG_RULES = ['anyone', 'followers', 'nobody'] as const;
@@ -95,6 +96,7 @@ export interface PersonMatch extends Match {
   displayName?: string;
   spaceTitle?: string;
   bio?: string;
+  cover?: Cover;
   followers: number;
   /** Titles of the sources they feature. */
   featured: string[];
@@ -103,9 +105,11 @@ export interface PersonMatch extends Match {
 }
 
 /** What open_room passes on from Space links, once: people to offer a follow of, and newcomers who came in through yours. */
-export interface Intros { offer: string[]; joined: string[] }
+export interface Intros { offer: string[]; joined: string[]; covers?: Record<string, Cover> }
 
 export interface PageQuery {
+  /** Internal tie breaker when a page ends among simultaneous posts. */
+  beforeId?: string | undefined;
   limit?: number | undefined;
   before?: string | undefined;
 }
@@ -124,7 +128,7 @@ const newId = (prefix: string) => `${prefix}${randomBytes(6).toString('hex')}`;
 // ---- the rules ----------------------------------------------------------------
 
 /** An author as others see them: by handle, never by account id. */
-export interface Author { handle: string; displayName?: string }
+export interface Author { handle: string; displayName?: string; cover?: Cover }
 
 /**
  * The original of a reblog as the viewer may see it, drawn live: its author, note and clip.
@@ -153,7 +157,7 @@ export interface SharedItem extends Omit<Share, 'accountId'> {
 }
 
 /** Someone who reblogged a post, as the viewer may see them. */
-export interface Reblogger { handle: string; reblogId: string; createdAt: string; note?: string; detached?: true }
+export interface Reblogger { cover?: Cover; handle: string; reblogId: string; createdAt: string; note?: string; detached?: true }
 
 export interface SocialDeps {
   store: SocialStore;
@@ -161,6 +165,7 @@ export interface SocialDeps {
   /** Accounts that can't be seen (suspended). */
   hidden?: (accountId: string) => boolean;
   now?: () => number;
+  accountCreatedAt?: (accountId: string) => number | undefined;
 }
 
 /**
@@ -171,19 +176,21 @@ export interface SocialDeps {
  */
 export type SocialService = Pick<Social,
   'resolve' | 'share' | 'unshare' | 'get' | 'feed' | 'sharesOf' | 'follow' | 'unfollow' | 'mute' | 'block' | 'uses' | 'connections' | 'stats' | 'report'
-  | 'reblog' | 'shareSettings' | 'reblogsOf' | 'takeIntros' | 'findPeople' | 'lobby'>;
+  | 'setSpace' | 'spaceDetails' | 'reblog' | 'shareSettings' | 'reblogsOf' | 'takeIntros' | 'findPeople' | 'lobby'>;
 
 export class Social {
   private store: SocialStore;
   private profiles: PublicProfiles;
   private hidden: (accountId: string) => boolean;
   private now: () => number;
+  private accountCreatedAt: (accountId: string) => number | undefined;
 
   constructor(deps: SocialDeps) {
     this.store = deps.store;
     this.profiles = deps.profiles;
     this.hidden = deps.hidden ?? (() => false);
     this.now = deps.now ?? Date.now;
+    this.accountCreatedAt = deps.accountCreatedAt ?? (() => undefined);
   }
 
   private at(): string {
@@ -197,7 +204,8 @@ export class Social {
     if (found.profile.accountId !== viewer && (await this.blockedEitherWay(viewer, found.profile.accountId))) {
       throw new SocialError(`No MCPortal profile for @${found.profile.handle}`, 'not_found');   // a block hides both ways, silently
     }
-    return found.profile;
+    const { broughtAboard: _brought, ...profile } = found.profile;
+    return profile;
   }
 
   private async blockedEitherWay(a: string, b: string): Promise<boolean> {
@@ -206,6 +214,10 @@ export class Social {
 
   /** The one visibility rule for shares. */
   async canSee(viewer: string, share: Share): Promise<boolean> {
+    if (!viewer) {
+      const profile = await this.profiles.get(share.accountId);
+      return Boolean(profile && !profile.private && !share.hiddenAt && !this.hidden(share.accountId) && share.audience === 'everyone');
+    }
     if (share.accountId === viewer) return true;
     if (share.hiddenAt || this.hidden(share.accountId)) return false;
     if (!(await this.profiles.get(share.accountId))) return false;   // gone private: shares go with the profile
@@ -215,13 +227,13 @@ export class Social {
       const root = await this.store.getShare(share.reblogOf.root);
       if (root && root.accountId !== viewer && (await this.blockedEitherWay(viewer, root.accountId))) return false;
     }
-    if (share.audience === 'mcportal') return true;
+    if (share.audience === 'everyone') return true;
     return (await this.store.outgoing('follows', viewer)).includes(share.accountId);
   }
 
   private async authorOf(accountId: string): Promise<Author | undefined> {
     const profile = await this.profiles.get(accountId);
-    return profile ? { handle: profile.handle, ...(profile.displayName ? { displayName: profile.displayName } : {}) } : undefined;
+    return profile ? { handle: profile.handle, ...(profile.displayName ? { displayName: profile.displayName } : {}), ...(profile.cover ? { cover: profile.cover } : {}) } : undefined;
   }
 
   /**
@@ -264,7 +276,7 @@ export class Social {
         author: (await this.authorOf(accountId)) ?? { handle: 'you' },
         mine: accountId === viewer,
         reblogCount: counts.get(rootIdOf(s)) ?? 0,
-        canReblog: Boolean(root) && !s.detachedAt && !mine.has(rootIdOf(s)) && !(await this.refusal(viewer, root!)),
+        canReblog: Boolean(viewer) && Boolean(root) && !s.detachedAt && !mine.has(rootIdOf(s)) && !(await this.refusal(viewer, root!)),
       };
       const myReblog = mine.get(rootIdOf(s));
       if (myReblog) item.myReblog = myReblog;
@@ -283,7 +295,7 @@ export class Social {
   private async post(author: string, input: { note?: unknown; audience?: unknown }, fields: Omit<Share, 'id' | 'accountId' | 'note' | 'audience' | 'createdAt'>): Promise<SharedItem> {
     if (!(await this.profiles.get(author))) throw new SocialError('Sharing needs a public profile, so people know who shared it. Create one with set_public_profile first', 'failed_precondition');
     if ((await this.store.countShares(author)) >= SOCIAL_LIMITS.sharesPerUser) throw new SocialError(`You have ${SOCIAL_LIMITS.sharesPerUser} posts, the most MCPortal keeps. Remove some with unshare`, 'limit_exceeded');
-    const audience: Audience = input.audience === 'mcportal' ? 'mcportal' : 'followers';
+    const audience: Audience = input.audience === 'everyone' ? 'everyone' : 'followers';
     let note: string;
     try {
       note = cleanText(input.note, SOCIAL_LIMITS.note, 'note');
@@ -367,13 +379,15 @@ export class Social {
       if (isAuthor ? this.hidden(r.accountId) || (await this.blockedEitherWay(viewer, r.accountId)) : r.detachedAt || !visible) continue;
       const who = await this.authorOf(r.accountId);
       if (!who) continue;
-      out.push({ handle: who.handle, reblogId: r.id, createdAt: r.createdAt, ...(r.note && visible ? { note: r.note } : {}), ...(r.detachedAt ? { detached: true as const } : {}) });
+      out.push({ ...who, reblogId: r.id, createdAt: r.createdAt, ...(r.note && visible ? { note: r.note } : {}), ...(r.detachedAt ? { detached: true as const } : {}) });
     }
     return out;
   }
 
   async unshare(author: string, id: string): Promise<boolean> {
-    return this.store.deleteShare(author, id);
+    const removed = await this.store.deleteShare(author, id);
+    if (removed && (await this.profiles.get(author))?.pinnedShareId === id) await this.profiles.set(author, { pinnedShareId: '' });
+    return removed;
   }
 
   /** One share, if the viewer may see it. */
@@ -381,7 +395,7 @@ export class Social {
     const share = await this.store.getShare(id);
     if (!share || !(await this.canSee(viewer, share))) return undefined;
     const item = (await this.present(viewer, [share]))[0]!;
-    const canFollow = await this.followable(viewer, share, item);
+    const canFollow = viewer ? await this.followable(viewer, share, item) : [];
     if (canFollow.length) item.canFollow = canFollow;
     return item;
   }
@@ -445,7 +459,7 @@ export class Social {
     for (let round = 0; round < 5 && visible.length < limit; round++) {
       const page = await this.store.sharesBy(authors, { limit: 100, before });
       for (const s of page) {
-        if (visible.length >= limit || s.audience !== 'mcportal' || !(await this.canSee(viewer, s))) continue;
+        if (visible.length >= limit || s.audience !== 'everyone' || !(await this.canSee(viewer, s))) continue;
         if (s.reblogOf && muted.size && muted.has((await this.store.getShare(s.reblogOf.root))?.accountId ?? '')) continue;
         const day = `${s.accountId} ${s.createdAt.slice(0, 10)}`;
         const posted = perDay.get(day) ?? 0;
@@ -466,10 +480,60 @@ export class Social {
 
   /** One person's shares that the viewer may see (all of them, for yourself). */
   async sharesOf(viewer: string, accountId: string, query: PageQuery = {}): Promise<SharedItem[]> {
-    const page = await this.store.sharesBy([accountId], { ...query, limit: limitOf(query) * 2, includeHidden: accountId === viewer });
     const visible: Share[] = [];
-    for (const s of page) if (visible.length < limitOf(query) && (await this.canSee(viewer, s))) visible.push(s);
+    let cursor = query;
+    for (let round = 0; round < 10 && visible.length < limitOf(query); round++) {
+      const page = await this.store.sharesBy([accountId], { ...cursor, limit: 100, includeHidden: accountId === viewer });
+      for (const s of page) if (visible.length < limitOf(query) && (await this.canSee(viewer, s))) visible.push(s);
+      if (page.length < 100) break;
+      const last = page.at(-1)!;
+      cursor = { ...query, before: last.createdAt, beforeId: last.id };
+    }
     return this.present(viewer, visible);
+  }
+
+  /** Validate authored choices against their ownership and current discoverability. */
+  async setSpace(owner: string, input: PublicProfileInput): Promise<Awaited<ReturnType<PublicProfiles['set']>>> {
+    if (input.pinnedShareId) {
+      const post = await this.store.getShare(input.pinnedShareId);
+      if (!post || post.accountId !== owner) throw new SocialError('Only a post of your own can be pinned', 'not_found');
+    }
+    if (input.travelers) for (const handle of input.travelers) {
+      const p = await this.resolve(owner, handle);
+      if (!p.listed || p.accountId === owner) throw new SocialError('Fellow travelers must be other listed people');
+    }
+    return this.profiles.set(owner, input);
+  }
+
+  /** Live, consent-aware travelers and earned stamps; follows never seed this list. */
+  async spaceDetails(viewer: string, owner: string): Promise<{ travelers: Author[]; stamps: SpaceStamp[]; volume: number; pinned?: SharedItem }> {
+    const p = await this.profiles.get(owner);
+    const travelers: Author[] = [];
+    for (const handle of p?.travelers ?? []) {
+      try {
+        const them = await this.resolve(owner, handle);
+        if (!them.listed || this.hidden(them.accountId) || (viewer && await this.blockedEitherWay(viewer, them.accountId))) continue;
+        travelers.push({ handle: them.handle, ...(them.displayName ? { displayName: them.displayName } : {}), ...(them.cover ? { cover: them.cover } : {}) });
+      } catch (e) { if (!(e instanceof SocialError && e.code === 'not_found')) throw e; }
+    }
+    const volume = Math.max(1, 1 + Math.floor((this.now() - Date.parse(p?.createdAt ?? this.at())) / (365.2425 * 86400_000)));
+    const stamps: SpaceStamp[] = [];
+    const born = this.accountCreatedAt(owner);
+    if (born !== undefined && born < Date.parse('2026-10-07T04:00:00Z')) stamps.push({ name: 'charter', label: 'Charter traveler' });
+    const brought = p?.broughtAboard ?? 0;
+    const milestone = [10, 3, 1].find((n) => brought >= n);
+    if (milestone) stamps.push({ name: 'brought', label: `Brought ${milestone} aboard` });
+    const posts: Share[] = [];
+    for (let round = 0; round < 10; round++) {
+      const last = posts.at(-1);
+      const page = await this.store.sharesBy([owner], { limit: 100, includeHidden: true, ...(last ? { before: last.createdAt, beforeId: last.id } : {}) });
+      posts.push(...page); if (page.length < 100) break;
+    }
+    const weeks = new Set(posts.map((s) => Math.floor((Date.parse(s.createdAt) + 3 * 86400_000) / (7 * 86400_000))));
+    if (weeks.size >= 10) stamps.push({ name: 'signal', label: 'Signal keeper' });
+    if (volume > 1) stamps.push({ name: 'volume', label: `Vol. ${volume}` });
+    const pinned = p?.pinnedShareId ? await this.get(viewer, p.pinnedShareId) : undefined;
+    return { travelers, stamps: stamps.filter((s) => !p?.hiddenStamps?.includes(s.name)), volume, ...(pinned ? { pinned } : {}) };
   }
 
   async follow(viewer: string, handle: string): Promise<PublicProfile> {
@@ -502,7 +566,7 @@ export class Social {
     const target = await this.resolve(viewer, handle);
     if (this.hidden(target.accountId)) throw new SocialError(`No MCPortal profile for @${target.handle}`, 'not_found');
     if (target.accountId === viewer) return 'self';
-    if (newAccount) await this.store.relate('joins', target.accountId, viewer);
+    if (newAccount && await this.store.relate('joins', target.accountId, viewer)) await this.profiles.recordJoin(target.accountId);
     if ((await this.store.outgoing('follows', viewer)).includes(target.accountId)) return 'following';
     await this.store.relate('intros', viewer, target.accountId);
     return 'offered';
@@ -527,6 +591,10 @@ export class Social {
       await this.store.unrelate('joins', viewer, id);
       if (!this.hidden(id) && !(await this.blockedEitherWay(viewer, id))) out.joined.push(profile.handle);
     }
+    for (const handle of [...out.offer, ...out.joined]) {
+      const profile = await this.profiles.byHandle(handle);
+      if (profile?.profile.cover) (out.covers ??= {})[handle] = profile.profile.cover;
+    }
     return out;
   }
 
@@ -545,19 +613,19 @@ export class Social {
     const people = listed.filter((p) => !skip.has(p.accountId) && p.handle !== options.except && !this.hidden(p.accountId));
     const common = commonness(listed.map((p) => ({ featured: p.sources ?? [] })));
     const postsOf = async (accountId: string) => (await this.store.sharesBy([accountId], { limit: 20 }))
-      .filter((s) => s.audience === 'mcportal' && !s.hiddenAt)
+      .filter((s) => s.audience === 'everyone' && !s.hiddenAt)
       .map((s) => ({ title: s.title, ...(s.url ? { url: s.url } : {}), ...(s.note ? { note: s.note } : {}) }));
     // Posts only count when the search looks at sites or words; otherwise they're read for the winners alone.
     const needPosts = wanted.hosts.length > 0 || wanted.terms.length > 0;
     const scored = await Promise.all(people.map(async (p) => {
       const posts = needPosts ? await postsOf(p.accountId) : [];
-      const candidate: Candidate = { handle: p.handle, displayName: p.displayName, spaceTitle: p.spaceTitle, bio: p.bio, featured: p.sources ?? [], posts };
+      const candidate: Candidate = { handle: p.handle, ...(p.cover ? { cover: p.cover } : {}), displayName: p.displayName, spaceTitle: p.spaceTitle, bio: p.bio, featured: p.sources ?? [], posts };
       return { p, posts, m: match(candidate, wanted, common) };
     }));
     const best = scored.filter((s) => s.m.score > 0).sort((a, b) => b.m.score - a.m.score || a.p.handle.localeCompare(b.p.handle)).slice(0, limit);
     return Promise.all(best.map(async ({ p, posts, m }) => ({
       ...m,
-      handle: p.handle,
+      handle: p.handle, ...(p.cover ? { cover: p.cover } : {}),
       ...(p.displayName ? { displayName: p.displayName } : {}),
       ...(p.spaceTitle ? { spaceTitle: p.spaceTitle } : {}),
       ...(p.bio ? { bio: p.bio } : {}),

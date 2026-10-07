@@ -237,7 +237,7 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
   const publicProfiles = oauth ? deps.publicProfiles : undefined;
   const social = oauth && publicProfiles ? deps.social : undefined;
   // The account page needs GitHub sign-in; without it, exports are written to the data directory.
-  const account = oauth ? new AccountPage({ accounts, oauth, store: deps.store, reading, handoffs, seen, editions, clips, publicProfiles, social, publicUrl: config.publicUrl, log, now: deps.now }) : undefined;
+  const account = oauth ? new AccountPage({ accounts, oauth, store: deps.store, reading, handoffs, seen, editions, clips, publicProfiles, social, publicUrl: config.publicUrl, log, now: deps.now, trustProxy: config.trustProxy }) : undefined;
   // Retention on a schedule: what's kept only for a while goes even on a quiet server.
   const stopHousekeeping = startHousekeeping(retentionTasks({ handoffs, editions, social, accounts, oauth }), log);
   const context = (userId: string, reqLog: Logger): ToolContext => ({
@@ -325,7 +325,7 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
         return json(tooLarge ? 413 : 400, { error: tooLarge ? 'too_large' : 'bad_request', error_description: tooLarge ? 'Over 60 MB' : 'Unreadable body' }, tooLarge ? { connection: 'close' } : {});
       }
       try {
-        const result = await importExport(parseExport(text), userId, { store: deps.store, reading, clips });
+        const result = await importExport(parseExport(text), userId, { store: deps.store, reading, clips, publicProfiles: deps.publicProfiles });
         return json(200, { result, summary: describeImport(result) });
       } catch (error) {
         if (!isAppError(error) || error.code === 'internal') throw error;

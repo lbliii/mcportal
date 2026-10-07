@@ -770,9 +770,9 @@ test('browser: every handle is a door: @names open their space and come back to 
         window.__calls.push({ name, args });
         if (name === 'open_space') return answer({ content: [], structuredContent: { space: { handle: args.handle, displayName: args.handle.toUpperCase(), mine: false, followers: 2, following: false, posts: [], sources: [], createdAt: now, updatedAt: now } } });
         if (name === 'relationship') return answer({ content: [], structuredContent: { handle: args.handle, layoutChanged: false } });
-        if (args.id === 's_ben') return answer({ content: [], structuredContent: { share: { id: 's_ben', kind: 'link', title: 'A post by cy', url: 'https://example.com/cy', audience: 'mcportal', createdAt: now,
+        if (args.id === 's_ben') return answer({ content: [], structuredContent: { share: { id: 's_ben', kind: 'link', title: 'A post by cy', url: 'https://example.com/cy', audience: 'everyone', createdAt: now,
           author: { handle: 'ben' }, mine: false, reblogCount: 1, canReblog: true, reblogOf: { root: 's_cy' }, original: { id: 's_cy', author: { handle: 'cy' }, note: "Cy's own words." }, canFollow: ['cy'] } } });
-        return answer({ content: [], structuredContent: { share: { id: 's_fay', kind: 'clip', title: 'Just for fay', clip: { kind: 'quote', data: { kind: 'quote', text: 'Cats are liquid.' } }, note: 'Worth a look.', audience: 'mcportal', createdAt: now,
+        return answer({ content: [], structuredContent: { share: { id: 's_fay', kind: 'clip', title: 'Just for fay', clip: { kind: 'quote', data: { kind: 'quote', text: 'Cats are liquid.' } }, note: 'Worth a look.', audience: 'everyone', createdAt: now,
           author: { handle: 'fay' }, mine: false, reblogCount: 0, canReblog: true, canFollow: ['fay'] } } });
       }
       const res = await real(url, init);
@@ -947,12 +947,12 @@ test('browser: Space links: the room offers a follow of whoever brought you, say
     await page.eval(`document.querySelector('#intros .handle').click()`);
     await page.waitFor(`!document.getElementById('reader').hidden && document.querySelector('#reader .space-head')`, 'a space');
     assert.equal(await page.eval(`getComputedStyle(document.getElementById('intros')).display`), 'none');
-    assert.ok(await page.eval(`document.querySelector('#reader .space-head').textContent.includes('Copy link to your space')`), 'your own space offers its link');
+    assert.ok(await page.eval(`document.querySelector('#reader .space-printshop').textContent.includes('Copy link to your space')`), 'your own space offers its link');
     // Your space says whether you're findable, and switches it.
-    await page.eval(`[...document.querySelectorAll('#reader .space-head .btn')].find((b) => b.textContent === 'Unlisted: list me').click()`);
-    await page.waitFor(`[...document.querySelectorAll('#reader .space-head .btn')].some((b) => b.textContent.startsWith('Listed:'))`, 'listed');
+    await page.eval(`[...document.querySelectorAll('#reader .space-printshop .btn')].find((b) => b.textContent === 'Unlisted: list me').click()`);
+    await page.waitFor(`[...document.querySelectorAll('#reader .space-printshop .btn')].some((b) => b.textContent.startsWith('Listed:'))`, 'listed');
     assert.deepEqual(await page.eval(`window.__calls.at(-1)`), { name: 'set_public_profile', args: { listed: true } });
-    await page.eval(`[...document.querySelectorAll('#reader .space-head .btn')].find((b) => b.textContent.includes('Copy link')).click()`);
+    await page.eval(`[...document.querySelectorAll('#reader .space-printshop .btn')].find((b) => b.textContent.includes('Copy link')).click()`);
     await page.waitFor(`/mcportal\\.example\\/@reader|Copied your Space link/.test(document.getElementById('toast').textContent)`, 'the link copied or shown');
     await page.eval(`document.querySelector('#reader .reader-top button').click()`);
     await page.waitFor(`document.getElementById('reader').hidden`, 'back to the room');

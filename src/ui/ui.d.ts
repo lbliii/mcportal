@@ -102,7 +102,7 @@ declare global {
    * URLs, each portal's fallback art style, the agent's edition and the room's lead
    * (open_room), and the labs on.
    */
-  type RoomState = { profile: Profile | null; identity: Identity | null; portals: Map<string, PortalResult>; saved: Set<string>; art: Map<string, number>; edition?: RoomEdition | undefined; lead?: Lead | undefined; labs: string[]; alsoShared: Map<string, string> };
+  type RoomState = { profile: Profile | null; identity: Identity | null; portals: Map<string, PortalResult>; saved: Set<string>; art: Map<string, number>; edition?: RoomEdition | undefined; lead?: Lead | undefined; labs: string[]; alsoShared: Map<string, NonNullable<ToolResults['open_room']['alsoShared']>[number]> };
 
   // ---- Admin page data (src/admin.ts: /admin/api/state and the POST actions).
   // admin.ts builds reports and usage as `unknown`, so their shapes are spelled out here

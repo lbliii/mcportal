@@ -14,6 +14,8 @@
  * Left out on purpose: anything that deletes everything or imports (deleteAll,
  * import), moderation and admin, and account deletion. Those stay on their pages.
  */
+import { SPACE_INPUT } from '../space-input.ts';
+import type { PublicProfileInput } from '../public-profiles.ts';
 import { clipInput } from '../portability.ts';
 import { buildClip, CLIP_LIMITS, newClipId, type ClipKind } from '../clips.ts';
 import { buildEdition } from '../editions.ts';
@@ -64,7 +66,10 @@ const portalsOf = (profile: Profile) => profile.columns.flatMap((c) => c.panels)
  * can tell "me" from "them").
  */
 function publicRef<P extends { accountId: string; handle: string }>(profile: P, ctx: ToolContext): P {
-  return profile.accountId === ctx.userId ? profile : { ...profile, accountId: `@${profile.handle}` };
+  if (profile.accountId === ctx.userId) return profile;
+  const copy = { ...profile, accountId: `@${profile.handle}` };
+  if ('broughtAboard' in copy) delete copy.broughtAboard;
+  return copy;
 }
 
 /** An "@handle" from publicRef back to the account, as the caller may see it; or the caller's own id. */
@@ -187,9 +192,9 @@ export const API_METHODS: Record<string, ApiMethod> = {
       return found ? { ...found, profile: publicRef(found.profile, ctx) } : null;
     }),
   /** Featured sources must be portals in the room, as set_public_profile picks them. */
-  'profiles.set': params<{ handle?: string; displayName?: string; bio?: string; spaceTitle?: string; accent?: string; reblogs?: string; sources?: Array<{ title?: string; source: string; config: unknown }> }>(
+  'profiles.set': params<PublicProfileInput>(
     { type: 'object', additionalProperties: false, properties: {
-      handle, displayName: { type: 'string', maxLength: 50 }, bio: { type: 'string', maxLength: 160 }, spaceTitle: { type: 'string', maxLength: 60 }, accent: { type: 'string', maxLength: 20 }, reblogs: { type: 'string', enum: REBLOG_RULES },
+      handle, displayName: { type: 'string', maxLength: 50 }, bio: { type: 'string', maxLength: 160 }, spaceTitle: { type: 'string', maxLength: 60 }, ...SPACE_INPUT, listed: { type: 'boolean' }, reblogs: { type: 'string', enum: REBLOG_RULES },
       sources: { type: 'array', maxItems: 12, items: { type: 'object', required: ['source', 'config'], additionalProperties: false, properties: { title: { type: 'string', maxLength: 80 }, source: { type: 'string', maxLength: 20 }, config: {} } } },
     } },
     async (input, ctx) => {
@@ -198,11 +203,13 @@ export const API_METHODS: Record<string, ApiMethod> = {
         const stray = input.sources.find((s) => !room.has(`${s.source}|${JSON.stringify(s.config)}`));
         if (stray) throw new AppError('invalid_argument', `Only portals in the room can be featured (${clean(stray.title ?? stray.source, 60)} isn't one).`);
       }
-      return profilesOf(ctx).set(ctx.userId, input);
+      return socialOf(ctx).setSpace(ctx.userId, input);
     }, 'write'),
   'profiles.remove': params(NO_PARAMS, async (_p, ctx) => (await profilesOf(ctx).remove(ctx.userId)) ?? null, 'write'),
+  'profiles.restoreAppearance': params<{ appearance: unknown }>({ type: 'object', required: ['appearance'], additionalProperties: false, properties: { appearance: { type: 'object' } } }, async (p, ctx) => profilesOf(ctx).restoreAppearance(ctx.userId, p.appearance), 'write'),
 
   // ---- social, always as the token's account
+  'social.spaceDetails': params<{ accountId: string }>({ type: 'object', required: ['accountId'], additionalProperties: false, properties: { accountId: { type: 'string' } } }, async (p, ctx) => socialOf(ctx).spaceDetails(ctx.userId, await accountOf(p.accountId, ctx))),
   'social.resolve': params<{ handle: string }>({ type: 'object', required: ['handle'], additionalProperties: false, properties: { handle } },
     async (p, ctx) => publicRef(await socialOf(ctx).resolve(ctx.userId, p.handle), ctx)),
   /** A clip or saved item the server looks up itself, as the share tool does; never content from the request. */

@@ -95,7 +95,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (process.argv.includes('--ceilings')) {
     const ceilings = {
       totals: Object.fromEntries(PROFILES.map((p) => [p, results[p].total])),
-      tools: Object.fromEntries(active.tools.map((t) => [t.name, t.tokens]).sort(([a], [b]) => String(a).localeCompare(String(b)))),
+      tools: Object.fromEntries([...new Map(PROFILES.flatMap((p) => results[p].tools).map((t) => [t.name, t])).values()].map((t) => [t.name, t.tokens]).sort(([a], [b]) => String(a).localeCompare(String(b)))),
     };
     await writeFile(new URL('../test/footprint-ceilings.json', import.meta.url), `${JSON.stringify(ceilings, null, 2)}\n`);
     console.log('Wrote test/footprint-ceilings.json');

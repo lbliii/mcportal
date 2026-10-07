@@ -201,6 +201,11 @@ for (const b of BACKENDS) {
     assert.equal(page[0]!.title, 's119', 'newest first');
     assert.equal((await store.sharesBy([alice], {})).length, 30, 'default page');
     assert.deepEqual((await store.sharesBy([alice], { limit: 2, before: at(10) })).map((s) => s.title), ['s9', 's8']);
+    const tiedOwner = user('tied');
+    for (let i = 0; i < 105; i++) await store.addShare({ ...share(200), accountId: tiedOwner, id: `${tiedOwner}-${String(i).padStart(3, '0')}` });
+    const tied = await store.sharesBy([tiedOwner], { limit: 100 });
+    const tail = await store.sharesBy([tiedOwner], { limit: 100, before: tied.at(-1)!.createdAt, beforeId: tied.at(-1)!.id });
+    assert.equal(new Set([...tied, ...tail].map((s) => s.id)).size, 105, 'timestamp ties paginate without skipping or duplicating posts');
     assert.equal(await store.setHidden(`${alice}-s119`, at(200)), true);
     assert.equal((await store.sharesBy([alice], { limit: 1 }))[0]!.title, 's118', 'hidden shares are left out');
     assert.ok((await store.sharesBy([alice], { limit: 1, includeHidden: true }))[0]!.hiddenAt, 'unless asked for');
@@ -222,7 +227,7 @@ for (const b of BACKENDS) {
     assert.ok((await store.reports('resolved')).some((r) => r.id === report.id));
 
     // Reblogs: found and counted by their original; one per account per original.
-    const reblog = (by: string, i: number, root: string): Share => ({ id: `${by}-rb${i}`, accountId: by, kind: 'link', title: 'r', audience: 'mcportal', createdAt: at(400 + i), reblogOf: { root } });
+    const reblog = (by: string, i: number, root: string): Share => ({ id: `${by}-rb${i}`, accountId: by, kind: 'link', title: 'r', audience: 'everyone', createdAt: at(400 + i), reblogOf: { root } });
     const root = `${alice}-s50`;
     await store.addShare(reblog(bob, 1, root));
     await store.addShare(reblog(alice, 2, root));

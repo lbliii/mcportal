@@ -100,18 +100,18 @@ function linkKey(url: string): string {
  * the user doesn't follow shared with everyone, one name per story, newest share first.
  * Only public posts; never the user, people they follow, mute or block.
  */
-async function alsoSharedIn(portals: PortalResult[], ctx: ToolContext): Promise<Array<{ url: string; handle: string }>> {
+async function alsoSharedIn(portals: PortalResult[], ctx: ToolContext): Promise<NonNullable<ToolResults['open_room']['alsoShared']>> {
   if (!ctx.social) return [];
   const inRoom = new Map<string, string>();
   for (const portal of portals) if (portal.source !== 'following' && portal.source !== 'lobby') for (const item of portal.items) if (item.url) inRoom.set(linkKey(item.url), item.url);
   if (!inRoom.size) return [];
   try {
-    const out = new Map<string, string>();
+    const out = new Map<string, NonNullable<ToolResults['open_room']['alsoShared']>[number]>();
     for (const share of await ctx.social.lobby(ctx.userId, { limit: 100 }, { unfollowedOnly: true })) {
       const url = share.url ? inRoom.get(linkKey(share.url)) : undefined;
-      if (url && !out.has(url)) out.set(url, share.author.handle);
+      if (url && !out.has(url)) out.set(url, { url, handle: share.author.handle, ...(share.author.cover ? { cover: share.author.cover } : {}) });
     }
-    return [...out].map(([url, handle]) => ({ url, handle }));
+    return [...out.values()];
   } catch {
     return [];   // a nicety, never a failure
   }

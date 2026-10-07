@@ -218,7 +218,7 @@ test('pg social: shares, feed rules, relations, hiding, reports, forget; schema 
   const store = new PgSocialStore(db);
   const social = new Social({ store, profiles, now: () => (now += 1000) });
   for (let i = 0; i < 45; i++) await social.share('pa', { kind: 'link', title: `f${i}`, url: `https://example.com/${i}` });
-  const pub = await social.share('pa', { kind: 'link', title: 'public', url: 'https://example.com/p', audience: 'mcportal' });
+  const pub = await social.share('pa', { kind: 'link', title: 'public', url: 'https://example.com/p', audience: 'everyone' });
   await social.follow('pb', 'pg_alice');
   const first = await social.feed('pb', { limit: 30 });
   assert.equal(first.length, 30);

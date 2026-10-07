@@ -116,12 +116,13 @@
     const claim = el('button', { class: 'btn primary', type: 'button' }, 'Claim');
     // Being findable is its own choice, asked plainly and off by default (docs/plans/finding-people.md).
     const listed = el('input', { type: 'checkbox' });
+    const publicSpace = el('input', { type: 'checkbox' }); publicSpace.checked = true;
     const submit = async () => {
       const handle = input.value.trim().replace(/^@/, '');
       if (!handle) { input.focus(); return; }
       claim.disabled = true; input.disabled = true; problem.hidden = true;
       try {
-        const { profile } = (await callTool('set_public_profile', { handle, listed: listed.checked })).structuredContent;
+        const { profile } = (await callTool('set_public_profile', { handle, listed: listed.checked, public: publicSpace.checked })).structuredContent;
         if (state.identity && state.identity.mode !== 'ghost') drawIdentity({ ...state.identity, handle: profile.handle });
         toast(`You're @${profile.handle}.`);
         loadSpace('', false);
@@ -139,6 +140,7 @@
       el('p', null, 'Your handle is how people on MCPortal find you, follow you and see what you share. It makes a public profile and your Space; the rest of your room stays private.'),
       el('label', { class: 'who-claim' }, el('span', { 'aria-hidden': 'true' }, '@'), input),
       el('p', { class: 'muted' }, '2 to 30 letters, digits or underscores. You can change it later.'),
+      el('label', { class: 'who-list' }, publicSpace, 'Public Space: anyone on the web can read it'),
       el('label', { class: 'who-list' }, listed, 'List me, so people with similar sources can find me'),
       problem,
       el('div', { class: 'who-actions' },

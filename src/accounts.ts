@@ -233,6 +233,11 @@ export class Accounts {
     });
   }
 
+  createdAt(accountId: string): number | undefined {
+    this.refresh();
+    return this.doc?.accounts[accountId]?.createdAt;
+  }
+
   /** Role and status for the access gate. Unknown accounts are plain active users (bootstrap/legacy). */
   actor(accountId: string): { accountId: string; role: Role; status: AccountStatus; login?: string } {
     this.refresh();

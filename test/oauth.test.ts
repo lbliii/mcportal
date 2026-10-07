@@ -681,7 +681,7 @@ test('admin moderation: reports show on the admin page; hide, unhide and dismiss
   const social = new Social({ store: new DocumentSocialStore(), profiles: publicProfiles });
   await publicProfiles.set('github-7', { handle: 'spammer' });
   await publicProfiles.set('github-8', { handle: 'reader' });
-  const share = await social.share('github-7', { kind: 'link', title: 'Buy now', url: 'https://spam.example/', note: 'cheap', audience: 'mcportal' });
+  const share = await social.share('github-7', { kind: 'link', title: 'Buy now', url: 'https://spam.example/', note: 'cheap', audience: 'everyone' });
   const report = await social.report('github-8', { shareId: share.id }, 'spam');
   const app = await startApp({ github: { clientId: 'gh-client', clientSecret: 'gh-secret' } }, fakeUpstreams(users).fetcher, { accounts, publicProfiles, social });
   const cookieOf = (res: { headers: Record<string, string | string[] | undefined> }, name: string) =>
@@ -726,7 +726,7 @@ test('space links: /@handle shows only the handle until you sign in there; signi
   const social = new Social({ store: new DocumentSocialStore(), profiles: publicProfiles });
   const ana = await accounts.admit({ githubId: 99, login: 'ana' });
   assert.ok(ana.ok);
-  await publicProfiles.set(ana.account.id, { handle: 'ana', bio: 'A bio only for people signed in' });
+  await publicProfiles.set(ana.account.id, { handle: 'ana', bio: 'A bio only for people signed in', public: false });
   const app = await startApp({ github: { clientId: 'gh-client', clientSecret: 'gh-secret' } }, fakeUpstreams(users).fetcher, { accounts, publicProfiles, social });
   const cookieOf = (res: { headers: Record<string, string | string[] | undefined> }, name: string) =>
     ([] as string[]).concat(res.headers['set-cookie'] ?? []).map((c) => c.split(';')[0]!).find((c) => c.startsWith(`${name}=`) && c.length > name.length + 1);
@@ -759,7 +759,7 @@ test('space links: /@handle shows only the handle until you sign in there; signi
     assert.ok((await accounts.forIdentity({ githubId: 7, login: 'Newbie' }))?.id === newbie, 'the account exists now');
     assert.match((await raw(app.port, { path: '/@ana', headers: { cookie: session } })).body, /offers to follow @ana/);
     assert.match((await raw(app.port, { path: '/account', headers: { cookie: session } })).body, /Signed-in apps and devices/, 'the same sign-in serves the account page');
-    assert.deepEqual(await social.takeIntros(newbie), { offer: ['ana'], joined: [] });
+    assert.deepEqual(await social.takeIntros(newbie), { offer: ['ana'], joined: [], covers: { ana: (await publicProfiles.get(ana.account.id))!.cover! } });
     await publicProfiles.set(newbie, { handle: 'newbie' });
     assert.deepEqual((await social.takeIntros(ana.account.id)).joined, ['newbie'], 'ana hears that someone joined through her link');
 

@@ -430,26 +430,6 @@
     .docs-toggle { display: inline-flex; }
   }
   :root:not(.fullscreen) .reader.space { max-height: 860px; }
-  .space-head { border-top: 4px solid var(--mp-space-accent); padding-top: 14px; margin-bottom: 18px; }
-  .space-head h1 { margin: 0 0 2px; }
-  .space-head .who { color: var(--mp-text-secondary); }
-  .space-head .bio { font-size: var(--mp-type-15); margin: 8px 0; max-width: 640px; }
-  .space-head .row { display: flex; flex-wrap: wrap; gap: var(--mp-space-8); align-items: center; color: var(--mp-text-secondary); font-size: var(--mp-type-12-5); }
-  .space-head .btn.follow { border-color: var(--mp-border-selected); color: var(--mp-action-primary); font-weight: 600; }
-  .space-head .btn.follow[aria-pressed="true"] { background: var(--mp-action-primary); color: var(--mp-action-on-primary); }
-  .space h2 { font-size: var(--mp-type-13); text-transform: uppercase; letter-spacing: .06em; color: var(--mp-text-secondary); margin: 22px 0 10px; }
-  .posts { columns: 3 250px; column-gap: var(--mp-space-12); }
-  .post { break-inside: avoid; margin: 0 0 12px; border: 1px solid var(--mp-border-divider); border-radius: var(--mp-radius-card); overflow: hidden; background: var(--mp-surface-canvas); cursor: pointer; }
-  .post:hover, .post:focus-visible { border-color: var(--mp-space-accent); outline: none; }
-  .post .pc { padding: var(--mp-space-10) var(--mp-space-12); }
-  .post img { display: block; width: 100%; background: #fff; }
-  .post .pq { font-size: var(--mp-type-16); line-height: 1.45; white-space: pre-wrap; border-left: 3px solid var(--mp-space-accent); padding-left: 10px; margin: 0 0 6px; display: -webkit-box; -webkit-line-clamp: 8; -webkit-box-orient: vertical; overflow: hidden; }
-  .post .pt { font-weight: 600; line-height: 1.3; margin: 0 0 4px; }
-  .post .pn { color: var(--mp-text-primary); margin: 6px 0 0; white-space: pre-wrap; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }
-  .post .pm { color: var(--mp-text-secondary); font-size: var(--mp-type-11-5); margin-top: var(--mp-space-8); display: flex; gap: var(--mp-space-8); flex-wrap: wrap; }
-  .post .mini { font-size: var(--mp-type-12); border-collapse: collapse; width: 100%; }
-  .post .mini td, .post .mini th { border-bottom: 1px solid var(--mp-border-divider); padding: 3px 5px; text-align: left; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .post .body-lines p { margin: 0 0 4px; }
   .sources { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--mp-space-8); }
   .source { border: 1px solid var(--mp-border-divider); border-radius: var(--mp-radius-card); padding: var(--mp-space-8) var(--mp-space-10); display: flex; gap: var(--mp-space-8); align-items: center; }
   .source .st { flex: 1; min-width: 0; }

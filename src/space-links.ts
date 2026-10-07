@@ -10,6 +10,9 @@
  * owner hears so once (Social.introduce). Being signed in to the account page counts too.
  * A handle that doesn't exist, is suspended, or blocks you looks the same: nobody here.
  */
+import { createHash } from 'node:crypto';
+import { RateLimiter } from './lib/rate-limit.ts';
+import { publicSpacePage, publicSpaceFeed, previewMeta } from './spaces.ts';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Accounts } from './accounts.ts';
 import type { OAuthServer } from './auth/oauth.ts';
@@ -21,7 +24,7 @@ import type { PageSessions } from './page-sessions.ts';
 import type { PublicProfiles } from './public-profiles.ts';
 import type { Social } from './social.ts';
 
-const ROUTE = /^\/@([a-z0-9_]{2,30})(\/signin)?$/;
+const ROUTE = /^\/@([a-z0-9_]{2,30})(\/(?:signin|feed))?$/;
 const HEADERS = { 'x-robots-tag': 'noindex, nofollow' };
 
 export interface SpaceLinkDeps {
@@ -33,27 +36,36 @@ export interface SpaceLinkDeps {
   sessions: PageSessions;
   publicUrl: string;
   log?: Logger | undefined;
+  trustProxy?: boolean | undefined;
+  now?: (() => number) | undefined;
 }
 
 export class SpaceLinks {
   private deps: SpaceLinkDeps;
+  private limits: RateLimiter;
+  private cache = new Map<string, { signature: string; at: number; page: string; feed: string }>();
 
   constructor(deps: SpaceLinkDeps) {
     this.deps = deps;
+    this.limits = new RateLimiter(120, 60_000, deps.now);
   }
 
   /** Returns true if it handled the request. */
   async handle(req: IncomingMessage, res: ServerResponse, url: URL): Promise<boolean> {
-    if (req.method !== 'GET') return false;
+    if (req.method !== 'GET' && req.method !== 'HEAD') return false;
     let path: string;
     try { path = decodeURIComponent(url.pathname).replace(/\/+$/, '').toLowerCase(); } catch { return false; }
     const match = ROUTE.exec(path);
     if (!match) return false;
     const handle = match[1]!;
+    const hops = this.deps.trustProxy ? String(req.headers['x-forwarded-for'] ?? '').split(',').map((s) => s.trim()).filter(Boolean) : [];
+    const ip = hops.at(-1) || req.socket.remoteAddress || 'unknown';
+    if (!this.limits.take(ip)) { sendHtml(res, 429, page('Slow down', '<p>Try again in a minute.</p>'), { ...HEADERS, 'retry-after': '60' }); return true; }
     const owner = await this.deps.publicProfiles.byHandle(handle);
     if (!owner || this.deps.accounts.actor(owner.profile.accountId).status !== 'active') return this.nobody(res, handle), true;
 
-    if (match[2]) {
+    if (match[2] === '/signin') {
+      if (req.method !== 'GET') { this.nobody(res, handle); return true; }
       this.deps.oauth.beginPageSignIn(req, res, async (who, out, clearCookie) => {
         if ('error' in who) return sendHtml(out, 400, page('Sign-in failed', `<p>${escapeHtml(who.error)}.</p><p><a class="button primary" href="/@${handle}/signin">Try again</a></p>`, { door: 'shut', kicker: 'Signal lost' }), { ...clearCookie, ...HEADERS });
         const existed = Boolean(await this.deps.accounts.forIdentity(who));
@@ -72,6 +84,34 @@ export class SpaceLinks {
     const viewer = current?.session.accountId;
     const outcome = viewer ? await this.introduce(viewer, handle, false) : undefined;
     if (outcome === 'hidden') return this.nobody(res, handle), true;
+    if (!owner.profile.private) {
+      const profile = owner.profile;
+      // Check visibility anew before using any cached HTML: a hide, deletion, block or
+      // private switch takes effect on this request, including another writer's changes.
+      const [posts, details] = await Promise.all([
+        this.deps.social.sharesOf('', profile.accountId, { limit: 50 }),
+        this.deps.social.spaceDetails('', profile.accountId),
+      ]);
+      const { accountId: _id, travelers: _travelers, broughtAboard: _brought, ...pub } = profile;
+      const space = { ...pub, ...details, mine: false, followers: 0, following: false, posts, sources: profile.sources ?? [], link: new URL(`/@${profile.handle}`, this.deps.publicUrl).href };
+      const signature = createHash('sha256').update(JSON.stringify(space)).digest('hex');
+      const now = (this.deps.now ?? Date.now)();
+      let cached = this.cache.get(handle);
+      if (!cached || cached.signature !== signature || now - cached.at > 60_000) {
+        cached = { signature, at: now, page: publicSpacePage(space, this.deps.publicUrl), feed: publicSpaceFeed(space, this.deps.publicUrl) };
+        if (this.cache.size >= 300) this.cache.delete(this.cache.keys().next().value!);
+        this.cache.set(handle, cached);
+      }
+      if (match[2] === '/feed') {
+        res.writeHead(200, { ...HEADERS, 'content-type': 'application/rss+xml; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' });
+        res.end(req.method === 'HEAD' ? undefined : cached.feed);
+      } else {
+        sendHtml(res, 200, req.method === 'HEAD' ? '' : cached.page, HEADERS);
+      }
+      return true;
+    }
+    this.cache.delete(handle);
+    if (match[2] === '/feed') { this.nobody(res, handle); return true; }
     const at = `@${escapeHtml(owner.profile.handle)}`;
     const mcp = escapeHtml(`${this.deps.publicUrl}/mcp`);
     const ask = `<p>Ask your agent:</p><p><code>open ${at}'s space</code></p>`;
@@ -98,7 +138,7 @@ export class SpaceLinks {
       body = `<h1>${at} is on MCPortal</h1>${done}${ask}
 <h2>Haven't added MCPortal to your agent yet?</h2>${connect}`;
     }
-    sendHtml(res, 200, page(`@${owner.profile.handle}`, body, { door: 'open', kicker: viewer ? 'Signed in' : 'A door has opened!' }), HEADERS);
+    sendHtml(res, 200, page(`@${owner.profile.handle}`, body, { door: 'open', kicker: viewer ? 'Signed in' : 'A door has opened!', head: previewMeta(owner.profile.handle, owner.profile.cover, this.deps.publicUrl) }), HEADERS);
     return true;
   }
 

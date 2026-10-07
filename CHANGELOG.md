@@ -2,7 +2,15 @@
 
 ## Unreleased
 
+### Spaces that feel like someone's
+- **Your own cover and format:** eight paperback ink sets, five motifs, a stored random composition, and paperback, magazine or patch formats. The print shop saves choices, re-rolls the cover and sets web visibility. The same escaped renderer draws chat cards and script-free public pages, with narrow, dark and forced-colors support. Patch avatars appear on social subject surfaces.
+- **Your expression:** pin one of your own posts, choose up to four transmitting topics and six listed fellow travelers, and hide earned stamps. Stamps mark charter membership, bringing people aboard, ten weeks of posting and the Space's volume; they never rank people.
+- **Read on the web:** a claimed Space is public by default at `/@handle`, with a separate unchecked listing choice. Its RSS feed contains the latest fifty visible posts. Followers-only posts stay private; hidden, removed and private originals cannot leak through reblogs. Public quotes stop at 400 characters; other clips require sign-in. Forty prerendered cover previews ship with the server. Pages and feeds are rate-limited, rechecked before cache reuse and marked `noindex, nofollow`.
+- **Updated privacy and portability:** turning off Public Space withdraws the page and feed on the next request; copies and feed-reader caches cannot be recalled. Export version 2 includes Space fields; imports map old accents and restore validated cover plates without changing privacy or trusting stamp counts. No database migration.
+- **Linked clients must update to 0.10.0:** `accent` becomes `ink`/`motif`, and the share audience `mcportal` becomes `everyone`. The state API's minimum client version is raised in this release. Hosted connectors update with the deployment; local clients and plugins need the new release.
+
 ### Room layouts
+- River is a standard layout, available without a lab flag.
 - Reader and source controls stay visible while scrolling, stacking below the main toolbar. Rows wrap on narrow screens, and docs navigation and restored passages account for their height.
 
 ## v0.9.2 — 2026-10-07
