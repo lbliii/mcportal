@@ -39,7 +39,7 @@ Layouts are `columns`, `shelves` and `river`. With the `frontpage` lab on, `buil
 | `list_sources` | `RO` | Lists the source types and the settings each accepts. | none |
 | `import_opml` | `OW` | Imports subscriptions from another feed reader. Working feeds become portals; a new user's room is built from their folders. | `opml*` |
 
-Source types: `hn`, `rss`, `github`, `docs`, `saved`, `clips`, `following`. Pinned portals come only from `pin_portal`.
+Source types: `hn`, `rss`, `github`, `docs`, `saved`, `clips`, `following`, `lobby`. Pinned portals come only from `pin_portal`, and the People portal only from `suggest_people`.
 
 ## Reading
 
@@ -82,22 +82,24 @@ Hosted servers only. A local MCPortal that isn't signed in has no social layer, 
 
 | Tool | Hints | What it does | Inputs |
 |---|---|---|---|
-| `open_space` | `RO` | Opens someone's Space, or the user's own, as a card. | `handle` |
+| `open_space` | `RO` | Opens someone's Space, or the user's own, as a card, with its link and which of their sources are already in the room. | `handle` |
 | `get_public_profile` | `RO` | Returns the user's public profile and a suggested handle, or someone else's. | `handle` |
-| `set_public_profile` | `OW` | Creates or changes the public profile and Space: handle, name, bio, Space title, accent, featured portals, default reblog setting. | `handle`, `displayName`, `bio`, `spaceTitle`, `accent`, `featuredPortalIds`, `reblogs` |
+| `set_public_profile` | `OW` | Creates or changes the public profile and Space: handle, name, bio, Space title, accent, featured portals, default reblog setting, and whether `find_people` can suggest them (`listed`, off by default). | `handle`, `displayName`, `bio`, `spaceTitle`, `accent`, `featuredPortalIds`, `reblogs`, `listed` |
 | `remove_public_profile` | `D` | Removes the handle, name and bio. The handle stays reserved for 30 days. | none |
 | `share` | `OW` | Shares a saved link or clip with a note, or reblogs a post, to followers or everyone on MCPortal. | `savedUrl`, `clipId`, `reblogOf`, `note`, `audience`, `reblogs` |
 | `unshare` | `D` | Removes a share or reblog. | `id*` |
-| `get_share` | `RO` | Shows one share or reblog in full, as a card. | `id*` |
+| `get_share` | `RO` | Shows one share or reblog in full, as a card, with `canFollow` when it offers a Follow. | `id*` |
 | `share_settings` | `D` `OW` | Changes who may reblog a post, or detaches it from someone's reblog (permanent). | `id*`, `reblogs`, `detach` |
 | `list_shares` | `RO` | Lists the user's shares, or what someone shared that the user may see. | `handle`, `limit`, `before` |
 | `relationship` | `OW` | Follows, unfollows, mutes, unmutes, blocks or unblocks a person. The first follow adds a Following portal. | `handle*`, `action*` |
 | `list_connections` | `RO` | Lists who the user follows, mutes and blocks, and their follower count. | none |
+| `find_people` | `RO` | Suggests listed people who share the user's topics (`about`), sites (`sources`) or taste (`like`); with none, their room. Each comes with reasons drawn only from what they made public. | `about`, `sources`, `like` |
+| `suggest_people` | — | Keeps picks from `find_people` in the People portal, best first, each with a one-line reason. Suggestions last 30 days. | `picks*` |
 | `report` | — | Reports a share or person to the admins with a reason. | `reason*`, `shareId`, `handle` |
 
 Social tools appear in stages so they cost the model nothing until used:
 
-- `set_public_profile`, `open_space`, `relationship` and `report` are listed whenever the server has a social layer.
+- `set_public_profile`, `open_space`, `relationship`, `report`, `find_people` and `suggest_people` are listed whenever the server has a social layer.
 - The rest appear once the account has a handle, a follow, a mute or a block.
 
 ## Account
@@ -124,6 +126,7 @@ The room UI calls these through the MCP Apps bridge. They are declared with `_me
 | `create_handoff` | Stores a page and selected passage under a short code for `open_handoff` |
 | `record_reading` | Records that a URL was seen, opened or read, with progress |
 | `get_reading` | Returns where the user left off in a URL |
+| `pass_person` | The People portal's Not for me: removes the suggestion, and `find_people` remembers the pass for 90 days |
 
 ## Usage cost
 
@@ -134,7 +137,7 @@ On a hosted server each call spends units from the per-user budget ([`MCPORTAL_L
 | 20 | `import_opml`, `import_portal` |
 | 5 | `find_source`, `export_data` |
 | 3 | `open_room`, `list_new_items`, `open_handoff` |
-| 2 | `read_source`, `add_portal`, `refresh_portal`, `read_article`, `open_docs`, `read_doc_page` |
+| 2 | `read_source`, `add_portal`, `refresh_portal`, `read_article`, `open_docs`, `read_doc_page`, `find_people` |
 | 1 to 4 | `get_thumbnails` (1, plus 1 per 8 URLs) |
 | 1 | Everything else |
 

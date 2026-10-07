@@ -21,7 +21,7 @@ export interface LinkAuth {
 }
 
 export interface StateClientOptions {
-  /** The hosted MCPortal, e.g. https://mcportal-production.up.railway.app */
+  /** The hosted MCPortal, e.g. https://mcportal.lol */
   server: string;
   auth: LinkAuth;
   /** Defaults to the global fetch (keep-alive). */

@@ -55,7 +55,7 @@ Set these on the `mcportal` service:
 | `GITHUB_CLIENT_SECRET` | from the OAuth App |
 | `MCPORTAL_ADMINS` | your GitHub login (comma-separate several) |
 
-Setting admins makes the server invite-only. You then let people in from `/admin` or the admin CLI; see [Administer an instance](administer.md).
+Setting admins makes the server invite-only. You then let people in from `/admin` or the admin CLI; see [Administer an instance](administer.md). To keep admins and still let anyone with a GitHub account sign in, as the public service does, also set `MCPORTAL_OPEN_SIGNUP=1`.
 
 Then fill in the public pages. The landing page, terms, privacy, support and security pages and `/.well-known/security.txt` name whoever runs the server:
 

@@ -175,7 +175,7 @@ test('arrange_room moves portals and reports the diff; remove_portal removes onl
   // "Put GitHub on the left"
   const saved = await call(c, 'arrange_room', { move: [{ portal: 'gh-mcp', column: 1, position: 1 }] });
   assert.equal(saved.isError, undefined);
-  assert.match(saved.content[0]!.text, /moved: .*gh-mcp \(column 2 → 1\)/);
+  assert.match(saved.content[0]!.text, /moved: gh-mcp \(column 2 → 1\)\./, 'only what was asked to move, not portals that shifted around it');
   assert.equal((await call(c, 'open_room')).structuredContent.portals[0].portalId, 'gh-mcp');
   assert.deepEqual(saved.structuredContent.profile.columns.map((col: any) => col.panels.map((p: any) => p.id)), [['gh-mcp', 'hn-top'], ['simonw']], 'the emptied column is dropped; nothing else changes');
 

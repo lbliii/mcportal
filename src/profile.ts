@@ -451,6 +451,41 @@ function locate(profile: Profile): Map<string, { column: number; index: number; 
   return map;
 }
 
+/**
+ * The portals that moved, as a person would say it: the fewest portals whose moving explains the
+ * new layout. Portals that only shifted because others were added, removed or moved around them,
+ * or because an emptied column closed up, didn't move. Read every column top to bottom, left to
+ * right: the portals that keep their order (the longest run in common, preferring portals still in
+ * their old column) stayed put; the rest moved. Of two neighbours that stayed in order but are now
+ * split into, or joined in, one column, the one whose column number changed moved.
+ */
+function movedPortals(before: Profile, after: Profile, a: ReturnType<typeof locate>, b: ReturnType<typeof locate>): Set<string> {
+  const order = (p: Profile, other: ReturnType<typeof locate>) => p.columns.flatMap((c) => c.panels.map((portal) => portal.id)).filter((id) => other.has(id));
+  const was = order(before, b);
+  const now = order(after, a);
+  const weight = (id: string) => (a.get(id)!.column === b.get(id)!.column ? 2 : 1);
+  // Heaviest common subsequence: best[i][j] for was[i..] and now[j..].
+  const best = Array.from({ length: was.length + 1 }, () => new Array<number>(now.length + 1).fill(0));
+  for (let i = was.length - 1; i >= 0; i--) {
+    for (let j = now.length - 1; j >= 0; j--) {
+      best[i]![j] = was[i] === now[j] ? weight(was[i]!) + best[i + 1]![j + 1]! : Math.max(best[i + 1]![j]!, best[i]![j + 1]!);
+    }
+  }
+  const kept: string[] = [];
+  for (let i = 0, j = 0; i < was.length && j < now.length;) {
+    if (was[i] === now[j]) { kept.push(was[i]!); i++; j++; }
+    else if (best[i + 1]![j]! >= best[i]![j + 1]!) i++;
+    else j++;
+  }
+  const moved = new Set(was.filter((id) => !kept.includes(id)));
+  for (let k = 1; k < kept.length; k++) {
+    const [x, y] = [kept[k - 1]!, kept[k]!];
+    const together = (m: ReturnType<typeof locate>) => m.get(x)!.column === m.get(y)!.column;
+    if (together(a) !== together(b)) moved.add(a.get(y)!.column !== b.get(y)!.column ? y : x);
+  }
+  return moved;
+}
+
 /** What changed between two layouts, by portal id. */
 export function diffProfiles(before: Profile, after: Profile): ProfileDiff {
   const a = locate(before);
@@ -463,13 +498,14 @@ export function diffProfiles(before: Profile, after: Profile): ProfileDiff {
     const was = before.columns[i];
     if (was && was.width !== c.width) diff.settings.push(`column ${i + 1} width ${was.width} → ${c.width}`);
   });
+  const moved = movedPortals(before, after, a, b);
   for (const [id, was] of a) {
     const now = b.get(id);
     if (!now) {
       diff.removed.push(id);
       continue;
     }
-    if (was.column !== now.column || was.index !== now.index) diff.moved.push(`${id} (column ${was.column + 1} → ${now.column + 1})`);
+    if (moved.has(id)) diff.moved.push(`${id} (column ${was.column + 1} → ${now.column + 1})`);
     if ((was.portal.title ?? '') !== (now.portal.title ?? '')) diff.retitled.push(id);
     if (JSON.stringify(was.portal.config) !== JSON.stringify(now.portal.config) || was.portal.source !== now.portal.source) diff.reconfigured.push(id);
   }

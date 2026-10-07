@@ -58,7 +58,9 @@ Candidates are tried one at a time, nearest first, because some sites answer bur
 
 For **each page**, MCPortal asks the page's URL for markdown first (`Accept: text/markdown`), then tries the URL with `.md` appended, then falls back to the HTML reader. The route that worked is remembered per host, so later pages go straight to it.
 
-**GitHub repos** take their own route. One API call lists the repo's files, and a docs folder's markdown becomes the pages, ordered by `SUMMARY.md` or `_sidebar.md` when there is one. GitHub URLs never go through the generic ladder: walking up from a repo would find GitHub's own `llms.txt`.
+**GitHub repos** take their own route, so a project's docs can be read straight from the repo, with no docs site at all. Give it `owner/repo` or a folder link. One API call lists the repo's files, and a docs folder's markdown becomes the pages, ordered by `SUMMARY.md` or `_sidebar.md` when there is one. Without a folder, MCPortal picks the usual one (`docs`, `doc`, `book/src`, `website/docs` and so on), or the README. Translated docs keep English.
+
+Without an outline file, each top-level folder is a section. Pages in deeper folders stay together inside their section, each folder led by its README or index, and their titles name the folder: uv's `docs/concepts/projects/workspaces.md` is **Projects › Workspaces** under **Concepts**. GitHub URLs never go through the generic ladder: walking up from a repo would find GitHub's own `llms.txt`. Public repos only.
 
 ### Judge bodies, not status codes
 
