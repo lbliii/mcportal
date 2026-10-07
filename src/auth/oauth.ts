@@ -101,7 +101,28 @@ export function isAllowedRedirectUri(value: string): boolean {
     if (url.hash || url.username || url.password) return false;
     if (url.protocol === 'https:') return true;
     // Native / CLI clients use loopback redirects (RFC 8252).
-    return url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+    return url.protocol === 'http:' && LOOPBACK_HOSTS.includes(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
+const LOOPBACK_HOSTS = ['localhost', '127.0.0.1', '[::1]'];
+
+/**
+ * Does a request-time redirect_uri match a registered one? Exact match, except that a
+ * loopback redirect may use any port (RFC 8252 §7.3): native clients such as Codex
+ * register `http://127.0.0.1/callback` and listen on whatever port the OS hands them.
+ */
+export function redirectUriMatches(registered: string, requested: string): boolean {
+  if (registered === requested) return true;
+  try {
+    const a = new URL(registered);
+    const b = new URL(requested);
+    if (a.protocol !== 'http:' || b.protocol !== 'http:' || !LOOPBACK_HOSTS.includes(a.hostname)) return false;
+    a.port = '';
+    b.port = '';
+    return a.href === b.href && !b.username && !b.password && !b.hash;
   } catch {
     return false;
   }
@@ -359,7 +380,7 @@ export class OAuthServer {
     const q = url.searchParams;
     const client = await this.resolveClient(q.get('client_id') ?? '');
     const redirectUri = q.get('redirect_uri') ?? (client.redirectUris.length === 1 ? client.redirectUris[0]! : '');
-    if (!client.redirectUris.includes(redirectUri)) throw new OAuthError('invalid_request', 'redirect_uri is not registered for this client');
+    if (!client.redirectUris.some((registered) => redirectUriMatches(registered, redirectUri))) throw new OAuthError('invalid_request', 'redirect_uri is not registered for this client');
     if (q.get('response_type') !== 'code') throw new OAuthError('unsupported_response_type', 'Only response_type=code is supported');
     const challenge = q.get('code_challenge') ?? '';
     if (q.get('code_challenge_method') !== 'S256' || !/^[A-Za-z0-9_-]{43}$/.test(challenge)) {
