@@ -173,7 +173,7 @@ export const ROOM_TOOLS: ToolDef[] = [
     name: 'build_room',
     title: 'Build the room from starter packs',
     access: 'write',
-    description: `Set up the user's room from up to ${MAX_PACKS} starter packs (ids from open_room's setup). Replaces the layout, keeping saved items: confirm first if they built the room themselves. An empty list keeps the sample room and finishes setup. Then call open_room.`,
+    description: `Set up the room from up to ${MAX_PACKS} packs (ids in open_room). Replaces its layout, keeps saved items: confirm if the user built it. An empty list keeps the room and finishes setup. Then open_room.`,
     inputSchema: {
       type: 'object',
       required: ['packs'],
@@ -212,7 +212,7 @@ export const ROOM_TOOLS: ToolDef[] = [
     name: 'arrange_room',
     title: 'Arrange the room',
     access: 'write',
-    description: "Change the room's layout: move portals (to a column, 1 = left; one past the last makes a new column), set column widths, retitle portals or change their settings, rename the room, or switch layout or how stories open. Name portals by id or title (open_room lists them); only what you name changes. Removing is remove_portal.",
+    description: "Arrange portals by id/title (open_room lists them): move to a column (1 = left; last + 1 creates one), set widths, titles, config, room name, layout or story opening. Only what you name changes. Remove with remove_portal.",
     inputSchema: {
       type: 'object',
       additionalProperties: false,
@@ -222,7 +222,7 @@ export const ROOM_TOOLS: ToolDef[] = [
         retitle: { type: 'array', items: { type: 'object', required: ['portal', 'title'], additionalProperties: false, properties: { portal: { type: 'string' }, title: { type: 'string' } } } },
         configure: { type: 'array', items: { type: 'object', required: ['portal', 'config'], additionalProperties: false, properties: { portal: { type: 'string' }, config: { type: 'object', description: 'Settings to change (list_sources)' } } } },
         name: { type: 'string' },
-        layout: { type: 'string', enum: OFFERED_LAYOUTS, description: `columns: side by side; shelves: sideways rows; river: one stream, newest first${OFFERED_LAYOUTS.includes('frontpage') ? '; frontpage: picks, then top items per portal' : ''}` },
+        layout: { type: 'string', enum: OFFERED_LAYOUTS, description: `columns: lanes; shelves: sideways cards; river: newest first; catalogue: compact rows; editorial: lead per source; paperback: covers${OFFERED_LAYOUTS.includes('frontpage') ? '; frontpage: agent picks' : ''}` },
         openIn: { type: 'string', enum: ['card', 'chat'], description: 'stories open in the room, or as their own card in the chat' },
       },
     },

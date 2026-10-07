@@ -10,6 +10,8 @@
 - **Linked clients must update to 0.10.0:** `accent` becomes `ink`/`motif`, and the share audience `mcportal` becomes `everyone`. The state API's minimum client version is raised in this release. Hosted connectors update with the deployment; local clients and plugins need the new release.
 
 ### Room layouts
+- Columns gets illustrated source headers and clearer story rows; Shelves gets consistent cover strips, summaries and visible actions; River gets a room heading, a more readable story hierarchy and source art. Shelf arrows reflect the available scroll direction.
+- Catalogue, Editorial and Paperback join the room's layout choices. A named toolbar chooser saves each person's preference to their profile, keeping their sources and saved items. The three designs adapt to narrow screens and the host's theme.
 - River is a standard layout, available without a lab flag.
 - Reader and source controls stay visible while scrolling, stacking below the main toolbar. Rows wrap on narrow screens, and docs navigation and restored passages account for their height.
 

@@ -5,9 +5,14 @@
     root.classList.toggle('show-sources', on); $('btnSources').setAttribute('aria-pressed', String(on));
   });
   // Layout and open-in are saved to the profile, so the next open_room keeps them.
+  let settingsBusy = false;
   /** @param {Pick<Partial<Profile>, 'layout' | 'openIn'>} change */
   async function saveSettings(change) {
-    if (!state.profile) return;
+    if (!state.profile || settingsBusy) return;
+    settingsBusy = true;
+    const controls = [...$$('[data-layout]'), $('btnLayout'), $('btnOpenIn')];
+    controls.forEach((b) => b.setAttribute('disabled', ''));
+    $('btnLayout').setAttribute('aria-busy', 'true');
     const before = state.profile;
     state.profile = { ...before, ...change };
     drawLayout();
@@ -18,11 +23,27 @@
     } catch (error) {
       state.profile = before; drawLayout();
       toast(`Couldn't save: ${errorText(error)}`);
+    } finally {
+      settingsBusy = false;
+      controls.forEach((b) => b.removeAttribute('disabled'));
+      $('btnLayout').removeAttribute('aria-busy');
+      if (change.layout) $('btnLayout').focus({ preventScroll: true });
     }
   }
+  $('layoutMenu').addEventListener('beforetoggle', (event) => {
+    if (event.newState !== 'open') return;
+    const anchor = $('btnLayout').getBoundingClientRect();
+    const width = Math.min(300, window.innerWidth - 24);
+    $('layoutMenu').style.left = `${Math.max(12, Math.min(anchor.left, window.innerWidth - width - 12))}px`;
+  });
+  $('layoutMenu').addEventListener('toggle', () => {
+    $('btnLayout').setAttribute('aria-expanded', String($('layoutMenu').matches(':popover-open')));
+  });
   for (const b of $$('[data-layout]')) {
     b.addEventListener('click', () => {
       const layout = layoutNamed(b.dataset.layout);
+      $('layoutMenu').hidePopover();
+      $('btnLayout').focus({ preventScroll: true });
       if (layout && state.profile && state.profile.layout !== layout) saveSettings({ layout });
     });
   }

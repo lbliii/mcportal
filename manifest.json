@@ -34,11 +34,11 @@
     },
     {
       "name": "build_room",
-      "description": "Set up the user's room from up to 4 starter packs (ids from open_room's setup)."
+      "description": "Set up the room from up to 4 packs (ids in open_room)."
     },
     {
       "name": "arrange_room",
-      "description": "Change the room's layout: move portals (to a column, 1 = left; one past the last makes a new column), set column widths, retitle portals or change their settings, rename the room, or switch layout or how stories open."
+      "description": "Arrange portals by id/title (open_room lists them): move to a column (1 = left; last + 1 creates one), set widths, titles, config, room name, layout or story opening."
     },
     {
       "name": "remove_portal",

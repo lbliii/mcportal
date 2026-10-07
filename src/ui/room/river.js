@@ -215,7 +215,8 @@
 
     const newCount = [...state.portals.values()].reduce((n, p) => n + (p.newCount ?? 0), 0);
     const date = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
-    col.append(el('header', { class: 'river-head' }, el('h1', { class: 'fp-kicker' }, newCount ? `${date} · ${newCount} new` : date)));
+    col.append(el('header', { class: 'river-head' }, el('h1', null, profile.name),
+      el('p', null, newCount ? `${date} · ${newCount} new` : date)));
     if (riverView.arrived) {
       col.append(el('button', { class: 'river-arrived', type: 'button', onclick: showArrivals },
         `${riverView.arrived} new ${riverView.arrived === 1 ? 'story' : 'stories'} since you started`));

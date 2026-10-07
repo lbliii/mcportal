@@ -31,12 +31,14 @@ declare global {
     btnAdd: HTMLButtonElement;
     btnExpand: HTMLButtonElement;
     btnImportOpml: HTMLButtonElement;
+    btnLayout: HTMLButtonElement;
     btnOpenIn: HTMLButtonElement;
     btnRefresh: HTMLButtonElement;
     btnSources: HTMLButtonElement;
     btnWho: HTMLButtonElement;
     whoMenu: HTMLDivElement;
     grid: HTMLElement;
+    layoutMenu: HTMLDivElement;
     mainBar: HTMLElement;
     opmlFile: HTMLInputElement;
     reader: HTMLElement;

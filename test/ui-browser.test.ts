@@ -148,7 +148,7 @@ test('browser: river is visible without labs and the toolbar saves the choice', 
   await openRoom();
   try {
     assert.equal(await page.eval(`document.querySelector('[data-layout="river"]').hidden`), false);
-    await page.click('[data-layout="river"]');
+    await chooseLayout('river');
     await page.waitFor(`document.querySelector('#grid.river .river-feed article')`, 'the river to draw');
     assert.equal(await page.eval(`document.querySelector('[data-layout="river"]').getAttribute('aria-pressed')`), 'true');
     assert.equal((await profiles.get('default')).layout, 'river');
@@ -157,6 +157,119 @@ test('browser: river is visible without labs and the toolbar saves the choice', 
     assert.deepEqual(page.problems, []);
   } finally {
     await profiles.put('default', room());
+  }
+});
+
+/** Choose through the same named, keyboard-accessible popover as a person using the room. */
+async function chooseLayout(layout: string): Promise<void> {
+  await page.waitFor(`!document.getElementById('btnLayout').disabled`, 'layout settings to finish saving');
+  await page.click('#btnLayout');
+  await page.click(`[data-layout="${layout}"]`);
+  await page.waitFor(`!document.getElementById('btnLayout').disabled`, 'the layout preference to save');
+}
+
+test('browser: all three designs reopen, adapt to narrow themes, and keep the reader and save controls', { skip }, async () => {
+  await openRoom();
+  try {
+    for (const layout of ['catalogue', 'editorial', 'paperback']) {
+      await chooseLayout(layout);
+      await page.waitFor(`document.querySelector('#grid.${layout} .designed')`, `${layout} to draw`);
+      assert.equal((await profiles.get('default')).layout, layout);
+      assert.equal(await page.eval(`document.activeElement.id`), 'btnLayout');
+      assert.equal(await page.eval(`document.querySelector('#layoutMenu').matches(':popover-open')`), false);
+      await page.goto(`${app.base}/preview`);
+      await page.waitFor(`document.querySelector('#grid.${layout} .designed') && !document.querySelector('.skeleton')`, `${layout} to reopen`);
+      assert.deepEqual(await page.eval(`[...document.querySelectorAll('[data-portal]')].map(n => n.dataset.portal)`), ['hn-top', 'gh-mcp', 'simonw', 'saved', 'docs']);
+      for (const width of [320, 754, 1280]) for (const theme of ['light', 'dark']) {
+        await page.send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
+        await page.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: theme }] });
+        await page.waitFor(`document.documentElement.dataset.theme === '${theme}'`, 'the room theme to change');
+        assert.equal(await page.eval(`document.documentElement.scrollWidth <= innerWidth`), true, `${layout} fits ${width}px in ${theme}`);
+        assert.equal(await page.eval(`Boolean(document.querySelector('#grid button button, #grid button a'))`), false, 'actions stay outside the opening button');
+      }
+      await page.click('[data-portal="saved"] .item-main');
+      await page.waitFor(`!document.getElementById('reader').hidden && document.querySelector('#reader h1')?.textContent.includes('PS5')`, 'the article to open');
+      await page.click('#reader [aria-label="Back to your room"]');
+      await page.waitFor(`!document.getElementById('grid').hidden`, 'the chosen layout to return');
+      assert.equal(await page.eval(`document.querySelector('[data-portal="saved"] [data-save-url]').getAttribute('aria-pressed')`), 'true');
+      assert.deepEqual(page.problems, []);
+    }
+  } finally {
+    await page.send('Emulation.setEmulatedMedia', { features: [] });
+    await page.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+    await profiles.put('default', room());
+  }
+});
+
+test('browser: the original layouts retain opening, saving and reachable controls on narrow screens', { skip }, async () => {
+  await openRoom();
+  try {
+    for (const layout of ['columns', 'shelves', 'river']) {
+      await chooseLayout(layout);
+      await page.waitFor(`document.querySelector('#grid.${layout}') && !document.querySelector('.skeleton')`, `${layout} to draw`);
+      assert.equal((await profiles.get('default')).layout, layout);
+      for (const width of [320, 754, 1280]) for (const theme of ['light', 'dark']) {
+        await page.send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
+        await page.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: theme }] });
+        await page.waitFor(`document.documentElement.dataset.theme === '${theme}'`, 'the theme to change');
+        assert.equal(await page.eval(`document.documentElement.scrollWidth <= innerWidth`), true, `${layout} fits ${width}px in ${theme}`);
+        assert.equal(await page.eval(`Boolean(document.querySelector('#grid button button, #grid button a'))`), false);
+        if (layout === 'shelves') {
+          assert.equal(await page.eval(`[...document.querySelectorAll('.card')].every(card => {
+            const box = card.getBoundingClientRect();
+            const cover = card.querySelector('.thumb').getBoundingClientRect();
+            return Math.abs(cover.top - box.top - 1) < 1 && [...card.querySelectorAll('.item-meta button')].every(button => {
+              const rect = button.getBoundingClientRect();
+              return rect.left >= box.left && rect.right <= box.right && rect.bottom <= box.bottom;
+            });
+          })`), true, 'cover strips align and actions fit inside every card');
+          await page.waitFor(`document.querySelector('[data-portal="saved"] [aria-label="Scroll Saved left"]').disabled`, 'the left edge to disable its arrow');
+          assert.equal(await page.eval(`document.querySelector('[data-portal="saved"] [aria-label="Scroll Saved right"]').disabled`), true, 'a single saved card has no empty scrolling action');
+          assert.ok(await page.eval(`Boolean(document.querySelector('[data-portal="saved"] [aria-label="Share to your space"]'))`), 'saved stories keep their share action');
+        }
+      }
+      const main = layout === 'shelves' ? '.card-main' : '.item-main';
+      const saved = layout === 'river' ? `article:has([data-save-url="${ARTICLE}"])` : '[data-portal="saved"]';
+      await page.click(`${saved} ${main}`);
+      await page.waitFor(`!document.getElementById('reader').hidden && document.querySelector('#reader h1')?.textContent.includes('PS5')`, 'the article to open');
+      await page.click('#reader [aria-label="Back to your room"]');
+      await page.waitFor(`!document.getElementById('grid').hidden`, 'the chosen layout to return');
+      await page.click(`${saved} [data-save-url="${ARTICLE}"]`);
+      await page.waitFor(`document.querySelector('#grid [data-save-url="${ARTICLE}"][aria-pressed="false"]')`, 'the save to be removed');
+      assert.equal((await profiles.get('default')).saved.some(item => item.url === ARTICLE), false);
+      await tool('save_item', { url: ARTICLE, title: 'Hijacking the PS5' });
+      await page.goto(`${app.base}/preview`);
+      await page.waitFor(`document.querySelector('#grid.${layout} [data-save-url="${ARTICLE}"]') && !document.querySelector('.skeleton')`, 'the chosen layout to reopen');
+      assert.deepEqual(page.problems, []);
+    }
+  } finally {
+    await page.send('Emulation.setEmulatedMedia', { features: [] });
+    await page.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+    await profiles.put('default', room());
+  }
+});
+
+test('browser: a rejected layout preference restores the previous room and keeps the chooser usable', { skip }, async () => {
+  const { identifier } = await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `
+    const originalFetch = window.fetch;
+    window.fetch = (input, options) => {
+      const call = options?.body && typeof options.body === 'string' ? JSON.parse(options.body) : null;
+      if (call?.params?.name === 'arrange_room') return Promise.resolve(Response.json({ jsonrpc: '2.0', id: call.id, result: { isError: true, content: [{ type: 'text', text: 'Fixture save refused' }] } }));
+      return originalFetch(input, options);
+    };` });
+  try {
+    await openRoom();
+    await chooseLayout('paperback');
+    assert.equal(await page.eval(`document.querySelector('#grid').classList.contains('paperback')`), false);
+    assert.equal(await page.eval(`document.getElementById('btnLayout').textContent`), 'Layout: Columns');
+    assert.equal((await profiles.get('default')).layout, 'columns');
+    assert.match(await page.eval<string>(`document.getElementById('toast').textContent`), /Couldn't save: Fixture save refused/);
+    assert.equal(await page.eval(`document.activeElement.id`), 'btnLayout');
+    await page.click('#btnLayout');
+    assert.equal(await page.eval(`document.querySelector('[data-layout="paperback"]').disabled`), false);
+    assert.deepEqual(page.problems, []);
+  } finally {
+    await page.send('Page.removeScriptToEvaluateOnNewDocument', { identifier });
   }
 });
 

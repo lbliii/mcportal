@@ -107,8 +107,8 @@ test('arrange: a title that names two portals is refused with their ids', () => 
 test('layouts: river is always offered; front page still needs its lab, and existing rooms stay valid', async () => {
   assert.deepEqual(labsFrom(' FrontPage , nonsense'), ['frontpage']);
   assert.deepEqual(labsFrom(undefined), []);
-  assert.deepEqual(offeredLayouts([]), ['columns', 'shelves', 'river']);
-  assert.deepEqual(offeredLayouts(['frontpage']), ['columns', 'shelves', 'frontpage', 'river']);
+  assert.deepEqual(offeredLayouts([]), ['columns', 'shelves', 'river', 'catalogue', 'editorial', 'paperback']);
+  assert.deepEqual(offeredLayouts(['frontpage']), ['columns', 'shelves', 'frontpage', 'river', 'catalogue', 'editorial', 'paperback']);
   assert.deepEqual(labsFrom('frontpage,river,reblog'), ['frontpage'], 'graduated labs are ignored');
   assert.equal(validateProfile({ ...defaultProfile(), layout: 'frontpage' }).layout, 'frontpage');
   assert.equal(validateProfile({ ...defaultProfile(), layout: 'river' }).layout, 'river');
@@ -116,7 +116,9 @@ test('layouts: river is always offered; front page still needs its lab, and exis
   const ctx = { store: new MemoryProfileStore({ default: before }), fetcher: createFixtureFetcher(), cache: new TtlCache(), userId: 'default', labs: [] };
   const list = await handleMessage({ jsonrpc: '2.0', id: 1, method: 'tools/list' }, ctx) as { result: { tools: Array<{ name: string; inputSchema: { properties: { layout?: { enum: string[] } } } }> } };
   for (const name of ['arrange_room', 'build_room']) {
-    assert.ok(list.result.tools.find((t) => t.name === name)?.inputSchema.properties.layout?.enum.includes('river'), `${name} offers river without labs`);
+    for (const layout of ['river', 'catalogue', 'editorial', 'paperback']) {
+      assert.ok(list.result.tools.find((t) => t.name === name)?.inputSchema.properties.layout?.enum.includes(layout), `${name} offers ${layout} without labs`);
+    }
   }
   const refused = await handleMessage({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'arrange_room', arguments: { layout: 'frontpage' } } }, ctx) as { result: { structuredContent: { error?: { code: string } } } };
   assert.equal(refused.result.structuredContent.error?.code, 'invalid_argument');
@@ -129,4 +131,19 @@ test('layouts: river is always offered; front page still needs its lab, and exis
   assert.deepEqual(after.pins, before.pins);
   await handleMessage({ jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'build_room', arguments: { packs: ['gaming'], layout: 'river' } } }, ctx);
   assert.equal((await ctx.store.get('default')).layout, 'river', 'starter packs can build a river without labs');
+});
+
+test('layouts: all three design preferences persist without changing sources, pins or bookmarks', async () => {
+  const before = { ...room(), saved: [{ url: 'https://example.com/saved', title: 'Saved', savedAt: '2026-01-01T00:00:00.000Z' }] };
+  const ctx = { store: new MemoryProfileStore({ default: before }), fetcher: createFixtureFetcher(), cache: new TtlCache(), userId: 'default', labs: [] };
+  for (const layout of ['catalogue', 'editorial', 'paperback']) {
+    const result = await handleMessage({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'arrange_room', arguments: { layout } } }, ctx) as { result: { isError?: boolean } };
+    assert.ok(!result.result.isError);
+    const after = await ctx.store.get('default');
+    assert.equal(validateProfile(after).layout, layout);
+    assert.deepEqual(after.columns, before.columns);
+    assert.deepEqual(after.pins, before.pins);
+    assert.deepEqual(after.saved, before.saved);
+    assert.equal(after.openIn, before.openIn);
+  }
 });

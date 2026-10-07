@@ -27,7 +27,7 @@ Every tool MCPortal offers your agent, grouped by area. The registry is [`src/to
 | `list_new_items` | `RO` `OW` | Lists what the user hasn't seen, each with a ref, plus taste signals for ranking. | `portals` |
 | `show_highlights` | `OW` | Shows the agent's picks from `list_new_items` as a highlights card. The room leads with them for a day. | `picks*`, `title`, `intro` |
 
-Layouts are `columns`, `shelves` and `river`. With the `frontpage` lab on, `build_room` and `arrange_room` also offer `frontpage` (see [configuration](configuration.md#labs)).
+Layouts are `columns`, `shelves`, `river`, `catalogue` (compact illustrated rows), `editorial` (a lead story per source, then smaller features) and `paperback` (a grid of illustrated covers). Choose one from **Layout** in the room toolbar or ask your agent; the choice is saved to your profile. With the `frontpage` lab on, `build_room` and `arrange_room` also offer `frontpage` (see [configuration](configuration.md#labs)).
 
 ## Sources
 
