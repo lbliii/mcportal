@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.9.2 — 2026-10-07
+
 ### Fixes
 - **Codex can sign in to the hosted MCPortal:** a loopback redirect (`http://127.0.0.1/callback`) now matches on any port, as RFC 8252 requires. Codex registers its callback without a port and listens on whatever port the system gives it, so every Codex sign-in failed with "redirect_uri is not registered for this client".
 
