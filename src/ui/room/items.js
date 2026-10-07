@@ -33,6 +33,7 @@
           ? el('button', { class: 'mi', title: 'Open the discussion', 'aria-label': `${hit[1]} comments, open the discussion`, onclick: (/** @type {MouseEvent} */ e) => { e.stopPropagation(); openLink(url); } }, icon('comment'), hit[1])
           : el('span', { class: 'mi', style: 'cursor:default' }, icon('comment'), hit[1]));
       } else if (/^by /.test(m)) byline = m;
+      else if (item.share && (hit = /^(reblogged )?@([a-z0-9_]{2,30})$/.exec(m))) out.push(el('span', { class: 'meta-text' }, hit[1] ?? '', handleButton(hit[2] ?? '')));   // a Following item's people
       else out.push(el('span', /^\W*[\d.,]+k?\b/.test(m) ? null : { class: 'meta-text' }, m));   // words (a domain, a language) can give way; counts can't
     }
     if (when && item.publishedAt) out.push(el('span', null, ago(item.publishedAt)));
@@ -71,10 +72,11 @@
     const original = reblogs[0]?.share?.reblog;
     const direct = shared.find((s) => !s.share?.reblog);
     const by = original ? original.by : direct?.handle;
-    let context = '';
-    if (reblogs.length > 2) context = `Reblogged by ${sharerNames(reblogs.map((s) => s.handle))}`;
-    else if (reblogs.length) context = `${sharerNames(reblogs.map((s) => s.handle))} reblogged ${original?.by ? `@${original.by}` : 'a removed post'}`;
-    else if (shared.length) context = `${sharerNames(shared.map((s) => s.handle))} shared`;
+    /** @type {Array<Node | string>} */
+    let context = [];
+    if (reblogs.length > 2) context = ['Reblogged by ', ...sharerNames(reblogs.map((s) => s.handle))];
+    else if (reblogs.length) context = [...sharerNames(reblogs.map((s) => s.handle)), ' reblogged ', original?.by ? handleButton(original.by) : 'a removed post'];
+    else if (shared.length) context = [...sharerNames(shared.map((s) => s.handle)), ' shared'];
     /** @type {Array<{ by: string, note: string }>} */
     const trail = [];
     const originalNote = original ? original.note : direct?.note;
@@ -88,11 +90,12 @@
     return { context, trail, removed, target };
   }
 
-  /** "@a shared", "@a and @b", "@a, @b and 2 more". @param {string[]} handles */
+  /** "@a", "@a and @b", "@a, @b and 2 more", each handle a door to their space. @param {string[]} handles @returns {Array<Node | string>} */
   function sharerNames(handles) {
-    const names = handles.map((h) => `@${h}`);
-    if (names.length <= 2) return names.join(' and ');
-    return `${names.slice(0, 2).join(', ')} and ${names.length - 2} more`;
+    const names = handles.map((h) => handleButton(h));
+    if (names.length === 1) return names;
+    if (names.length === 2) return [names[0], ' and ', names[1]];
+    return [names[0], ', ', names[1], ` and ${names.length - 2} more`];
   }
 
   /** Which portal an item is from, outside it: the portal's dot and title. @param {PortalResult} portal @param {string} color */
@@ -143,14 +146,14 @@
         item.image && item.image.kind === 'thumb' ? thumbBox(item, portal) : null,
         itemTitle(item), item.summary && !following ? el('span', { class: 'item-summary' }, item.summary) : null);
       return el('article', { class: 'item story', style: `--mp-source-color:${color}`, onclick: openOnClick(item, portal) },
-        context ? el('div', { class: 'story-context' }, context) : null,
+        context.length ? el('div', { class: 'story-context' }, context) : null,
         el('div', { class: 'item-from' }, el('span', { class: 'dot', style: `background:${color}` }),
           el('button', { class: 'story-portal', type: 'button', title: `Open ${portal.title}`, onclick: () => openPortal(portal.portalId) }, portal.title),
           also.length ? el('span', { class: 'story-also' }, `also on ${also.join(', ')}`) : null,
           item.publishedAt ? el('span', { class: 'story-when' }, ago(item.publishedAt)) : null),
         main,
         removed ? el('p', { class: 'story-removed' }, removed) : null,
-        trail.map((n) => el('p', { class: 'story-note' }, el('span', { class: 'story-note-by' }, `@${n.by}`), n.note)),
+        trail.map((n) => el('p', { class: 'story-note' }, handleButton(n.by, 'story-note-by'), n.note)),
         out.length ? el('div', { class: 'item-meta' }, out) : null, why ? itemWhy(why) : null);
     },
 

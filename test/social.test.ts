@@ -147,6 +147,20 @@ test('reblogs: one hop. Reblogging a reblog reblogs the original, crediting the 
   assert.equal((await social.get('a', original.id))?.reblogCount, 1, 'undo is unshare');
 });
 
+test("canFollow: one share names the people on it the viewer doesn't follow yet: author, original's author, via", async () => {
+  const { social } = await world();
+  const original = await social.share('a', { ...link('p'), audience: 'mcportal' });
+  const bobs = await social.reblog('b', { id: original.id, audience: 'mcportal' });
+  const carols = await social.reblog('c', { id: bobs.id, audience: 'mcportal' });
+  assert.equal((await social.get('a', original.id))?.canFollow, undefined, 'nobody to follow on your own post');
+  assert.deepEqual((await social.get('b', bobs.id))?.canFollow, ['alice'], 'your own reblog: its original');
+  assert.deepEqual((await social.get('d', carols.id))?.canFollow, ['carol', 'alice', 'bob'], 'the reblogger, the original, then who it came via');
+  await social.follow('d', 'alice');
+  assert.deepEqual((await social.get('d', carols.id))?.canFollow, ['carol', 'bob'], 'people you follow drop out');
+  await social.follow('d', 'carol');
+  assert.equal((await social.feed('d'))[0]!.canFollow, undefined, 'only get says it, not every feed item');
+});
+
 test('reblogs: a removed or detached original leaves a tombstone; blocks and mutes hide reblogs', async () => {
   const { social, suspended } = await world();
   const gone = await social.share('a', { ...link('gone'), note: 'soon gone' });

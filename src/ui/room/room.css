@@ -208,6 +208,8 @@
   .post .pr svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; }
   /* a sharer's note: their words, set apart from the source's */
   .story-note { max-width: 34em; margin: var(--mp-space-8) 0 0; padding-left: var(--mp-space-10); border-left: 3px solid var(--mp-source-following); font-size: var(--mp-type-13-5); white-space: pre-wrap; }
+  .handle { border: 0; padding: 0; background: none; color: inherit; font: inherit; font-weight: var(--mp-weight-strong); text-align: left; cursor: pointer; }
+  .handle:hover, .handle:focus-visible { color: var(--mp-text-primary); text-decoration: underline; }
   .story-note-by { display: block; color: var(--mp-text-secondary); font-size: var(--mp-type-11-5); font-weight: var(--mp-weight-strong); white-space: normal; }
   .story .thumb { width: 100%; height: auto; aspect-ratio: 1.91 / 1; margin-bottom: var(--mp-space-8); }
   .story .item-title { display: block; font-size: var(--mp-type-18); font-weight: var(--mp-weight-heading); line-height: var(--mp-line-heading); }
@@ -449,6 +451,8 @@
   .composer { border: 1px solid var(--mp-border-divider); border-radius: var(--mp-radius-card); padding: var(--mp-space-10) var(--mp-space-12); margin: 16px 0; }
   .composer textarea { width: 100%; min-height: 70px; font: inherit; padding: var(--mp-space-6) var(--mp-space-8); border: 1px solid var(--mp-border-control); border-radius: var(--mp-radius-control); background: var(--mp-surface-canvas); color: var(--mp-text-primary); resize: vertical; }
   .composer .row { display: flex; gap: var(--mp-space-8); align-items: center; margin-top: var(--mp-space-8); }
+  .shared-by { margin: 0 0 var(--mp-space-12); }
+  .shared-by .share-actions:empty { display: none; }
   .reader .share-note { margin: 0 0 18px; padding: var(--mp-space-10) 14px; border-left: 3px solid var(--mp-source-following); background: var(--mp-surface-hover); border-radius: 0 8px 8px 0; white-space: pre-wrap; }
   .reader .clip-note { margin: 0 0 18px; color: var(--mp-text-secondary); font-style: italic; white-space: pre-wrap; }
   .reader .clip-quote { font-size: var(--mp-type-18); line-height: 1.55; white-space: pre-wrap; margin: 0 0 10px; padding-left: 14px; border-left: 3px solid var(--mp-source-clips); }

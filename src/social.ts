@@ -123,6 +123,8 @@ export interface SharedItem extends Omit<Share, 'accountId'> {
   myReblog?: string;
   /** Whether the viewer may reblog it now. */
   canReblog: boolean;
+  /** One share only (get): the people on it the viewer could follow (its author, the original's, via), by handle. */
+  canFollow?: string[];
 }
 
 /** Someone who reblogged a post, as the viewer may see them. */
@@ -352,7 +354,23 @@ export class Social {
   /** One share, if the viewer may see it. */
   async get(viewer: string, id: string): Promise<SharedItem | undefined> {
     const share = await this.store.getShare(id);
-    return share && (await this.canSee(viewer, share)) ? (await this.present(viewer, [share]))[0] : undefined;
+    if (!share || !(await this.canSee(viewer, share))) return undefined;
+    const item = (await this.present(viewer, [share]))[0]!;
+    const canFollow = await this.followable(viewer, share, item);
+    if (canFollow.length) item.canFollow = canFollow;
+    return item;
+  }
+
+  /** Who on a post the viewer doesn't follow yet: its author, the original's author, then whoever it came via. Only people the viewer can see. */
+  private async followable(viewer: string, share: Share, item: SharedItem): Promise<string[]> {
+    const following = new Set(await this.store.outgoing('follows', viewer));
+    // present() names an author without a profile 'you'; nobody can follow that.
+    const people: Array<[string | undefined, string | undefined]> = [[share.accountId, (await this.authorOf(share.accountId))?.handle]];
+    if (share.reblogOf && item.original && 'author' in item.original) people.push([(await this.store.getShare(share.reblogOf.root))?.accountId, item.original.author.handle]);
+    if (share.reblogOf?.via && item.via) people.push([(await this.store.getShare(share.reblogOf.via))?.accountId, item.via]);
+    const out: string[] = [];
+    for (const [id, handle] of people) if (id && handle && id !== viewer && !following.has(id) && !out.includes(handle)) out.push(handle);
+    return out;
   }
 
   /** The Following portal: shares from people the viewer follows, minus muted and blocked. */

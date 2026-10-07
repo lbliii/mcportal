@@ -639,6 +639,98 @@ test("browser: in the river, follows' shares and reblogs join their stories with
   }
 });
 
+test('browser: every handle is a door: @names open their space and come back to where you were; a share offers to follow its author', { skip }, async () => {
+  // As in the river test, the page gets a Following portal on the way in, and the social
+  // tools are answered in the page.
+  const { identifier } = await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => {
+    const real = window.fetch;
+    window.__calls = [];
+    const answer = (result) => new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result }), { status: 200, headers: { 'content-type': 'application/json' } });
+    const now = new Date().toISOString();
+    window.fetch = async (url, init) => {
+      const body = init && typeof init.body === 'string' ? JSON.parse(init.body) : null;
+      const name = body && body.params && body.params.name;
+      const args = body && body.params && body.params.arguments;
+      if (url === '/mcp' && ['open_space', 'get_share', 'relationship'].includes(name)) {
+        window.__calls.push({ name, args });
+        if (name === 'open_space') return answer({ content: [], structuredContent: { space: { handle: args.handle, displayName: args.handle.toUpperCase(), mine: false, followers: 2, following: false, posts: [], sources: [], createdAt: now, updatedAt: now } } });
+        if (name === 'relationship') return answer({ content: [], structuredContent: { handle: args.handle, layoutChanged: false } });
+        if (args.id === 's_ben') return answer({ content: [], structuredContent: { share: { id: 's_ben', kind: 'link', title: 'A post by cy', url: 'https://example.com/cy', audience: 'mcportal', createdAt: now,
+          author: { handle: 'ben' }, mine: false, reblogCount: 1, canReblog: true, reblogOf: { root: 's_cy' }, original: { id: 's_cy', author: { handle: 'cy' }, note: "Cy's own words." }, canFollow: ['cy'] } } });
+        return answer({ content: [], structuredContent: { share: { id: 's_fay', kind: 'clip', title: 'Just for fay', clip: { kind: 'quote', data: { kind: 'quote', text: 'Cats are liquid.' } }, note: 'Worth a look.', audience: 'mcportal', createdAt: now,
+          author: { handle: 'fay' }, mine: false, reblogCount: 0, canReblog: true, canFollow: ['fay'] } } });
+      }
+      const res = await real(url, init);
+      if (name !== 'open_room') return res;
+      const json = await res.json();
+      const room = json.result && json.result.structuredContent;
+      if (room && room.portals) {
+        room.identity = { mode: 'hosted', handle: 'reader' };
+        room.profile.columns.push({ width: 1, panels: [{ id: 'following', source: 'following', title: 'Following', config: {} }] });
+        room.portals.push({ portalId: 'following', source: 'following', title: 'Following', provenance: { source: 'following', endpoint: 'shares from people you follow', fetchedAt: now, cached: false, ttlSeconds: 0 }, items: [
+          { id: 's_ben', title: 'A post by cy', url: 'https://example.com/cy', meta: ['@ben', 'reblogged @cy', 'link'], publishedAt: now, share: { id: 's_ben', kind: 'link', canReblog: true, reblog: { root: 's_cy', by: 'cy', note: "Cy's own words." } } },
+          { id: 's_fay', title: 'Just for fay', meta: ['@fay', 'quote'], publishedAt: now, share: { id: 's_fay', kind: 'clip', canReblog: true } },
+        ] });
+      }
+      return new Response(JSON.stringify(json), { status: res.status, headers: { 'content-type': 'application/json' } });
+    };
+  })();` });
+  await profiles.put('default', validateProfile({ ...room(), layout: 'river' }));
+  const find = (title: string) => `[...document.querySelectorAll('.river-feed > article')].find((n) => n.querySelector('.item-title').textContent.endsWith(${JSON.stringify(title)}))`;
+  const spaceOpen = (handle: string) => page.waitFor(`!document.getElementById('reader').hidden && document.querySelector('#reader .space-head h1')?.textContent === ${JSON.stringify(handle.toUpperCase())}`, `@${handle}'s space`);
+  try {
+    page.problems.length = 0;
+    await page.goto(`${app.base}/preview`);
+    await page.waitFor(`document.querySelector('#grid.river .river-feed article') && !document.querySelector('.skeleton')`, 'the river');
+    assert.deepEqual(await page.eval(`[...${find('A post by cy')}.querySelectorAll('.story-context .handle, .story-note .handle')].map((n) => n.textContent)`), ['@ben', '@cy', '@cy'],
+      'the context row and the trail name people as buttons');
+
+    // From the river: the original's author, then back to the river.
+    await page.eval(`${find('A post by cy')}.querySelector('.story-context .handle:last-child').click()`);
+    await spaceOpen('cy');
+    assert.deepEqual(await page.eval(`window.__calls.at(-1)`), { name: 'open_space', args: { handle: 'cy' } });
+    await page.eval(`document.querySelector('#reader .reader-top button').click()`);
+    await page.waitFor(`document.getElementById('reader').hidden && !document.getElementById('grid').hidden`, 'back to the river');
+
+    // A shared clip opens as a share: its author is a door, and Follow is right there.
+    await page.eval(`${find('Just for fay')}.querySelector('.item-main').click()`);
+    await page.waitFor(`document.querySelector('#reader .share-actions .btn.follow')`, 'the share with Follow');
+    assert.equal(await page.eval(`document.querySelector('#reader .byline').textContent.split(' · ')[0]`), '@fay shared a quote');
+    await page.eval(`document.querySelector('#reader .share-actions .btn.follow').click()`);
+    await page.waitFor(`document.querySelector('#reader .btn.follow').getAttribute('aria-pressed') === 'true'`, 'the follow');
+    assert.deepEqual(await page.eval(`window.__calls.at(-1)`), { name: 'relationship', args: { handle: 'fay', action: 'follow' } });
+    assert.equal(await page.eval(`document.querySelector('#reader .btn.follow').textContent`), 'Following @fay');
+
+    // From the share to the space and back to the very same share, as it was.
+    await page.eval(`document.querySelector('#reader .byline .handle').click()`);
+    await spaceOpen('fay');
+    await page.eval(`document.querySelector('#reader .reader-top button').click()`);
+    await page.waitFor(`document.querySelector('#reader h1')?.textContent === 'Just for fay'`, 'back to the share');
+    assert.equal(await page.eval(`document.querySelector('#reader .btn.follow').textContent`), 'Following @fay', 'the share comes back as you left it');
+    assert.equal(await page.eval(`document.getElementById('reader').classList.contains('space')`), false);
+
+    // A shared link opens in the reader, which still says who passed it on, with Follow for the original's author.
+    await page.eval(`document.querySelector('#reader .reader-top button').click()`);
+    await page.waitFor(`document.getElementById('reader').hidden`, 'back to the river');
+    await page.eval(`${find('A post by cy')}.querySelector('.item-main').click()`);
+    await page.waitFor(`document.querySelector('#reader .shared-by .btn.follow')`, 'the reader with who shared it');
+    assert.equal(await page.eval(`document.querySelector('#reader .shared-by .byline').textContent`), "@ben reblogged @cy's link");
+    assert.deepEqual(await page.eval(`[...document.querySelectorAll('#reader .shared-by .story-note')].map((n) => n.textContent)`), ["@cyCy's own words."]);
+    assert.equal(await page.eval(`document.querySelector('#reader .shared-by .btn.follow').textContent`), 'Follow @cy');
+    assert.deepEqual(await page.eval(`window.__calls.at(-1)`), { name: 'get_share', args: { id: 's_ben' } });
+
+    // A Following portal's rows name their people as buttons too.
+    await page.eval(`document.querySelector('#reader .reader-top button').click()`);
+    await page.eval(`document.querySelector('[data-layout="columns"]').click()`);
+    await page.waitFor(`!document.querySelector('#grid.river') && document.querySelector('#grid .item .item-meta .handle')`, 'handles in Following rows');
+    assert.deepEqual(await page.eval(`[...document.querySelectorAll('#grid .item .item-meta .handle')].map((n) => n.textContent)`), ['@ben', '@cy', '@fay']);
+    assert.deepEqual(page.problems, []);
+  } finally {
+    await page.send('Page.removeScriptToEvaluateOnNewDocument', { identifier });
+    await profiles.put('default', room());
+  }
+});
+
 test('browser: a portal opens to fill the room; the reader returns to it, and Escape steps back out', { skip }, async () => {
   const saved = Array.from({ length: 14 }, (_, i) => ({ url: `https://example.com/saved-${i}`, title: `Saved ${i}`, savedAt: '2026-09-01T00:00:00.000Z' }));
   await profiles.put('default', validateProfile({ ...room(), saved: [{ url: ARTICLE, title: 'Hijacking the PS5', savedAt: '2026-09-01T00:00:00.000Z' }, ...saved] }));
