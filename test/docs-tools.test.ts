@@ -48,6 +48,20 @@ test('github: owner/repo, folder, file and raw links are understood; anything el
   assert.equal(originalUrl('https://docs.stripe.com/testing.md'), 'https://docs.stripe.com/testing.md');
 });
 
+test('github: deeper folders stay together inside their section and name themselves', async () => {
+  const site = await loadGithubDocs('https://github.com/acme/widgets', mapFetcher({
+    [TREE]: tree([
+      'docs/index.md', 'docs/concepts/index.md', 'docs/concepts/cache.md',
+      'docs/concepts/projects/index.md', 'docs/concepts/projects/workspaces.md', 'docs/concepts/projects/init.md',
+      'docs/concepts/authentication/index.md', 'docs/concepts/authentication/cli.md', 'docs/concepts/authentication/http.md',
+    ]),
+  }));
+  assert.deepEqual(site.sections.map((s) => [s.title, s.pages.map((p) => p.title)]), [
+    ['acme/widgets', ['Introduction']],
+    ['Concepts', ['Overview', 'Cache', 'Authentication', 'Authentication › CLI', 'Authentication › HTTP', 'Projects', 'Projects › Init', 'Projects › Workspaces']],
+  ]);
+});
+
 test('github: a docs folder by subfolder, README first, English only, agent files and partials skipped', async () => {
   const fetcher = mapFetcher({
     [TREE]: tree([

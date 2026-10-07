@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 import { surface } from './footprint.ts';
 
 const ROOT = new URL('../', import.meta.url);
-const HOSTED = 'https://mcportal-production.up.railway.app';
+const HOSTED = 'https://mcportal.lol';
 const REPOSITORY = 'https://github.com/lbliii/mcportal';
 const NAME = 'io.github.lbliii/mcportal';
 
