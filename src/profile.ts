@@ -46,8 +46,9 @@ export interface ColumnInput {
  * columns: side-by-side portals. shelves: one horizontally scrolling row per portal.
  * frontpage: the agent's picks, then each portal's top items, top to bottom (a lab).
  * river: every portal merged into one stream, picks first, then new, then seen.
+ * catalogue, editorial, paperback: source sections as compact rows, feature spreads or illustrated covers.
  */
-export const LAYOUTS = ['columns', 'shelves', 'frontpage', 'river'] as const;
+export const LAYOUTS = ['columns', 'shelves', 'frontpage', 'river', 'catalogue', 'editorial', 'paperback'] as const;
 export type Layout = (typeof LAYOUTS)[number];
 /** Layouts that are labs, each behind the lab of the same name. */
 const LAB_LAYOUTS: readonly Layout[] = ['frontpage'];

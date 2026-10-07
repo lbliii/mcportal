@@ -20,11 +20,17 @@
   <div class="spacer"></div>
   <span class="status" id="status">Warming up the portal…</span>
   <span class="sep room-only"></span>
-  <div class="seg room-only" role="group" aria-label="Layout">
-    <button class="ib" data-layout="columns" data-icon="columns" aria-pressed="true" title="Columns: scroll sideways, then down each column" aria-label="Columns layout"></button>
-    <button class="ib" data-layout="shelves" data-icon="shelves" aria-pressed="false" title="Shelves: one sideways row per source" aria-label="Shelves layout"></button>
-    <button class="ib" data-layout="frontpage" data-icon="frontpage" aria-pressed="false" title="Front page: your agent's picks, then each source's top stories" aria-label="Front page layout" hidden></button>
-    <button class="ib" data-layout="river" data-icon="river" aria-pressed="false" title="River: every source in one stream, newest first" aria-label="River layout"></button>
+  <button class="btn layout-choice room-only" id="btnLayout" popovertarget="layoutMenu" aria-expanded="false" aria-label="Choose room layout">Layout: Columns</button>
+  <div class="layout-menu room-only" id="layoutMenu" popover role="group" aria-label="Room layout">
+    <p>Choose your layout</p>
+    <button data-layout="catalogue" aria-pressed="false"><span class="layout-symbol" data-icon="river" aria-hidden="true"></span><b>Catalogue</b><span>Compact rows for scanning</span></button>
+    <button data-layout="editorial" aria-pressed="false"><span class="layout-symbol" data-icon="frontpage" aria-hidden="true"></span><b>Editorial</b><span>A lead story, then smaller features</span></button>
+    <button data-layout="paperback" aria-pressed="false"><span class="layout-symbol" data-icon="shelves" aria-hidden="true"></span><b>Paperback</b><span>A shelf of illustrated covers</span></button>
+    <hr>
+    <button data-layout="columns" aria-pressed="true"><span class="layout-symbol" data-icon="columns" aria-hidden="true"></span><b>Columns</b><span>Side-by-side portals</span></button>
+    <button data-layout="shelves" aria-pressed="false"><span class="layout-symbol" data-icon="shelves" aria-hidden="true"></span><b>Shelves</b><span>Sideways rows of cards</span></button>
+    <button data-layout="river" aria-pressed="false"><span class="layout-symbol" data-icon="river" aria-hidden="true"></span><b>River</b><span>One stream, newest first</span></button>
+    <button data-layout="frontpage" aria-pressed="false" hidden><span class="layout-symbol" data-icon="frontpage" aria-hidden="true"></span><b>Front page</b><span>Your agent’s picks, then top stories</span></button>
   </div>
   <button class="ib room-only" id="btnAdd" data-icon="plus" aria-pressed="false" title="Add a source: any site, feed, subreddit, YouTube channel or repo" aria-label="Add a source"></button>
   <button class="ib room-only" id="btnOpenIn" data-icon="chat" aria-pressed="false" title="Open stories as their own card in the conversation" aria-label="Open stories in chat" hidden></button>

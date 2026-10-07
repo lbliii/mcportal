@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Room layouts
+- Columns gets illustrated source headers and clearer story rows; Shelves gets consistent cover strips, summaries and visible actions; River gets a room heading, a more readable story hierarchy and source art. Shelf arrows reflect the available scroll direction.
+- Catalogue, Editorial and Paperback join the room's layout choices. A named toolbar chooser saves each person's preference to their profile, keeping their sources and saved items. The three designs adapt to narrow screens and the host's theme.
+
 ## v0.10.0 — 2026-10-07
 
 ### Spaces that feel like someone's

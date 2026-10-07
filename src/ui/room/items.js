@@ -4,7 +4,7 @@
   // row (a line in a portal list), tile (a card in a shelf), lead (the front page's
   // first story) or story (one in the river). New forms join ITEM_FORMS; each keeps one content-opening button with
   // its actions beside it, never inside it.
-  /** @typedef {'row' | 'tile' | 'lead' | 'story'} ItemForm */
+  /** @typedef {'row' | 'tile' | 'lead' | 'story' | 'catalogue' | 'editorial' | 'paperback'} ItemForm */
   /**
    * How an item looks: its portal's colour, whether its shelf shows pictures, whether it
    * names its portal (outside one), the agent's reason for picking it (its own words), the
@@ -112,6 +112,9 @@
 
   /** @type {Record<ItemForm, (item: Item, portal: PortalResult, look: ItemLook) => HTMLElement>} */
   const ITEM_FORMS = {
+    catalogue: (item, portal, look) => designedItem(item, portal, 'catalogue', look),
+    editorial: (item, portal, look) => designedItem(item, portal, 'editorial', look),
+    paperback: (item, portal, look) => designedItem(item, portal, 'paperback', look),
     /** A line in a portal's list: title, summary, a thumbnail beside them, and every action. */
     row(item, portal, { color = '', from = false, why = '' }) {
       const { out, byline } = itemActions(item, portal);
@@ -146,10 +149,13 @@
       const { context, trail, removed, target } = storySocial(item, portal, shared);
       const reblog = reblogButton(target);
       if (reblog) out.push(reblog);
+      const illustrated = !following && Boolean(item.url) && item.image?.kind !== 'thumb';
+      const picture = item.image?.kind === 'thumb' ? thumbBox(item, portal)
+        : illustrated ? thumbBox({ ...item, image: undefined }, portal) : null;
       const main = el('button', { class: 'item-main', type: 'button', title: byline, onclick: (/** @type {MouseEvent} */ e) => openFrom(e, item, portal) },
-        item.image && item.image.kind === 'thumb' ? thumbBox(item, portal) : null,
-        itemTitle(item), item.summary && !following ? el('span', { class: 'item-summary' }, item.summary) : null);
-      return el('article', { class: 'item story', style: `--mp-source-color:${color}`, onclick: openOnClick(item, portal) },
+        picture, el('span', { class: 'story-copy' }, itemTitle(item),
+          item.summary && !following ? el('span', { class: 'item-summary' }, item.summary) : null));
+      return el('article', { class: illustrated ? 'item story story-illustrated' : 'item story', style: `--mp-source-color:${color}`, onclick: openOnClick(item, portal) },
         context.length ? el('div', { class: 'story-context' }, context)
           : alsoBy ? el('div', { class: 'story-context' }, 'also shared by ', patchAvatar(alsoBy.cover), handleButton(alsoBy.handle)) : null,
         el('div', { class: 'item-from' }, el('span', { class: 'dot', style: `background:${color}` }),
@@ -164,16 +170,26 @@
 
     /** A card in a shelf. In a media shelf every card gets a picture area, so the row stays even. */
     tile(item, portal, { color = '', media = false }) {
-      const meta = compactMeta(item).out;
-      const save = saveButton(item, portal.source);
-      if (save) { save.classList.add('go'); meta.push(save); }
-      meta.push(...personActions(item, portal));
-      const reblog = portal.source === 'saved' ? null : reblogButton(reblogTarget(item, portal, item.share));
-      if (reblog) meta.push(reblog);
-      const content = [itemTitle(item), media ? null : item.summary ? el('span', { class: 'item-summary' }, item.summary) : null];
-      const main = el('button', { class: 'card-main', type: 'button', title: item.title, onclick: (/** @type {MouseEvent} */ e) => openFrom(e, item, portal) },
+      const { out, byline } = itemActions(item, portal);
+      const action = (/** @type {HTMLElement | null} */ node) => node?.matches('button.go, button.save, button.reblog');
+      const actions = out.filter(action);
+      const meta = out.filter((node) => !action(node));
+      if (actions.length) meta.push(el('span', { class: 'card-actions' }, actions));
+      const content = [itemTitle(item), item.summary ? el('span', { class: 'item-summary' }, item.summary) : null];
+      const main = el('button', { class: 'card-main', type: 'button', title: byline, onclick: (/** @type {MouseEvent} */ e) => openFrom(e, item, portal) },
         patchAvatar(item.person?.cover || item.share?.cover), media ? [thumbBox(item.image && item.image.kind === 'thumb' ? item : { ...item, image: undefined }, portal), el('span', { class: 'card-body' }, content)] : content);
       return el('div', { class: media ? 'card media' : 'card', style: `--mp-source-color:${color}`, onclick: openOnClick(item, portal) }, main,
         meta.length ? el('div', { class: 'item-meta' }, meta) : null);
     },
   };
+
+  /** One opening button, with the same independent actions as a regular row. @param {Item} item @param {PortalResult} portal @param {'catalogue' | 'editorial' | 'paperback'} form @param {ItemLook} look */
+  function designedItem(item, portal, form, { color = '' }) {
+    const { out, byline } = itemActions(item, portal);
+    const picture = thumbBox(item.image?.kind === 'avatar' ? { ...item, image: undefined } : item, portal);
+    const main = el('button', { class: 'item-main', type: 'button', title: byline, onclick: (/** @type {MouseEvent} */ e) => openFrom(e, item, portal) },
+      picture, el('span', { class: 'collection-copy' }, patchAvatar(item.person?.cover || item.share?.cover), itemTitle(item),
+        item.summary ? el('span', { class: 'item-summary' }, item.summary) : null));
+    return el('article', { class: `item designed ${form}-item`, style: `--mp-source-color:${color}`, onclick: openOnClick(item, portal) }, main,
+      out.length ? el('div', { class: 'item-meta' }, out) : null);
+  }
