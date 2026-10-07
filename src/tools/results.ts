@@ -37,6 +37,8 @@ export type RoomResult = {
   labs?: string[];
   /** Space links, said once: people to offer a follow of, and newcomers who joined through the user's link. */
   intros?: Intros;
+  /** Stories in the room that a listed person the user doesn't follow shared with everyone: one handle per story's link. */
+  alsoShared?: Array<{ url: string; handle: string }>;
 };
 
 /** After a save or unsave: the saved list, the room, and the Saved portal redrawn. */

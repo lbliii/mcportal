@@ -9,7 +9,8 @@
    * How an item looks: its portal's colour, whether its shelf shows pictures, whether it
    * names its portal (outside one), the agent's reason for picking it (its own words), the
    * other portals that have the same story, and the people you follow who shared it.
-   * @typedef {{ color?: string, media?: boolean, from?: boolean, why?: string, also?: string[], shared?: Array<{ handle: string, note?: string | undefined, share?: Item['share'] }> }} ItemLook
+   * Also: a listed person you don't follow who shared it with everyone (one name; "also shared by").
+   * @typedef {{ color?: string, media?: boolean, from?: boolean, why?: string, also?: string[], shared?: Array<{ handle: string, note?: string | undefined, share?: Item['share'], followed?: boolean }>, alsoBy?: string }} ItemLook
    */
 
   /** @param {Item} item @param {PortalResult} portal @param {ItemForm} [form] @param {ItemLook} [look] */
@@ -78,6 +79,7 @@
     if (reblogs.length > 2) context = ['Reblogged by ', ...sharerNames(reblogs.map((s) => s.handle))];
     else if (reblogs.length) context = [...sharerNames(reblogs.map((s) => s.handle)), ' reblogged ', original?.by ? handleButton(original.by) : 'a removed post'];
     else if (shared.length) context = [...sharerNames(shared.map((s) => s.handle)), ' shared'];
+    if (context.length && shared.every((s) => s.followed === false)) context.push(' · not followed');   // a Lobby post: someone new
     /** @type {Array<{ by: string, note: string }>} */
     const trail = [];
     const originalNote = original ? original.note : direct?.note;
@@ -134,11 +136,11 @@
      * picture across, a larger title, a sharer's note in their own voice, every action. The
      * portal's name opens the portal.
      */
-    story(item, portal, { color = '', why = '', also = [], shared = [] }) {
+    story(item, portal, { color = '', why = '', also = [], shared = [], alsoBy = '' }) {
       // A Following item's meta is "@handle", "reblogged @x" and its kind, and its summary is the
       // note: the context row and the trail say those, so they aren't repeated.
-      const following = portal.source === 'following';
-      const meta = following ? item.meta.filter((m) => !m.startsWith('@') && !m.startsWith('reblogged ') && m !== 'link') : item.meta;
+      const following = portal.source === 'following' || portal.source === 'lobby';
+      const meta = following ? item.meta.filter((m) => !m.startsWith('@') && !m.startsWith('reblogged ') && m !== 'link' && m !== 'not followed') : item.meta;
       const { out, byline } = itemActions({ ...item, meta }, portal, false, false);
       const { context, trail, removed, target } = storySocial(item, portal, shared);
       const reblog = reblogButton(target);
@@ -147,7 +149,8 @@
         item.image && item.image.kind === 'thumb' ? thumbBox(item, portal) : null,
         itemTitle(item), item.summary && !following ? el('span', { class: 'item-summary' }, item.summary) : null);
       return el('article', { class: 'item story', style: `--mp-source-color:${color}`, onclick: openOnClick(item, portal) },
-        context.length ? el('div', { class: 'story-context' }, context) : null,
+        context.length ? el('div', { class: 'story-context' }, context)
+          : alsoBy ? el('div', { class: 'story-context' }, 'also shared by ', handleButton(alsoBy)) : null,
         el('div', { class: 'item-from' }, el('span', { class: 'dot', style: `background:${color}` }),
           el('button', { class: 'story-portal', type: 'button', title: `Open ${portal.title}`, onclick: () => openPortal(portal.portalId) }, portal.title),
           also.length ? el('span', { class: 'story-also' }, `also on ${also.join(', ')}`) : null,

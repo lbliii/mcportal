@@ -10,7 +10,7 @@ import { ACTIVE_LABS } from '../labs.ts';
 import { MAX_PACKS, packSummaries, STARTER_PACKS } from '../packs.ts';
 import { SEEN_BATCH, tracksSeen, withNews } from '../seen.ts';
 import { describeDiff, describeLayout, diffProfiles, findPortal, normalizeSourceConfig, offeredLayouts, type Layout, type PortalInput, type Profile, type ProfileDiff } from '../profile.ts';
-import { clipsPortal, clipsQuery, followingPortal, loadPortal, peoplePortal, pinnedPortal, savedPortal } from '../sources.ts';
+import { clipsPortal, clipsQuery, followingPortal, loadPortal, lobbyPortal, peoplePortal, pinnedPortal, savedPortal } from '../sources.ts';
 import type { Intros } from '../social.ts';
 import type { PortalResult } from '../types.ts';
 import { identityOf, labsOf, ok, toolError, toolFailure, untrusted, ROOM_URI, type CallToolResult, type ToolContext, type ToolDef } from './kit.ts';
@@ -23,6 +23,10 @@ export async function portalFor(spec: PortalInput, profile: Profile, ctx: ToolCo
   if (spec.source === 'pinned') return pinnedPortal(spec, profile.pins);
   if (spec.source === 'clips') return clipsPortal(spec, ctx.clips ? await ctx.clips.list(ctx.userId, clipsQuery(spec)) : []);
   if (spec.source === 'people') return peoplePortal(spec, await suggestedPeople(profile, ctx));
+  if (spec.source === 'lobby') {
+    const { limit } = normalizeSourceConfig('lobby', spec.config, spec.id);
+    return lobbyPortal(spec, ctx.social ? await ctx.social.lobby(ctx.userId, { limit }) : []);
+  }
   if (spec.source === 'following') {
     const { limit } = normalizeSourceConfig('following', spec.config, spec.id);
     return followingPortal(spec, ctx.social ? await ctx.social.feed(ctx.userId, { limit }) : []);
@@ -80,6 +84,39 @@ async function rearrange(change: Arrangement, ctx: ToolContext): Promise<CallToo
 }
 
 
+/** A link's identity for matching the same story: no fragment, tracking parameters, www or trailing slash (as the river's storyKey). */
+function linkKey(url: string): string {
+  try {
+    const u = new URL(url);
+    for (const k of [...u.searchParams.keys()]) if (/^(utm_.*|ref|fbclid|gclid)$/.test(k)) u.searchParams.delete(k);
+    return `${u.host.replace(/^www\./, '')}${u.pathname.replace(/\/+$/, '')}${u.search}`;
+  } catch {
+    return url;
+  }
+}
+
+/**
+ * "Also shared by" (docs/plans/finding-people.md): stories in the room that a listed person
+ * the user doesn't follow shared with everyone, one name per story, newest share first.
+ * Only public posts; never the user, people they follow, mute or block.
+ */
+async function alsoSharedIn(portals: PortalResult[], ctx: ToolContext): Promise<Array<{ url: string; handle: string }>> {
+  if (!ctx.social) return [];
+  const inRoom = new Map<string, string>();
+  for (const portal of portals) if (portal.source !== 'following' && portal.source !== 'lobby') for (const item of portal.items) if (item.url) inRoom.set(linkKey(item.url), item.url);
+  if (!inRoom.size) return [];
+  try {
+    const out = new Map<string, string>();
+    for (const share of await ctx.social.lobby(ctx.userId, { limit: 100 }, { unfollowedOnly: true })) {
+      const url = share.url ? inRoom.get(linkKey(share.url)) : undefined;
+      if (url && !out.has(url)) out.set(url, share.author.handle);
+    }
+    return [...out].map(([url, handle]) => ({ url, handle }));
+  } catch {
+    return [];   // a nicety, never a failure
+  }
+}
+
 /** What open_room tells the agent about Space links: whom to offer, who joined. Handles are [a-z0-9_] only. */
 function introLines(intros: Intros): string {
   const names = (handles: string[]) => handles.map((h) => `@${h}`).join(', ');
@@ -127,8 +164,9 @@ export const ROOM_TOOLS: ToolDef[] = [
       // Space links (docs/plans/finding-people.md): said once, after setup, so a newcomer meets them in a built room.
       const intros = ctx.social ? await ctx.social.takeIntros(ctx.userId).catch(() => undefined) : undefined;
       const said = intros && (intros.offer.length || intros.joined.length) ? intros : undefined;
+      const alsoShared = await alsoSharedIn(portals, ctx);
       return ok([summarizePortals(profile, portals, notice, edition), ...(said ? [introLines(said)] : [])].join('\n'),
-        { profile, portals, notice, identity, ...(edition ? { edition } : {}), ...(lead ? { lead } : {}), ...(said ? { intros: said } : {}), ...(labsOf(ctx).length ? { labs: [...labsOf(ctx)] } : {}), generatedAt: new Date().toISOString() } satisfies ToolResults['open_room']);
+        { profile, portals, notice, identity, ...(edition ? { edition } : {}), ...(lead ? { lead } : {}), ...(said ? { intros: said } : {}), ...(alsoShared.length ? { alsoShared } : {}), ...(labsOf(ctx).length ? { labs: [...labsOf(ctx)] } : {}), generatedAt: new Date().toISOString() } satisfies ToolResults['open_room']);
     },
   },
   {

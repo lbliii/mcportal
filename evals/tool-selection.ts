@@ -99,6 +99,7 @@ export const TOOL_CASES: ToolCase[] = [
   { prompt: 'who else is like @ada?', tool: 'find_people', args: { like: 'ada' } },
   { prompt: 'let people with similar sources find me', tool: 'set_public_profile', args: { listed: true } },
   { prompt: 'find me a few people to follow and keep them in my room', tool: 'find_people' },
+  { prompt: 'add the Lobby to my room', tool: 'add_portal', args: { source: 'lobby' } },
 
   // Not for MCPortal
   { prompt: "what's 17 times 23?", tool: null },
