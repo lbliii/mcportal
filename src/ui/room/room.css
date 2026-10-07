@@ -65,6 +65,7 @@
   .who-claim { display: flex; align-items: center; gap: var(--mp-space-4); margin-top: var(--mp-space-8); font-size: var(--mp-type-14, 14px); }
   .who-claim input { flex: 1; min-width: 0; padding: 5px 9px; border: 1px solid var(--mp-border-control); border-radius: var(--mp-radius-control); background: var(--mp-surface-canvas); color: var(--mp-text-primary); font: inherit; }
   .who-claim input:focus { outline: 2px solid var(--mp-action-primary); outline-offset: -1px; }
+  .who-list { display: flex; align-items: center; gap: var(--mp-space-6); margin: var(--mp-space-4) 0; font-size: var(--mp-type-13-5); }
   .who-error { color: var(--mp-status-error); }
   @container (max-width: 560px) { .who { padding: 0; width: var(--mp-control-minimum); justify-content: center; } .who-name { display: none; } }
   .sep { width: 1px; height: 16px; background: var(--mp-border-divider); margin: 0 3px; }

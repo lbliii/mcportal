@@ -50,6 +50,8 @@ export interface PublicProfile {
   sources?: FeaturedSource[];
   /** Who may reblog their new posts, unless a post says otherwise. Absent: anyone. */
   reblogs?: 'followers' | 'nobody';
+  /** Findable by people with similar sources (find_people). Opt-in: absent means unlisted. */
+  listed?: true;
   createdAt: string;
   updatedAt: string;
 }
@@ -64,6 +66,8 @@ export interface PublicProfileInput {
   sources?: Array<{ title?: string; source: string; config: unknown }> | undefined;
   /** Who may reblog new posts by default: anyone, followers or nobody. */
   reblogs?: string | undefined;
+  /** Findable by people with similar sources, or not. */
+  listed?: boolean | undefined;
 }
 
 /** Only sources MCPortal fetches itself can be featured; configs are re-validated. */
@@ -185,6 +189,12 @@ export class PublicProfiles {
     return { profile: { ...profile }, ...(movedFrom ? { movedFrom } : {}) };
   }
 
+  /** Everyone who chose to be findable (docs/plans/finding-people.md), minus suspended accounts. */
+  async listed(): Promise<PublicProfile[]> {
+    const doc = await this.load();
+    return Object.values(doc.profiles).filter((p) => p.listed && !this.hidden(p.accountId)).map((p) => ({ ...p }));
+  }
+
   /** Create or change your profile. A new profile needs a handle. Throws HandleError. */
   set(accountId: string, input: PublicProfileInput): Promise<{ profile: PublicProfile; created: boolean; released?: string }> {
     return this.write((doc) => {
@@ -224,6 +234,7 @@ export class PublicProfiles {
       if (accent) profile.accent = accent;
       if (sources?.length) profile.sources = sources;
       if (reblogs) profile.reblogs = reblogs;
+      if (input.listed !== undefined ? input.listed === true : current?.listed) profile.listed = true;
       doc.profiles[accountId] = profile;
       return { profile: { ...profile }, created: !current, ...(released ? { released } : {}) };
     });

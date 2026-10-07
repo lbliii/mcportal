@@ -1,10 +1,10 @@
 {
   "totals": {
     "local": 4034,
-    "linked": 5241,
-    "hosted-new": 4555,
-    "hosted-active": 5178,
-    "hosted-labs": 5178
+    "linked": 5384,
+    "hosted-new": 4698,
+    "hosted-active": 5321,
+    "hosted-labs": 5321
   },
   "tools": {
     "account_settings": 64,
@@ -14,6 +14,7 @@
     "clip": 361,
     "delete_clip": 49,
     "export_data": 97,
+    "find_people": 126,
     "find_source": 139,
     "get_clip": 64,
     "get_public_profile": 62,
@@ -42,7 +43,7 @@
     "save_item": 132,
     "search_clips": 144,
     "search_docs": 133,
-    "set_public_profile": 250,
+    "set_public_profile": 267,
     "share": 165,
     "share_settings": 90,
     "show_highlights": 143,

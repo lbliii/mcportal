@@ -191,7 +191,9 @@
         space.bio ? el('p', { class: 'bio' }, space.bio) : null,
         el('div', { class: 'row' }, follow, el('span', null, `${space.followers} follower${space.followers === 1 ? '' : 's'}`), el('span', null, `· ${space.posts.length} post${space.posts.length === 1 ? '' : 's'}`),
           space.mine ? el('span', null, '· this is what visitors see (followers-only posts show only to followers)') : null),
-        space.mine && space.link ? el('div', { class: 'row' }, el('button', { class: 'btn', type: 'button', onclick: () => copySpaceLink(space.link ?? '') }, icon('share'), ' Copy link to your space')) : null),
+        space.mine ? el('div', { class: 'row' },
+          space.link ? el('button', { class: 'btn', type: 'button', onclick: () => copySpaceLink(space.link ?? '') }, icon('share'), ' Copy link to your space') : null,
+          listingButton(space, withBack, back)) : null),
       space.sources.length ? el('h2', null, 'Sources I read') : null,
       space.sources.length ? el('div', { class: 'sources' }, sources) : null,
       el('h2', null, 'Posts'),
@@ -325,6 +327,24 @@
       strip.append(el('div', { class: 'intro' }, el('span', null, ...intros.joined.flatMap((h, i) => [i ? ', ' : '', handleButton(h)]), ` joined MCPortal through your Space link.`)));
     }
     $('grid').before(strip);
+  }
+
+  /**
+   * Your Space says whether people with similar sources can find you, and switches it.
+   * @param {Space} space @param {boolean} withBack @param {(e: MouseEvent) => void} [back]
+   */
+  function listingButton(space, withBack, back) {
+    const button = el('button', { class: 'btn', type: 'button', 'aria-pressed': String(Boolean(space.listed)) }, space.listed ? 'Listed: people with similar sources can find you' : 'Unlisted: list me');
+    button.addEventListener('click', async () => {
+      button.disabled = true;
+      try {
+        const { profile } = (await callTool('set_public_profile', { listed: !space.listed })).structuredContent;
+        space.listed = profile.listed;
+        toast(profile.listed ? 'Listed. People with similar sources can find you.' : 'Unlisted. Only people with your handle or link can find you.');
+        showSpace(space, withBack, back);
+      } catch (error) { toast(errorText(error)); button.disabled = false; }
+    });
+    return button;
   }
 
   /** Copy a Space's link; where the clipboard is off limits, show it to copy by hand. @param {string} link */

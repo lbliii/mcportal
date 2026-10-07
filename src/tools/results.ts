@@ -10,7 +10,7 @@ import type { Clip, ClipSummary } from '../clips.ts';
 import type { FetchedSource, SourceCandidate } from '../discover.ts';
 import type { Profile, ProfileDiff, SourceSettings } from '../profile.ts';
 import type { FeaturedSource, PublicProfile } from '../public-profiles.ts';
-import type { Intros, Reblogger, SharedItem } from '../social.ts';
+import type { Intros, PersonMatch, Reblogger, SharedItem } from '../social.ts';
 import type { Handoff } from '../handoffs.ts';
 import type { Candidate, HighlightPick, Lead, RoomEdition } from '../highlights.ts';
 import type { ReadingState } from '../reading.ts';
@@ -90,6 +90,7 @@ export type ToolResults = {
   clip: { clip: ClipSummary; profile: Profile; layoutChanged: boolean; portals: PortalResult[] };
   open_space: SpaceResult;
   /** labs: the server's, so a card offers what the room would. */
+  find_people: { people: Array<PersonMatch & { reasons: string[] }> };
   get_share: { share: SharedItem; rebloggers?: Reblogger[]; labs?: string[] };
   share: { share: SharedItem };
   share_settings: { share: SharedItem };

@@ -21,6 +21,7 @@ function describeProfile(p: PublicProfile): string {
     p.spaceTitle ? `space: ${p.spaceTitle}` : '',
     p.sources?.length ? `featured sources: ${p.sources.map((s) => s.title).join(', ')}` : '',
     p.reblogs ? `new posts can be reblogged by: ${p.reblogs === 'nobody' ? 'nobody' : 'followers only'}` : '',
+    p.listed ? 'listed: people with similar sources can find them (find_people)' : 'unlisted: found only by handle or Space link',
   ].filter(Boolean).join('\n');
 }
 
@@ -70,6 +71,7 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
         accent: { type: 'string', enum: [...ACCENTS, ''] },
         featuredPortalIds: { type: 'array', maxItems: MAX_FEATURED, items: { type: 'string' }, description: 'Ids (from open_room) of feed, Hacker News or GitHub portals to recommend; [] clears' },
         reblogs: { type: 'string', enum: ['anyone', 'followers', 'nobody'] },
+        listed: { type: 'boolean', description: 'findable via find_people' },
       },
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
@@ -92,6 +94,7 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
           accent: typeof args.accent === 'string' ? args.accent : undefined,
           sources,
           reblogs: typeof args.reblogs === 'string' ? args.reblogs : undefined,
+          listed: typeof args.listed === 'boolean' ? args.listed : undefined,
         });
         const skipped = sources ? sources.length - (profile.sources?.length ?? 0) : 0;
         const head = created ? `Created your public profile as @${profile.handle}. ${UNLOCKS}` : released ? `Changed your handle from @${released} to @${profile.handle}. @${released} points to you for 30 days.` : 'Updated your public profile.';

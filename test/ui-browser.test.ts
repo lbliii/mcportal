@@ -799,9 +799,10 @@ test('browser: Space links: the room offers a follow of whoever brought you, say
       const body = init && typeof init.body === 'string' ? JSON.parse(init.body) : null;
       const name = body && body.params && body.params.name;
       const args = body && body.params && body.params.arguments;
-      if (url === '/mcp' && (name === 'relationship' || name === 'open_space')) {
+      if (url === '/mcp' && (name === 'relationship' || name === 'open_space' || name === 'set_public_profile')) {
         window.__calls.push({ name, args });
         if (name === 'relationship') return answer({ content: [], structuredContent: { handle: args.handle, layoutChanged: false } });
+        if (name === 'set_public_profile') return answer({ content: [], structuredContent: { profile: { handle: 'reader', ...(args.listed ? { listed: true } : {}), createdAt: now, updatedAt: now } } });
         return answer({ content: [], structuredContent: { space: { handle: 'reader', mine: true, followers: 0, following: false, posts: [], sources: [], link: 'https://mcportal.example/@reader', createdAt: now, updatedAt: now } } });
       }
       const res = await real(url, init);
@@ -832,6 +833,10 @@ test('browser: Space links: the room offers a follow of whoever brought you, say
     await page.waitFor(`!document.getElementById('reader').hidden && document.querySelector('#reader .space-head')`, 'a space');
     assert.equal(await page.eval(`getComputedStyle(document.getElementById('intros')).display`), 'none');
     assert.ok(await page.eval(`document.querySelector('#reader .space-head').textContent.includes('Copy link to your space')`), 'your own space offers its link');
+    // Your space says whether you're findable, and switches it.
+    await page.eval(`[...document.querySelectorAll('#reader .space-head .btn')].find((b) => b.textContent === 'Unlisted: list me').click()`);
+    await page.waitFor(`[...document.querySelectorAll('#reader .space-head .btn')].some((b) => b.textContent.startsWith('Listed:'))`, 'listed');
+    assert.deepEqual(await page.eval(`window.__calls.at(-1)`), { name: 'set_public_profile', args: { listed: true } });
     await page.eval(`[...document.querySelectorAll('#reader .space-head .btn')].find((b) => b.textContent.includes('Copy link')).click()`);
     await page.waitFor(`/mcportal\\.example\\/@reader|Copied your Space link/.test(document.getElementById('toast').textContent)`, 'the link copied or shown');
     await page.eval(`document.querySelector('#reader .reader-top button').click()`);

@@ -24,6 +24,7 @@
  * The store interface and the in-process store live in social-store.ts and are
  * re-exported from here.
  */
+import { commonness, match, type Candidate, type Match, type Wanted } from './people.ts';
 import { randomBytes } from 'node:crypto';
 import { ClipError, cleanText, type Clip } from './clips.ts';
 import { AppError, type AppErrorOptions, type ErrorCode } from './lib/errors.ts';
@@ -84,6 +85,19 @@ export interface Report {
  * 'joins', someone new (b) joined through a's link (tell a once).
  */
 export type Relation = 'follows' | 'mutes' | 'blocks' | 'intros' | 'joins';
+
+/** A listed person who matches what find_people looked for: what they made public, and why they match. */
+export interface PersonMatch extends Match {
+  handle: string;
+  displayName?: string;
+  spaceTitle?: string;
+  bio?: string;
+  followers: number;
+  /** Titles of the sources they feature. */
+  featured: string[];
+  /** Their latest posts shared with everyone: evidence for the agent. */
+  posts: Array<{ title: string; url?: string; note?: string }>;
+}
 
 /** What open_room passes on from Space links, once: people to offer a follow of, and newcomers who came in through yours. */
 export interface Intros { offer: string[]; joined: string[] }
@@ -154,7 +168,7 @@ export interface SocialDeps {
  */
 export type SocialService = Pick<Social,
   'resolve' | 'share' | 'unshare' | 'get' | 'feed' | 'sharesOf' | 'follow' | 'unfollow' | 'mute' | 'block' | 'uses' | 'connections' | 'stats' | 'report'
-  | 'reblog' | 'shareSettings' | 'reblogsOf' | 'takeIntros'>;
+  | 'reblog' | 'shareSettings' | 'reblogsOf' | 'takeIntros' | 'findPeople'>;
 
 export class Social {
   private store: SocialStore;
@@ -468,6 +482,43 @@ export class Social {
       if (!this.hidden(id) && !(await this.blockedEitherWay(viewer, id))) out.joined.push(profile.handle);
     }
     return out;
+  }
+
+  /**
+   * Listed people who match `wanted` (docs/plans/finding-people.md), best first. Never the
+   * viewer, anyone they follow, mute or block (or who blocks them), anyone suspended, or
+   * anyone unlisted; `except` leaves one more out by handle. Only what people chose to make
+   * public is read: their profile, featured sources, and posts shared with everyone.
+   */
+  async findPeople(viewer: string, wanted: Wanted, options: { limit?: number; except?: string } = {}): Promise<PersonMatch[]> {
+    const limit = Math.min(12, Math.max(1, options.limit ?? 12));
+    const listed = await this.profiles.listed();
+    const [follows, mutes, blocks, blockedBy] = await Promise.all([
+      this.store.outgoing('follows', viewer), this.store.outgoing('mutes', viewer), this.store.outgoing('blocks', viewer), this.store.incoming('blocks', viewer)]);
+    const skip = new Set([viewer, ...follows, ...mutes, ...blocks, ...blockedBy]);
+    const people = listed.filter((p) => !skip.has(p.accountId) && p.handle !== options.except && !this.hidden(p.accountId));
+    const common = commonness(listed.map((p) => ({ featured: p.sources ?? [] })));
+    const postsOf = async (accountId: string) => (await this.store.sharesBy([accountId], { limit: 20 }))
+      .filter((s) => s.audience === 'mcportal' && !s.hiddenAt)
+      .map((s) => ({ title: s.title, ...(s.url ? { url: s.url } : {}), ...(s.note ? { note: s.note } : {}) }));
+    // Posts only count when the search looks at sites or words; otherwise they're read for the winners alone.
+    const needPosts = wanted.hosts.length > 0 || wanted.terms.length > 0;
+    const scored = await Promise.all(people.map(async (p) => {
+      const posts = needPosts ? await postsOf(p.accountId) : [];
+      const candidate: Candidate = { handle: p.handle, displayName: p.displayName, spaceTitle: p.spaceTitle, bio: p.bio, featured: p.sources ?? [], posts };
+      return { p, posts, m: match(candidate, wanted, common) };
+    }));
+    const best = scored.filter((s) => s.m.score > 0).sort((a, b) => b.m.score - a.m.score || a.p.handle.localeCompare(b.p.handle)).slice(0, limit);
+    return Promise.all(best.map(async ({ p, posts, m }) => ({
+      ...m,
+      handle: p.handle,
+      ...(p.displayName ? { displayName: p.displayName } : {}),
+      ...(p.spaceTitle ? { spaceTitle: p.spaceTitle } : {}),
+      ...(p.bio ? { bio: p.bio } : {}),
+      followers: (await this.store.incoming('follows', p.accountId)).length,
+      featured: (p.sources ?? []).map((s) => s.title),
+      posts: (needPosts ? posts : await postsOf(p.accountId)).slice(0, 5),
+    })));
   }
 
   /** Blocking also removes follows (and Space-link notes) both ways. Unblocking doesn't restore them. */
