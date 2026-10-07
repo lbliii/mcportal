@@ -37,7 +37,7 @@ async function hosted() {
   const store = new MemoryProfileStore();
   const clips = new MemoryClipStore();
   const publicProfiles = new PublicProfiles(memoryPersistence());
-  const social = new Social({ store: new DocumentSocialStore(), profiles: publicProfiles });
+  const social = new Social({ store: new DocumentSocialStore(), profiles: publicProfiles, preferences: store });
   const app = await startApp({ github: { clientId: 'gh-client', clientSecret: 'gh-secret' } }, createFixtureFetcher(), {
     store, clips, publicProfiles, social, authPersistence,
     accounts: new Accounts(memoryPersistence(), makeBootstrap([], [])),
@@ -169,6 +169,13 @@ test('linked: sharing and following work from a local MCPortal, as the linked ac
     await mac.ctx.social!.shareSettings(lawrence.accountId, shared.structuredContent.share.id, { reblogs: 'nobody' });
     assert.deepEqual((await mac.ctx.social!.reblogsOf(lawrence.accountId, shared.structuredContent.share.id)).map((r) => r.handle), ['friend']);
     assert.equal((await mac.ctx.social!.get(lawrence.accountId, shared.structuredContent.share.id))?.reblogCount, 1);
+    // A choice made on one device is loaded and used by a new linked device.
+    await mac.call('share', { savedUrl: 'https://example.com/kept', audience: 'followers' });
+    const secondDevice = device(h.app, lawrence.accountId, fixed(lawrence.tokens.access_token));
+    assert.equal((await secondDevice.call('account_settings')).structuredContent.shareAudience, 'followers');
+    const remembered = await secondDevice.call('share', { clipId: clip.structuredContent.clip.id });
+    assert.equal(remembered.structuredContent.share.audience, 'followers');
+    assert.equal((await secondDevice.ctx.social!.get(lawrence.accountId, shared.structuredContent.share.id))?.audience, 'everyone', 'earlier posts are unchanged');
     // The stores refuse to act as anyone else, whatever a caller passes.
     await assert.rejects(mac.ctx.social!.feed(friend.accountId), /only as its linked account/);
     await assert.rejects(mac.ctx.store.get(friend.accountId), /only its linked account/);

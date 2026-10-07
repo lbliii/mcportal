@@ -88,25 +88,82 @@
 
   // ------------------------------------------------------------ sharing into your space
   // The user writes the note here themselves, so nothing is posted in their name without them.
+  let audienceSwitchId = 0;
+  /** Public uses the existing everyone audience; followers-only never reaches the public Space. @param {SharedItem['audience']} audience */
+  const audienceHelp = (audience) => audience === 'everyone' ? 'Visible on your Space. Private Space settings still apply.' : 'Visible only to your followers. Hidden from your public Space.';
+
+  /** Keep newly opened composers in this room in sync with the preference saved by the server. @param {SharedItem} share */
+  function rememberShareAudience(share) {
+    if (state.profile) state.profile.shareAudience = share.audience;
+  }
+
+  /**
+   * One audience control for composers and quick reblogs. Cards without a room load
+   * the account's private preference before enabling submission.
+   * @param {string} verb @param {HTMLButtonElement} submit @param {boolean} [inMenu] @param {SharedItem['audience']} [initialAudience]
+   */
+  function audienceSwitch(verb, submit, inMenu = false, initialAudience) {
+    const id = `share-audience-${++audienceSwitchId}`;
+    /** @type {SharedItem['audience']} */
+    let selected = initialAudience ?? state.profile?.shareAudience ?? 'everyone';
+    const help = el('div', { id: `${id}-help`, class: 'audience-help', 'aria-live': 'polite' }, audienceHelp(selected));
+    /** @type {SharedItem['audience'][]} */
+    const choices = ['everyone', 'followers'];
+    const inputs = choices.map((value) => el('input', { type: 'radio', name: id, value, checked: selected === value,
+      ...(inMenu ? { role: 'menuitemradio', tabindex: '-1', 'aria-checked': String(selected === value) } : {}),
+      onchange: () => { selected = value; draw(); } }));
+    const group = el('div', { class: 'audience-switch', role: 'group', 'aria-label': `${verb} audience`, 'aria-describedby': `${id}-help` },
+      inputs.map((input, i) => el('label', null, input, choices[i] === 'everyone' ? 'Public' : 'Followers only')));
+    const node = el('div', { class: 'share-audience-control', ...(inMenu ? { role: 'none' } : {}) }, group, help);
+    let ready = Boolean(state.profile || initialAudience);
+    function draw() {
+      for (const input of inputs) {
+        input.checked = input.value === selected;
+        if (inMenu) input.setAttribute('aria-checked', String(input.checked));
+      }
+      help.textContent = audienceHelp(selected);
+    }
+    /** @param {boolean} disabled */
+    function disable(disabled) { for (const input of inputs) input.disabled = disabled; submit.disabled = disabled; }
+    function load() {
+      disable(true);
+      help.textContent = 'Loading your audience preference…';
+      callTool('account_settings').then(({ structuredContent }) => {
+        selected = structuredContent.shareAudience ?? 'everyone';
+        ready = true;
+        draw(); disable(false);
+      }).catch((error) => {
+        help.replaceChildren('Couldn’t load your audience preference. ', el('button', { type: 'button', class: 'link-btn',
+          ...(inMenu ? { role: 'menuitem', tabindex: '-1' } : {}),
+          onclick: load }, 'Retry'));
+        toast(errorText(error));
+      });
+    }
+    if (!state.profile && !initialAudience) load();
+    return { node, value: () => selected, disable, isReady: () => ready };
+  }
+
   /**
    * @param {Record<string, string | undefined>} target what to post: { clipId }, { savedUrl } or { reblogOf } @param {string} title
-   * @param {{ verb?: string, onDone?: (share: SharedItem) => void }} [options] the button's word, and what to do once it's posted
+   * @param {{ verb?: string, audience?: SharedItem['audience'] | undefined, onDone?: (share: SharedItem) => void }} [options] the button's word, and what to do once it's posted
    */
-  function composer(target, title, { verb = 'Share', onDone } = {}) {
+  function composer(target, title, { verb = 'Share', audience: initialAudience, onDone } = {}) {
     const note = el('textarea', { placeholder: 'Add a note (optional): why it\'s worth a look', 'aria-label': `${verb} note (optional)`, maxlength: '500' });
-    const audience = el('select', { class: 'btn', 'aria-label': `Who sees this ${verb.toLowerCase()}` }, el('option', { value: 'followers' }, 'Followers'), el('option', { value: 'everyone' }, 'Everyone who can see your Space'));
-    const go = el('button', { class: 'btn', style: 'font-weight:600' }, verb);
+    const go = el('button', { type: 'button', class: 'btn', style: 'font-weight:600' }, verb);
+    const audience = audienceSwitch(verb, go, false, initialAudience);
     const box = el('div', { class: 'composer' }, el('div', { class: 'byline', style: 'margin:0 0 6px' }, `${verb} “${title}” to your space`), note,
-      el('div', { class: 'row' }, el('span', null, 'Who sees it:'), audience, el('span', { class: 'spacer' }), go));
+      el('div', { class: 'row' }, audience.node, go));
     go.addEventListener('click', async () => {
-      go.disabled = true;
+      const selected = audience.value();
+      audience.disable(true);
       try {
-        const result = await callTool('share', { ...target, note: note.value, audience: audience.value });
-        box.replaceChildren(el('div', null, `Transmitted! ${audience.value === 'everyone' ? 'Everyone who can see your Space' : 'Your followers'} will find it in your space.`));
+        const result = await callTool('share', { ...target, note: note.value, audience: selected });
+        rememberShareAudience(result.structuredContent.share);
+        box.replaceChildren(el('div', { role: 'status' }, `${verb === 'Reblog' ? 'Reblogged' : 'Shared'} · ${result.structuredContent.share.audience === 'everyone' ? 'Public' : 'Followers only'}. ${audienceHelp(result.structuredContent.share.audience)}`));
         onDone?.(result.structuredContent.share);
       } catch (error) {
         toast(errorText(error));
-        go.disabled = false;
+        audience.disable(false);
       }
     });
     return box;
@@ -116,16 +173,16 @@
    * The composer as its own view: share a saved item, or (with options) reblog a post, its
    * original's author and note quoted above, in their voice.
    * @param {{ title: string, url?: string | undefined }} item
-   * @param {{ target?: Record<string, string | undefined>, verb?: string, quote?: { by: string, note?: string | undefined } | undefined, onDone?: (share: SharedItem) => void }} [options]
+   * @param {{ target?: Record<string, string | undefined>, verb?: string, audience?: SharedItem['audience'] | undefined, quote?: { by: string, note?: string | undefined } | undefined, onDone?: (share: SharedItem) => void }} [options]
    */
-  function openComposer(item, { target = { savedUrl: item.url }, verb = 'Share', quote, onDone } = {}) {
+  function openComposer(item, { target = { savedUrl: item.url }, verb = 'Share', audience, quote, onDone } = {}) {
     const reader = $('reader');
     rememberRoomNavigation();
     $('grid').hidden = true; reader.hidden = false; reader.scrollTop = 0; window.scrollTo(0, 0);
     reader.replaceChildren(...present([el('div', { class: 'reader-top' }, iconButton('back', 'Back to your room', closeReader, 'ib')),
       el('h1', null, item.title), el('div', { class: 'byline' }, [item.url, quote ? `reblogging @${quote.by}` : ''].filter(Boolean).join(' · ')),
       quote && quote.note ? el('p', { class: 'story-note' }, el('span', { class: 'story-note-by' }, `@${quote.by}`), quote.note) : null,
-      composer(target, item.title, { verb, onDone })]));
+      composer(target, item.title, { verb, audience, onDone })]));
   }
 
   // ------------------------------------------------------------ spaces
@@ -432,7 +489,7 @@
   // voices at most. Your own post shows who reblogged it and your controls over that.
   /** @param {SharedItem} share @param {boolean} withBack @param {Reblogger[]} [rebloggers] */
   function shareNodes(share, withBack, rebloggers = []) {
-    const to = share.audience === 'everyone' ? 'everyone on MCPortal' : 'followers';
+    const to = share.audience === 'everyone' ? 'Public' : 'Followers only';
     const original = share.original && 'author' in share.original ? share.original : undefined;
     const preview = share.reblogOf ? original : share;
     const top = el('div', { class: 'reader-top' },

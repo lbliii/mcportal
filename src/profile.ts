@@ -115,6 +115,8 @@ export interface Profile {
   name: string;
   layout: Layout;
   openIn: OpenIn;
+  /** Explicit audience preference for future shares; absent until one is chosen. */
+  shareAudience?: 'everyone' | 'followers';
   columns: ColumnSpec[];
   /** Newest first. Only save_item / remove_saved change it; arrange_room carries it over. */
   saved: SavedItem[];
@@ -323,8 +325,9 @@ export function validateProfile(input: unknown, now = new Date()): Profile {
   const onboarded = input.onboarded !== false;
   const pinnedIds = columns.flatMap((c) => c.panels).filter((p) => p.source === 'pinned').map((p) => p.id);
   const pins = normalizePins(input.pins, pinnedIds, now);
+  const shareAudience = input.shareAudience === 'everyone' || input.shareAudience === 'followers' ? input.shareAudience : undefined;
   const people = normalizePeople(input.people, now);
-  return { version: 1, name, layout, openIn, columns, saved: normalizeSaved(input.saved, now), pins, onboarded, ...(people ? { people } : {}), updatedAt: now.toISOString() };
+  return { version: 1, name, layout, openIn, ...(shareAudience ? { shareAudience } : {}), columns, saved: normalizeSaved(input.saved, now), pins, onboarded, ...(people ? { people } : {}), updatedAt: now.toISOString() };
 }
 
 /** Suggestions and passes: valid handles only, the reason cleaned, expired ones dropped, one per handle, capped. */

@@ -1,11 +1,10 @@
 /**
  * Sharing and follows (identity plan, phase 4). Native to MCPortal: shares are
- * seen by signed-in users in their Following portal or on a profile, never
- * published to the open web.
+ * seen in Following or on a profile. Public Space projections use the everyone audience.
  *
  *   share   a saved link or a clip with a note. The content is copied at share
  *           time, so the share doesn't change if the clip does. Audience:
- *           'followers' (default) or 'everyone' (anyone signed in).
+ *           'followers' or 'everyone' (public, the default without a preference).
  *   follow  open for anyone with a public profile.
  *   mute    their shares disappear from your Following portal.
  *   block   they can't follow you or see your shares, and you don't see theirs;
@@ -29,6 +28,7 @@ import { randomBytes } from 'node:crypto';
 import { ClipError, cleanText, type Clip } from './clips.ts';
 import { AppError, type AppErrorOptions, type ErrorCode } from './lib/errors.ts';
 import { clean } from './lib/text.ts';
+import type { ProfileStore } from './store.ts';
 import { normalizeLinkPreview } from './profile.ts';
 import type { LinkPreview } from './types.ts';
 import type { Cover, SpaceStamp } from './space-design.ts';
@@ -164,6 +164,7 @@ export interface Reblogger { cover?: Cover; handle: string; reblogId: string; cr
 export interface SocialDeps {
   store: SocialStore;
   profiles: PublicProfiles;
+  preferences?: ProfileStore;
   /** Accounts that can't be seen (suspended). */
   hidden?: (accountId: string) => boolean;
   now?: () => number;
@@ -183,6 +184,7 @@ export type SocialService = Pick<Social,
 export class Social {
   private store: SocialStore;
   private profiles: PublicProfiles;
+  private preferences: ProfileStore | undefined;
   private hidden: (accountId: string) => boolean;
   private now: () => number;
   private accountCreatedAt: (accountId: string) => number | undefined;
@@ -190,6 +192,7 @@ export class Social {
   constructor(deps: SocialDeps) {
     this.store = deps.store;
     this.profiles = deps.profiles;
+    this.preferences = deps.preferences;
     this.hidden = deps.hidden ?? (() => false);
     this.now = deps.now ?? Date.now;
     this.accountCreatedAt = deps.accountCreatedAt ?? (() => undefined);
@@ -298,7 +301,9 @@ export class Social {
   private async post(author: string, input: { note?: unknown; audience?: unknown }, fields: Omit<Share, 'id' | 'accountId' | 'note' | 'audience' | 'createdAt'>): Promise<SharedItem> {
     if (!(await this.profiles.get(author))) throw new SocialError('Sharing needs a public profile, so people know who shared it. Create one with set_public_profile first', 'failed_precondition');
     if ((await this.store.countShares(author)) >= SOCIAL_LIMITS.sharesPerUser) throw new SocialError(`You have ${SOCIAL_LIMITS.sharesPerUser} posts, the most MCPortal keeps. Remove some with unshare`, 'limit_exceeded');
-    const audience: Audience = input.audience === 'everyone' ? 'everyone' : 'followers';
+    if (input.audience !== undefined && !(AUDIENCES as readonly unknown[]).includes(input.audience)) throw new SocialError(`audience must be one of ${AUDIENCES.join(', ')}`);
+    const audience: Audience = input.audience === 'everyone' || input.audience === 'followers'
+      ? input.audience : (await this.preferences?.get(author))?.shareAudience ?? 'everyone';
     let note: string;
     try {
       note = cleanText(input.note, SOCIAL_LIMITS.note, 'note');
@@ -307,6 +312,11 @@ export class Social {
       throw new SocialError(error.message.replace(/\.$/, ''), error.code);
     }
     const share: Share = { id: newId('s'), accountId: author, ...fields, ...(note ? { note } : {}), audience, createdAt: this.at() };
+    // Save an explicit selection before posting, so a preference write failure can't
+    // make a successfully published post look like a failed share. Never infer from old posts.
+    if (input.audience !== undefined) await this.preferences?.update(author, (profile) => ({
+      ...(profile.shareAudience !== audience ? { profile: { ...profile, shareAudience: audience } } : {}), result: undefined,
+    }));
     await this.store.addShare(share);
     return (await this.present(author, [share]))[0]!;
   }

@@ -811,7 +811,7 @@ test("browser: in the river, follows' shares and reblogs join their stories with
       const name = body && body.params && body.params.name;
       if (url === '/mcp' && (name === 'share' || name === 'unshare')) {
         window.__calls.push({ name, args: body.params.arguments });
-        return answer(name === 'share' ? { content: [], structuredContent: { share: { id: 's_mine' } } } : { content: [], structuredContent: { removed: true } });
+        return answer(name === 'share' ? { content: [], structuredContent: { share: { id: 's_mine', audience: body.params.arguments.audience } } } : { content: [], structuredContent: { removed: true } });
       }
       const res = await real(url, init);
       if (name !== 'open_room') return res;
@@ -850,8 +850,7 @@ test("browser: in the river, follows' shares and reblogs join their stories with
     return node ? { context: node.querySelector('.story-context')?.textContent ?? null, trail: [...node.querySelectorAll('.story-note')].map((n) => n.textContent), removed: node.querySelector('.story-removed')?.textContent ?? null,
       from: node.querySelector('.item-from').textContent, reblog: b ? { label: b.getAttribute('aria-label'), disabled: b.disabled } : null } : null;
   })()`);
-  // Count the primary actions independently of the asynchronous read-it-first nudge, checked below.
-  const menu = () => page.eval<string[]>(`[...document.querySelectorAll('.reblog-menu > [role="menuitem"]')].map((n) => n.textContent)`);
+  const menu = () => page.eval<string[]>(`[...document.querySelectorAll('.reblog-menu > [role="menuitem"], .reblog-submit-row > [role="menuitem"]')].map((n) => n.textContent)`);
   try {
     page.problems.length = 0;
     await page.goto(`${app.base}/preview`);
@@ -871,6 +870,8 @@ test("browser: in the river, follows' shares and reblogs join their stories with
     // The menu: Reblog and Reblog with a note, plus a nudge to read it first.
     await page.eval(`${find('A post by cy')}.querySelector('.mi.reblog').click()`);
     assert.deepEqual(await menu(), ['Reblog', 'Reblog with a note']);
+    assert.equal(await page.eval(`document.querySelector('.reblog-menu input:checked').value`), 'everyone', 'quick reblog defaults to Public');
+    assert.match(await page.eval<string>(`document.querySelector('.reblog-menu .audience-help').textContent`), /Visible on your Space/);
     assert.equal(await page.eval(`document.activeElement.textContent`), 'Reblog', 'focus moves into the menu');
     await page.waitFor(`document.querySelector('.reblog-nudge')`, 'the read-it-first nudge');
     assert.match(await page.eval<string>(`document.querySelector('.reblog-nudge').textContent`), /You haven't read this yet\. Read it first\?/);
@@ -881,7 +882,7 @@ test("browser: in the river, follows' shares and reblogs join their stories with
     await page.eval(`[...document.querySelectorAll('.reblog-menu [role="menuitem"]')].find((n) => n.textContent === 'Reblog').click()`);
     await page.waitFor(`${find('A post by cy')}.querySelector('.mi.reblog').classList.contains('on')`, 'the reblog to land');
     assert.equal((await read('A post by cy'))?.reblog?.label, 'Undo reblog (4 reblogs)');
-    assert.deepEqual(await page.eval(`window.__calls.at(-1)`), { name: 'share', args: { reblogOf: 's_ben' } }, "it reblogs the post behind the story; the server finds cy's original");
+    assert.deepEqual(await page.eval(`window.__calls.at(-1)`), { name: 'share', args: { reblogOf: 's_ben', audience: 'everyone' } }, "it reblogs the post behind the story with its visible audience");
     assert.match(await page.eval<string>(`document.getElementById('toast').textContent`), /Sent through the portal!/);
     await page.eval(`${find('A post by cy')}.querySelector('.mi.reblog').click()`);
     assert.deepEqual(await menu(), ['Undo reblog']);
@@ -893,6 +894,8 @@ test("browser: in the river, follows' shares and reblogs join their stories with
     // A story no one has posted: reblogging with a note saves it first, then opens the composer.
     const plain = await page.eval<string>(`[...document.querySelectorAll('.river-feed > article')].find((n) => n.dataset.story.startsWith('gh-mcp')).querySelector('.item-title').textContent`);
     await page.eval(`[...document.querySelectorAll('.river-feed > article')].find((n) => n.dataset.story.startsWith('gh-mcp')).querySelector('.mi.reblog').click()`);
+    await page.eval(`document.querySelector('.reblog-menu input[value="followers"]').click()`);
+    assert.equal(await page.eval(`document.querySelector('.reblog-menu input:checked').value`), 'followers');
     await page.eval(`[...document.querySelectorAll('.reblog-menu [role="menuitem"]')].find((n) => n.textContent === 'Reblog with a note').click()`);
     await page.waitFor(`!document.getElementById('reader').hidden && document.querySelector('#reader .composer')`, 'the composer');
     assert.match(await page.eval<string>(`document.querySelector('#reader .composer').textContent`), new RegExp(`Reblog “${plain.replace(/^New/, '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}” to your space`));
@@ -903,6 +906,18 @@ test("browser: in the river, follows' shares and reblogs join their stories with
     assert.deepEqual(preview.image, { url: 'https://img.example.com/cover.png', kind: 'thumb' });
     assert.equal(preview.title, 'My chosen bookmark title', 'adding the preview preserves a chosen bookmark title');
     assert.equal(preview.note, undefined, 'source descriptions are not personal notes');
+    assert.equal(await page.eval(`document.querySelector('.composer input:checked').value`), 'followers', 'the menu choice carries into the note composer');
+    assert.match(await page.eval<string>(`document.querySelector('.composer .audience-help').textContent`), /Hidden from your public Space/);
+    await page.click('.composer .row > button');
+    await page.waitFor(`document.querySelector('.composer [role="status"]')`, 'the followers reblog');
+    assert.equal(await page.eval(`window.__calls.at(-1).args.audience`), 'followers');
+    assert.match(await page.eval<string>(`document.querySelector('.composer').textContent`), /Reblogged · Followers only/);
+    await page.click('#reader .reader-top button');
+    await page.eval(`${find('A post by cy')}.querySelector('.mi.reblog').click()`);
+    assert.equal(await page.eval(`document.querySelector('.reblog-menu input:checked').value`), 'followers', 'future quick reblogs remember the choice');
+    await page.eval(`[...document.querySelectorAll('.reblog-menu [role="menuitem"]')].find((n) => n.textContent === 'Reblog').click()`);
+    await page.waitFor(`${find('A post by cy')}.querySelector('.mi.reblog').classList.contains('on')`, 'the followers quick reblog');
+    assert.equal(await page.eval(`window.__calls.at(-1).args.audience`), 'followers');
     // No labs at all: the river is offered, and in columns every feed row has a reblog button too.
     assert.equal(await page.eval(`document.querySelector('[data-layout="river"]').hidden`), false);
     await page.eval(`document.querySelector('[data-layout="columns"]').click()`);
@@ -1010,6 +1025,59 @@ test('browser: every handle is a door: @names open their space and come back to 
     assert.deepEqual(page.problems, []);
   } finally {
     await page.send('Page.removeScriptToEvaluateOnNewDocument', { identifier });
+    await profiles.put('default', room());
+  }
+});
+
+test('browser: a standalone clip loads the saved audience before sharing, retries failures, and wraps on narrow screens', { skip }, async () => {
+  await profiles.put('default', validateProfile({ ...room(), shareAudience: 'followers' }));
+  const host = await attachHost();
+  const { identifier } = await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => {
+    const real = window.fetch;
+    window.__shares = [];
+    let failPreference = true;
+    window.fetch = async (url, init) => {
+      const body = init && typeof init.body === 'string' ? JSON.parse(init.body) : null;
+      const name = body?.params?.name;
+      let result;
+      if (url === '/mcp' && name === 'account_settings' && failPreference) {
+        failPreference = false;
+        result = { isError: true, content: [{ type: 'text', text: 'Preference temporarily unavailable' }] };
+      } else if (url === '/mcp' && name === 'share') {
+        window.__shares.push(body.params.arguments);
+        result = { content: [], structuredContent: { share: { id: 's_clip', audience: body.params.arguments.audience } } };
+      }
+      return result ? new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result }), { status: 200, headers: { 'content-type': 'application/json' } }) : real(url, init);
+    };
+  })();` });
+  try {
+    page.problems.length = 0;
+    await page.send('Emulation.setDeviceMetricsOverride', { width: 360, height: 900, deviceScaleFactor: 1, mobile: false });
+    await page.goto(`${app.base}/preview`);
+    await page.eval(`window.postMessage({ jsonrpc: '2.0', method: 'ui/notifications/tool-result', params: { structuredContent: { clip: {
+      id: 'c_test', title: 'A standalone clip', kind: 'quote', tags: [], source: { kind: 'conversation' }, createdAt: new Date().toISOString(), data: { kind: 'quote', text: 'Keep this thought.' }
+    } } } }, '*')`);
+    await page.waitFor(`document.querySelector('#reader h1')?.textContent === 'A standalone clip'`, 'the standalone clip card');
+    await page.eval(`[...document.querySelectorAll('#reader button')].find((b) => b.textContent.includes('Share to your space')).click()`);
+    await page.waitFor(`document.querySelector('.audience-help button')`, 'the preference retry');
+    assert.equal(await page.eval(`document.querySelector('.composer .row > button').disabled`), true, 'failure blocks submission rather than guessing Public');
+    assert.equal(await page.eval(`window.__shares.length`), 0);
+    await page.click('.audience-help button');
+    await page.waitFor(`document.querySelector('.composer input:checked')?.value === 'followers' && !document.querySelector('.composer .row > button').disabled`, 'the saved audience after retry');
+    assert.match(await page.eval<string>(`document.querySelector('.audience-help').textContent`), /Hidden from your public Space/);
+    await page.eval(`document.documentElement.style.fontSize = '200%'`);
+    assert.equal(await page.eval(`(() => { const box = document.querySelector('.composer').getBoundingClientRect(); return [...document.querySelectorAll('.composer .row button, .composer label')].every((n) => { const r = n.getBoundingClientRect(); return r.left >= box.left && r.right <= box.right; }); })()`), true, 'controls fit at 360px with enlarged text');
+    await page.click('.composer input[value="everyone"]');
+    assert.match(await page.eval<string>(`document.querySelector('.audience-help').textContent`), /Visible on your Space/);
+    await page.click('.composer .row > button');
+    await page.waitFor(`document.querySelector('.composer [role="status"]')`, 'the public clip share');
+    assert.deepEqual(await page.eval(`window.__shares`), [{ clipId: 'c_test', note: '', audience: 'everyone' }]);
+    assert.match(await page.eval<string>(`document.querySelector('.composer').textContent`), /Shared · Public/);
+    assert.deepEqual(page.problems, []);
+  } finally {
+    await page.send('Page.removeScriptToEvaluateOnNewDocument', { identifier });
+    await page.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: host });
+    await page.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
     await profiles.put('default', room());
   }
 });

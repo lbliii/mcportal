@@ -143,7 +143,7 @@ async function start(argv: string[]): Promise<void> {
   await accounts.load();
   const suspended = (id: string) => accounts.actor(id).status !== 'active';
   const publicProfiles = new PublicProfiles(profilesPersistence, { hidden: suspended });
-  const social = new Social({ store: socialStore, profiles: publicProfiles, hidden: suspended, accountCreatedAt: (id) => accounts.createdAt(id) });
+  const social = new Social({ preferences: store, store: socialStore, profiles: publicProfiles, hidden: suspended, accountCreatedAt: (id) => accounts.createdAt(id) });
   // Running locally without auth (npm start): a local MCPortal that can sign in, like the stdio one.
   const local = storage === 'files' && !config.github && !config.staticToken && config.allowUnauthenticated;
   const session = local ? new LocalSession({

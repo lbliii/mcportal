@@ -306,7 +306,9 @@
   /* the stamp: the icon lands like a print stamp, a little off register, then settles */
   @keyframes mp-stamp { 0% { transform: scale(1.35) rotate(-8deg); filter: drop-shadow(1.5px 1px 0 var(--mp-brand-brick)); } 55% { transform: scale(0.92); filter: drop-shadow(1px 0.5px 0 var(--mp-brand-brick)); } 100% { transform: none; filter: none; } }
   @media (prefers-reduced-motion: no-preference) { .reblog.stamp svg { animation: mp-stamp 420ms var(--mp-ease-standard); } }
-  .reblog-menu { position: absolute; z-index: var(--mp-layer-toast); min-width: 13rem; max-width: 18rem; padding: var(--mp-space-4); background: var(--mp-surface-raised); color: var(--mp-text-primary); border: 1px solid var(--mp-border-divider); border-radius: var(--mp-radius-control); box-shadow: 0 6px 20px rgb(0 0 0 / 0.16); }
+  .reblog-menu { position: absolute; z-index: var(--mp-layer-toast); width: min(24rem, calc(100vw - 16px)); padding: var(--mp-space-8); background: var(--mp-surface-raised); color: var(--mp-text-primary); border: 1px solid var(--mp-border-divider); border-radius: var(--mp-radius-control); box-shadow: 0 6px 20px rgb(0 0 0 / 0.16); }
+  .reblog-submit-row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--mp-space-8); }
+  .reblog-submit-row > button { min-height: var(--mp-control-height); padding: var(--mp-space-6) var(--mp-space-10); font: inherit; color: var(--mp-text-primary); background: var(--mp-surface-input); border: 1px solid var(--mp-border-control); border-radius: var(--mp-radius-control); cursor: pointer; }
   .reblog-menu > [role="menuitem"] { display: block; width: 100%; min-height: 32px; padding: var(--mp-space-6) var(--mp-space-10); border: 0; border-radius: var(--mp-radius-sm); background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
   .reblog-menu > [role="menuitem"]:hover, .reblog-menu [role="menuitem"]:focus-visible { background: var(--mp-surface-hover); outline: none; }
   .reblog-nudge { padding: var(--mp-space-6) var(--mp-space-10) var(--mp-space-8); margin-bottom: var(--mp-space-4); border-bottom: 1px solid var(--mp-border-divider); color: var(--mp-text-secondary); font-size: var(--mp-type-12-5); }
@@ -576,6 +578,14 @@
   .composer .row { display: flex; gap: var(--mp-space-8); align-items: center; margin-top: var(--mp-space-8); }
   .shared-by { margin: 0 0 var(--mp-space-12); }
   .shared-by .share-actions:empty { display: none; }
+  .share-audience-control { flex: 1; min-width: min(100%, 13rem); }
+  .audience-switch { display: inline-flex; max-width: 100%; gap: var(--mp-space-2); padding: var(--mp-space-2); border: 1px solid var(--mp-border-control); border-radius: 999px; background: var(--mp-surface-inset); }
+  .audience-switch label { position: relative; display: flex; align-items: center; justify-content: center; min-width: 0; min-height: var(--mp-control-height); padding: var(--mp-space-4) var(--mp-space-10); border: 1px solid transparent; border-radius: 999px; font-weight: var(--mp-weight-strong); text-align: center; cursor: pointer; }
+  .audience-switch label:has(input:checked) { background: var(--mp-action-primary); color: var(--mp-action-on-primary); border-color: var(--mp-action-primary); }
+  .audience-switch label:has(input:focus-visible) { outline: 2px solid var(--mp-focus-ring); outline-offset: 2px; }
+  .audience-switch label:has(input:disabled) { opacity: 0.6; cursor: wait; }
+  .audience-switch input { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; margin: 0; opacity: 0; cursor: inherit; }
+  .audience-help { margin-top: var(--mp-space-4); color: var(--mp-text-secondary); font-size: var(--mp-type-12-5); }
   .reader .share-note { margin: 0 0 18px; padding: var(--mp-space-10) 14px; border-left: 3px solid var(--mp-source-following); background: var(--mp-surface-hover); border-radius: 0 8px 8px 0; white-space: pre-wrap; }
   .reader .clip-note { margin: 0 0 18px; color: var(--mp-text-secondary); font-style: italic; white-space: pre-wrap; }
   .reader .clip-quote { font-size: var(--mp-type-18); line-height: 1.55; white-space: pre-wrap; margin: 0 0 10px; padding-left: 14px; border-left: 3px solid var(--mp-source-clips); }
