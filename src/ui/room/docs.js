@@ -40,7 +40,7 @@
     return site.sections.map((section, i) => el('details', { open: site.sections.length === 1 ? true : null },
       el('summary', null, section.title, el('span', { class: 'n' }, String(section.pages.length))),
       el('ul', null, section.pages.map((p) => el('li', null, el('a', {
-        class: p.index ? 'idx' : null, 'data-url': p.url, title: p.description || p.title,
+        class: p.index ? 'idx' : null, href: p.url, 'data-url': p.url, title: p.description || p.title,
         onclick: (/** @type {MouseEvent} */ e) => { e.preventDefault(); if (p.index) openDocs({ docs: p.url }, { parent: docsState }); else loadDocsPage(p.url); },
       }, p.title))))));
   }
@@ -57,6 +57,7 @@
     const reader = $('reader');
     reader.classList.add('docs'); reader.classList.remove('toc-open');
     const list = el('div', { class: 'docs-list' }, docsTocNodes(site));
+    const requestState = docsState;
     /** @type {ReturnType<typeof setTimeout> | undefined} */
     let timer;
     const search = el('input', { class: 'docs-search', type: 'search', placeholder: site.symbols ? 'Search pages and symbols' : 'Search pages', 'aria-label': `Search ${site.title}` });
@@ -66,21 +67,24 @@
       if (query.length < 2) { list.replaceChildren(...docsTocNodes(site)); markCurrentPage(); return; }
       timer = setTimeout(async () => {
         try {
-          if (!docsState) return;   // the reader closed while this search waited
+          if (docsState !== requestState) return;
           const { hits } = (await callTool('search_docs', { ...docsState.key, query, limit: 30 })).structuredContent;
-          if (search.value.trim() !== query) return;
+          if (docsState !== requestState || search.value.trim() !== query) return;
           list.replaceChildren(hits.length
-            ? el('ul', { class: 'docs-hits' }, hits.map((h) => el('li', null, el('a', { onclick: () => loadDocsPage(h.url) }, h.title,
+            ? el('ul', { class: 'docs-hits' }, hits.map((h) => el('li', null, el('a', { href: h.url, 'data-url': h.url, onclick: (/** @type {MouseEvent} */ e) => { e.preventDefault(); loadDocsPage(h.url); } }, h.title,
               el('span', { class: 'sub' }, h.kind === 'symbol' ? h.role : h.section || '')))))
             : el('div', { class: 'docs-hits' }, el('div', { class: 'empty' }, 'No titles match.')));
+          markCurrentPage();
         } catch (error) {
+          if (docsState !== requestState || search.value.trim() !== query) return;
           console.error('[mcportal] search_docs failed', error);
           list.replaceChildren(el('div', { class: 'error', role: 'alert' }, errorText(error)));
         }
       }, 250);
     });
     // The up button is on screen only while this state, which has a parent, is current.
-    const toc = el('aside', { class: 'docs-toc', 'aria-label': 'Contents' },
+    const toc = el('aside', { id: 'docsContents', class: 'docs-toc', 'aria-label': 'Contents' },
+      el('button', { class: 'btn docs-close', onclick: () => toggleDocsContents(false) }, 'Close contents'),
       docsState.parent ? el('button', { class: 'docs-up', onclick: () => { const up = /** @type {DocsState} */ (/** @type {DocsState} */ (docsState).parent); showDocs({ site: up.site, docs: up.docs }, up.key, { parent: up.parent, card: up.card }); } }, `← ${docsState.parent.site.title}`) : null,
       el('div', { class: 'docs-site' }, site.title), search, list);
     reader.replaceChildren(el('div', { class: 'docs-grid' }, toc, el('div', { class: 'docs-page' }), el('nav', { class: 'docs-otp', 'aria-label': 'On this page' })));
@@ -95,11 +99,12 @@
     if (!docsState) return;
     const toc = $first('.docs-toc', $('reader'));
     if (!toc) return;
-    for (const a of $$('a.current', toc)) a.classList.remove('current');
+    for (const a of $$('a.current', toc)) { a.classList.remove('current'); a.removeAttribute('aria-current'); }
     const url = docsState.url;
     const current = [...$$('a[data-url]', toc)].find((a) => a.dataset.url === url);
     if (!current) return;
     current.classList.add('current');
+    current.setAttribute('aria-current', 'page');
     const details = current.closest('details');
     if (details) details.open = true;
     const top = current.offsetTop - toc.offsetTop;
@@ -108,9 +113,19 @@
 
   /** @param {string} id */
   function scrollToAnchor(id) {
-    const target = $first(`.docs-page [data-anchor="${CSS.escape(id)}"]`, $('reader'));
-    if (target) target.scrollIntoView({ block: 'start', behavior: scrollBehavior() });
-    return !!target;
+    const page = $first('.docs-page', $('reader'));
+    return page ? focusReaderAnchor(page, id) : false;
+  }
+
+  /** @param {boolean} open */
+  function toggleDocsContents(open) {
+    const reader = $('reader');
+    reader.classList.toggle('toc-open', open);
+    const toggle = $first('.docs-toggle', reader);
+    toggle?.setAttribute('aria-expanded', String(open));
+    const destination = open ? $first('.docs-search', reader) : toggle;
+    destination?.scrollIntoView({ block: 'nearest', behavior: 'auto' });
+    destination?.focus({ preventScroll: true });
   }
 
   /** @param {string} target */
@@ -126,6 +141,8 @@
     reader.classList.remove('toc-open');
     if (docsState.url === url && hash) { scrollToAnchor(hash); return; }
     if (stopReading) stopReading();
+    otp.replaceChildren();
+    column.setAttribute('aria-busy', 'true');
     column.replaceChildren(docsMessage('Loading…'));
     try {
       const data = (await callTool('read_doc_page', { url, ...docsState.key })).structuredContent;
@@ -141,23 +158,29 @@
       };
       const original = isHttpUrl(page.originalUrl) ? page.originalUrl : page.url;
       const top = readerTop(original, !docsState.card, page.title);
-      top.append(el('button', { class: 'btn docs-toggle', onclick: () => reader.classList.toggle('toc-open') }, 'Contents'));
+      top.append(el('button', { class: 'btn docs-toggle', 'aria-expanded': 'false', 'aria-controls': 'docsContents', onclick: () => toggleDocsContents(!reader.classList.contains('toc-open')) }, 'Contents'));
       const pager = el('div', { class: 'docs-pager' },
         prev ? el('button', { class: 'prev', onclick: () => loadDocsPage(prev.url) }, el('small', null, 'Previous'), prev.title) : null,
         next ? el('button', { class: 'next', onclick: () => loadDocsPage(next.url) }, el('small', null, 'Next'), next.title) : null);
       const minutes = Math.max(1, Math.round((page.wordCount || 0) / 230));
       const how = docsState.key.portalId ? `portalId "${docsState.key.portalId}"` : `docs "${String(docsState.key.docs).slice(0, 300)}"`;
+      const body = passageSource(blockNodes(page.blocks, onLink), page.url, page.title, `Use read_doc_page with that url and ${how} for the rest of the page.`);
+      const heads = logicalBlocks(body).filter((node) => /^H[234]$/.test(node.tagName));
+      if (heads.length > 1) {
+        const outline = readerOutline(heads, body);
+        outline.classList.add('docs-outline');
+        top.append(outline);
+      }
       column.replaceChildren(top,
         el('div', { class: 'docs-crumb' }, [docsState.site.title, section].filter(Boolean).join(' › ')),
         el('h1', null, page.title),
         el('div', { class: 'byline' }, `${minutes} min read`),
-        passageSource(blockNodes(page.blocks, onLink), page.url, page.title, `Use read_doc_page with that url and ${how} for the rest of the page.`),
+        body,
         pager,
         el('div', { class: 'prov' }, `From ${provenance.endpoint}${provenanceTime(provenance)}. Text only; the site's scripts and trackers aren't loaded.`));
-      const heads = page.blocks.filter((b) => b.type === 'h' && typeof b.id === 'string' && (b.level === 2 || b.level === 3));
-      // heads keeps only headings whose id is a string.
       otp.replaceChildren(...(heads.length > 1 ? [el('div', { class: 'otp-title' }, 'On this page'),
-        ...heads.slice(0, 60).map((h) => el('a', { class: h.level === 3 ? 'l3' : null, onclick: () => scrollToAnchor(/** @type {string} */ (h.id)) }, h.text))] : []));
+        ...heads.slice(0, 60).map((h) => el('a', { class: h.tagName !== 'H2' ? 'l3' : null, href: `#${h.dataset.anchor}`, onclick: (/** @type {MouseEvent} */ e) => { e.preventDefault(); scrollToAnchor(h.dataset.anchor || ''); } }, h.textContent))] : []));
+      column.removeAttribute('aria-busy');
       const handed = (() => { const body = $first('[data-passage-url]', column); return body ? applyHandoff(body) : false; })();
       markCurrentPage();
       if (!handed && (!hash || !scrollToAnchor(hash))) { reader.scrollTop = 0; window.scrollTo(0, 0); }
@@ -171,6 +194,7 @@
       }
     } catch (error) {
       if (generation !== readerGeneration || docsState !== requestState) return;
+      column.removeAttribute('aria-busy');
       console.error('[mcportal] read_doc_page failed', { url, ...docsState.key }, error);
       column.replaceChildren(readerTop(url, !docsState.card), el('div', { class: 'error' }, `This page couldn't be read (${errorText(error)}).`),
         el('button', { class: 'btn', onclick: () => openLink(url) }, 'Open the original'));
@@ -232,7 +256,11 @@
   }
   // Escape steps out one level: the reader to where it opened from, an open portal to the room.
   document.addEventListener('keydown', (e) => {
-    if (e.key !== 'Escape') return;
+    if (e.key !== 'Escape' || e.defaultPrevented) return;
+    if (passageBar) { hidePassageBar(); document.getSelection()?.removeAllRanges(); e.preventDefault(); return; }
+    const outline = $first('.reader-outline[open]', $('reader'));
+    if (outline instanceof HTMLDetailsElement) { outline.open = false; outline.querySelector('summary')?.focus(); e.preventDefault(); return; }
+    if ($('reader').classList.contains('toc-open')) { toggleDocsContents(false); e.preventDefault(); return; }
     if (!$('reader').hidden) closeReader();
     else if (portalLevel && !$('grid').hidden) closePortal();
   });

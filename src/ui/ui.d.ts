@@ -22,6 +22,7 @@ declare global {
 
   /** Every element of room.html that the script looks up by id, with its element type. */
   interface RoomElements {
+    docsContents: HTMLElement;
     addForm: HTMLFormElement;
     addHint: HTMLDivElement;
     addInput: HTMLInputElement;

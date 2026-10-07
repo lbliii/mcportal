@@ -43,9 +43,10 @@
   /** What to say in the new chat, with Copy, above the page. @param {HTMLElement} body @param {string} prompt */
   function showHandoffSent(body, prompt) {
     for (const old of $$('.handoff-sent', $('reader'))) old.remove();
+    const text = el('code', null, prompt);
     const panel = el('div', { class: 'handoff-sent', role: 'status' },
-      el('span', null, 'Sent. In a new chat, say: '), el('code', null, prompt),
-      copyButton(prompt),
+      el('span', null, 'Sent. In a new chat, say: '), text,
+      copyButton(prompt, text, 'Copy prompt'),
       el('button', { class: 'btn', type: 'button', onclick: () => panel.remove() }, 'Done'));
     body.before(panel);
     panel.scrollIntoView({ block: 'nearest' });

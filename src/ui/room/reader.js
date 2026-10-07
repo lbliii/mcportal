@@ -51,7 +51,7 @@
       if (s.strong) text = el('strong', null, text);
       const href = s.href;
       if (typeof href === 'string' && /^#[\w\-.:%~]{1,200}$/.test(href)) {
-        text = el('a', { href, onclick: (/** @type {MouseEvent} */ e) => { e.preventDefault(); scope().querySelector(`[data-anchor="${CSS.escape(href.slice(1))}"]`)?.scrollIntoView({ block: 'start', behavior: scrollBehavior() }); } }, text);
+        text = el('a', { href, onclick: (/** @type {MouseEvent} */ e) => { e.preventDefault(); focusReaderAnchor(scope(), href.slice(1)); } }, text);
       } else if (typeof href === 'string' && isHttpUrl(href)) {
         text = el('a', { href, title: href, onclick: (/** @type {MouseEvent} */ e) => { e.preventDefault(); onLink(href); } }, text);
       }
@@ -59,12 +59,44 @@
     });
   }
 
-  /** @param {string} text */
-  function copyButton(text) {
-    const button = el('button', { class: 'copy', type: 'button' }, 'Copy');
+  /** @param {ParentNode} scope @param {string} id */
+  function focusReaderAnchor(scope, id) {
+    let decoded = id;
+    try { decoded = decodeURIComponent(id); } catch { /* Keep malformed publisher anchors literal. */ }
+    const target = /** @type {HTMLElement | null} */ (scope.querySelector(`[data-anchor="${CSS.escape(id)}"]`) || scope.querySelector(`[data-anchor="${CSS.escape(decoded)}"]`));
+    if (!target) return false;
+    const reader = target.closest('.reader');
+    // An inline card owns its scroll area. Scrolling every ancestor can move
+    // that area underneath the room bar in the host's iframe.
+    if (reader instanceof HTMLElement && !root.classList.contains('fullscreen')) {
+      reader.scrollTop += target.getBoundingClientRect().top - readerVisibleTop(reader) - 12;
+    } else target.scrollIntoView({ block: 'start', behavior: 'auto' });
+    target.focus({ preventScroll: true });
+    return true;
+  }
+
+  /** Render the same heading navigation in articles and narrow docs views.
+   * @param {HTMLElement[]} heads @param {ParentNode} body
+   */
+  function readerOutline(heads, body) {
+    const outline = el('details', { class: 'reader-outline' });
+    outline.append(el('summary', null, 'On this page'), el('nav', { 'aria-label': 'On this page' }, heads.slice(0, 60).map((h) => el('a', {
+      class: h.tagName === 'H2' ? null : 'nested', href: `#${h.dataset.anchor}`,
+      onclick: (/** @type {MouseEvent} */ e) => { e.preventDefault(); outline.open = false; focusReaderAnchor(body, h.dataset.anchor || ''); },
+    }, h.textContent))));
+    return outline;
+  }
+
+  /** @param {string} text @param {HTMLElement} source @param {string} [label] */
+  function copyButton(text, source, label = 'Copy code') {
+    const button = el('button', { class: 'copy', type: 'button', 'aria-label': label }, 'Copy');
     button.addEventListener('click', async () => {
-      try { await navigator.clipboard.writeText(text); button.textContent = 'Copied'; }
-      catch { button.textContent = 'Select and copy'; }
+      try { await navigator.clipboard.writeText(text); button.textContent = 'Copied'; toast(label === 'Copy code' ? 'Code copied' : 'Copied'); }
+      catch {
+        const range = document.createRange(); range.selectNodeContents(source);
+        const selection = document.getSelection(); selection?.removeAllRanges(); selection?.addRange(range);
+        button.textContent = 'Selected'; toast('Text selected. Use your keyboard or context menu to copy.');
+      }
       setTimeout(() => { button.textContent = 'Copy'; }, 1500);
     });
     return button;
@@ -132,8 +164,9 @@
           break;
         }
         case 'pre': {
-          const head = b.lang || b.label ? el('div', { class: 'code-head' }, [b.label, b.lang].filter(Boolean).join(' · '), copyButton(b.text)) : null;
-          node = el('div', { ...attrs, class: 'code' }, head, el('pre', null, b.text));
+          const source = el('pre', { tabindex: '0', 'aria-label': b.label || (b.lang ? `${b.lang} code` : 'Code example') }, b.text);
+          const head = el('div', { class: 'code-head' }, el('span', { class: 'code-label' }, [b.label, b.lang].filter(Boolean).join(' · ') || 'Code'), copyButton(b.text, source));
+          node = el('div', { ...attrs, class: 'code' }, head, source);
           break;
         }
         case 'li': {
@@ -147,8 +180,8 @@
           quote.append(el('p', attrs, spanNodes(b, scope, onLink)));
           return;
         }
-        case 'table': node = Array.isArray(b.columns) && Array.isArray(b.rows) ? el('div', { ...attrs, class: 'table-wrap' }, el('table', null,
-          el('thead', null, el('tr', null, b.columns.map((c) => el('th', null, c)))),
+        case 'table': node = Array.isArray(b.columns) && Array.isArray(b.rows) ? el('div', { ...attrs, class: 'table-wrap', tabindex: '0', role: 'region', 'aria-label': 'Scrollable table' }, el('table', null,
+          el('thead', null, el('tr', null, b.columns.map((c) => el('th', { scope: 'col' }, c)))),
           el('tbody', null, b.rows.map((r) => el('tr', null, r.map((c) => el('td', null, c))))))) : el('p', attrs, b.text); break;
         case 'callout': {
           const tone = /** @type {Array<string | undefined>} */ (['note', 'tip', 'warning', 'danger']).includes(b.tone) ? b.tone : 'note';
@@ -193,11 +226,7 @@
     const top = readerTop(a.url, withBack, a.title, reblog);
     const heads = logicalBlocks(body).filter((node) => /^H[23]$/.test(node.tagName));
     if (a.wordCount >= 800 && heads.length >= 3) {
-      const outline = el('details', { class: 'reader-outline' });
-      outline.append(el('summary', null, 'On this page'), el('nav', { 'aria-label': 'On this page' }, heads.slice(0, 60).map((h) => el('a', {
-        href: `#${h.dataset.anchor}`, onclick: (/** @type {MouseEvent} */ e) => { e.preventDefault(); outline.open = false; h.scrollIntoView({ block: 'start', behavior: scrollBehavior() }); h.focus({ preventScroll: true }); },
-      }, h.textContent))));
-      top.append(outline);
+      top.append(readerOutline(heads, body));
     }
     const p = a.provenance;
     return [top, el('h1', null, a.title), el('div', { class: 'byline article-meta' }, metadata.map((part) => el('span', null, part))), body,
