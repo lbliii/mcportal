@@ -810,7 +810,8 @@ test("browser: in the river, follows' shares and reblogs join their stories with
     return node ? { context: node.querySelector('.story-context')?.textContent ?? null, trail: [...node.querySelectorAll('.story-note')].map((n) => n.textContent), removed: node.querySelector('.story-removed')?.textContent ?? null,
       from: node.querySelector('.item-from').textContent, reblog: b ? { label: b.getAttribute('aria-label'), disabled: b.disabled } : null } : null;
   })()`);
-  const menu = () => page.eval<string[]>(`[...document.querySelectorAll('.reblog-menu [role="menuitem"]')].map((n) => n.textContent)`);
+  // Count the primary actions independently of the asynchronous read-it-first nudge, checked below.
+  const menu = () => page.eval<string[]>(`[...document.querySelectorAll('.reblog-menu > [role="menuitem"]')].map((n) => n.textContent)`);
   try {
     page.problems.length = 0;
     await page.goto(`${app.base}/preview`);
