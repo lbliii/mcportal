@@ -58,5 +58,5 @@ test('release: versions are edited in place, keeping each file as it is', async 
   const mcp = await readFile(new URL('../src/mcp.ts', import.meta.url), 'utf8');
   const server = withVersion('src/mcp.ts', mcp, '9.9.9');
   assert.deepEqual(statedVersions('src/mcp.ts', server), ['9.9.9']);
-  assert.equal(server.length, mcp.length, 'only the version changed');
+  assert.equal(withVersion('src/mcp.ts', server, statedVersions('src/mcp.ts', mcp)[0]!), mcp, 'only the version changed, including when its length changes');
 });
