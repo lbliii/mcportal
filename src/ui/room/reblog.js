@@ -100,11 +100,13 @@
     if (openMenu) { const same = openMenu.button === button; closeReblogMenu(same); if (same) return; }
     const { mine } = markOf(target);
     const item = (/** @type {string} */ label, /** @type {() => void} */ act) => el('button', { type: 'button', role: 'menuitem', tabindex: '-1', onclick: () => { closeReblogMenu(false); act(); } }, label);
+    const go = item('Reblog', () => { if (audience) reblog(target, button, audience.value()); });
+    const audience = mine ? null : audienceSwitch('Reblog', go, true);
     const menu = el('div', { class: 'reblog-menu', role: 'menu', 'aria-label': `Reblog “${target.title}”` },
       mine ? item('Undo reblog', () => undoReblog(target, button))
-        : [item('Reblog', () => reblog(target, button)), item('Reblog with a note', () => reblogWithNote(target, button))]);
+        : [el('div', { class: 'reblog-submit-row', role: 'none' }, audience?.node, go), item('Reblog with a note', () => reblogWithNote(target, button, audience?.isReady() ? audience.value() : undefined))]);
     menu.addEventListener('keydown', (e) => {
-      const items = [...menu.querySelectorAll('[role="menuitem"]')];
+      const items = [...menu.querySelectorAll('[role^="menuitem"]:not(:disabled)')];
       const at = items.findIndex((i) => i === document.activeElement);
       if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeReblogMenu(); }
       else if (e.key === 'Tab') closeReblogMenu(false);
@@ -120,7 +122,7 @@
     menu.style.left = `${Math.round(Math.max(8, Math.min(box.right - menu.offsetWidth, document.documentElement.clientWidth - menu.offsetWidth - 8)) + window.scrollX)}px`;
     openMenu = { menu, button };
     button.setAttribute('aria-expanded', 'true');
-    $first('[role="menuitem"]', menu)?.focus();
+    $first('[role="menuitem"]:not(:disabled)', menu)?.focus();
     // Read it first? Only a nudge, never a gate: the reader opens if they take it. Not in the reader itself.
     const { url, item: story, portal } = target;
     if (!mine && url && story && portal && isHttpUrl(url) && $('reader').hidden) {
@@ -144,32 +146,36 @@
 
   /**
    * Post it: reblog the post behind the story, or (no post behind it) save the link and post
-   * it. Resolves to the new post's id, or null when it didn't happen (the toast says why).
-   * @param {ReblogTarget} target @param {string} [note] @param {string} [audience]
+   * it. Resolves to the new post, or null when it didn't happen (the toast says why).
+   * @param {ReblogTarget} target @param {string | undefined} note @param {SharedItem['audience']} audience
    */
   async function postReblog(target, note, audience) {
-    const extra = { ...(note ? { note } : {}), ...(audience ? { audience } : {}) };
-    if (target.shareId) return (await callTool('share', { reblogOf: target.shareId, ...extra })).structuredContent.share.id;
+    const extra = { ...(note ? { note } : {}), audience };
+    if (target.shareId) return (await callTool('share', { reblogOf: target.shareId, ...extra })).structuredContent.share;
     const url = target.url ?? '';
     if (!(await saveReblogLink(target))) return null;   // saving failed; changeSaved said why
-    return (await callTool('share', { savedUrl: url, ...extra })).structuredContent.share.id;
+    return (await callTool('share', { savedUrl: url, ...extra })).structuredContent.share;
   }
 
-  /** It happened: mark it everywhere, stamp the button, say so. @param {ReblogTarget} target @param {string} id @param {HTMLElement} [button] */
-  function reblogged(target, id, button) {
+  /** It happened: mark it everywhere, stamp the button, say so. @param {ReblogTarget} target @param {SharedItem} share @param {HTMLElement} [button] */
+  function reblogged(target, share, button) {
+    rememberShareAudience(share);
     const { count } = markOf(target);
-    reblogMarks.set(target.key, { mine: id, count: target.shareId ? count + 1 : count });
+    reblogMarks.set(target.key, { mine: share.id, count: target.shareId ? count + 1 : count });
     markReblogs(target.key);
     if (button && button.isConnected) { button.classList.remove('stamp'); void button.offsetWidth; button.classList.add('stamp'); }
-    toast('Sent through the portal! Reblogged to your followers.');
+    toast(`Sent through the portal! Reblogged · ${share.audience === 'everyone' ? 'Public' : 'Followers only'}. ${audienceHelp(share.audience)}`);
   }
 
-  /** @param {ReblogTarget} target @param {HTMLElement} button */
-  async function reblog(target, button) {
+  /** @param {ReblogTarget} target @param {HTMLElement} button @param {SharedItem['audience']} audience */
+  async function reblog(target, button, audience) {
+    button.setAttribute('aria-busy', 'true');
+    if (button instanceof HTMLButtonElement) button.disabled = true;
     try {
-      const id = await postReblog(target);
-      if (id) reblogged(target, id, button);
+      const share = await postReblog(target, undefined, audience);
+      if (share) reblogged(target, share, button);
     } catch (error) { toast(`The portal refused: ${errorText(error)}`); }
+    finally { button.removeAttribute('aria-busy'); drawReblogButton(button, target); }
   }
 
   /** @param {ReblogTarget} target @param {HTMLElement} button */
@@ -188,14 +194,15 @@
   /**
    * The composer, with the original quoted above it. A link no one has posted is saved first,
    * since a post is of something saved.
-   * @param {ReblogTarget} target @param {HTMLElement} button
+   * @param {ReblogTarget} target @param {HTMLElement} button @param {SharedItem['audience']} [audience]
    */
-  async function reblogWithNote(target, button) {
+  async function reblogWithNote(target, button, audience) {
     if (!target.shareId && !(await saveReblogLink(target))) return;
     openComposer({ title: target.title, url: target.url }, {
       target: target.shareId ? { reblogOf: target.shareId } : { savedUrl: target.url },
       verb: 'Reblog',
+      audience,
       quote: target.quote,
-      onDone: (/** @type {SharedItem} */ share) => reblogged(target, share.id, button),
+      onDone: (/** @type {SharedItem} */ share) => reblogged(target, share, button),
     });
   }

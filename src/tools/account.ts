@@ -191,11 +191,12 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
     async handler(_args, ctx) {
       const identity = await identityOf(ctx);
+      const shareAudience = (await ctx.store.get(ctx.userId)).shareAudience ?? 'everyone';
       if (!ctx.accountUrl) {
         const signIn = ctx.link ? ' To keep this portal in a hosted account (the same portal on every device, plus sharing), link_account signs in.' : '';
-        return ok(`${describeIdentity(identity)} To remove everything, delete that folder.${signIn}`, { identity, url: null } satisfies ToolResults['account_settings']);
+        return ok(`${describeIdentity(identity)} To remove everything, delete that folder.${signIn}`, { identity, url: null, shareAudience } satisfies ToolResults['account_settings']);
       }
-      return ok(`${describeIdentity(identity)} The account page is ${ctx.accountUrl}: the user signs in with GitHub there to download everything or delete their account.`, { identity, url: ctx.accountUrl } satisfies ToolResults['account_settings']);
+      return ok(`${describeIdentity(identity)} The account page is ${ctx.accountUrl}: the user signs in with GitHub there to download everything or delete their account.`, { identity, url: ctx.accountUrl, shareAudience } satisfies ToolResults['account_settings']);
     },
   },
   {

@@ -37,7 +37,7 @@ A **handle** is how people find you. It's 2 to 30 letters, digits or underscores
 A **post** is anything in a Space. A **share** is a post about a saved link or a clip, with a note.
 
 - **You approve the words.** The agent shares only when you ask, and asks you to approve any note it writes.
-- **You pick the audience:** your followers (the default) or everyone who can see your Space.
+- **You pick the audience:** Public (everyone who can see your Space) or Followers only. New shares use your last explicit choice, or Public if you have not chosen an audience. Private Space settings still apply.
 - **The server looks everything up.** A share names a saved item or clip by ID; the title, link and content come from your own store, never from the request. The content is copied at share time, so later edits to the clip don't change the post.
 - **Keep the link's context.** Saving a feed item keeps its source description (up to 500 characters) and content thumbnail when available. A link share snapshots that preview separately from your personal note. Existing bookmarks without previews still work; saving them again from a feed can add the preview. Images load through the server's guarded thumbnail fetcher, including on public Spaces and in RSS.
 - **`unshare`** removes a post.

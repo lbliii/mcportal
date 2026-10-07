@@ -37,7 +37,7 @@ const room = (extra: Partial<Profile> = {}) => validateProfile({
 async function hosted() {
   const store = new MemoryProfileStore({ alice: room(), bob: room() });
   const profiles = new PublicProfiles(memoryPersistence());
-  const social = new Social({ store: new DocumentSocialStore(), profiles });
+  const social = new Social({ store: new DocumentSocialStore(), profiles, preferences: store });
   await profiles.set('alice', { handle: 'alice' });
   await profiles.set('bob', { handle: 'bob' });
   const shared = { store, clips: new MemoryClipStore(), reading: new FileReadingStore(await mkdtemp(path.join(tmpdir(), 'mcportal-api-'))), seen: new FileSeenStore(null), handoffs: new MemoryHandoffStore(), editions: new MemoryEditionStore(), publicProfiles: profiles, social, fetcher: createFixtureFetcher(), cache: new TtlCache() };

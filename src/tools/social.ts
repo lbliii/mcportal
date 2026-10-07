@@ -18,7 +18,7 @@ import type { ToolResults } from './results.ts';
 
 export function shareLine(s: SharedItem): string {
   const who = s.mine ? 'you' : `@${s.author.handle}`;
-  const to = s.audience === 'everyone' ? 'everyone who can see their Space' : 'followers';
+  const to = s.audience === 'everyone' ? 'Public' : 'Followers only';
   const original = s.original && 'author' in s.original ? s.original : undefined;
   const preview = s.reblogOf ? original : s;
   const what = s.reblogOf
@@ -210,10 +210,10 @@ export const SOCIAL_TOOLS: ToolDef[] = [
   },
   {
     name: 'share',
-    title: 'Share with followers',
+    title: 'Share to your Space',
     access: 'write',
     available: socialActive,
-    description: "Share one of the user's saved links (savedUrl) or clips (clipId), or reblog a post (reblogOf), with a note, to their followers or everyone who can see their Space. Only when they ask; ask first if they haven't read it; if you write the note, share only after they approve its exact words.",
+    description: "Share a saved link (savedUrl), clip (clipId), or reblog a post (reblogOf). Only when asked; ask first if unread. An agent-written note needs approval of its exact words.",
     inputSchema: {
       type: 'object',
       additionalProperties: false,
@@ -221,7 +221,7 @@ export const SOCIAL_TOOLS: ToolDef[] = [
         savedUrl: { type: 'string', description: 'URL of a saved item' },
         clipId: { type: 'string' },
         note: { type: 'string', maxLength: 500 },
-        audience: { type: 'string', enum: AUDIENCES },
+        audience: { type: 'string', enum: AUDIENCES, description: 'everyone: Public; followers: Followers only. Default: saved choice or Public.' },
         reblogOf: { type: 'string', description: 'post id' },
         reblogs: { type: 'string', enum: REBLOG_RULES },
       },

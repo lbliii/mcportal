@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Sharing and quick reblogging show a Public / Followers only switch beside submission, with an explanation of public Space visibility. An explicit audience selection is remembered privately across sessions and devices; existing posts and reblog restrictions are preserved.
+- For hosts and agents: new shares and reblogs without an audience use the saved explicit preference, or `everyone` (Public) if none exists. Pass `followers` for Followers only. The existing audience values are unchanged.
+
 - Continue reading shows source labels, readable titles and progress bars; room and reader navigation gain clearer control groups, visible Room destinations and responsive spacing.
 - Preserve source descriptions and thumbnails on saved links and shares, and show them in Spaces, Following and RSS. Reblogs draw previews from the original so removal and privacy changes still take effect; personal notes stay separate.
 - Find text within an article or docs page with match counts and keyboard navigation, and adjust reading text size and line width for the current open session.
