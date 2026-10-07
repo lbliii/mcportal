@@ -29,12 +29,24 @@
       await readingWrites.catch(() => {});
       const { reading } = (await callTool('list_reading', { unfinished: true, limit: 4 })).structuredContent;
       if (generation !== continueGeneration) return;
-      strip.replaceChildren(el('h2', null, 'Continue reading'),
-        el('ul', null, reading.filter((r) => isHttpUrl(r.url)).map((r) => el('li', null,
-          el('button', { class: 'continue-item', type: 'button', onclick: () => continueReading(r) },
-            el('span', null, r.title || r.url),
-            el('small', null, `${Math.round((r.progress ?? 0) * 100)}% · opened ${ago(r.lastOpenedAt)}`))))));
-      strip.hidden = !reading.length;
+      const items = reading.filter((r) => isHttpUrl(r.url));
+      strip.replaceChildren(el('div', { class: 'continue-head' },
+        el('h2', null, 'Continue reading'), el('span', { class: 'continue-count' }, `${items.length} unfinished`)),
+        el('ul', null, items.map((r) => {
+          const progress = Math.max(0, Math.min(100, Math.round((r.progress ?? 0) * 100)));
+          const source = new URL(r.url).hostname.replace(/^www\./, '');
+          const title = r.title || r.url;
+          return el('li', null,
+            el('button', { class: 'continue-item', type: 'button', title, onclick: () => continueReading(r) },
+              el('span', { class: 'continue-source' }, source),
+              el('span', { class: 'continue-title' }, title),
+              el('span', { class: 'continue-meta' },
+                el('span', { class: 'continue-percent' }, `${progress}% read`),
+                el('span', null, `Opened ${ago(r.lastOpenedAt)}`)),
+              el('span', { class: 'continue-progress', 'aria-hidden': 'true' },
+                el('span', { style: `width:${progress}%` }))));
+        })));
+      strip.hidden = !items.length;
     } catch { if (generation === continueGeneration) strip.hidden = true; }   // older servers may not have reading history
     finally { if (generation === continueGeneration) strip.setAttribute('aria-busy', 'false'); }
   }

@@ -234,6 +234,7 @@ test('browser: the original layouts retain opening, saving and reachable control
       await page.waitFor(`!document.getElementById('reader').hidden && document.querySelector('#reader h1')?.textContent.includes('PS5')`, 'the article to open');
       await page.click('#reader [aria-label="Back to your room"]');
       await page.waitFor(`!document.getElementById('grid').hidden`, 'the chosen layout to return');
+      await page.waitFor(`document.querySelector('.continue-reading')?.getAttribute('aria-busy') === 'false'`, 'reading history to settle before measuring the save button');
       await page.click(`${saved} [data-save-url="${ARTICLE}"]`);
       await page.waitFor(`document.querySelector('#grid [data-save-url="${ARTICLE}"][aria-pressed="false"]')`, 'the save to be removed');
       assert.equal((await profiles.get('default')).saved.some(item => item.url === ARTICLE), false);
@@ -474,6 +475,8 @@ test('browser: Continue reading survives a fresh view, opens docs at its saved p
   await openRoom();
   await page.waitFor(`document.querySelector('.continue-item')`, 'recent unfinished reading');
   assert.match(await page.eval<string>(`document.querySelector('.continue-reading').textContent`), /Deploy.*35%/s);
+  assert.equal(await page.eval<string>(`document.querySelector('.continue-source').textContent`), 'docs.example.com');
+  assert.equal(await page.eval<string>(`document.querySelector('.continue-progress > span').style.width`), '35%');
   assert.doesNotMatch(await page.eval<string>(`document.querySelector('.continue-reading').textContent`), /First steps|PS5/);
   await page.click('.continue-item');
   await page.waitFor(`document.querySelector('.docs-page .mark-read:not([disabled])') && document.getElementById('toast').textContent.includes('where you left off')`, 'the docs page to resume');
@@ -1008,7 +1011,7 @@ test('browser: a portal opens to fill the room; the reader returns to it, and Es
     // The reader opens over the portal and comes back to it.
     await page.click('.level .item-main');
     await page.waitFor(`!document.getElementById('reader').hidden && document.querySelector('#reader h1')`, 'the reader');
-    await page.click('#reader .reader-top .ib');
+    await page.click('#reader .reader-top [aria-label="Back to your room"]');
     await page.waitFor(`document.getElementById('reader').hidden && document.querySelector('.level')`, 'back at the portal');
     assert.equal(await page.eval(`document.querySelectorAll('.level li').length`), 15, 'still showing what it showed');
     await escape();
@@ -1229,7 +1232,7 @@ test('browser: docs find searches current content and reading comfort follows pa
     await page.click('[aria-label="Next match"]');
     await page.click('.reader-comfort-toggle');
     assert.equal(await page.eval(`document.querySelectorAll('.reader-find-hit').length`), 0);
-    assert.ok(await page.eval<boolean>(`(() => { const r = document.querySelector('.reader-top').getBoundingClientRect(); return r.top >= document.querySelector('.bar').getBoundingClientRect().bottom - 1 && document.querySelector('#readerComfort').hidden === false; })()`), 'reader controls remain reachable in a short host frame');
+    await page.waitFor(`(() => { const r = document.querySelector('.reader-top').getBoundingClientRect(); return r.top >= document.querySelector('.bar').getBoundingClientRect().bottom - 1 && document.querySelector('#readerComfort').hidden === false; })()`, 'reader controls to remain reachable after reflow in a short host frame');
     const before = await page.eval<number>(`parseFloat(getComputedStyle(document.querySelector('.body')).fontSize)`);
     await page.eval(`(() => { const s = document.querySelector('[aria-label="Reading text size"]'); s.value = 'larger'; s.dispatchEvent(new Event('change')); const m = document.querySelector('[aria-label="Reading line width"]'); m.value = 'focused'; m.dispatchEvent(new Event('change')); })()`);
     await page.waitFor(`parseFloat(getComputedStyle(document.querySelector('.body')).fontSize) > ${before}`, 'larger reading type');

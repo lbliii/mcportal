@@ -18,6 +18,11 @@ import {serveSite,DEFAULT_SUPPORT_URL} from '../src/site.ts';
 const ctx={store:new MemoryProfileStore({room:{...defaultProfile(),onboarded:true},frontpage:{...defaultProfile(),onboarded:true,layout:'frontpage'},river:{...defaultProfile(),onboarded:true,layout:'river'}}),editions:new MemoryEditionStore(),fetcher:createFixtureFetcher(),cache:new TtlCache(),userId:'room'};
 const rpc=(name:string,args:Record<string,unknown>,userId:string)=>handleMessage({jsonrpc:'2.0',id:1,method:'tools/call',params:{name,arguments:args}},{...ctx,userId}).then((r)=>(r as {result:{structuredContent:any}}).result);
 const now='2026-09-30T12:00:00Z',url='https://example.com/guide';
+const unfinished=[
+ ['https://example.com/guide','Conversational portals',.35],
+ ['https://example.org/field-notes','Field notes from a small web',.72],
+ ['https://example.net/library','How the card catalogue learned to dream',0],
+].map(([url,title,progress])=>({url,title,progress,status:'opened',lastSeenAt:now,lastOpenedAt:now}));
 const blocks=[{type:'h',level:2,id:'room',text:'A room for your internet'},{type:'p',text:'Your agent brings reading, saved clips and shared ideas into one conversational space.'},{type:'callout',kind:'note',text:'Keep useful actions visible before hover.'},{type:'pre',text:'const theme = "adaptive";',lang:'javascript'}];
 const article={url,title:'Conversational portals',byline:'MCPortal fixtures',wordCount:230,blocks,provenance:{endpoint:url,fetchedAt:now,cached:false}};
 const clip={id:'c_fixture',title:'Ideas worth keeping',kind:'note',tags:['design'],createdAt:now,source:{kind:'conversation'},note:'A clipped thought from a conversation.',data:{kind:'note',blocks}};
@@ -60,7 +65,7 @@ createServer(async(req,res)=>{try{
  if(u.pathname==='/rpc'){let text='';for await(const chunk of req){text+=chunk;if(text.length>100000)throw new Error('Large request');}const msg=JSON.parse(text);
   res.setHeader('content-type','application/json');
   const name=msg.params?.name;
-  const canned=name==='read_doc_page'?result({page:article,section:'Getting started',provenance:article.provenance}):name==='get_clip'?result({clip}):name==='get_share'?result({share}):name==='open_space'?result({space}):name==='search_docs'?result({hits:[{url,title:article.title}]}):null;
+  const canned=name==='list_reading'?result({reading:unfinished}):name==='read_doc_page'?result({page:article,section:'Getting started',provenance:article.provenance}):name==='get_clip'?result({clip}):name==='get_share'?result({share}):name==='open_space'?result({space}):name==='search_docs'?result({hits:[{url,title:article.title}]}):null;
   res.end(JSON.stringify(canned?{jsonrpc:'2.0',id:msg.id,result:canned}:await handleMessage(msg,ctx)));return;
  }
  if(u.pathname==='/auth'){res.setHeader('content-security-policy',PAGE_CSP);res.end(page('Connect to MCPortal',`<h1>Connect to MCPortal?</h1>${handshake('MCPortal on Mac')}<p><strong>MCPortal on Mac</strong> wants to open and change your MCPortal room.</p><p class="muted">After you approve, you'll sign in with GitHub, then be sent back to <code>127.0.0.1:50108</code>. Only continue if you started this from that app.</p><form><button class="primary" type="button">Continue with GitHub</button><button type="button">Cancel</button></form><p class="muted">By continuing, you agree to MCPortal's <a href="/terms">terms</a> and confirm you're at least 13. See the <a href="/privacy">privacy policy</a> for what's kept.</p>`,{door:'open'}));return;}

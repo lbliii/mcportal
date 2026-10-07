@@ -37,6 +37,12 @@
   }
 
   // ------------------------------------------------------------ portal level
+  /** A visible destination in contextual navigation. @param {() => unknown} back @param {string} [label] */
+  function roomBackButton(back, label = 'Back to your room') {
+    const button = iconButton('back', label, back, 'btn room-back');
+    button.append(el('span', null, 'Room'));
+    return button;
+  }
   // One portal filling the frame. It's drawn inside the grid, so the reader opens over it
   // and returns to it like it does to the room. The room's own nodes are set aside, not
   // redrawn, and come back where they were: lanes, rows, pages shown, focus.
@@ -99,8 +105,8 @@
   /** @param {PortalResult} portal */
   function renderPortalLevel(portal) {
     const wrap = el('section', { class: 'level', 'data-portal-level': portal.portalId, style: `--mp-source-color:${portalColor(portal)}` },
-      el('div', { class: 'level-head' },
-        iconButton('back', 'Back to your room', closePortal, 'ib'),
+      el('div', { class: 'level-head', role: 'group', 'aria-label': 'Source controls' },
+        roomBackButton(closePortal),
         el('span', { class: 'dot', style: `background:${portalColor(portal)}` }),
         el('h1', { class: 'level-title', tabindex: '-1' }, portal.title),
         el('span', { class: 'portal-count' }, portalCount(portal)),

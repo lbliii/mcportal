@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Continue reading shows source labels, readable titles and progress bars; room and reader navigation gain clearer control groups, visible Room destinations and responsive spacing.
 - Find text within an article or docs page with match counts and keyboard navigation, and adjust reading text size and line width for the current open session.
 - Refine article and documentation reading with clearer typography, Copy on every code block, narrow-view heading navigation, focused Contents controls, and keyboard-friendly section jumps and overflow.
 
