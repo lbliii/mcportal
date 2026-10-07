@@ -19,7 +19,7 @@
   <div class="room-name" id="roomName"></div>
   <div class="spacer"></div>
   <span class="status" id="status">Warming up the portal…</span>
-  <span class="sep room-only"></span>
+  <div class="room-actions room-only" role="group" aria-label="Room controls">
   <button class="btn layout-choice room-only" id="btnLayout" popovertarget="layoutMenu" aria-expanded="false" aria-label="Choose room layout">Layout: Columns</button>
   <div class="layout-menu room-only" id="layoutMenu" popover role="group" aria-label="Room layout">
     <p>Choose your layout</p>
@@ -36,10 +36,13 @@
   <button class="ib room-only" id="btnOpenIn" data-icon="chat" aria-pressed="false" title="Open stories as their own card in the conversation" aria-label="Open stories in chat" hidden></button>
   <button class="ib room-only" id="btnSources" data-icon="sources" aria-pressed="false" title="Show where each portal's data came from" aria-label="Show sources"></button>
   <button class="ib room-only" id="btnRefresh" data-icon="refresh" title="Refresh all portals" aria-label="Refresh all portals"></button>
+  </div>
+  <div class="global-actions" role="group" aria-label="Display and account">
   <button class="ib" id="btnExpand" data-icon="expand" title="Fullscreen: step all the way through" aria-label="Fullscreen"></button>
   <div class="who-wrap room-only">
     <button class="who" id="btnWho" aria-haspopup="dialog" aria-controls="whoMenu" hidden></button>
     <div class="who-menu" id="whoMenu" role="dialog" aria-label="Your account" hidden></div>
+  </div>
   </div>
 </header>
 <section id="addSheet" class="add-sheet room-only" hidden>
