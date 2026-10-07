@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.9.0 — 2026-10-07
+
 ### Finding people
 - **Every handle opens that person's Space:** in the share reader, the river's "@ana shared" lines, reblog notes and Following rows. Back returns to exactly where you were.
 - **Follow from a post:** a share, and a link someone you follow shared, offer Follow for the first person on it you don't follow yet (the author, the original's author, or who it came via). `get_share` returns `canFollow`.
