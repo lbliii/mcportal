@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.10.0 — 2026-10-07
+
 ### Spaces that feel like someone's
 - **Your own cover and format:** eight paperback ink sets, five motifs, a stored random composition, and paperback, magazine or patch formats. The print shop saves choices, re-rolls the cover and sets web visibility. The same escaped renderer draws chat cards and script-free public pages, with narrow, dark and forced-colors support. Patch avatars appear on social subject surfaces.
 - **Your expression:** pin one of your own posts, choose up to four transmitting topics and six listed fellow travelers, and hide earned stamps. Stamps mark charter membership, bringing people aboard, ten weeks of posting and the Space's volume; they never rank people.

@@ -28,7 +28,7 @@ export const API_IMPORT_PATH = '/api/v1/import';
 export const API_MAX_CALLS = 20;
 /** The header a client names its version in, and the oldest version this server still serves. */
 export const CLIENT_HEADER = 'mcportal-client';
-export const MIN_CLIENT_VERSION = '0.5.0';
+export const MIN_CLIENT_VERSION = '0.10.0';
 
 export interface ApiMethod {
   /** For the access gate: read your own data, or change it. */
