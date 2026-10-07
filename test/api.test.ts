@@ -174,7 +174,7 @@ test('api social: shares name a clip or saved item the server looks up; always a
   const h = await hosted();
   const alice = h.ctx('alice'), bob = h.ctx('bob');
   assert.equal(await code(call(alice, 'social.share', { savedUrl: 'https://example.com/not-saved' })), 'invalid_argument');
-  const link = await call(alice, 'social.share', { savedUrl: 'https://example.com/kept', note: 'worth it', audience: 'mcportal' });
+  const link = await call(alice, 'social.share', { savedUrl: 'https://example.com/kept', note: 'worth it', audience: 'everyone' });
   assert.equal(link.title, 'Kept link', 'the title comes from the saved item, not the request');
   assert.equal(await code(call(alice, 'social.share', { clipId: 'cnope' })), 'not_found');
   assert.equal(await code(call(alice, 'social.share', { savedUrl: 'https://example.com/kept', title: 'Forged' })), 'invalid_argument', 'no content from the request');

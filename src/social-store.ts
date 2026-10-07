@@ -116,8 +116,8 @@ export class DocumentSocialStore implements SocialStore {
   async sharesBy(accountIds: string[], query: PageQuery & { includeHidden?: boolean }): Promise<Share[]> {
     const ids = new Set(accountIds);
     return structuredClone((await this.load()).shares
-      .filter((s) => ids.has(s.accountId) && (query.includeHidden || !s.hiddenAt) && (!query.before || s.createdAt < query.before))
-      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0))
+      .filter((s) => ids.has(s.accountId) && (query.includeHidden || !s.hiddenAt) && (!query.before || s.createdAt < query.before || (s.createdAt === query.before && Boolean(query.beforeId) && s.id < query.beforeId!)))
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : a.id < b.id ? 1 : a.id > b.id ? -1 : 0))
       .slice(0, limitOf(query)));
   }
 

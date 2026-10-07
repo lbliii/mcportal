@@ -104,7 +104,7 @@ test('arrange: a title that names two portals is refused with their ids', () => 
   assert.throws(() => arrange(twins, { remove: ['github'] }), /names 2 portals \(gh, blog\); use an id/);
 });
 
-test('labs: the front page is offered only while its lab is on, the river always, and a room that chose one stays valid', async () => {
+test('layouts: river is always offered; front page still needs its lab, and existing rooms stay valid', async () => {
   assert.deepEqual(labsFrom(' FrontPage , nonsense'), ['frontpage']);
   assert.deepEqual(labsFrom(undefined), []);
   assert.deepEqual(offeredLayouts([]), ['columns', 'shelves', 'river']);
@@ -112,11 +112,21 @@ test('labs: the front page is offered only while its lab is on, the river always
   assert.deepEqual(labsFrom('frontpage,river,reblog'), ['frontpage'], 'graduated labs are ignored');
   assert.equal(validateProfile({ ...defaultProfile(), layout: 'frontpage' }).layout, 'frontpage');
   assert.equal(validateProfile({ ...defaultProfile(), layout: 'river' }).layout, 'river');
-  // These tests run without MCPORTAL_LABS: the model can't pick it.
-  const ctx = { store: new MemoryProfileStore({ default: { ...defaultProfile(), onboarded: true } }), fetcher: createFixtureFetcher(), cache: new TtlCache(), userId: 'default' };
-  for (const layout of ['frontpage']) {
-    const res = await handleMessage({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'arrange_room', arguments: { layout } } }, ctx) as { result: { structuredContent: { error?: { code: string } } } };
-    assert.equal(res.result.structuredContent.error?.code, 'invalid_argument', layout);
+  const before = { ...room(), saved: [{ url: 'https://example.com/saved', title: 'Saved', savedAt: '2026-01-01T00:00:00.000Z' }] };
+  const ctx = { store: new MemoryProfileStore({ default: before }), fetcher: createFixtureFetcher(), cache: new TtlCache(), userId: 'default', labs: [] };
+  const list = await handleMessage({ jsonrpc: '2.0', id: 1, method: 'tools/list' }, ctx) as { result: { tools: Array<{ name: string; inputSchema: { properties: { layout?: { enum: string[] } } } }> } };
+  for (const name of ['arrange_room', 'build_room']) {
+    assert.ok(list.result.tools.find((t) => t.name === name)?.inputSchema.properties.layout?.enum.includes('river'), `${name} offers river without labs`);
   }
-  assert.equal((await ctx.store.get('default')).layout, 'columns');
+  const refused = await handleMessage({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'arrange_room', arguments: { layout: 'frontpage' } } }, ctx) as { result: { structuredContent: { error?: { code: string } } } };
+  assert.equal(refused.result.structuredContent.error?.code, 'invalid_argument');
+  const changed = await handleMessage({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'arrange_room', arguments: { layout: 'river' } } }, ctx) as { result: { isError?: boolean } };
+  assert.ok(!changed.result.isError);
+  const after = await ctx.store.get('default');
+  assert.equal(after.layout, 'river');
+  assert.deepEqual(after.columns, before.columns);
+  assert.deepEqual(after.saved, before.saved);
+  assert.deepEqual(after.pins, before.pins);
+  await handleMessage({ jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'build_room', arguments: { packs: ['gaming'], layout: 'river' } } }, ctx);
+  assert.equal((await ctx.store.get('default')).layout, 'river', 'starter packs can build a river without labs');
 });

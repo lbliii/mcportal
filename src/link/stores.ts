@@ -328,6 +328,7 @@ export function remoteProfiles(client: StateClient, accountId: string): ProfileD
     async get(id) { mine(id); return (await client.call<Awaited<ReturnType<ProfileDirectory['get']>> | null>('profiles.mine')) ?? undefined; },
     async byHandle(handle) { return (await client.call<Awaited<ReturnType<ProfileDirectory['byHandle']>> | null>('profiles.byHandle', { handle })) ?? undefined; },
     async set(id, input) { mine(id); return client.call('profiles.set', dropUndefined({ ...input })); },
+    async restoreAppearance(id, appearance) { mine(id); return client.call('profiles.restoreAppearance', { appearance }); },
     async remove(id) { mine(id); return (await client.call<Awaited<ReturnType<ProfileDirectory['remove']>> | null>('profiles.remove')) ?? undefined; },
   };
 }
@@ -336,6 +337,8 @@ export function remoteProfiles(client: StateClient, accountId: string): ProfileD
 export function remoteSocial(client: StateClient, accountId: string): SocialService {
   const as = (viewer: string) => { if (viewer !== accountId) throw new Error('A linked MCPortal acts only as its linked account.'); };
   return {
+    async setSpace(owner, input) { as(owner); return client.call('profiles.set', dropUndefined({ ...input })); },
+    async spaceDetails(viewer, owner) { as(viewer); return client.call('social.spaceDetails', { accountId: owner }); },
     async resolve(viewer, handle) { as(viewer); return client.call('social.resolve', { handle }); },
     async share(author, input) {
       as(author);

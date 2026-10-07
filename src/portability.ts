@@ -14,7 +14,8 @@ import { gzipSync } from 'node:zlib';
 import { buildClip, ClipError, CLIP_KINDS, clipText, type Clip, type ClipStore } from './clips.ts';
 import { buildOpml } from './opml.ts';
 import { LIMITS, normalizePinnedItems, normalizeSaved, ProfileError, validateProfile, type PortalSpec, type Profile } from './profile.ts';
-import type { PublicProfile } from './public-profiles.ts';
+import { importedInk } from './space-design.ts';
+import { HandleError, type ProfileDirectory, type PublicProfile } from './public-profiles.ts';
 import type { SharedItem, SocialService, Social } from './social.ts';
 import type { ReadingStore, ReadingState } from './reading.ts';
 import type { ProfileStore } from './store.ts';
@@ -24,7 +25,7 @@ import type { ArticleBlock } from './types.ts';
 
 export const EXPORT_FORMATS = ['mcportal', 'bookmarks', 'clips', 'opml'] as const;
 export type ExportFormat = (typeof EXPORT_FORMATS)[number];
-export const EXPORT_VERSION = 1;
+export const EXPORT_VERSION = 2;
 
 export interface ExportFile {
   filename: string;
@@ -93,7 +94,15 @@ export async function buildExport(format: ExportFormat, userId: string, from: Ex
       ...(p.displayName ? { displayName: p.displayName } : {}),
       ...(p.bio ? { bio: p.bio } : {}),
       ...(p.spaceTitle ? { spaceTitle: p.spaceTitle } : {}),
-      ...(p.accent ? { accent: p.accent } : {}),
+      ...(p.cover ? { cover: p.cover } : {}),
+      ...(p.format ? { format: p.format } : {}),
+      ...(p.frequency ? { frequency: p.frequency } : {}),
+      ...(p.pinnedShareId ? { pinnedShareId: p.pinnedShareId } : {}),
+      ...(p.travelers ? { travelers: p.travelers } : {}),
+      ...(p.hiddenStamps ? { hiddenStamps: p.hiddenStamps } : {}),
+      ...(p.private ? { private: p.private } : {}),
+      ...(p.listed ? { listed: p.listed } : {}),
+      ...(p.broughtAboard ? { broughtAboard: p.broughtAboard } : {}),
       ...(p.sources ? { sources: p.sources } : {}),
       ...(p.reblogs ? { reblogs: p.reblogs } : {}),
     } : null,
@@ -216,6 +225,8 @@ export function clipsArchive(clips: Clip[], now = new Date()): Buffer {
 // ---- import -------------------------------------------------------------------
 
 export interface ImportResult {
+  spaceAppearanceRestored?: true;
+  spaceError?: string;
   portalsAdded: number;
   portalsSkipped: string[];
   layoutAdopted: boolean;
@@ -265,6 +276,10 @@ export function parseExport(text: string): PortalExport {
   }
   if (!isRecord(data) || data.format !== 'mcportal-export') throw new ProfileError('That is not an MCPortal export (no "format": "mcportal-export").');
   if (typeof data.version !== 'number' || data.version > EXPORT_VERSION) throw new ProfileError(`This export is version ${String(data.version)}; this MCPortal reads up to version ${EXPORT_VERSION}. Update MCPortal first.`);
+  if (isRecord(data.publicProfile) && 'accent' in data.publicProfile) {
+    if (!data.publicProfile.cover) data.publicProfile.cover = { ink: importedInk(data.publicProfile.accent), motif: 'arches', seed: 0 };
+    delete data.publicProfile.accent;
+  }
   return data as unknown as PortalExport;
 }
 
@@ -300,7 +315,7 @@ function mergeProfile(before: Profile, incoming: Profile, counts: Pick<ImportRes
 }
 
 /** Add an export to a room. Never removes or rearranges anything. */
-export async function importExport(data: PortalExport, userId: string, to: { store: ProfileStore; reading?: ReadingStore | undefined; clips?: ClipStore | undefined }): Promise<ImportResult> {
+export async function importExport(data: PortalExport, userId: string, to: { store: ProfileStore; reading?: ReadingStore | undefined; clips?: ClipStore | undefined; publicProfiles?: ProfileDirectory | undefined }): Promise<ImportResult> {
   const result: ImportResult = { portalsAdded: 0, portalsSkipped: [], layoutAdopted: false, savedAdded: 0, clipsAdded: 0, clipsSkipped: 0, clipErrors: [] };
   let incoming: Profile | undefined;
   try {
@@ -345,6 +360,10 @@ export async function importExport(data: PortalExport, userId: string, to: { sto
     }
   }
   if (to.reading && Array.isArray(data.reading)) await to.reading.import(userId, data.reading);
+  if (to.publicProfiles && data.publicProfile?.cover && await to.publicProfiles.get(userId)) {
+    try { if (await to.publicProfiles.restoreAppearance(userId, data.publicProfile)) result.spaceAppearanceRestored = true; }
+    catch (error) { if (!(error instanceof HandleError)) throw error; result.spaceError = error.message; }
+  }
   return result;
 }
 
@@ -353,8 +372,9 @@ export function describeImport(r: ImportResult): string {
     r.layoutAdopted ? `took the exported layout (${r.portalsAdded} portals)` : `${r.portalsAdded} portal(s) added`,
     `${r.savedAdded} saved item(s) added`,
     `${r.clipsAdded} clip(s) added${r.clipsSkipped ? ` (${r.clipsSkipped} already here)` : ''}`,
+    ...(r.spaceAppearanceRestored ? ['Space cover and format restored'] : []),
   ];
-  const problems = [...r.portalsSkipped.map((p) => `portal skipped: ${p}`), ...r.clipErrors.slice(0, 5).map((c) => `clip skipped: ${c}`)];
+  const problems = [...r.portalsSkipped.map((p) => `portal skipped: ${p}`), ...r.clipErrors.slice(0, 5).map((c) => `clip skipped: ${c}`), ...(r.spaceError ? [`Space appearance skipped: ${r.spaceError}`] : [])];
   return `Imported: ${parts.join(', ')}.${problems.length ? `\n${problems.join('\n')}` : ''}`;
 }
 

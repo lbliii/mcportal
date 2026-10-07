@@ -8,12 +8,13 @@
 <style>
   /*include:design/tokens.css*/
   /*include:room/room.css*/
+  /*include:space.css*/
   /*include:design/primitives.css*/
 </style>
 </head>
 <body>
 <template id="brandBadge"><!--include:brand/badge.svg--></template>
-<header class="bar">
+<header class="bar" id="mainBar">
   <div class="brand" title="MCPortal"><!--include:brand/mark-line.svg--><!--include:brand/wordmark.svg--></div>
   <div class="room-name" id="roomName"></div>
   <div class="spacer"></div>
@@ -69,7 +70,9 @@
   const $$ = (selector, /** @type {ParentNode} */ from = document) => /** @type {NodeListOf<HTMLElement>} */ (from.querySelectorAll(selector));
   /** The first element matching a selector, or null. @param {string} selector */
   const $first = (selector, /** @type {ParentNode} */ from = document) => /** @type {HTMLElement | null} */ (from.querySelector(selector));
+  /*include:space-inks.js*/
   /*include:art.js*/
+  /*include:space-format.js*/
 
   // MCPortal icon set: 24px grid, 1.75px round strokes, 1.5px corner radius, drawn in currentColor.
   // The icon set and its stroke come from scripts/brand.ts, so they match the Line mark.

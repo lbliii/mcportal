@@ -94,7 +94,7 @@
    */
   function composer(target, title, { verb = 'Share', onDone } = {}) {
     const note = el('textarea', { placeholder: 'Add a note (optional): why it\'s worth a look', 'aria-label': `${verb} note (optional)`, maxlength: '500' });
-    const audience = el('select', { class: 'btn', 'aria-label': `Who sees this ${verb.toLowerCase()}` }, el('option', { value: 'followers' }, 'Followers'), el('option', { value: 'mcportal' }, 'Everyone on MCPortal'));
+    const audience = el('select', { class: 'btn', 'aria-label': `Who sees this ${verb.toLowerCase()}` }, el('option', { value: 'followers' }, 'Followers'), el('option', { value: 'everyone' }, 'Everyone who can see your Space'));
     const go = el('button', { class: 'btn', style: 'font-weight:600' }, verb);
     const box = el('div', { class: 'composer' }, el('div', { class: 'byline', style: 'margin:0 0 6px' }, `${verb} “${title}” to your space`), note,
       el('div', { class: 'row' }, el('span', null, 'Who sees it:'), audience, el('span', { class: 'spacer' }), go));
@@ -102,7 +102,7 @@
       go.disabled = true;
       try {
         const result = await callTool('share', { ...target, note: note.value, audience: audience.value });
-        box.replaceChildren(el('div', null, `Transmitted! ${audience.value === 'mcportal' ? 'Everyone on MCPortal' : 'Your followers'} will find it in your space.`));
+        box.replaceChildren(el('div', null, `Transmitted! ${audience.value === 'everyone' ? 'Everyone who can see your Space' : 'Your followers'} will find it in your space.`));
         onDone?.(result.structuredContent.share);
       } catch (error) {
         toast(errorText(error));
@@ -129,83 +129,99 @@
   }
 
   // ------------------------------------------------------------ spaces
-  const ACCENT = { blue: '#2563eb', teal: '#0d9488', green: '#16a34a', amber: '#d97706', orange: '#ea580c', rose: '#e11d48', violet: '#7c3aed', slate: '#475569' };
-
-  /** @param {SharedItem} post */
-  function postPreview(post) {
-    const c = post.clip ? post.clip.data : null;
-    let hostName = '';
-    try { hostName = post.url ? new URL(post.url).hostname.replace(/^www\./, '') : ''; } catch { hostName = ''; }
-    let top = null;
-    if (c && c.kind === 'image' && c.data && /^image\/(png|jpeg|webp|svg\+xml)$/.test(c.mime) && /^[A-Za-z0-9+/=]+$/.test(c.data)) top = el('img', { alt: '', loading: 'lazy', src: `data:${c.mime};base64,${c.data}` });
-    const body = [];
-    if (c && c.kind === 'quote') body.push(el('p', { class: 'pq' }, c.text), c.attribution ? el('div', { class: 'pm' }, `— ${c.attribution}`) : null);
-    else if (c && c.kind === 'table') body.push(el('div', { class: 'pt' }, post.title), el('table', { class: 'mini' }, el('tr', null, c.columns.slice(0, 4).map((x) => el('th', null, x))), c.rows.slice(0, 5).map((r) => el('tr', null, r.slice(0, 4).map((x) => el('td', null, x))))));
-    else if (c && c.kind === 'note') body.push(el('div', { class: 'pt' }, post.title), el('div', { class: 'body-lines' }, c.blocks.slice(1, 4).map((b) => el('p', null, b.type === 'li' ? `• ${b.text}` : b.text))));
-    else if (c && c.kind === 'exchange') body.push(el('div', { class: 'pt' }, post.title), el('div', { class: 'body-lines' }, c.turns.slice(0, 2).map((t) => el('p', null, el('b', null, `${t.speaker}: `), t.text.slice(0, 160)))));
-    else if (c && c.kind === 'image') body.push(el('div', { class: 'pt' }, post.title));
-    else body.push(el('div', { class: 'pt' }, post.title), hostName ? el('div', { class: 'pm', style: 'margin-top:0' }, hostName) : null);
-    const original = post.original && 'author' in post.original ? post.original : undefined;
-    const meta = [ago(post.createdAt), post.mine && post.audience === 'followers' ? 'followers only' : null, post.hiddenAt ? 'hidden by an admin' : null,
-      post.reblogCount ? `${post.reblogCount} reblog${post.reblogCount === 1 ? '' : 's'}` : null].filter(Boolean);
-    const reblogged = post.reblogOf ? el('div', { class: 'pr' }, icon('reblog'), original ? `reblogged @${original.author.handle}${post.via ? ` via @${post.via}` : ''}` : 'reblogged a removed post') : null;
-    return [top, el('div', { class: 'pc' }, reblogged, body, post.note ? el('p', { class: 'pn' }, post.note) : null, el('div', { class: 'pm' }, meta.join(' · ')))];
+  /** Print-shop choices are named plates; text is authored here or approved in chat. */
+  /** @param {Space} space @param {boolean} withBack @param {(e: MouseEvent) => void} [back] */
+  function printShop(space, withBack, back) {
+    const shop = el('section', { class: 'space-printshop', 'aria-label': 'Print shop' }, el('strong', null, 'Print shop'));
+    /** @param {Record<string, unknown>} input */
+    const save = async (input) => {
+      try { await callTool('set_public_profile', input); const updated = (await callTool('open_space', {})).structuredContent.space; showSpace(updated, withBack, back); }
+      catch (error) { toast(errorText(error)); }
+    };
+    for (const [field, label, values, value] of [
+      ['ink', 'Ink', spaceInks.sets.map((s) => s.name), space.cover?.ink],
+      ['motif', 'Motif', spaceInks.motifs, space.cover?.motif],
+      ['format', 'Format', spaceInks.formats, space.format || 'paperback'],
+    ]) {
+      const select = el('select', { 'aria-label': String(label) });
+      // The three named sets above are arrays; keep their values out of arbitrary markup.
+      if (Array.isArray(values)) for (const v of values) { const option = el('option', { value: v }, v.replace(/-/g, ' ')); option.selected = v === value; select.append(option); }
+      select.addEventListener('change', () => save({ [String(field)]: select.value }));
+      shop.append(el('label', null, String(label), select));
+    }
+    shop.append(el('button', { class: 'btn', type: 'button', onclick: () => save({ reroll: true }) }, 'Re-roll'),
+      el('button', { class: 'btn', type: 'button', disabled: !space.link, onclick: () => copySpaceLink(space.link || '') }, 'Copy link to your space'),
+      listingButton(space, withBack, back));
+    const publicBox = el('input', { type: 'checkbox', 'aria-label': 'Public Space' });
+    publicBox.checked = !space.private;
+    publicBox.addEventListener('change', () => save({ public: publicBox.checked }));
+    const settings = el('div', { class: 'space-printshop-settings' });
+    settings.append(el('label', null, publicBox, 'Public Space: anyone on the web can read it.'), el('p', { class: 'space-privacy-note' }, 'Followers-only posts stay within your followers. Copies, screenshots and feed caches made while public cannot be recalled.'));
+    const topics = el('input', { type: 'text', value: space.frequency?.join(', ') || '', 'aria-label': 'Transmitting on topics', placeholder: 'Up to four topics, separated by commas' });
+    const travelers = el('input', { type: 'text', value: (space.travelers || []).map((p) => p.handle).join(', '), 'aria-label': 'Fellow travelers', placeholder: 'Up to six listed handles' });
+    settings.append(el('label', null, 'Transmitting on', topics), el('label', null, 'Fellow travelers', travelers),
+      el('button', { class: 'btn', type: 'button', onclick: () => save({ frequency: topics.value.split(',').map((s) => s.trim()).filter(Boolean), travelers: travelers.value.split(',').map((s) => s.trim()).filter(Boolean) }) }, 'Save words and travelers'));
+    const stamps = el('details', null, el('summary', null, 'Visible stamps'));
+    for (const name of spaceInks.stamps) {
+      const box = el('input', { type: 'checkbox' }); box.checked = !space.hiddenStamps?.some((s) => s === name);
+      box.addEventListener('change', () => {
+        /** @type {Set<string>} */ const hidden = new Set(space.hiddenStamps || []); box.checked ? hidden.delete(name) : hidden.add(name);
+        void save({ hiddenStamps: [...hidden] });
+      });
+      stamps.append(el('label', null, box, name));
+    }
+    settings.append(stamps);
+    shop.append(el('details', null, el('summary', null, 'Words, travelers and privacy'), settings));
+    return shop;
   }
 
   /** @param {Space} space @param {boolean} withBack @param {(e: MouseEvent) => void} [back] */
   function spaceNodes(space, withBack, back) {
-    const name = space.spaceTitle || space.displayName || `@${space.handle}`;
-    const follow = space.mine ? null : el('button', { class: 'btn follow', 'aria-pressed': String(space.following) }, space.following ? 'Following' : 'Follow');
-    if (follow) follow.addEventListener('click', async () => {
-      const action = space.following ? 'unfollow' : 'follow';
-      follow.disabled = true;
-      try {
-        await callTool('relationship', { handle: space.handle, action });
-        space.following = !space.following;
-        space.followers += space.following ? 1 : -1;
-        showSpace(space, withBack, back);
-      } catch (error) { toast(errorText(error)); follow.disabled = false; }
-    });
-    const reShow = (/** @type {number} */ scroll) => { showSpace(space, withBack, back); $('reader').scrollTop = scroll || 0; };
-    const posts = space.posts.map((post) => el('div', {
-      class: 'post', role: 'button', tabindex: '0', title: 'Open',
-      onclick: () => openShare({ title: post.title, share: { id: post.id, kind: post.kind } }, reShow),
-      onkeydown: (/** @type {KeyboardEvent} */ e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) { e.preventDefault(); openShare({ title: post.title, share: { id: post.id, kind: post.kind } }, reShow); } },
-    }, postPreview(post)));
-    const sources = space.sources.map((src) => {
-      const add = space.mine ? null : el('button', { class: 'btn' }, 'Add');
-      if (add) add.addEventListener('click', async () => {
-        add.disabled = true;
-        try { await callTool('add_portal', { source: src.source, config: src.config, title: src.title }); add.textContent = 'Added'; }
-        catch (error) { toast(errorText(error)); add.disabled = false; }
+    const sheet = el('div');
+    // spaceFormat escapes every authored value. Only the constant art engine supplies SVG.
+    sheet.innerHTML = spaceFormat.render(space);
+    for (const button of sheet.querySelectorAll('button')) {
+      button.addEventListener('click', async () => {
+        const postId = button.dataset.spacePost;
+        const pinId = button.dataset.spacePin;
+        const handle = button.dataset.spaceHandle;
+        if (postId) { const post = [...space.posts, ...(space.pinned ? [space.pinned] : [])].find((p) => p.id === postId); if (post) openShare({ title: post.title, share: { id: post.id, kind: post.kind } }, (scroll) => { showSpace(space, withBack, back); $('reader').scrollTop = scroll; }); }
+        else if (handle) openSpaceFrom(handle);
+        else {
+          button.disabled = true;
+          try {
+            if (pinId) { await callTool('set_public_profile', { pinnedShareId: space.pinnedShareId === pinId ? '' : pinId }); await loadSpace(space.mine ? '' : space.handle, false, back); }
+            else if (button.hasAttribute('data-space-follow')) {
+              await callTool('relationship', { handle: space.handle, action: space.following ? 'unfollow' : 'follow' });
+              space.following = !space.following; space.followers += space.following ? 1 : -1;
+              showSpace(space, withBack, back);
+            } else if (button.dataset.spaceSource !== undefined) {
+              const src = space.sources[Number(button.dataset.spaceSource)];
+              if (src) { await callTool('add_portal', { source: src.source, config: src.config, title: src.title }); button.textContent = 'Added'; }
+            }
+          } catch (error) { toast(errorText(error)); button.disabled = false; }
+        }
       });
-      // An rss source carries an rss config: normalizeFeatured pairs them.
-      return el('div', { class: 'source' }, el('span', { class: 'dot', style: `background:${loneColor(src.source, src.config)}` }),
-        el('div', { class: 'st' }, el('div', null, src.title), el('div', null, src.source === 'rss' ? (() => { try { return new URL(/** @type {Extract<PortalSpec, { source: 'rss' }>['config']} */ (src.config).url).hostname.replace(/^www\./, ''); } catch { return 'feed'; } })() : src.source === 'hn' ? 'Hacker News' : 'GitHub')), add);
+    }
+    for (const post of sheet.querySelectorAll('.post')) post.addEventListener('click', (event) => {
+      if (event.target instanceof Element && event.target.closest('button, a')) return;
+      post.querySelector('button[data-space-post]')?.dispatchEvent(new MouseEvent('click'));
     });
-    return present([
-      withBack ? el('div', { class: 'reader-top' }, iconButton('back', 'Back to your room', back || closeReader, 'ib')) : null,
-      el('div', { class: 'space-head' },
-        el('h1', null, name),
-        el('div', { class: 'who' }, [`@${space.handle}`, space.spaceTitle && space.displayName ? space.displayName : null].filter(Boolean).join(' · ')),
-        space.bio ? el('p', { class: 'bio' }, space.bio) : null,
-        el('div', { class: 'row' }, follow, el('span', null, `${space.followers} follower${space.followers === 1 ? '' : 's'}`), el('span', null, `· ${space.posts.length} post${space.posts.length === 1 ? '' : 's'}`),
-          space.mine ? el('span', null, '· this is what visitors see (followers-only posts show only to followers)') : null),
-        space.mine ? el('div', { class: 'row' },
-          space.link ? el('button', { class: 'btn', type: 'button', onclick: () => copySpaceLink(space.link ?? '') }, icon('share'), ' Copy link to your space') : null,
-          listingButton(space, withBack, back)) : null),
-      space.sources.length ? el('h2', null, 'Sources I read') : null,
-      space.sources.length ? el('div', { class: 'sources' }, sources) : null,
-      el('h2', null, 'Posts'),
-      posts.length ? el('div', { class: 'posts' }, posts) : el('div', { class: 'empty' }, space.mine ? 'Your space stands empty, waiting. Share a saved item or a clip to put something in it.' : 'Nothing shared that you can see yet.'),
-    ]);
+    if (space.format === 'patch') {
+      for (const link of sheet.querySelectorAll('.space-tabs a')) link.addEventListener('click', (e) => {
+        e.preventDefault(); const target = link.getAttribute('href');
+        for (const section of sheet.querySelectorAll('section[id]')) if (section instanceof HTMLElement) section.hidden = `#${section.id}` !== target;
+        for (const tab of sheet.querySelectorAll('.space-tabs a')) tab.setAttribute('aria-current', String(tab === link));
+      });
+    }
+    const toolbar = withBack ? el('div', { class: 'reader-top' }, iconButton('back', 'Back to your room', back || closeReader, 'ib')) : null;
+    if (toolbar) trackReaderToolbar(toolbar);
+    return present([toolbar, space.mine ? printShop(space, withBack, back) : null, sheet]);
   }
 
   /** @param {Space} space @param {boolean} withBack @param {(e: MouseEvent) => void} [back] */
   function showSpace(space, withBack, back) {
     const reader = $('reader');
-    // No accent reads ACCENT[undefined], which falls back to the default.
-    reader.style.setProperty('--mp-space-accent', ACCENT[/** @type {keyof typeof ACCENT} */ (space.accent)] || 'var(--mp-action-primary)');
     reader.classList.add('space');
     $('grid').hidden = true; reader.hidden = false;
     reader.replaceChildren(...spaceNodes(space, withBack, back));
@@ -240,13 +256,18 @@
   function openSpaceFrom(handle) {
     const reader = $('reader');
     if (reader.hidden) { rememberRoomNavigation(); void loadSpace(handle, false); return; }
-    const was = { nodes: [...reader.childNodes], scroll: reader.scrollTop, className: reader.className, accent: reader.style.getPropertyValue('--mp-space-accent') };
+    const was = { nodes: [...reader.childNodes], scroll: reader.scrollTop, className: reader.className };
     void loadSpace(handle, false, () => {
       reader.className = was.className;
-      reader.style.setProperty('--mp-space-accent', was.accent);
       reader.replaceChildren(...was.nodes);
       reader.scrollTop = was.scroll;
     });
+  }
+
+  /** @param {import('../space-design.ts').Cover | undefined} cover */
+  function patchAvatar(cover) {
+    if (!cover) return null;
+    const node = el('span'); node.innerHTML = spaceFormat.avatar(cover); return node;
   }
 
   /**
@@ -293,7 +314,7 @@
       .then((result) => { const follow = followButton(result.structuredContent.share); if (follow) actions.append(follow); })
       .catch(() => {});   // the reader works without it
     return el('section', { class: 'shared-by', 'aria-label': 'Shared with you' },
-      el('div', { class: 'byline' }, author ? handleButton(author) : 'Someone', ...(by ? [' reblogged ', handleButton(by), "'s link"] : [' shared this link'])),
+      el('div', { class: 'byline' }, patchAvatar(share.cover), author ? handleButton(author) : 'Someone', ...(by ? [' reblogged ', handleButton(by), "'s link"] : [' shared this link'])),
       by && share.reblog?.note ? el('p', { class: 'story-note' }, handleButton(by, 'story-note-by'), share.reblog.note) : null,
       item.summary ? el('p', { class: by ? 'story-note' : 'share-note' }, by && author ? handleButton(author, 'story-note-by') : null, item.summary) : null,
       actions);
@@ -310,7 +331,7 @@
     const strip = el('section', { id: 'intros', class: 'intros', 'aria-label': 'From Space links' });
     for (const handle of intros.offer) {
       const follow = el('button', { class: 'btn follow', type: 'button', 'aria-pressed': 'false' }, `Follow @${handle}`);
-      const row = el('div', { class: 'intro' }, el('span', null, 'You came in through ', handleButton(handle), "'s Space link."), follow,
+      const row = el('div', { class: 'intro' }, patchAvatar(intros.covers?.[handle]), el('span', null, 'You came in through ', handleButton(handle), "'s Space link."), follow,
         el('button', { class: 'link-btn', type: 'button', onclick: () => { row.remove(); if (!strip.children.length) strip.remove(); } }, 'Not now'));
       follow.addEventListener('click', async () => {
         follow.disabled = true;
@@ -324,7 +345,7 @@
       strip.append(row);
     }
     if (intros.joined.length) {
-      strip.append(el('div', { class: 'intro' }, el('span', null, ...intros.joined.flatMap((h, i) => [i ? ', ' : '', handleButton(h)]), ` joined MCPortal through your Space link.`)));
+      strip.append(el('div', { class: 'intro' }, el('span', null, ...intros.joined.flatMap((h, i) => [i ? ', ' : '', ...present([patchAvatar(intros.covers?.[h])]), handleButton(h)]), ` joined MCPortal through your Space link.`)));
     }
     $('grid').before(strip);
   }
@@ -340,7 +361,7 @@
       try {
         const { profile } = (await callTool('set_public_profile', { listed: !space.listed })).structuredContent;
         space.listed = profile.listed;
-        toast(profile.listed ? 'Listed. People with similar sources can find you.' : 'Unlisted. Only people with your handle or link can find you.');
+        toast(profile.listed ? 'Listed. People with similar sources can find you.' : "Unlisted. Your Space\'s public visibility is unchanged.");
         showSpace(space, withBack, back);
       } catch (error) { toast(errorText(error)); button.disabled = false; }
     });
@@ -409,7 +430,7 @@
   // voices at most. Your own post shows who reblogged it and your controls over that.
   /** @param {SharedItem} share @param {boolean} withBack @param {Reblogger[]} [rebloggers] */
   function shareNodes(share, withBack, rebloggers = []) {
-    const to = share.audience === 'mcportal' ? 'everyone on MCPortal' : 'followers';
+    const to = share.audience === 'everyone' ? 'everyone on MCPortal' : 'followers';
     const original = share.original && 'author' in share.original ? share.original : undefined;
     const top = el('div', { class: 'reader-top' },
       iconButton('back', withBack ? 'Back to your room' : 'Open your room', closeReader, 'ib'),
@@ -461,7 +482,7 @@
           cut.replaceWith(el('span', { class: 'pm' }, 'removed from this reblog'));
         } catch (error) { toast(errorText(error)); }
       });
-      return el('li', null, handleButton(r.handle), ' · ', cut);
+      return el('li', null, patchAvatar(r.cover), handleButton(r.handle), ' · ', cut);
     });
     return el('section', { class: 'share-reblogs', 'aria-label': 'Reblogs' },
       el('h2', null, share.reblogCount ? `${share.reblogCount} reblog${share.reblogCount === 1 ? '' : 's'}` : 'No reblogs yet'),

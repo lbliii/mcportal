@@ -10,7 +10,7 @@ import type { Clip, ClipSummary } from '../clips.ts';
 import type { FetchedSource, SourceCandidate } from '../discover.ts';
 import type { Profile, ProfileDiff, SourceSettings } from '../profile.ts';
 import type { FeaturedSource, PublicProfile } from '../public-profiles.ts';
-import type { Intros, PersonMatch, Reblogger, SharedItem } from '../social.ts';
+import type { SocialService, Intros, PersonMatch, Reblogger, SharedItem } from '../social.ts';
 import type { Handoff } from '../handoffs.ts';
 import type { Candidate, HighlightPick, Lead, RoomEdition } from '../highlights.ts';
 import type { ReadingState } from '../reading.ts';
@@ -38,7 +38,7 @@ export type RoomResult = {
   /** Space links, said once: people to offer a follow of, and newcomers who joined through the user's link. */
   intros?: Intros;
   /** Stories in the room that a listed person the user doesn't follow shared with everyone: one handle per story's link. */
-  alsoShared?: Array<{ url: string; handle: string }>;
+  alsoShared?: Array<{ url: string; handle: string; cover?: import('../space-design.ts').Cover }>;
 };
 
 /** After a save or unsave: the saved list, the room, and the Saved portal redrawn. */
@@ -64,7 +64,7 @@ export type DocsPageResult = {
 
 /** Someone's space: their public profile, their posts and the sources they recommend. */
 export type SpaceResult = {
-  space: Omit<PublicProfile, 'accountId'> & { mine: boolean; followers: number; following: boolean; posts: SharedItem[]; sources: FeaturedSource[]; link?: string };
+  space: Omit<PublicProfile, 'accountId' | 'travelers'> & Awaited<ReturnType<SocialService['spaceDetails']>> & { mine: boolean; followers: number; following: boolean; posts: SharedItem[]; sources: FeaturedSource[]; link?: string };
 };
 
 export type ToolResults = {

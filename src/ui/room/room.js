@@ -95,7 +95,7 @@
     state.portals = new Map(data.portals.map((p) => [p.portalId, p]));
     for (const portal of data.portals) portalLoadedAt.set(portal.portalId, Date.now());
     state.edition = data.edition; state.lead = data.lead; state.labs = data.labs ?? [];
-    state.alsoShared = new Map((data.alsoShared ?? []).map((a) => [storyKey(a.url), a.handle]));   // "also shared by", keyed as the river keys stories
+    state.alsoShared = new Map((data.alsoShared ?? []).map((a) => [storyKey(a.url), a]));   // "also shared by", keyed as the river keys stories
     $('roomName').textContent = data.profile.name;
     drawIdentity(data.identity);
     drawLayout();

@@ -48,6 +48,7 @@ const MAX_FORM = 2048;
 export const MAX_UPLOAD = 60 * 1024 * 1024;
 
 export interface AccountDeps {
+  trustProxy?: boolean | undefined;
   accounts: Accounts;
   oauth: OAuthServer;
   store: ProfileStore;
@@ -208,7 +209,7 @@ export class AccountPage {
     this.now = deps.now ?? Date.now;
     this.sessions = new PageSessions('account', { publicUrl: deps.publicUrl, ttlMs: SESSION_MS, max: MAX_ENTRIES, now: this.now });
     if (deps.publicProfiles && deps.social) {
-      this.spaceLinks = new SpaceLinks({ accounts: deps.accounts, oauth: deps.oauth, publicProfiles: deps.publicProfiles, social: deps.social, sessions: this.sessions, publicUrl: deps.publicUrl, log: deps.log });
+      this.spaceLinks = new SpaceLinks({ accounts: deps.accounts, oauth: deps.oauth, publicProfiles: deps.publicProfiles, social: deps.social, sessions: this.sessions, publicUrl: deps.publicUrl, log: deps.log, trustProxy: deps.trustProxy, now: deps.now });
     }
   }
 

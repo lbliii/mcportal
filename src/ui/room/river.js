@@ -224,7 +224,7 @@
     let pos = 0;
     /** @param {Story} story */
     const article = (story) => {
-      const node = watchNew(renderItem(story.item, story.portal, 'story', { color: portalColor(story.portal), why: story.why ?? '', also: story.also.map((p) => p.title), shared: story.shared, alsoBy: story.shared.length ? '' : state.alsoShared.get(story.key) ?? '' }), story.item, story.portal);
+      const node = watchNew(renderItem(story.item, story.portal, 'story', { color: portalColor(story.portal), why: story.why ?? '', also: story.also.map((p) => p.title), shared: story.shared, alsoBy: story.shared.length ? undefined : state.alsoShared.get(story.key) }), story.item, story.portal);
       node.dataset.story = storyId(story);
       node.setAttribute('aria-posinset', String(++pos));
       node.setAttribute('aria-setsize', '-1');

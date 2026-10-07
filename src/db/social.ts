@@ -52,11 +52,13 @@ export class PgSocialStore implements SocialStore {
     if (!query.includeHidden) where.push('hidden_at IS NULL');
     if (query.before && !Number.isNaN(Date.parse(query.before))) {
       values.push(query.before);
-      where.push(`created_at < $${values.length}`);
+      const dateParam = values.length;
+      if (query.beforeId) { values.push(query.beforeId); where.push(`(created_at, id) < ($${dateParam}::timestamptz, $${values.length}::text)`); }
+      else where.push(`created_at < $${dateParam}`);
     }
     values.push(limitOf(query));
     const { rows } = await this.db.query<{ data: Share; hidden_at: Date | null }>(
-      `SELECT data, hidden_at FROM mcportal_shares WHERE ${where.join(' AND ')} ORDER BY created_at DESC LIMIT $${values.length}`, values);
+      `SELECT data, hidden_at FROM mcportal_shares WHERE ${where.join(' AND ')} ORDER BY created_at DESC, id DESC LIMIT $${values.length}`, values);
     return rows.map((r) => this.row(r));
   }
 

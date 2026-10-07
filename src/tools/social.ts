@@ -18,7 +18,7 @@ import type { ToolResults } from './results.ts';
 
 export function shareLine(s: SharedItem): string {
   const who = s.mine ? 'you' : `@${s.author.handle}`;
-  const to = s.audience === 'mcportal' ? 'everyone on MCPortal' : 'followers';
+  const to = s.audience === 'everyone' ? 'everyone who can see their Space' : 'followers';
   const original = s.original && 'author' in s.original ? s.original : undefined;
   const what = s.reblogOf
     ? `reblogged ${original ? `@${original.author.handle}'s post` : s.original && 'removed' in s.original && s.original.removed === 'detached' ? 'a post its author removed from this reblog' : 'a post that was removed'}${s.via ? ` (via @${s.via})` : ''}`
@@ -132,7 +132,7 @@ export async function suggestedPeople(profile: Profile, ctx: ToolContext): Promi
       const them = await social.resolve(ctx.userId, pick.handle);
       if (!them.listed || them.handle !== pick.handle) return undefined;
       const stats = await social.stats(ctx.userId, them.accountId);
-      return { ...pick, displayName: them.displayName, spaceTitle: them.spaceTitle, followers: stats.followers, following: stats.following };
+      return { ...pick, displayName: them.displayName, spaceTitle: them.spaceTitle, followers: stats.followers, following: stats.following, cover: them.cover };
     } catch {
       return undefined;
     }
@@ -183,9 +183,10 @@ export const SOCIAL_TOOLS: ToolDef[] = [
         const mine = profile.accountId === ctx.userId;
         const posts = await ctx.social.sharesOf(ctx.userId, profile.accountId, { limit: GRID_POSTS });
         const stats = await ctx.social.stats(ctx.userId, profile.accountId);
-        const { accountId: _id, ...pub } = profile;
+        const details = await ctx.social.spaceDetails(ctx.userId, profile.accountId);
+        const { accountId: _id, travelers: _travelers, broughtAboard: _brought, ...pub } = profile;
         const link = spaceLink(ctx, profile.handle);
-        const space = { ...pub, mine, followers: stats.followers, following: stats.following, posts: forGrid(posts), sources: profile.sources ?? [], ...(link ? { link } : {}) };
+        const space = { ...pub, ...details, ...(details.pinned ? { pinned: forGrid([details.pinned])[0]! } : {}), mine, followers: stats.followers, following: stats.following, posts: forGrid(posts), sources: profile.sources ?? [], ...(link ? { link } : {}) };
         const title = profile.spaceTitle ?? `@${profile.handle}`;
         // What they feature that's in the user's room too: the user's own data, said only to them.
         const room = new Set(mine ? [] : (await ctx.store.get(ctx.userId)).columns.flatMap((c) => c.panels).map((p) => sourceSignal(p.source, p.config, p.title ?? p.id)?.key).filter((k) => k !== undefined));
@@ -211,7 +212,7 @@ export const SOCIAL_TOOLS: ToolDef[] = [
     title: 'Share with followers',
     access: 'write',
     available: socialActive,
-    description: "Share one of the user's saved links (savedUrl) or clips (clipId), or reblog a post (reblogOf), with a note, to their followers or everyone on MCPortal. Only when they ask; ask first if they haven't read it; if you write the note, share only after they approve its exact words.",
+    description: "Share one of the user's saved links (savedUrl) or clips (clipId), or reblog a post (reblogOf), with a note, to their followers or everyone who can see their Space. Only when they ask; ask first if they haven't read it; if you write the note, share only after they approve its exact words.",
     inputSchema: {
       type: 'object',
       additionalProperties: false,

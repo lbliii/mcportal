@@ -1,6 +1,6 @@
 # Plan: Spaces that feel like someone's
 
-**Status:** proposed 2026-10-07. Decided the same day: public read-only Spaces, public by default, no search indexing, prerendered link previews, and an RSS feed per public Space. Mockups: [`design/mockups/space-covers.html`](../../design/mockups/space-covers.html), which needs a local static server because it loads `src/ui/art.js` and the brand fonts. This is the "A room that feels yours" item on the [roadmap](README.md), applied to Spaces. It builds on public profiles (`src/public-profiles.ts`), the Space view (`src/ui/room/social.js`), Space links (`src/space-links.ts`) and the paperback art engine (`src/ui/art.js`).
+**Status:** implemented for v0.10.0 on 2026-10-07. Decided the same day: public read-only Spaces, public by default, no search indexing, prerendered link previews, and an RSS feed per public Space. Mockups: [`design/mockups/space-covers.html`](../../design/mockups/space-covers.html), which needs a local static server because it loads `src/ui/art.js` and the brand fonts. This is the "A room that feels yours" item on the [roadmap](README.md), applied to Spaces. It builds on public profiles (`src/public-profiles.ts`), the Space view (`src/ui/room/social.js`), Space links (`src/space-links.ts`) and the paperback art engine (`src/ui/art.js`).
 
 ## Where we are
 

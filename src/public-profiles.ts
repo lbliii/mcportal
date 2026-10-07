@@ -1,7 +1,7 @@
 /**
  * Public profiles and handles (identity plan, phase 3). Opt-in: an account has no
- * public profile until its owner claims a handle. Profiles are visible only to
- * signed-in MCPortal users (through tools), never published to the open web.
+ * public profile until its owner claims a handle. Spaces are public by default;
+ * owners can keep them within signed-in MCPortal with public: false.
  *
  * Handles: 2-30 of a-z 0-9 _, unique and case-insensitive, reserved words blocked.
  * A handle that is given up (changed, or the profile removed) is held for 30 days:
@@ -11,6 +11,8 @@
  * Like accounts, the state is one document (file or Postgres row) held in memory;
  * it moves to tables when sharing needs joins. One server instance.
  */
+import { randomInt } from 'node:crypto';
+import { INKS, MOTIFS, FORMATS, STAMPS, type Cover, type SpaceFormat, type StampName } from './space-design.ts';
 import type { AuthPersistence } from './auth/store.ts';
 import { DOCUMENT_MAX_AGE_MS, SharedDocument } from './lib/document.ts';
 import { AppError, type AppErrorOptions, type ErrorCode } from './lib/errors.ts';
@@ -25,9 +27,6 @@ export const RESERVED_HANDLES = new Set([
   'root', 'security', 'settings', 'share', 'shares', 'staff', 'support', 'system', 'undefined', 'you',
 ]);
 
-/** Accent colours a space can use; the UI maps names to colours, so no CSS comes from users. */
-export const ACCENTS = ['blue', 'teal', 'green', 'amber', 'orange', 'rose', 'violet', 'slate'] as const;
-export type Accent = (typeof ACCENTS)[number];
 
 /** A source someone features in their space, so visitors can add it to their own portal. */
 export interface FeaturedSource {
@@ -45,7 +44,15 @@ export interface PublicProfile {
   bio?: string;
   /** The space's name, e.g. "liminal webspace". */
   spaceTitle?: string;
-  accent?: Accent;
+  cover?: Cover;
+  format?: SpaceFormat;
+  frequency?: string[];
+  pinnedShareId?: string;
+  travelers?: string[];
+  hiddenStamps?: StampName[];
+  private?: true;
+  /** Lasting aggregate; no identities survive the one-time join note. */
+  broughtAboard?: number;
   /** Sources from their portal they recommend. Copies: visitors never read anyone's portal. */
   sources?: FeaturedSource[];
   /** Who may reblog their new posts, unless a post says otherwise. Absent: anyone. */
@@ -61,7 +68,15 @@ export interface PublicProfileInput {
   displayName?: string | undefined;
   bio?: string | undefined;
   spaceTitle?: string | undefined;
-  accent?: string | undefined;
+  ink?: string | undefined;
+  motif?: string | undefined;
+  reroll?: boolean | undefined;
+  format?: string | undefined;
+  frequency?: string[] | undefined;
+  pinnedShareId?: string | undefined;
+  travelers?: string[] | undefined;
+  hiddenStamps?: string[] | undefined;
+  public?: boolean | undefined;
   /** Replaces the featured list; [] clears it. */
   sources?: Array<{ title?: string; source: string; config: unknown }> | undefined;
   /** Who may reblog new posts by default: anyone, followers or nobody. */
@@ -128,7 +143,7 @@ export function suggestHandle(login: string | undefined): string | undefined {
 /** Who holds a deleted account's handles while they're held. */
 const DELETED_HOLDER = 'deleted';
 
-export type ProfileDirectory = Pick<PublicProfiles, 'get' | 'byHandle' | 'set' | 'remove'>;
+export type ProfileDirectory = Pick<PublicProfiles, 'get' | 'byHandle' | 'set' | 'remove' | 'restoreAppearance'>;
 
 export class PublicProfiles {
   private doc: SharedDocument<Doc>;
@@ -165,7 +180,9 @@ export class PublicProfiles {
   /** Your own profile (visible to you even while suspended). */
   async get(accountId: string): Promise<PublicProfile | undefined> {
     const doc = await this.load();
-    return doc.profiles[accountId] ? { ...doc.profiles[accountId] } : undefined;
+    const profile = doc.profiles[accountId];
+    if (profile && !profile.cover) return (await this.set(accountId, {})).profile;
+    return profile ? structuredClone(profile) : undefined;
   }
 
   /**
@@ -186,13 +203,13 @@ export class PublicProfiles {
     }
     const profile = accountId ? doc.profiles[accountId] : undefined;
     if (!profile || this.hidden(profile.accountId)) return undefined;
-    return { profile: { ...profile }, ...(movedFrom ? { movedFrom } : {}) };
+    return { profile: (await this.get(profile.accountId))!, ...(movedFrom ? { movedFrom } : {}) };
   }
 
   /** Everyone who chose to be findable (docs/plans/finding-people.md), minus suspended accounts. */
   async listed(): Promise<PublicProfile[]> {
     const doc = await this.load();
-    return Object.values(doc.profiles).filter((p) => p.listed && !this.hidden(p.accountId)).map((p) => ({ ...p }));
+    return Promise.all(Object.values(doc.profiles).filter((p) => p.listed && !this.hidden(p.accountId)).map(async (p) => (await this.get(p.accountId))!));
   }
 
   /** Create or change your profile. A new profile needs a handle. Throws HandleError. */
@@ -223,20 +240,60 @@ export class PublicProfiles {
       const displayName = input.displayName !== undefined ? clean(input.displayName, 50) : current?.displayName;
       const bio = input.bio !== undefined ? clean(input.bio, 160) : current?.bio;
       const spaceTitle = input.spaceTitle !== undefined ? clean(input.spaceTitle, 60) : current?.spaceTitle;
-      if (input.accent !== undefined && input.accent !== '' && !(ACCENTS as readonly string[]).includes(input.accent)) throw new HandleError(`accent must be one of ${ACCENTS.join(', ')}`);
-      const accent = input.accent !== undefined ? ((input.accent || undefined) as Accent | undefined) : current?.accent;
+      if (input.ink !== undefined && !INKS.includes(input.ink as Cover['ink'])) throw new HandleError(`ink must be one of ${INKS.join(', ')}`);
+      if (input.motif !== undefined && !MOTIFS.includes(input.motif as Cover['motif'])) throw new HandleError(`motif must be one of ${MOTIFS.join(', ')}`);
+      if (input.format !== undefined && !FORMATS.includes(input.format as SpaceFormat)) throw new HandleError(`format must be one of ${FORMATS.join(', ')}`);
+      profile.cover = { ink: input.ink as Cover['ink'] ?? current?.cover?.ink ?? INKS[randomInt(INKS.length)]!, motif: input.motif as Cover['motif'] ?? current?.cover?.motif ?? MOTIFS[randomInt(MOTIFS.length)]!, seed: input.reroll || !current?.cover ? randomInt(0x100000000) : current.cover.seed };
+      profile.format = input.format as SpaceFormat ?? current?.format ?? 'paperback';
+      const frequency = input.frequency ?? current?.frequency;
+      if (frequency && (frequency.length > 4 || frequency.some((t) => typeof t !== 'string' || !clean(t, 24) || t.length > 24))) throw new HandleError('frequency is up to four topics, each 1–24 characters');
+      if (frequency?.length) profile.frequency = [...new Set(frequency.map((t) => clean(t, 24)))];
+      const travelers = input.travelers ?? current?.travelers;
+      if (travelers && (travelers.length > 6 || travelers.some((h) => 'error' in normalizeHandle(h)))) throw new HandleError('travelers is up to six valid handles');
+      if (travelers?.length) profile.travelers = [...new Set(travelers.map((h) => (normalizeHandle(h) as { handle: string }).handle))];
+      const hiddenStamps = input.hiddenStamps ?? current?.hiddenStamps;
+      if (hiddenStamps?.some((n) => !STAMPS.includes(n as StampName))) throw new HandleError(`hiddenStamps must name ${STAMPS.join(', ')}`);
+      if (hiddenStamps?.length) profile.hiddenStamps = [...new Set(hiddenStamps)] as StampName[];
+      const pinned = input.pinnedShareId !== undefined ? input.pinnedShareId : current?.pinnedShareId;
+      if (pinned) profile.pinnedShareId = clean(pinned, 80);
+      if (input.public !== undefined ? !input.public : current?.private) profile.private = true;
+      if (current?.broughtAboard) profile.broughtAboard = current.broughtAboard;
       const sources = input.sources !== undefined ? normalizeFeatured(input.sources) : current?.sources;
       if (input.reblogs !== undefined && !['anyone', 'followers', 'nobody'].includes(input.reblogs)) throw new HandleError('reblogs must be one of anyone, followers, nobody');
       const reblogs = input.reblogs !== undefined ? (input.reblogs === 'anyone' ? undefined : input.reblogs as 'followers' | 'nobody') : current?.reblogs;
       if (displayName) profile.displayName = displayName;
       if (bio) profile.bio = bio;
       if (spaceTitle) profile.spaceTitle = spaceTitle;
-      if (accent) profile.accent = accent;
       if (sources?.length) profile.sources = sources;
       if (reblogs) profile.reblogs = reblogs;
       if (input.listed !== undefined ? input.listed === true : current?.listed) profile.listed = true;
       doc.profiles[accountId] = profile;
-      return { profile: { ...profile }, created: !current, ...(released ? { released } : {}) };
+      return { profile: structuredClone(profile), created: !current, ...(released ? { released } : {}) };
+    });
+  }
+
+  async recordJoin(accountId: string): Promise<void> {
+    await this.write((doc) => {
+      const p = doc.profiles[accountId];
+      if (p) { p.broughtAboard = (p.broughtAboard ?? 0) + 1; p.updatedAt = new Date(this.now()).toISOString(); }
+    });
+  }
+
+  /** Imports restore validated plates on an existing Space, without claiming a handle,
+   * publishing text, changing privacy or importing claims about earned stamps. */
+  restoreAppearance(accountId: string, raw: unknown): Promise<boolean> {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return Promise.resolve(false);
+    const value = raw as Record<string, unknown>;
+    const cover = value.cover as Partial<Cover> | undefined;
+    if (!cover || !INKS.includes(cover.ink!) || !MOTIFS.includes(cover.motif!) || !Number.isInteger(cover.seed) || cover.seed! < 0 || cover.seed! > 0xffffffff) throw new HandleError('The imported Space cover is invalid');
+    if (value.format !== undefined && !FORMATS.includes(value.format as SpaceFormat)) throw new HandleError('The imported Space format is invalid');
+    return this.write((doc) => {
+      const current = doc.profiles[accountId];
+      if (!current) return false;
+      current.cover = { ink: cover.ink!, motif: cover.motif!, seed: cover.seed! };
+      if (value.format !== undefined) current.format = value.format as SpaceFormat;
+      current.updatedAt = new Date(this.now()).toISOString();
+      return true;
     });
   }
 

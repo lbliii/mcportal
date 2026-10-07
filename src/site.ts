@@ -1,3 +1,4 @@
+import { INKS, MOTIFS } from './space-design.ts';
 import { DESIGN_CSS, PRIMITIVES_CSS } from './design/generated.ts';
 /**
  * The public pages: the landing page at /, /privacy, /terms, /support and /security, the screenshots
@@ -17,8 +18,8 @@ import { fileURLToPath } from 'node:url';
 import { escapeHtml } from './lib/web.ts';
 
 export const DEFAULT_SUPPORT_URL = 'https://github.com/lbliii/mcportal/issues';
-const POLICY_UPDATED = '2026-10-03';   // bump when what's stored changes
-const TERMS_UPDATED = '2026-10-02';    // bump when the terms change (and announce material changes first)
+const POLICY_UPDATED = '2026-10-07';   // bump when what's stored changes
+const TERMS_UPDATED = '2026-10-07';    // bump when the terms change (and announce material changes first)
 const IMAGE_DIR = fileURLToPath(new URL('./site/', import.meta.url));
 const TAGLINE = 'Your liminal webspace.';
 /** The hero's night sky, drawn by scripts/brand.ts with class hooks for the opening below. */
@@ -27,6 +28,7 @@ const DESCRIPTION = 'MCPortal is a reading room that lives in your agent: the si
 
 /** Every file served from src/site, by URL path. Nothing else in that folder is reachable. */
 const FILES: Record<string, { file: string; type: string; maxAge: number }> = {
+  ...Object.fromEntries(INKS.flatMap((ink) => MOTIFS.map((motif) => [`/site/space-${ink}-${motif}.png`, { file: `space-${ink}-${motif}.png`, type: 'image/png', maxAge: 86_400 }]))),
   '/site/chat-room.png': { file: 'chat-room.png', type: 'image/png', maxAge: 86_400 },
   '/site/chat-reader.png': { file: 'chat-reader.png', type: 'image/png', maxAge: 86_400 },
   '/site/chat-docs.png': { file: 'chat-docs.png', type: 'image/png', maxAge: 86_400 },
@@ -273,11 +275,11 @@ function privacy(site: SiteConfig): string {
 <tr><td><b>Highlights:</b> the picks your agent makes for the top of your room, in its own words</td><td>To lead your room with them</td><td>24 hours, until replaced; expired ones are removed within a day</td></tr>
 <tr><td><b>Pages sent to a new chat:</b> the link, title and any passage you selected when you send a page from the reader to a new chat</td><td>To open it there</td><td>7 days, at most 50; expired ones are removed within a day</td></tr>
 <tr><td><b>Pinned results:</b> if you ask your agent to pin results from another connected tool (for example, a list of issues), the titles, links, short summaries and details it copies in, and the request needed to refresh them</td><td>To show that portal</td><td>Until you remove the portal</td></tr>
-<tr><td><b>Public profile and space (only if you create one):</b> your handle, display name, bio, space title and colour, and the sources you choose to feature, which other signed-in MCPortal users can see</td><td>So people can find you</td><td>Until you remove it; a handle you give up stays reserved for you for 30 days. If you delete your account, your handles stay reserved for 30 days, so nobody can pose as you, without saying whose they were</td></tr>
+<tr><td><b>Public profile and space (only if you create one):</b> your handle, display name, bio, Space title, cover, format, topics, chosen fellow travelers, stamps, and featured sources. Public Spaces can be read on the web; members-only Spaces are restricted to signed-in MCPortal users</td><td>So people can find you</td><td>Until you remove it; a handle you give up stays reserved for you for 30 days. If you delete your account, your handles stay reserved for 30 days, so nobody can pose as you, without saying whose they were</td></tr>
 <tr><td><b>Shares:</b> links and clips you choose to share, with your note, a copy of what you shared, and who it's for (your followers or everyone on MCPortal)</td><td>To show them to the people you shared them with</td><td>Until you remove them</td></tr>
 <tr><td><b>Follows, mutes and blocks:</b> who you follow, mute and block</td><td>To build your Following portal and keep blocked people apart</td><td>Until you change them. People see how many followers you have, never who</td></tr>
 <tr><td><b>Listing:</b> whether you chose to be findable by people with similar sources (off unless you turn it on)</td><td>So find_people can suggest you, from your public profile, featured sources and posts shared with everyone, and so those posts (at most 3 a day) appear in the Lobby, and next to the same story in other people's rivers ("also shared by")</td><td>Until you turn it off, which takes you out of suggestions at once</td></tr>
-<tr><td><b>Space links:</b> whose Space link you signed in through, and, if it brought a new account, that you joined through it</td><td>So your room offers to follow them once, and they hear once that you joined</td><td>Until your room or theirs has said so (a block removes it at once)</td></tr>
+<tr><td><b>Space links:</b> whose Space link you signed in through, and, if it brought a new account, that you joined through it</td><td>So your room offers to follow them once, and they hear once that you joined</td><td>Until your room or theirs has said so (a block removes it at once). An aggregate count of newcomers brought aboard stays on the inviter’s profile, without identities</td></tr>
 <tr><td><b>Reports:</b> what you reported, why, and when</td><td>So admins can act on abuse</td><td>Deleted 180 days after they're resolved. If you delete your account, reports you made no longer name you (and, once resolved, lose the reason you gave), and reports about you no longer name you</td></tr>
 <tr><td><b>Sign-in tokens:</b> stored only as one-way hashes, with the app that asked for them (for example, Claude). An app's registration records the name it gives, which for MCPortal on your own computer includes the computer's name</td><td>To keep you signed in</td><td>Access tokens 1 hour; refresh tokens 30 days. An app registration nobody is signed in with is deleted after 180 days unused, and the ones only you used are deleted with your account</td></tr>
 <tr><td><b>Invites and the admin audit log:</b> who invited whom, accounts being created and deleted, and suspensions or reinstatements with a short reason</td><td>To run invites and keep a record of admin actions</td><td>Log entries for a year at most (and only the newest 2,000). Invites nobody used lapse after 90 days. If you delete your account, its entries no longer say whose they were</td></tr>
@@ -296,7 +298,7 @@ function privacy(site: SiteConfig): string {
 <p>If you sign in from it, your room, saved items, clips, reading history, seen marks, public profile, shares and follows are stored by this service exactly as the table above says, and the first sign-in adds that computer's portal to your account. MCPortal on your computer still fetches feeds, articles and pictures itself, so those sites see your computer's address rather than the server's. Its sign-in tokens are kept in a file on your computer that only your user can read. Signing out copies your portal back to the computer, ends that sign-in, and deletes the file. Your <a href="/account">account page</a> lists each signed-in computer by name, and you can revoke one from there, for example if you lose it.</p>
 
 <h2>What other people see</h2>
-<p>Nothing, unless you choose. With a public profile, you have a space: signed-in MCPortal users can open it to see your handle, name, bio, space title, the sources you chose to feature, your follower count, and the shares you made for them (your followers, or everyone). Your Space link (<code>/@handle</code>) shows only your handle to people who aren't signed in. Shares are never published to the open web. Admins can see reported shares and profiles, and can hide a share or suspend an account.</p>
+<p>Your room stays private. If you claim a handle, your Space is public by default unless you uncheck Public Space. Anyone with its link can read your cover, title, bio, topics, featured sources, listed fellow travelers, stamps and posts for everyone. Its RSS feed contains the same public posts. Followers-only posts never reach the web. You can make your Space members-only at once; copies, screenshots and feed caches already made cannot be recalled. Public pages and feeds request no search indexing and carry no tracking, though some crawlers ignore that request. Publishing still happens only through your agent. Admins can see reported shares and profiles, and can hide a share or suspend an account.</p>
 
 <h2>Logs</h2>
 <p>Server logs record which tool ran, whether it worked, how long it took, and a reference that lets one server's logs be read together. The reference is a keyed one-way hash of your account that changes every time the server restarts, so it can't be traced back to you. Logs don't record your user ID, your IP address, what you read or what you asked for. An error message can occasionally include the name of a site that failed to load. Separately, the hosting provider (Railway) keeps request logs, which include IP addresses and the pages requested, for a limited time.</p>
@@ -370,7 +372,7 @@ function terms(site: SiteConfig): string {
 <h2>Your content</h2>
 <ul>
   <li>What you put in MCPortal (your room, saved items, notes, clips, profile and shares) stays yours. You give us permission to store it, process it and show it to the people you choose, only as needed to run MCPortal for you. That permission ends when you delete it, except for copies kept for the times the privacy policy states.</li>
-  <li>Shares and your public profile are seen by the audience you pick (your followers, or everyone signed in to MCPortal). Only share what you have the right to share, and remember that people who can see something can copy it.</li>
+  <li>Shares and your public profile are seen by the audience you pick (your followers, or everyone who can see your Space (the web when public, signed-in members otherwise)). Only share what you have the right to share, and remember that people who can see something can copy it.</li>
   <li>You can export everything in open formats, or delete your account yourself, at any time.</li>
 </ul>
 

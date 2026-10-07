@@ -153,7 +153,7 @@ test('linked: sharing and following work from a local MCPortal, as the linked ac
     await mac.call('build_room', { packs: ['developer'] });
     await mac.call('save_item', { url: 'https://example.com/kept', title: 'Worth reading' });
     assert.equal((await mac.call('set_public_profile', { handle: 'lawrence' })).isError, undefined);
-    const shared = await mac.call('share', { savedUrl: 'https://example.com/kept', note: 'read this', audience: 'mcportal' });
+    const shared = await mac.call('share', { savedUrl: 'https://example.com/kept', note: 'read this', audience: 'everyone' });
     assert.equal(shared.structuredContent.share.title, 'Worth reading');
     const clip = await mac.call('clip', { kind: 'quote', content: 'quotable', title: 'A clip' });
     assert.equal((await mac.call('share', { clipId: clip.structuredContent.clip.id })).isError, undefined, 'a clip shares by its hosted id');
@@ -288,11 +288,11 @@ test('hosted end to end: three accounts over /mcp share, follow, reblog, see it 
     assert.ok((await bob.rpc('tools/list')).tools.some((t: { name: string }) => t.name === 'share_settings'), 'the lab is on: its tools are listed');
 
     await alice.call('save_item', { url: 'https://example.com/found', title: 'A find' });
-    const post = (await alice.call('share', { savedUrl: 'https://example.com/found', note: 'Look at this.', audience: 'mcportal' })).structuredContent.share;
+    const post = (await alice.call('share', { savedUrl: 'https://example.com/found', note: 'Look at this.', audience: 'everyone' })).structuredContent.share;
     await bob.call('relationship', { handle: 'alice', action: 'follow' });
     const seenByBob = (await bob.call('open_room')).structuredContent.portals.find((p: any) => p.source === 'following').items[0];
     assert.equal(seenByBob.share.canReblog, true);
-    const reblog = await bob.call('share', { reblogOf: seenByBob.share.id, note: 'Agreed.', audience: 'mcportal' });
+    const reblog = await bob.call('share', { reblogOf: seenByBob.share.id, note: 'Agreed.', audience: 'everyone' });
     assert.ok(!reblog.isError, reblog.content[0]!.text);
 
     await carol.call('relationship', { handle: 'bob', action: 'follow' });

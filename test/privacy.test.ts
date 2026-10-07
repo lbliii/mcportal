@@ -72,7 +72,7 @@ test('hosted HTTPS responses send HSTS including errors; local HTTP does not', a
 
 test('everything exports full Space settings, private relationships and only the account’s own reports', async () => {
   const profiles = new PublicProfiles(memoryPersistence());
-  const own = (await profiles.set('alice-account', { handle: 'alice', spaceTitle: 'Alice’s Space', accent: 'teal', reblogs: 'followers', sources: [{ title: 'News', source: 'hn', config: { feed: 'top' } }] })).profile;
+  const own = (await profiles.set('alice-account', { handle: 'alice', spaceTitle: 'Alice’s Space', ink: 'atomic', reblogs: 'followers', sources: [{ title: 'News', source: 'hn', config: { feed: 'top' } }] })).profile;
   await profiles.set('bob-account', { handle: 'bob' });
   await profiles.set('carol-account', { handle: 'carol' });
   const storage = new DocumentSocialStore();
@@ -88,9 +88,9 @@ test('everything exports full Space settings, private relationships and only the
   suspended = true;
   assert.deepEqual((await social.connections('alice-account')).blocked, [], 'regular social responses still hide suspended accounts');
   const data = parseExport((await buildExport('mcportal', 'alice-account', { store: new MemoryProfileStore(), publicProfile: own, social })).body.toString());
-  assert.equal(data.version, 1, 'export stays additive and backward compatible');
+  assert.equal(data.version, 2, 'Space appearance is included in version 2');
   assert.equal(data.publicProfile?.spaceTitle, 'Alice’s Space');
-  assert.equal(data.publicProfile?.accent, 'teal');
+  assert.equal(data.publicProfile?.cover?.ink, 'atomic');
   assert.equal(data.publicProfile?.sources?.[0]?.title, 'News');
   assert.equal(data.publicProfile?.reblogs, 'followers');
   assert.deepEqual(data.following, ['bob']);

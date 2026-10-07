@@ -82,11 +82,11 @@ Hosted servers only. A local MCPortal that isn't signed in has no social layer, 
 
 | Tool | Hints | What it does | Inputs |
 |---|---|---|---|
-| `open_space` | `RO` | Opens someone's Space, or the user's own, as a card, with its link and which of their sources are already in the room. | `handle` |
+| `open_space` | `RO` | Opens someone's Space, or the user's own, as a card, with its chosen cover and format, pinned post, topics, travelers and stamps, its link and which of their sources are already in the room. | `handle` |
 | `get_public_profile` | `RO` | Returns the user's public profile and a suggested handle, or someone else's. | `handle` |
-| `set_public_profile` | `OW` | Creates or changes the public profile and Space: handle, name, bio, Space title, accent, featured portals, default reblog setting, and whether `find_people` can suggest them (`listed`, off by default). | `handle`, `displayName`, `bio`, `spaceTitle`, `accent`, `featuredPortalIds`, `reblogs`, `listed` |
+| `set_public_profile` | `OW` | Creates or changes the public profile and Space: handle, name, bio, Space title, cover ink and motif, format, topics, own pinned post, listed fellow travelers, hidden stamps, web visibility (public by default), featured portals, default reblog setting, and whether `find_people` can suggest them (`listed`, off by default). | `handle`, `displayName`, `bio`, `spaceTitle`, `ink`, `motif`, `reroll`, `format`, `frequency`, `pinnedShareId`, `travelers`, `hiddenStamps`, `public`, `featuredPortalIds`, `reblogs`, `listed` |
 | `remove_public_profile` | `D` | Removes the handle, name and bio. The handle stays reserved for 30 days. | none |
-| `share` | `OW` | Shares a saved link or clip with a note, or reblogs a post, to followers or everyone on MCPortal. | `savedUrl`, `clipId`, `reblogOf`, `note`, `audience`, `reblogs` |
+| `share` | `OW` | Shares a saved link or clip with a note, or reblogs a post, to followers or everyone who can see the Space (`followers` or `everyone`). | `savedUrl`, `clipId`, `reblogOf`, `note`, `audience`, `reblogs` |
 | `unshare` | `D` | Removes a share or reblog. | `id*` |
 | `get_share` | `RO` | Shows one share or reblog in full, as a card, with `canFollow` when it offers a Follow. | `id*` |
 | `share_settings` | `D` `OW` | Changes who may reblog a post, or detaches it from someone's reblog (permanent). | `id*`, `reblogs`, `detach` |
@@ -156,3 +156,5 @@ On a hosted server each call spends units from the per-user budget ([`MCPORTAL_L
 | Clips per user | 1,000, or 50 MB |
 
 Cache lifetimes: Hacker News 2 minutes, GitHub 5 minutes, feeds 10 minutes, reader pages 1 hour, docs indexes 1 day. Saved, clips, pinned and Following portals are never cached.
+
+Space inks: `atomic`, `space-age`, `pulp`, `olive-drab`, `pink-moon`, `mars`, `mission`, `harbor`. Motifs: `arches`, `orbits`, `portal`, `gravity`, `doorway`. Formats: `paperback`, `magazine`, `patch`. `reroll: true` changes the stored seed only. `frequency` is up to four topics of 24 characters; `travelers` up to six listed handles. An empty `pinnedShareId` unpins. `hiddenStamps` accepts `charter`, `brought`, `signal`, `volume`. The agent must get approval for exact bio and topic wording. `public: false` withdraws the web page and feed immediately, but cannot recall copies or feed-reader caches. `listed` controls discovery separately.

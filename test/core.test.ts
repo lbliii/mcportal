@@ -101,7 +101,7 @@ test('resources/read serves the self-contained room app', async () => {
   assert.match(content.text, /<title>MCPortal<\/title>/);
   assert.ok(!/<script[^>]+src=/.test(content.text), 'no external scripts');
   assert.ok(!content.text.includes('__MCPORTAL_DEV__='), 'dev bootstrap only in /preview');
-  assert.ok(!/innerHTML/.test(content.text), 'UI never renders remote data as HTML');
+  assert.deepEqual([...content.text.matchAll(/innerHTML\s*=([^;]+);/g)].map((m) => m[1]!.trim()), ['spaceFormat.render(space)', 'spaceFormat.avatar(cover)'], 'only the escaped shared Space renderer and constant art may produce markup');
   assert.ok(!/[\u2028\u2029]/.test(content.text), 'no raw line separators in scripts');
   for (const [, script] of content.text.matchAll(/<script>([\s\S]*?)<\/script>/g)) new vm.Script(script); // throws on a syntax error
   const missing = await rpc(ctx(), 'resources/read', { uri: 'ui://nope' });
@@ -421,7 +421,7 @@ test('get_thumbnails: oversized WordPress uploads go through Photon; timeouts ar
 test('fallback art: distinct styles per source, varied placement per item, inlined into the app', async () => {
   const src = await readFile(new URL('../src/ui/art.js', import.meta.url), 'utf8');
   type Art = { styles(keys: string[]): number[]; draw(style: number, item: string): string; motifOf(style: number): string; inkOf(style: number): number; leadOf(style: number): string };
-  const art = vm.runInNewContext(`${src}; portalArt`) as Art;
+  const art = vm.runInNewContext(`${await readFile(new URL('../src/ui/space-inks.js', import.meta.url), 'utf8')}\n${src}; portalArt`) as Art;
   const noIds = (svg: string) => svg.replace(/pa\d+/g, 'pa');
 
   // Styles: stable, distinct, fresh ink sets first, and adding a portal never restyles earlier ones.
