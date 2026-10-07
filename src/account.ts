@@ -39,6 +39,7 @@ import type { HandoffStore } from './handoffs.ts';
 import type { SeenStore } from './seen.ts';
 import type { ReadingStore } from './reading.ts';
 import type { ProfileStore } from './store.ts';
+import type { SourceDeps } from './sources.ts';
 
 const SESSION_MS = 3600 * 1000;
 const DOWNLOAD_MS = 15 * 60 * 1000;
@@ -59,6 +60,7 @@ export interface AccountDeps {
   clips?: ClipStore | undefined;
   publicProfiles?: PublicProfiles | undefined;
   social?: Social | undefined;
+  images?: SourceDeps | undefined;
   publicUrl: string;
   log?: Logger | undefined;
   now?: (() => number) | undefined;
@@ -209,7 +211,7 @@ export class AccountPage {
     this.now = deps.now ?? Date.now;
     this.sessions = new PageSessions('account', { publicUrl: deps.publicUrl, ttlMs: SESSION_MS, max: MAX_ENTRIES, now: this.now });
     if (deps.publicProfiles && deps.social) {
-      this.spaceLinks = new SpaceLinks({ accounts: deps.accounts, oauth: deps.oauth, publicProfiles: deps.publicProfiles, social: deps.social, sessions: this.sessions, publicUrl: deps.publicUrl, log: deps.log, trustProxy: deps.trustProxy, now: deps.now });
+      this.spaceLinks = new SpaceLinks({ accounts: deps.accounts, oauth: deps.oauth, publicProfiles: deps.publicProfiles, social: deps.social, images: deps.images, sessions: this.sessions, publicUrl: deps.publicUrl, log: deps.log, trustProxy: deps.trustProxy, now: deps.now });
     }
   }
 

@@ -134,6 +134,14 @@
   document.addEventListener('click', (e) => { if (openMenu && !e.composedPath().includes(openMenu.menu)) closeReblogMenu(false); });
 
   // ------------------------------------------------------------ acting
+  /** Keep the source preview even on an existing bookmark, preserving its chosen title. @param {ReblogTarget} target */
+  async function saveReblogLink(target) {
+    const url = target.url ?? '';
+    if (!target.item) return state.saved.has(url);
+    const saved = state.profile?.saved.find((s) => s.url === url);
+    return changeSaved({ ...target.item, title: saved?.title ?? target.item.title }, target.portal?.source ?? 'saved');
+  }
+
   /**
    * Post it: reblog the post behind the story, or (no post behind it) save the link and post
    * it. Resolves to the new post's id, or null when it didn't happen (the toast says why).
@@ -143,8 +151,7 @@
     const extra = { ...(note ? { note } : {}), ...(audience ? { audience } : {}) };
     if (target.shareId) return (await callTool('share', { reblogOf: target.shareId, ...extra })).structuredContent.share.id;
     const url = target.url ?? '';
-    if (!state.saved.has(url) && target.item) await toggleSaved(target.item, target.portal?.source ?? 'saved');
-    if (!state.saved.has(url)) return null;   // saving failed; toggleSaved said why
+    if (!(await saveReblogLink(target))) return null;   // saving failed; changeSaved said why
     return (await callTool('share', { savedUrl: url, ...extra })).structuredContent.share.id;
   }
 
@@ -184,11 +191,7 @@
    * @param {ReblogTarget} target @param {HTMLElement} button
    */
   async function reblogWithNote(target, button) {
-    if (!target.shareId) {
-      const url = target.url ?? '';
-      if (!state.saved.has(url) && target.item) await toggleSaved(target.item, target.portal?.source ?? 'saved');
-      if (!state.saved.has(url)) return;
-    }
+    if (!target.shareId && !(await saveReblogLink(target))) return;
     openComposer({ title: target.title, url: target.url }, {
       target: target.shareId ? { reblogOf: target.shareId } : { savedUrl: target.url },
       verb: 'Reblog',

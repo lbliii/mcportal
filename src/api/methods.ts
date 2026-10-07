@@ -225,7 +225,7 @@ export const API_METHODS: Record<string, ApiMethod> = {
       const url = httpUrl(p.savedUrl);
       const saved = url ? (await ctx.store.get(ctx.userId)).saved.find((s) => s.url === url) : undefined;
       if (!saved) throw new AppError('invalid_argument', 'Share a saved item (savedUrl) or a clip (clipId).');
-      return social.share(ctx.userId, { kind: 'link', title: saved.title, url: saved.url, note: p.note, audience: p.audience, reblogs: p.reblogs });
+      return social.share(ctx.userId, { kind: 'link', title: saved.title, url: saved.url, description: saved.description, image: saved.image, note: p.note, audience: p.audience, reblogs: p.reblogs });
     }, 'write'),
   /** A post the server looks up by id, as share does: nothing of the original comes from the request. */
   'social.reblog': params<{ id: string; note?: string; audience?: string }>(

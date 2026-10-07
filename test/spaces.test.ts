@@ -11,6 +11,7 @@ import { publicSpacePage, publicSpaceFeed } from '../src/spaces.ts';
 import { buildExport, importExport, parseExport } from '../src/portability.ts';
 import { MemoryProfileStore } from '../src/store.ts';
 import { raw, startApp } from './helpers.ts';
+import type { Fetcher } from '../src/types.ts';
 
 const origin = 'https://mcportal.example';
 async function world() {
@@ -158,6 +159,89 @@ test('public endpoints: followers stay private; cached content invalidates on hi
     assert.doesNotMatch((await raw(app.port, { path: '/@webalice' })).body, /Public title|SECRET FOLLOWERS/);
     await accounts.setStatus(account.account.id, 'suspended', 'admin');
     assert.equal((await raw(app.port, { path: '/@webalice' })).status, 404);
+  } finally { await app.close(); }
+});
+
+test('link previews render separately from notes in all formats and RSS; private or detached originals lose their previews', async () => {
+  const { social, profiles, space } = await world();
+  const original = await social.share('b', { kind: 'link', title: 'A visual story', url: 'https://example.com/story',
+    description: 'Source <description>', image: { url: 'https://example.com/cover.png', kind: 'thumb' }, note: 'Author commentary', audience: 'everyone' });
+  const reblog = await social.reblog('a', { id: original.id, note: 'My commentary', audience: 'everyone' });
+  const scripts = (await Promise.all(['space-inks.js', 'art.js', 'space-format.js'].map((f) => readFile(new URL(`../src/ui/${f}`, import.meta.url), 'utf8')))).join('\n');
+  const renderer = runInNewContext(`${scripts}; spaceFormat`, { URL }) as { render: (space: unknown) => string };
+  for (const format of SPACE_DESIGN.formats) {
+    await profiles.set('a', { format });
+    const data = await space('');
+    const html = publicSpacePage(data, origin);
+    assert.match(html, /class="space-description">Source &lt;description&gt;/);
+    assert.match(html, new RegExp(`src="/@alice/image/${reblog.id}"`));
+    assert.doesNotMatch(html, /src="https:\/\/example.com\/cover.png/);
+    assert.match(html, /Author commentary/); assert.match(html, /My commentary/);
+    const room = renderer.render(await space());
+    assert.match(room, /data-img="https:\/\/example.com\/cover.png"/);
+    const feed = publicSpaceFeed(data, origin);
+    assert.match(feed, /Source &lt;description&gt;/);
+    assert.match(feed, new RegExp(`<media:thumbnail url="${origin}/@alice/image/${reblog.id}"`));
+  }
+  await profiles.set('b', { public: false });
+  for (const body of [publicSpacePage(await space(''), origin), publicSpaceFeed(await space(''), origin)]) {
+    assert.doesNotMatch(body, /Source &lt;description&gt;|cover.png|\/image\//);
+    assert.match(body, /My commentary/);
+  }
+  await profiles.set('b', { public: true });
+  await social.shareSettings('b', original.id, { detach: reblog.id });
+  const room = renderer.render(await space());
+  assert.doesNotMatch(room, /Source &lt;description&gt;|cover.png/);
+});
+
+test('public thumbnail endpoints fetch only visible posts in their Space and revoke originals live', async () => {
+  const { profiles, social, store } = await world();
+  const accounts = new Accounts(memoryPersistence(), makeBootstrap([], [], true));
+  const alice = await accounts.admit({ githubId: 10, login: 'Alice' }); assert.ok(alice.ok);
+  const bob = await accounts.admit({ githubId: 11, login: 'Bob' }); assert.ok(bob.ok);
+  await profiles.set(alice.account.id, { handle: 'webalice' });
+  await profiles.set(bob.account.id, { handle: 'webbob' });
+  const image = { url: 'https://example.com/cover.png', kind: 'thumb' as const };
+  const original = await social.share(bob.account.id, { kind: 'link', title: 'A story', image, description: 'Source context', audience: 'everyone' });
+  const reblog = await social.reblog(alice.account.id, { id: original.id, audience: 'everyone' });
+  const secret = await social.share(alice.account.id, { kind: 'link', title: 'Private', image, audience: 'followers' });
+  const png = Buffer.from('89504e470d0a1a0a', 'hex');
+  let requests = 0;
+  const fetcher: Fetcher = async (url, options) => {
+    requests++;
+    assert.equal(url, image.url); assert.equal(options?.binary, true);
+    return { status: 200, url, contentType: 'image/png', text: png.toString('base64'), truncated: false };
+  };
+  const app = await startApp({ github: { clientId: 'client', clientSecret: 'secret' } }, fetcher, { accounts, publicProfiles: profiles, social });
+  const path = `/@webalice/image/${reblog.id}`;
+  try {
+    assert.equal((await raw(app.port, { path: `/@webalice/image/${original.id}` })).status, 404, "another Space's post cannot supply a thumbnail");
+    assert.equal((await raw(app.port, { path: `/@webalice/image/${secret.id}` })).status, 404);
+    assert.equal(requests, 0, 'inaccessible images are never fetched');
+    const response = await raw(app.port, { path });
+    assert.equal(response.status, 200); assert.equal(response.headers['content-type'], 'image/png');
+    assert.equal(response.headers['cache-control'], 'no-store');
+    const head = await raw(app.port, { path, method: 'HEAD' });
+    assert.equal(head.status, 200); assert.equal(head.body, '');
+    assert.equal(requests, 1, 'the guarded thumbnail cache is reused');
+    const page = await raw(app.port, { path: '/@webalice' });
+    assert.match(String(page.headers['content-security-policy']), /img-src 'self' data:/);
+    assert.match(page.body, /Source context/);
+    await store.setHidden(original.id, new Date().toISOString());
+    assert.equal((await raw(app.port, { path })).status, 404);
+    assert.doesNotMatch((await raw(app.port, { path: '/@webalice' })).body, /Source context|\/image\//);
+    await store.setHidden(original.id, null);
+    await profiles.set(bob.account.id, { public: false });
+    assert.equal((await raw(app.port, { path })).status, 404);
+    await profiles.set(bob.account.id, { public: true });
+    await profiles.set(alice.account.id, { public: false });
+    assert.equal((await raw(app.port, { path })).status, 404);
+    await profiles.set(alice.account.id, { public: true });
+    await social.shareSettings(bob.account.id, original.id, { detach: reblog.id });
+    assert.equal((await raw(app.port, { path })).status, 404);
+    assert.equal(requests, 1, 'revocation prevents even cached thumbnails from being served');
+    await social.unshare(alice.account.id, reblog.id);
+    assert.equal((await raw(app.port, { path })).status, 404);
   } finally { await app.close(); }
 });
 

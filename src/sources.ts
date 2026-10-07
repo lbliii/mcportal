@@ -49,7 +49,7 @@ export function savedPortal(portal: PortalInput, saved: SavedItem[]): PortalResu
   const items: Item[] = saved.slice(0, limit).map((s) => {
     let host = '';
     try { host = new URL(s.url).hostname.replace(/^www\./, ''); } catch { /* validated on save */ }
-    return { id: s.url, title: s.title, url: s.url, ...(s.note !== undefined ? { summary: s.note } : {}), meta: host ? [host] : [], publishedAt: s.savedAt };
+    return { id: s.url, title: s.title, url: s.url, ...(s.note || s.description ? { summary: s.note || s.description } : {}), ...(s.image ? { image: s.image } : {}), meta: host ? [host] : [], publishedAt: s.savedAt };
   });
   return {
     portalId: portal.id,
@@ -123,14 +123,16 @@ function sharesPortal(portal: PortalInput, shares: SharedItem[], source: 'follow
       ...(s.via ? { via: s.via } : {}),
     } : undefined;
     const kind = s.kind === 'clip' ? (original?.clip?.kind ?? s.clip?.kind ?? 'clip') : 'link';
+    const preview = s.reblogOf ? original : s;
     return {
       id: s.id,
       title: s.title,
       ...(s.url ? { url: s.url } : {}),
       ...(s.note ? { summary: clean(s.note, 280) } : {}),
+      ...(preview?.image ? { image: preview.image } : {}),
       meta: [`@${s.author.handle}`, ...(reblog ? [reblog.by ? `reblogged @${reblog.by}` : 'reblogged a removed post'] : []), kind, ...(s.canFollow?.includes(s.author.handle) ? ['not followed'] : [])],
       publishedAt: s.createdAt,
-      share: { ...(s.author.cover ? { cover: s.author.cover } : {}), id: s.id, kind: s.kind, ...(reblog ? { reblog } : {}), ...(s.reblogCount ? { reblogs: s.reblogCount } : {}), ...(s.myReblog ? { mine: s.myReblog } : {}), canReblog: s.canReblog },
+      share: { ...(s.author.cover ? { cover: s.author.cover } : {}), ...(preview?.description ? { description: preview.description } : {}), id: s.id, kind: s.kind, ...(reblog ? { reblog } : {}), ...(s.reblogCount ? { reblogs: s.reblogCount } : {}), ...(s.myReblog ? { mine: s.myReblog } : {}), canReblog: s.canReblog },
     };
   });
   return {
