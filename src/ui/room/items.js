@@ -53,6 +53,7 @@
    */
   function itemActions(item, portal, when = true, reblog = true) {
     const { out, byline } = compactMeta(item, when);
+    if (item.person) return { out: [...out, ...personActions(item, portal)], byline };   // a suggested person: no link to open, save or reblog
     if (item.url) out.push(el('button', { class: 'mi go', title: 'Open the original', 'aria-label': 'Open the original', onclick: () => openLink(item.url ?? '') }, icon('external')));   // checked just before
     out.push(saveButton(item, portal.source));
     if (portal.source === 'saved' && item.url) out.push(el('button', { class: 'mi go', title: 'Share to your space', 'aria-label': 'Share to your space', onclick: () => openComposer(item) }, icon('share')));
@@ -162,6 +163,7 @@
       const meta = compactMeta(item).out;
       const save = saveButton(item, portal.source);
       if (save) { save.classList.add('go'); meta.push(save); }
+      meta.push(...personActions(item, portal));
       const reblog = portal.source === 'saved' ? null : reblogButton(reblogTarget(item, portal, item.share));
       if (reblog) meta.push(reblog);
       const content = [itemTitle(item), media ? null : item.summary ? el('span', { class: 'item-summary' }, item.summary) : null];

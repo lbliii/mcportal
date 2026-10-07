@@ -1,6 +1,6 @@
 # Plan: finding people
 
-**Status:** proposed 2026-10-06; phases 1–3 built 2026-10-06. Builds on the social layer (`src/social.ts`), public profiles (`src/public-profiles.ts`), [reblogs](../explanation/social.md#reblogs) and [the river](../explanation/social.md#the-river). It's the "discovery through people's Spaces" part of the [roadmap](README.md).
+**Status:** proposed 2026-10-06; phases 1–3b built 2026-10-06. Builds on the social layer (`src/social.ts`), public profiles (`src/public-profiles.ts`), [reblogs](../explanation/social.md#reblogs) and [the river](../explanation/social.md#the-river). It's the "discovery through people's Spaces" part of the [roadmap](README.md).
 
 ## Where we are
 
@@ -70,9 +70,11 @@ There's no new table. Public profiles are already one document, so listed people
 
 **Passive hints:** `add_portal` ("On MCPortal, @ana also features it"), `build_room` ("@ana (3), @ben (2) also feature some of these sources"), and `open_space` ("in the user's room too: …"). The first two name handles only, never titles, and each suggests offering an introduction.
 
-**Not yet:** whether the user passed on someone before. That comes with the People portal's Not for me.
+**Passed people** come last in `find_people`, with a reason that says so (phase 3b).
 
-### 3b. The People portal: your agent's suggestions, kept in the room
+### 3b. The People portal: your agent's suggestions, kept in the room (built)
+
+**As built:** suggestions and passes live in the room's own data (`profile.people`, like pinned items), not a new store. `suggest_people` accepts only handles `find_people` returned to that user in the last hour (several searches count). Not for me is the app-only `pass_person`, and suggesting someone again clears a pass. The People portal isn't addable with `add_portal` and stays out of the river. Its card in the chat is `showPeopleCard`. The instructions say "For who to follow: find_people, then suggest_people."
 
 A portal (a new house source kind, `people`) where your agent's suggestions of who to follow live between chats. Each item is a person card:
 

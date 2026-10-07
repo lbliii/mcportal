@@ -23,8 +23,8 @@ function sourceLabel(c: SourceSettings<FetchedSource>): string {
   return 'hn';
 }
 
-/** Sources MCPortal fetches (or, for saved, reads) itself. Pinned portals only come from pin_portal. */
-const ADDABLE: SourceKind[] = SOURCES.filter((s) => s !== 'pinned');
+/** Sources MCPortal fetches (or, for saved, reads) itself. Pinned portals only come from pin_portal, People from suggest_people. */
+const ADDABLE: SourceKind[] = SOURCES.filter((s) => s !== 'pinned' && s !== 'people');
 
 export const SOURCE_TOOLS: ToolDef[] = [
   {

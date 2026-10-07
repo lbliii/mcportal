@@ -55,7 +55,7 @@ const INSTRUCTIONS = [
 ];
 
 /** Only where sharing exists (hosted). */
-const SOCIAL_INSTRUCTIONS = 'People share saved links and clips (share), follow each other (relationship), and have a Space (open_space). Only share when the user asks, and get their approval of the note\'s exact words first. Offer to follow people whose shares they like.';
+const SOCIAL_INSTRUCTIONS = 'People share saved links and clips (share), follow each other (relationship), and have a Space (open_space). Only share when the user asks, and get their approval of the note\'s exact words first. Offer to follow people whose shares they like. For who to follow: find_people, then suggest_people.';
 
 function instructions(ctx: ToolContext): string {
   return [...INSTRUCTIONS, ...(hasSocial(ctx) ? [SOCIAL_INSTRUCTIONS] : [])].join(' ');

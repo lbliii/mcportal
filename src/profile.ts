@@ -103,6 +103,7 @@ export interface SourceConfigs {
   pinned: PinnedConfig;
   clips: ClipsConfig;
   following: LimitConfig;
+  people: LimitConfig;
 }
 
 export type SourceConfig = SourceConfigs[SourceKind];
@@ -119,12 +120,24 @@ export interface Profile {
   pins: Record<string, PinnedData>;
   /** False only for a brand-new user who hasn't set up their room yet (shows the welcome). */
   onboarded: boolean;
+  /** The People portal's suggestions and who the user passed on (docs/plans/finding-people.md). Only suggest_people and pass_person change it. */
+  people?: PeopleData;
   updatedAt: string;
 }
 
+/** Someone the agent suggested, in its words: the reason is the agent's, from what they made public. */
+export interface PersonPick { handle: string; why: string; at: string }
+export interface PeopleData {
+  /** Newest first; a suggestion lasts 30 days. */
+  picks: PersonPick[];
+  /** "Not for me", remembered 90 days so find_people can say so. */
+  passed: Array<{ handle: string; at: string }>;
+}
+export const PEOPLE = { picks: 12, passed: 200, why: 200, pickDays: 30, passDays: 90 } as const;
+
 /** Columns scroll sideways, so there can be more than fit on screen. */
 export const LIMITS = { columns: 8, portalsPerColumn: 4, items: 30, saved: 200 } as const;
-export const SOURCES: SourceKind[] = ['hn', 'rss', 'github', 'docs', 'saved', 'pinned', 'clips', 'following'];
+export const SOURCES: SourceKind[] = ['hn', 'rss', 'github', 'docs', 'saved', 'pinned', 'clips', 'following', 'people'];
 
 /** A profile, layout or source config that fails validation. Defaults to invalid_argument; pass a code when it's something else. */
 export class ProfileError extends AppError {
@@ -195,6 +208,7 @@ const fetchLimit = (config: Record<string, unknown>) => clampInt(config.limit, 1
 const NORMALIZERS: { [S in SourceKind]: Normalizer<S> } = {
   saved: itemsLimit,
   following: itemsLimit,
+  people: itemsLimit,
   clips(config, where) {
     if (config.kind !== undefined && !(CLIP_KINDS as readonly unknown[]).includes(config.kind)) throw new ProfileError(`${where}: clips kind must be one of ${CLIP_KINDS.join(', ')}`);
     const tag = typeof config.tag === 'string' ? config.tag.toLowerCase().replace(/^#/, '').replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 30) : '';
@@ -306,7 +320,33 @@ export function validateProfile(input: unknown, now = new Date()): Profile {
   const onboarded = input.onboarded !== false;
   const pinnedIds = columns.flatMap((c) => c.panels).filter((p) => p.source === 'pinned').map((p) => p.id);
   const pins = normalizePins(input.pins, pinnedIds, now);
-  return { version: 1, name, layout, openIn, columns, saved: normalizeSaved(input.saved, now), pins, onboarded, updatedAt: now.toISOString() };
+  const people = normalizePeople(input.people, now);
+  return { version: 1, name, layout, openIn, columns, saved: normalizeSaved(input.saved, now), pins, onboarded, ...(people ? { people } : {}), updatedAt: now.toISOString() };
+}
+
+/** Suggestions and passes: valid handles only, the reason cleaned, expired ones dropped, one per handle, capped. */
+export function normalizePeople(raw: unknown, now = new Date()): PeopleData | undefined {
+  if (!isRecord(raw)) return undefined;
+  const day = 86_400_000;
+  const when = (v: unknown) => (typeof v === 'string' && !Number.isNaN(Date.parse(v)) ? new Date(v) : undefined);
+  const handleOf = (v: unknown) => (typeof v === 'string' && /^[a-z0-9_]{2,30}$/.test(v) ? v : undefined);
+  const picks: PersonPick[] = [];
+  for (const e of Array.isArray(raw.picks) ? raw.picks : []) {
+    if (!isRecord(e)) continue;
+    const handle = handleOf(e.handle), at = when(e.at), why = clean(e.why, PEOPLE.why);
+    if (!handle || !at || !why || now.getTime() - at.getTime() > PEOPLE.pickDays * day || picks.some((p) => p.handle === handle)) continue;
+    picks.push({ handle, why, at: at.toISOString() });
+    if (picks.length >= PEOPLE.picks) break;
+  }
+  const passed: PeopleData['passed'] = [];
+  for (const e of Array.isArray(raw.passed) ? raw.passed : []) {
+    if (!isRecord(e)) continue;
+    const handle = handleOf(e.handle), at = when(e.at);
+    if (!handle || !at || now.getTime() - at.getTime() > PEOPLE.passDays * day || passed.some((p) => p.handle === handle)) continue;
+    passed.push({ handle, at: at.toISOString() });
+    if (passed.length >= PEOPLE.passed) break;
+  }
+  return picks.length || passed.length ? { picks, passed } : undefined;
 }
 
 /** Keep pinned items only for pinned portals that exist; an unknown id gets none. */

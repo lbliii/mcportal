@@ -190,6 +190,7 @@ function privacy(site: SiteConfig): string {
 <tr><th>Data</th><th>Why</th><th>How long</th></tr>
 <tr><td><b>Account:</b> your GitHub numeric user ID and login, your role, how you joined (for example, by invite), and dates</td><td>To know who you are and whether you're allowed in</td><td>Until your account is deleted</td></tr>
 <tr><td><b>Your room:</b> its name, layout, the sources you add (feed addresses, subreddits, repos, searches), and settings</td><td>To show you your room</td><td>Until you change it or your account is deleted</td></tr>
+<tr><td><b>People suggestions:</b> the people your agent suggested following, with the one-line reason it wrote, and the ones you said "Not for me" to</td><td>For your People portal, and so your agent knows whom you passed on</td><td>30 days for a suggestion, 90 for a pass. Only you see them; the people suggested never do</td></tr>
 <tr><td><b>Saved items:</b> the link, title, source, date and any note you add</td><td>To show your Saved portal</td><td>Until you remove them</td></tr>
 <tr><td><b>Clips:</b> quotes, parts of a conversation, notes, tables, images and links you ask your agent to keep, with any title, note and tags</td><td>To show your Clips portal and find them again in later chats</td><td>Until you delete them</td></tr>
 <tr><td><b>Reading history:</b> the links you've seen, opened or read in your room, with their titles, when, and how far you got</td><td>To mark what's new and pick up where you left off</td><td>The latest 1,000 per account, until your account is deleted</td></tr>

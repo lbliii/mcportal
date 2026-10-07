@@ -106,10 +106,14 @@ export function termsOf(text: string): string[] {
   return [...new Set(words.filter((w) => w.length >= 3 && !STOP.has(w)))].slice(0, 12);
 }
 
-/** Whether a term is in a text: whole words, or the start of one for longer terms ("synth" finds "synths"). */
+/** A word without a plain plural s, so "cats" and "cat" meet ("glass" keeps its s). */
+const singular = (w: string) => (w.length > 3 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w);
+
+/** Whether a term is in a text: whole words, singular or plural, or the start of one for longer terms ("synth" finds "synthesizer"). */
 function mentions(text: string, term: string): boolean {
-  const words = text.toLowerCase().match(/[\p{L}\p{N}][\p{L}\p{N}+#]*/gu) ?? [];
-  return words.some((w) => w === term || (term.length >= 4 && w.startsWith(term)));
+  const words = (text.toLowerCase().match(/[\p{L}\p{N}][\p{L}\p{N}+#]*/gu) ?? []).map(singular);
+  const t = singular(term);
+  return words.some((w) => w === t || (t.length >= 4 && w.startsWith(t)));
 }
 
 /** How common each source and site is among everyone listed. */

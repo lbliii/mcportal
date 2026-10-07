@@ -5,6 +5,7 @@
   /** @param {Item} item @param {PortalResult} portal */
   function openItem(item, portal) {
     if (item.new) queueSeen(portal.portalId, item.id);
+    if (item.person) return openSpaceFrom(item.person.handle);
     if (item.clip) return openClip(item);
     if (item.share && item.share.kind === 'clip') return openShare(item);
     if (portal.source === 'docs' && item.url) return openDocs({ portalId: portal.portalId }, { url: item.url });

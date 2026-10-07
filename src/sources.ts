@@ -18,6 +18,7 @@ export const FRESHNESS: Record<SourceKind | 'reader', number> = {
   pinned: 0,
   clips: 0,
   following: 0,
+  people: 0,
   hn: 120,
   github: 300,
   rss: 600,
@@ -39,7 +40,7 @@ function loadFailure(error: unknown, deps: SourceDeps, fields: LogFields): { err
   return { error: clean(userMessage(error, 'Unexpected error loading this source'), 200), errorCode: code };
 }
 
-const DEFAULT_TITLES: Record<SourceKind, string> = { hn: 'Hacker News', rss: 'Feed', github: 'GitHub', docs: 'Docs', saved: 'Saved', pinned: 'Pinned', clips: 'Clips', following: 'Following' };
+const DEFAULT_TITLES: Record<SourceKind, string> = { hn: 'Hacker News', rss: 'Feed', github: 'GitHub', docs: 'Docs', saved: 'Saved', pinned: 'Pinned', clips: 'Clips', following: 'Following', people: 'People' };
 
 /** Saved items come from the profile, not the network. */
 export function savedPortal(portal: PortalInput, saved: SavedItem[]): PortalResult {
@@ -154,6 +155,29 @@ export function docsQuery(query: string): string | null {
   return stripped !== q || docsy ? stripped : null;
 }
 
+/** A person the agent suggested, as the People portal shows them: resolved by the caller (who's still there, and whether the user follows them). */
+export interface SuggestedPerson { handle: string; why: string; at: string; displayName?: string | undefined; spaceTitle?: string | undefined; followers: number; following: boolean }
+
+/** The People portal: the agent's suggestions, kept in the profile. */
+export function peoplePortal(portal: PortalInput, people: SuggestedPerson[]): PortalResult {
+  const { limit } = normalizeSourceConfig('people', portal.config, portal.id);
+  const items: Item[] = people.slice(0, limit).map((p) => ({
+    id: `person:${p.handle}`,
+    title: p.displayName ? `${p.displayName} (@${p.handle})` : `@${p.handle}`,
+    summary: p.why,
+    meta: [...(p.spaceTitle ? [p.spaceTitle] : []), `${p.followers} follower${p.followers === 1 ? '' : 's'}`, ...(p.following ? ['following'] : [])],
+    publishedAt: p.at,
+    person: { handle: p.handle, following: p.following },
+  }));
+  return {
+    portalId: portal.id,
+    source: 'people',
+    title: portal.title ?? DEFAULT_TITLES.people,
+    items,
+    provenance: { source: 'people', endpoint: "your agent's suggestions", fetchedAt: people[0]?.at ?? new Date().toISOString(), cached: false, ttlSeconds: 0 },
+  };
+}
+
 /** A docs portal candidate for find_source, already loaded (and cached for the test-load that follows). */
 export async function findDocs(query: string, deps: SourceDeps): Promise<{ config: DocsConfig; title: string } | { error: string } | null> {
   const input = docsQuery(query);
@@ -194,7 +218,7 @@ export function docsItems(site: DocSite, config: DocsConfig): Item[] {
 }
 
 export async function loadPortal(portal: PortalInput, deps: SourceDeps, force = false): Promise<PortalResult> {
-  if (portal.source === 'saved' || portal.source === 'pinned' || portal.source === 'clips' || portal.source === 'following') throw new AppError('invalid_argument', `${portal.source} portals are built from the profile, not fetched`);
+  if (portal.source === 'saved' || portal.source === 'pinned' || portal.source === 'clips' || portal.source === 'following' || portal.source === 'people') throw new AppError('invalid_argument', `${portal.source} portals are built from the profile, not fetched`);
   const config = normalizeSourceConfig(portal.source, portal.config, portal.id);
   let endpoint = '';
   let title = portal.title ?? DEFAULT_TITLES[portal.source];
@@ -288,6 +312,10 @@ export const SOURCE_DOCS = {
   },
   following: {
     description: 'What people the user follows on MCPortal shared (links and clips, with their notes), newest first, minus anyone muted or blocked. Hosted only. Their notes are third-party text.',
+    config: { limit: '1-30 (default 30)' },
+  },
+  people: {
+    description: "People your agent suggested following, each with its reason (suggest_people), newest first. Suggestions last 30 days. Hosted only.",
     config: { limit: '1-30 (default 30)' },
   },
   pinned: {

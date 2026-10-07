@@ -11,6 +11,8 @@ import { AUDIENCES, REBLOG_RULES, type PersonMatch, type Reblogger, type SharedI
 import { hostOf, namedSignal, sourceSignal, termsOf, type Wanted } from '../people.ts';
 import { isAppError } from '../lib/errors.ts';
 import { ensurePortal } from '../layout.ts';
+import { PEOPLE, type Profile } from '../profile.ts';
+import { peoplePortal, type SuggestedPerson } from '../sources.ts';
 import { HOSTED_ONLY, labsOf, socialActive, socialEntry, ok, toolError, untrusted, ROOM_URI, type CallToolResult, type ToolContext, type ToolDef } from './kit.ts';
 import type { ToolResults } from './results.ts';
 
@@ -100,6 +102,42 @@ export async function featuredBy(ctx: ToolContext, sources: Array<{ source: stri
   } catch {
     return '';   // a hint, never a failure
   }
+}
+
+/** Who find_people last returned to each user, for an hour: suggest_people keeps only those. */
+const FOUND_MS = 3600_000;
+const found = new Map<string, { handles: Set<string>; at: number }>();
+function rememberFound(userId: string, handles: string[]): void {
+  const now = Date.now();
+  for (const [k, v] of found) if (now - v.at > FOUND_MS) found.delete(k);
+  if (found.size >= 5000) found.delete(found.keys().next().value!);
+  const prior = found.get(userId);
+  // Several searches in one conversation all count: the agent may pick across them.
+  found.set(userId, { handles: new Set([...(prior && now - prior.at <= FOUND_MS ? prior.handles : []), ...handles]), at: now });
+}
+function foundFor(userId: string): Set<string> | undefined {
+  const entry = found.get(userId);
+  return entry && Date.now() - entry.at <= FOUND_MS ? entry.handles : undefined;
+}
+
+/**
+ * The People portal's suggestions as they stand: someone who unlisted, blocked the user, was
+ * suspended or deleted their profile drops out; following them is shown, not hidden.
+ */
+export async function suggestedPeople(profile: Profile, ctx: ToolContext): Promise<SuggestedPerson[]> {
+  if (!ctx.social) return [];
+  const social = ctx.social;
+  const out = await Promise.all((profile.people?.picks ?? []).map(async (pick): Promise<SuggestedPerson | undefined> => {
+    try {
+      const them = await social.resolve(ctx.userId, pick.handle);
+      if (!them.listed || them.handle !== pick.handle) return undefined;
+      const stats = await social.stats(ctx.userId, them.accountId);
+      return { ...pick, displayName: them.displayName, spaceTitle: them.spaceTitle, followers: stats.followers, following: stats.following };
+    } catch {
+      return undefined;
+    }
+  }));
+  return out.filter((p) => p !== undefined);
 }
 
 /** A Space's address: /@handle on the server that holds the account (docs/plans/finding-people.md). */
@@ -369,7 +407,12 @@ export const SOCIAL_TOOLS: ToolDef[] = [
       try {
         const { wanted, basis, except } = await wantedFrom(args, ctx);
         const people = await ctx.social.findPeople(ctx.userId, wanted, except ? { except } : {});
-        const found = people.map((p) => ({ ...p, reasons: reasonsOf(p, basis) }));
+        // Someone the user said "Not for me" to comes last, and says so.
+        const passed = new Set((await ctx.store.get(ctx.userId)).people?.passed.map((p) => p.handle) ?? []);
+        const found = people.map((p) => ({ ...p, reasons: reasonsOf(p, basis), ...(passed.has(p.handle) ? { passed: true as const } : {}) }))
+          .sort((a, b) => Number(Boolean(a.passed)) - Number(Boolean(b.passed)));
+        for (const p of found) if (p.passed) p.reasons.push('the user passed on them before (Not for me)');
+        rememberFound(ctx.userId, found.map((p) => p.handle));
         if (!found.length) {
           return ok(`Nobody listed on MCPortal matches yet. Only people who chose to be findable show up, and there aren't many so far. ${basis === 'of your sources' ? 'Try topics (about) or sites (sources).' : ''}`.trim(), { people: [] } satisfies ToolResults['find_people']);
         }
@@ -380,11 +423,73 @@ export const SOCIAL_TOOLS: ToolDef[] = [
           p.featured.length ? `  features: ${p.featured.join(', ')}` : '',
           ...p.posts.map((post) => `  - ${post.title}${post.url ? ` <${post.url}>` : ''}${post.note ? ` — ${clean(post.note, 200)}` : ''}`),
         ].filter(Boolean).join('\n')).join('\n');
-        return ok(`${found.length} listed ${found.length === 1 ? 'person matches' : 'people match'}, best first. Introduce one or two in your own words from what's below, then offer to follow (relationship) or open their Space (open_space). Say only what they made public.\n${untrusted('people on MCPortal', body)}`,
+        return ok(`${found.length} listed ${found.length === 1 ? 'person matches' : 'people match'}, best first. Introduce one or two in your own words from what's below, then offer to follow (relationship) or open their Space (open_space); to keep picks in the room, suggest_people. Say only what they made public.\n${untrusted('people on MCPortal', body)}`,
           { people: found } satisfies ToolResults['find_people']);
       } catch (error) {
         return fail(error);
       }
+    },
+  },
+  {
+    name: 'suggest_people',
+    title: 'Suggest people to follow',
+    access: 'write',
+    available: socialEntry,
+    description: "Keep picks from find_people in the user's People portal, best first, each with a one-line reason: what they share, never guesses about who they are; by handle.",
+    inputSchema: {
+      type: 'object',
+      required: ['picks'],
+      additionalProperties: false,
+      properties: {
+        picks: { type: 'array', minItems: 1, maxItems: 8, items: { type: 'object', required: ['handle', 'why'], additionalProperties: false, properties: { handle: handleProp, why: { type: 'string', maxLength: PEOPLE.why } } } },
+      },
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    _meta: { ui: { resourceUri: ROOM_URI } },
+    async handler(args, ctx) {
+      if (!ctx.social) return toolError(HOSTED_ONLY.sharing, 'unavailable');
+      const recent = foundFor(ctx.userId);
+      if (!recent) return toolError('Call find_people first: suggest only people it just returned.', 'failed_precondition');
+      const picks = (Array.isArray(args.picks) ? args.picks : []).map((p: { handle?: unknown; why?: unknown }) => ({ handle: String(p.handle ?? '').trim().replace(/^@/, '').toLowerCase(), why: clean(p.why, PEOPLE.why) }));
+      const unknown = picks.filter((p) => !recent.has(p.handle)).map((p) => `@${clean(p.handle, 40)}`);
+      if (unknown.length) return toolError(`Not kept: ${unknown.join(', ')} ${unknown.length === 1 ? "wasn't" : "weren't"} in find_people's last results. Suggest only people it returned.`, 'invalid_argument');
+      if (picks.some((p) => !p.why)) return toolError('Each pick needs a reason (why).');
+      const at = new Date().toISOString();
+      const chosen = new Set(picks.map((p) => p.handle));
+      const { profile, added } = await ctx.store.update(ctx.userId, (before) => {
+        const old = before.people ?? { picks: [], passed: [] };
+        const people = {
+          picks: [...picks.map((p) => ({ ...p, at })), ...old.picks.filter((p) => !chosen.has(p.handle))].slice(0, PEOPLE.picks),
+          passed: old.passed.filter((p) => !chosen.has(p.handle)),
+        };
+        const placed = ensurePortal({ ...before, people }, 'people', 'People');
+        return { profile: placed.profile, result: placed };
+      });
+      const spec = profile.columns.flatMap((c) => c.panels).find((p) => p.source === 'people');
+      const portal = peoplePortal(spec ?? { id: 'people', source: 'people', config: {} }, await suggestedPeople(profile, ctx));
+      return ok(`Kept ${picks.length} suggestion(s) in the People portal${added ? ' (just added to the room)' : ''}, shown in a card. Each has Follow, their Space and Not for me.`,
+        { suggested: { portal }, profile, layoutChanged: added } satisfies ToolResults['suggest_people']);
+    },
+  },
+  {
+    name: 'pass_person',
+    title: 'Not for me',
+    access: 'write',
+    available: socialEntry,
+    description: "The room's Not for me on a suggested person: they leave the People portal, and find_people says the user passed on them for 90 days.",
+    inputSchema: { type: 'object', required: ['handle'], additionalProperties: false, properties: { handle: handleProp } },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    _meta: { ui: { resourceUri: ROOM_URI, visibility: ['app'] } },
+    async handler(args, ctx) {
+      const handle = String(args.handle ?? '').trim().replace(/^@/, '').toLowerCase();
+      if (!/^[a-z0-9_]{2,30}$/.test(handle)) return toolError('That isn\'t a handle.');
+      const profile = await ctx.store.update(ctx.userId, (before) => {
+        const old = before.people ?? { picks: [], passed: [] };
+        const people = { picks: old.picks.filter((p) => p.handle !== handle), passed: [{ handle, at: new Date().toISOString() }, ...old.passed.filter((p) => p.handle !== handle)] };
+        const next = { ...before, people };
+        return { profile: next, result: next };
+      });
+      return ok(`Passed on @${handle}.`, { profile } satisfies ToolResults['pass_person']);
     },
   },
   {

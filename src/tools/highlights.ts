@@ -6,11 +6,20 @@
 import { buildEdition, EDITION_HOURS } from '../editions.ts';
 import { candidateLine, candidates, findByRef, parseRef, PICKS, tasteSignals, type HighlightPick } from '../highlights.ts';
 import { clean } from '../lib/text.ts';
-import { findPortal } from '../profile.ts';
+import { findPortal, type Profile } from '../profile.ts';
 import { tracksSeen } from '../seen.ts';
 import { ok, toolError, untrusted, ROOM_URI, type ToolDef } from './kit.ts';
 import type { ToolResults } from './results.ts';
 import { portalFor } from './room.ts';
+
+/** A catch-up is a good moment to refresh the People portal once it's empty or three weeks old (docs/plans/finding-people.md). */
+function peopleCue(profile: Profile): string {
+  if (!profile.columns.some((c) => c.panels.some((p) => p.source === 'people'))) return '';
+  const newest = profile.people?.picks[0]?.at;
+  const weeks = newest ? Math.floor((Date.now() - Date.parse(newest)) / (7 * 86_400_000)) : undefined;
+  if (weeks !== undefined && weeks < 3) return '';
+  return `Their People portal is ${weeks === undefined ? 'empty' : `${weeks} weeks old`}: you could offer to look for people again (find_people, then suggest_people).`;
+}
 
 export const HIGHLIGHT_TOOLS: ToolDef[] = [
   {
@@ -44,6 +53,7 @@ export const HIGHLIGHT_TOOLS: ToolDef[] = [
           : "Nothing new: the user has seen everything in their room.",
         items.length ? untrusted('new items in the room', items.map((c) => candidateLine(c)).join('\n')) : '',
         signals.length ? untrusted('what MCPortal knows of their taste', signals.join('\n')) : '',
+        peopleCue(profile),
       ].filter(Boolean).join('\n\n');
       return ok(text, { items, signals } satisfies ToolResults['list_new_items']);
     },

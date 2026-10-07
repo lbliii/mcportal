@@ -467,3 +467,53 @@ test('find_people: by room, topics, sites or someone like them, with reasons; ad
   assert.equal((await call(ctx('a'), 'set_public_profile', { listed: false })).structuredContent.profile.listed, undefined);
   assert.deepEqual((await call(ctx('c'), 'find_people')).structuredContent.people, [], 'unlisted from the tool too');
 });
+
+test('People portal: suggest_people keeps only people find_people just returned, with the agent\'s reason; Not for me remembers; unlisting drops them', async () => {
+  const { social, profiles, ctx, portals } = await world();
+  await profiles.set('a', { handle: 'alice', listed: true, bio: 'Plays World of Warcraft' });
+  await profiles.set('b', { handle: 'bob', listed: true, bio: 'Warcraft raids, weekly' });
+
+  const early = await call(ctx('d'), 'suggest_people', { picks: [{ handle: 'alice', why: 'Plays WoW' }] });
+  assert.equal(early.isError, true, 'nothing found yet');
+  assert.match(early.content[0]!.text, /Call find_people first/);
+
+  const found = await call(ctx('d'), 'find_people', { about: 'warcraft' });
+  assert.deepEqual(found.structuredContent.people.map((p: any) => p.handle).sort(), ['alice', 'bob']);
+  const stranger = await call(ctx('d'), 'suggest_people', { picks: [{ handle: 'carol', why: 'Who knows' }] });
+  assert.equal(stranger.isError, true);
+  assert.match(stranger.content[0]!.text, /@carol wasn't in find_people's last results/);
+  assert.equal((await call(ctx('d'), 'suggest_people', { picks: [{ handle: 'alice', why: '  ' }] })).isError, true, 'a reason is required');
+
+  const kept = await call(ctx('d'), 'suggest_people', { picks: [{ handle: '@Alice', why: 'Plays World of Warcraft, says so in her bio.' }, { handle: 'bob', why: 'Posts weekly raid notes.' }] });
+  assert.equal(kept.isError, undefined, kept.content[0]!.text);
+  assert.equal(kept.structuredContent.layoutChanged, true, 'the People portal arrives with the first suggestion');
+  const items = kept.structuredContent.suggested.portal.items;
+  assert.deepEqual(items.map((i: any) => [i.title, i.summary, i.person]), [
+    ['@alice', 'Plays World of Warcraft, says so in her bio.', { handle: 'alice', following: false }],
+    ['@bob', 'Posts weekly raid notes.', { handle: 'bob', following: false }]]);
+  const room = async () => (await call(ctx('d'), 'open_room')).structuredContent.portals.find((p: any) => p.source === 'people');
+  assert.equal((await room()).items.length, 2, 'kept in the room');
+
+  // Following shows; unlisting takes them out.
+  await social.follow('d', 'alice');
+  assert.deepEqual((await room()).items.map((i: any) => [i.person.handle, i.person.following, i.meta.includes('following')]), [['alice', true, true], ['bob', false, false]]);
+  await profiles.set('a', { listed: false });
+  assert.deepEqual((await room()).items.map((i: any) => i.person.handle), ['bob']);
+  await profiles.set('a', { listed: true });
+
+  // Not for me: out of the portal, and find_people says so, last.
+  const passed = await call(ctx('d'), 'pass_person', { handle: 'bob' });
+  assert.deepEqual(passed.structuredContent.profile.people.passed.map((p: any) => p.handle), ['bob']);
+  assert.deepEqual((await room()).items.map((i: any) => i.person.handle), ['alice']);
+  await social.unfollow('d', 'alice');
+  const again = await call(ctx('d'), 'find_people', { about: 'warcraft' });
+  assert.deepEqual(again.structuredContent.people.map((p: any) => [p.handle, p.passed ?? false]), [['alice', false], ['bob', true]]);
+  assert.ok(again.structuredContent.people[1].reasons.includes('the user passed on them before (Not for me)'));
+  // Suggesting someone again clears the pass.
+  await call(ctx('d'), 'suggest_people', { picks: [{ handle: 'bob', why: 'Second thoughts: great raid notes.' }] });
+  assert.deepEqual((await portals.get('d')).people?.passed, []);
+
+  // A catch-up mentions an empty or old People portal.
+  await portals.update('d', (p) => ({ profile: { ...p, people: { picks: [], passed: [] } }, result: null }));
+  assert.match((await call(ctx('d'), 'list_new_items')).content[0]!.text, /People portal is empty: you could offer to look for people again/);
+});

@@ -290,7 +290,7 @@
    */
   function portalItems(portal, items) {
     if (portal.error) return el('div', { class: 'error' }, `Signal lost in the ion storm (${portal.error}). Try refreshing this portal.`);
-    if (!portal.items.length) return el('div', { class: 'empty' }, 'All quiet on this frequency… for now. New posts will show up here.');
+    if (!portal.items.length) return el('div', { class: 'empty' }, portal.source === 'people' ? 'Ask your agent who you might like to follow.' : 'All quiet on this frequency… for now. New posts will show up here.');
     return items();
   }
 

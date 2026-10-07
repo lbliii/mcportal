@@ -90,7 +90,9 @@ export type ToolResults = {
   clip: { clip: ClipSummary; profile: Profile; layoutChanged: boolean; portals: PortalResult[] };
   open_space: SpaceResult;
   /** labs: the server's, so a card offers what the room would. */
-  find_people: { people: Array<PersonMatch & { reasons: string[] }> };
+  find_people: { people: Array<PersonMatch & { reasons: string[]; passed?: true }> };
+  suggest_people: { suggested: { portal: PortalResult }; profile: Profile; layoutChanged: boolean };
+  pass_person: { profile: Profile };
   get_share: { share: SharedItem; rebloggers?: Reblogger[]; labs?: string[] };
   share: { share: SharedItem };
   share_settings: { share: SharedItem };

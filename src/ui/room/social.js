@@ -347,6 +347,56 @@
     return button;
   }
 
+  /**
+   * A suggested person's buttons (the People portal, docs/plans/finding-people.md): Follow,
+   * and Not for me, which takes them out of the portal and tells find_people next time.
+   * @param {Item} item @param {PortalResult} portal
+   */
+  function personActions(item, portal) {
+    const person = item.person;
+    if (!person) return [];
+    const follow = el('button', { class: 'mi person-act follow', type: 'button', 'aria-pressed': String(person.following), disabled: person.following }, person.following ? 'Following' : 'Follow');
+    follow.addEventListener('click', async (/** @type {MouseEvent} */ e) => {
+      e.stopPropagation();
+      follow.disabled = true;
+      try {
+        const result = (await callTool('relationship', { handle: person.handle, action: 'follow' })).structuredContent;
+        person.following = true;
+        follow.setAttribute('aria-pressed', 'true');
+        follow.textContent = 'Following';
+        toast(`Following @${person.handle}. Their posts will arrive in your Following portal.`);
+        if (result.layoutChanged && !$('grid').hidden) void loadRoom();   // the Following portal was just added
+      } catch (error) { toast(errorText(error)); follow.disabled = false; }
+    });
+    const pass = el('button', { class: 'mi person-act', type: 'button' }, 'Not for me');
+    pass.addEventListener('click', async (/** @type {MouseEvent} */ e) => {
+      e.stopPropagation();
+      pass.disabled = true;
+      try {
+        await callTool('pass_person', { handle: person.handle });
+        portal.items = portal.items.filter((i) => i !== item);
+        pass.closest('.item, .card')?.remove();
+        toast(`Passed on @${person.handle}. Your agent will know next time it looks for people.`);
+      } catch (error) { toast(errorText(error)); pass.disabled = false; }
+    });
+    return [follow, pass];
+  }
+
+  // This view belongs to a suggest_people call: the agent's picks as a card.
+  /** @param {PortalResult} portal */
+  function showPeopleCard(portal) {
+    root.classList.add('article-view');
+    $('roomName').textContent = 'people';
+    $('welcome').hidden = true;
+    $('grid').hidden = true;
+    const reader = $('reader');
+    reader.hidden = false; reader.scrollTop = 0;
+    reader.replaceChildren(readerTop('', false), el('h1', null, 'People you might follow'),
+      el('div', { class: 'byline' }, "Your agent's picks, from what they chose to share. They're kept in your People portal."),
+      portal.items.length ? el('div', { class: 'people-card' }, portal.items.map((item) => renderItem(item, portal))) : el('div', { class: 'empty' }, 'Nobody to suggest right now.'));
+    setStatus('');
+  }
+
   /** Copy a Space's link; where the clipboard is off limits, show it to copy by hand. @param {string} link */
   async function copySpaceLink(link) {
     try { await navigator.clipboard.writeText(link); toast('Copied your Space link. Anyone who signs in through it is offered a follow of you.'); }

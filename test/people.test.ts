@@ -35,4 +35,17 @@ test('people: a rare shared source counts for more than a common one; words and 
   assert.deepEqual(b.terms, { space: ['cats'], posts: [] });
   assert.ok(a.score > b.score, `the rare source wins (${a.score} > ${b.score})`);
   assert.equal(match({ handle: 'zed', featured: [], posts: [] }, wanted, common).score, 0);
+  assert.deepEqual(match({ handle: 'cy', bio: 'One cat, many synthesizers', featured: [], posts: [] }, { sources: [], hosts: [], terms: ['cats', 'synth', 'glass'] }, common).terms.space, ['cats', 'synth'], 'plurals meet, and a longer term finds longer words');
+});
+
+test('people data: suggestions last 30 days and passes 90, one per handle, reasons cleaned', async () => {
+  const { normalizePeople } = await import('../src/profile.ts');
+  const now = new Date('2026-10-06T00:00:00Z');
+  const daysAgo = (n: number) => new Date(now.getTime() - n * 86_400_000).toISOString();
+  const people = normalizePeople({
+    picks: [{ handle: 'ana', why: ' Cats,\n mostly ', at: daysAgo(1) }, { handle: 'ana', why: 'again', at: daysAgo(2) }, { handle: 'old', why: 'gone', at: daysAgo(31) }, { handle: 'Bad Handle', why: 'x', at: daysAgo(1) }, { handle: 'nowhy', why: '', at: daysAgo(1) }],
+    passed: [{ handle: 'ben', at: daysAgo(89) }, { handle: 'cy', at: daysAgo(91) }],
+  }, now);
+  assert.deepEqual(people, { picks: [{ handle: 'ana', why: 'Cats, mostly', at: daysAgo(1) }], passed: [{ handle: 'ben', at: daysAgo(89) }] });
+  assert.equal(normalizePeople({ picks: [], passed: [] }, now), undefined, 'nothing kept when empty');
 });
