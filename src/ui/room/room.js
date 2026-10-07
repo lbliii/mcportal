@@ -101,6 +101,7 @@
     refreshContinueReading();
     setUpdated(data.generatedAt);
     if (data.notice) toast(data.notice);
+    if (data.intros) drawIntros(data.intros);
   }
 
   // ------------------------------------------------------------ pictures

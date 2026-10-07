@@ -693,3 +693,63 @@ test('admin moderation: reports show on the admin page; hide, unhide and dismiss
     await app.close();
   }
 });
+
+test('space links: /@handle shows only the handle until you sign in there; signing in admits a newcomer and remembers the intro', async () => {
+  const { Accounts, accountIdFor, makeBootstrap, memoryPersistence } = await import('../src/accounts.ts');
+  const { PublicProfiles } = await import('../src/public-profiles.ts');
+  const { DocumentSocialStore, Social } = await import('../src/social.ts');
+  const users = { 'gh-code-newbie': { id: 7, login: 'Newbie' }, 'gh-code-ana': { id: 99, login: 'ana' } };
+  const accounts = new Accounts(memoryPersistence(), makeBootstrap([], [], true));
+  const publicProfiles = new PublicProfiles(memoryPersistence());
+  const social = new Social({ store: new DocumentSocialStore(), profiles: publicProfiles });
+  const ana = await accounts.admit({ githubId: 99, login: 'ana' });
+  assert.ok(ana.ok);
+  await publicProfiles.set(ana.account.id, { handle: 'ana', bio: 'A bio only for people signed in' });
+  const app = await startApp({ github: { clientId: 'gh-client', clientSecret: 'gh-secret' } }, fakeUpstreams(users).fetcher, { accounts, publicProfiles, social });
+  const cookieOf = (res: { headers: Record<string, string | string[] | undefined> }, name: string) =>
+    ([] as string[]).concat(res.headers['set-cookie'] ?? []).map((c) => c.split(';')[0]!).find((c) => c.startsWith(`${name}=`) && c.length > name.length + 1);
+  const signInThrough = async (path: string, code: string) => {
+    const start = await raw(app.port, { path });
+    assert.equal(start.status, 302);
+    const gh = new URL(String(start.headers.location));
+    assert.equal(gh.host, 'github.com');
+    return raw(app.port, { path: `/oauth/callback?code=${code}&state=${gh.searchParams.get('state')}`, headers: { cookie: cookieOf(start, 'mcportal_page')! } });
+  };
+  try {
+    const nobody = await raw(app.port, { path: '/@nobody_here' });
+    assert.equal(nobody.status, 404);
+    assert.match(nobody.body, /Nobody here by that name/);
+
+    const visitor = await raw(app.port, { path: '/@ANA' });
+    assert.equal(visitor.status, 200, 'handles are case-insensitive');
+    assert.equal(visitor.headers['x-robots-tag'], 'noindex, nofollow');
+    assert.match(visitor.body, /@ana is on MCPortal/);
+    assert.match(visitor.body, /href="\/@ana\/signin"/);
+    assert.doesNotMatch(visitor.body, /A bio only/, 'nothing but the handle before sign-in');
+
+    // A newcomer signs in on the page: admitted (open sign-up), back to the page, intro remembered.
+    const newbie = accountIdFor(7);
+    assert.equal(await accounts.forIdentity({ githubId: 7, login: 'Newbie' }), undefined);
+    const done = await signInThrough('/@ana/signin', 'gh-code-newbie');
+    assert.equal(done.status, 302);
+    assert.equal(done.headers.location, '/@ana');
+    const session = cookieOf(done, 'mcportal_account')!;
+    assert.ok((await accounts.forIdentity({ githubId: 7, login: 'Newbie' }))?.id === newbie, 'the account exists now');
+    assert.match((await raw(app.port, { path: '/@ana', headers: { cookie: session } })).body, /offers to follow @ana/);
+    assert.match((await raw(app.port, { path: '/account', headers: { cookie: session } })).body, /Signed-in apps and devices/, 'the same sign-in serves the account page');
+    assert.deepEqual(await social.takeIntros(newbie), { offer: ['ana'], joined: [] });
+    await publicProfiles.set(newbie, { handle: 'newbie' });
+    assert.deepEqual((await social.takeIntros(ana.account.id)).joined, ['newbie'], 'ana hears that someone joined through her link');
+
+    // Your own link, signed in.
+    const own = await signInThrough('/@ana/signin', 'gh-code-ana');
+    assert.match((await raw(app.port, { path: '/@ana', headers: { cookie: cookieOf(own, 'mcportal_account')! } })).body, /This is your Space link/);
+    assert.deepEqual(await social.takeIntros(ana.account.id), { offer: [], joined: [] }, 'an existing account brings nobody new');
+
+    // Suspended: nobody there.
+    await accounts.setStatus(ana.account.id, 'suspended', 'admin');
+    assert.equal((await raw(app.port, { path: '/@ana' })).status, 404);
+  } finally {
+    await app.close();
+  }
+});

@@ -1,6 +1,6 @@
 # Plan: finding people
 
-**Status:** proposed 2026-10-06; phase 1 built 2026-10-06. Builds on the social layer (`src/social.ts`), public profiles (`src/public-profiles.ts`), [reblogs](../explanation/social.md#reblogs) and [the river](../explanation/social.md#the-river). It's the "discovery through people's Spaces" part of the [roadmap](README.md).
+**Status:** proposed 2026-10-06; phases 1 and 2 built 2026-10-06. Builds on the social layer (`src/social.ts`), public profiles (`src/public-profiles.ts`), [reblogs](../explanation/social.md#reblogs) and [the river](../explanation/social.md#the-river). It's the "discovery through people's Spaces" part of the [roadmap](README.md).
 
 ## Where we are
 
@@ -46,13 +46,13 @@ From cheapest to richest. Each one stands on its own.
 - **Built:** a shared link opened from the Following portal keeps a "@ben reblogged @cy's link" line, the notes, and Follow in the article reader.
 - `get_share`, `list_new_items` and `open_space` results already name handles. Server instructions tell the agent it can offer to follow ("Want @ana's posts in your Following portal?") when the user reacts well to something someone shared.
 
-### 2. Space links and invites
+### 2. Space links and invites (built)
 
 - Every Space gets an address: `https://<host>/@ana`. It's `noindex`, and it's the only public URL a person has.
-- **Signed in:** the link opens your room straight onto @ana's Space as a card, with Follow.
-- **Not signed in:** a small page says "@ana is on MCPortal, your liminal webspace", with Sign in with GitHub. After sign-in (and onboarding, for a new account), the room opens on @ana's Space. Nothing else about the person shows before sign-in, matching the privacy page.
-- **This is the invite.** With open sign-up, "invite a friend" just means sharing your Space link. A new account that arrives through it gets offered a follow of the inviter, and the inviter sees "@ben joined through your link" next time they open their Space. Both are offered, never automatic.
-- The toolbar's Your space menu gets **Copy link to your space**.
+- **The room lives in the agent, not in a browser,** so the link is a bridge page (`src/space-links.ts`), not a web room. It shows only the handle until you sign in, matching the privacy page. If you already use MCPortal, it says what to ask your agent ("open @ana's space"). If you're new, it offers Sign in with GitHub and the steps to add MCPortal to your agent.
+- **Signing in on the page leaves a note** (an `intros` relation). The next time your agent opens your room, `open_room` tells it to offer a follow of @ana, and the room shows a strip with **Follow @ana** and **Not now**. A visit while signed in to the account page counts too. Each note is said once, after room setup, so a newcomer meets it in a built room.
+- **This is the invite.** With open sign-up, "invite a friend" just means sharing your Space link. When the link brings a brand-new account, @ana's room says "@ben joined MCPortal through your Space link" once (a `joins` relation). It waits until @ben has claimed a handle, since until then there's no one to name. A block removes both notes.
+- **Copy link to your space** sits in your own Space view, which is one click from the toolbar's Your space. `open_space` gives the agent the link, so "share my space" works in chat.
 
 ### 3. Listing and `find_people`
 

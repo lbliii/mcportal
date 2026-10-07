@@ -14,6 +14,8 @@ Everything is opt-in. A local install in ghost mode has no social layer at all. 
 
 A **Space** is your public page inside MCPortal. It holds a title, a bio, an accent color, "Sources I read" (up to 12 portals from your room that visitors can add with one click), and your posts as a grid. `open_space` shows anyone's Space, or yours, as a card in the chat.
 
+A **Space link** is a Space's address, `/@handle`. The room's Space view copies yours, and `open_space` gives it to the agent. The room lives in the agent, not in a browser, so the link is a bridge page (`src/space-links.ts`) that shows only the handle until you sign in. If you already use MCPortal, it tells you what to ask your agent. If you're new, it lets you sign in with GitHub. Signing in there leaves a one-time note. The next time your agent opens your room, it offers to follow the link's owner, and the room shows a Follow button. If the link brought a new account, its owner's room says so once the newcomer has a handle. Both notes are relations (`intros`, `joins`) stored beside follows. Each is said once, and a block removes both.
+
 A **handle** is how people find you. It's 2 to 30 letters, digits or underscores, unique regardless of case, and suggested from your GitHub login without being tied to it. Words like `admin` and `api` are reserved. A handle you give up is held for 30 days, so nobody can take it to pose as you.
 
 ## Shares

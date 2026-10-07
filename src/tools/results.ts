@@ -10,7 +10,7 @@ import type { Clip, ClipSummary } from '../clips.ts';
 import type { FetchedSource, SourceCandidate } from '../discover.ts';
 import type { Profile, ProfileDiff, SourceSettings } from '../profile.ts';
 import type { FeaturedSource, PublicProfile } from '../public-profiles.ts';
-import type { Reblogger, SharedItem } from '../social.ts';
+import type { Intros, Reblogger, SharedItem } from '../social.ts';
 import type { Handoff } from '../handoffs.ts';
 import type { Candidate, HighlightPick, Lead, RoomEdition } from '../highlights.ts';
 import type { ReadingState } from '../reading.ts';
@@ -35,6 +35,8 @@ export type RoomResult = {
   lead?: Lead;
   /** Labs this server has on (src/labs.ts), so the room can offer them. */
   labs?: string[];
+  /** Space links, said once: people to offer a follow of, and newcomers who joined through the user's link. */
+  intros?: Intros;
 };
 
 /** After a save or unsave: the saved list, the room, and the Saved portal redrawn. */
@@ -60,7 +62,7 @@ export type DocsPageResult = {
 
 /** Someone's space: their public profile, their posts and the sources they recommend. */
 export type SpaceResult = {
-  space: Omit<PublicProfile, 'accountId'> & { mine: boolean; followers: number; following: boolean; posts: SharedItem[]; sources: FeaturedSource[] };
+  space: Omit<PublicProfile, 'accountId'> & { mine: boolean; followers: number; following: boolean; posts: SharedItem[]; sources: FeaturedSource[]; link?: string };
 };
 
 export type ToolResults = {

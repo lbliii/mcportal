@@ -190,7 +190,8 @@
         el('div', { class: 'who' }, [`@${space.handle}`, space.spaceTitle && space.displayName ? space.displayName : null].filter(Boolean).join(' · ')),
         space.bio ? el('p', { class: 'bio' }, space.bio) : null,
         el('div', { class: 'row' }, follow, el('span', null, `${space.followers} follower${space.followers === 1 ? '' : 's'}`), el('span', null, `· ${space.posts.length} post${space.posts.length === 1 ? '' : 's'}`),
-          space.mine ? el('span', null, '· this is what visitors see (followers-only posts show only to followers)') : null)),
+          space.mine ? el('span', null, '· this is what visitors see (followers-only posts show only to followers)') : null),
+        space.mine && space.link ? el('div', { class: 'row' }, el('button', { class: 'btn', type: 'button', onclick: () => copySpaceLink(space.link ?? '') }, icon('share'), ' Copy link to your space')) : null),
       space.sources.length ? el('h2', null, 'Sources I read') : null,
       space.sources.length ? el('div', { class: 'sources' }, sources) : null,
       el('h2', null, 'Posts'),
@@ -294,6 +295,42 @@
       by && share.reblog?.note ? el('p', { class: 'story-note' }, handleButton(by, 'story-note-by'), share.reblog.note) : null,
       item.summary ? el('p', { class: by ? 'story-note' : 'share-note' }, by && author ? handleButton(author, 'story-note-by') : null, item.summary) : null,
       actions);
+  }
+
+  /**
+   * What Space links left for this room, said once (open_room's intros): a Follow for the
+   * people whose link brought the user here, and who joined through the user's own link.
+   * @param {ToolResults['open_room']['intros']} intros
+   */
+  function drawIntros(intros) {
+    document.getElementById('intros')?.remove();
+    if (!intros || (!intros.offer.length && !intros.joined.length)) return;
+    const strip = el('section', { id: 'intros', class: 'intros', 'aria-label': 'From Space links' });
+    for (const handle of intros.offer) {
+      const follow = el('button', { class: 'btn follow', type: 'button', 'aria-pressed': 'false' }, `Follow @${handle}`);
+      const row = el('div', { class: 'intro' }, el('span', null, 'You came in through ', handleButton(handle), "'s Space link."), follow,
+        el('button', { class: 'link-btn', type: 'button', onclick: () => { row.remove(); if (!strip.children.length) strip.remove(); } }, 'Not now'));
+      follow.addEventListener('click', async () => {
+        follow.disabled = true;
+        try {
+          const result = (await callTool('relationship', { handle, action: 'follow' })).structuredContent;
+          follow.setAttribute('aria-pressed', 'true');
+          follow.textContent = `Following @${handle}`;
+          if (result.layoutChanged) void loadRoom();   // the Following portal was just added
+        } catch (error) { toast(errorText(error)); follow.disabled = false; }
+      });
+      strip.append(row);
+    }
+    if (intros.joined.length) {
+      strip.append(el('div', { class: 'intro' }, el('span', null, ...intros.joined.flatMap((h, i) => [i ? ', ' : '', handleButton(h)]), ` joined MCPortal through your Space link.`)));
+    }
+    $('grid').before(strip);
+  }
+
+  /** Copy a Space's link; where the clipboard is off limits, show it to copy by hand. @param {string} link */
+  async function copySpaceLink(link) {
+    try { await navigator.clipboard.writeText(link); toast('Copied your Space link. Anyone who signs in through it is offered a follow of you.'); }
+    catch { toast(`Your Space link: ${link}`); }
   }
 
   // ------------------------------------------------------------ shares

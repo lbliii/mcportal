@@ -12,6 +12,7 @@
  *   GET  /download/<token>         a one-time link from the export_data tool (15 minutes)
  *   GET  /upload/<token>           a one-time link from import_portal: pick a file (15 minutes)
  *   POST /upload/<token>
+ *   GET  /@<handle>, /@<handle>/signin   a Space link (src/space-links.ts)
  *
  * Uploads go from the browser straight to the server, so an export of any size
  * (up to the clip caps) never has to pass through the model.
@@ -31,6 +32,7 @@ import { page } from './page.ts';
 import { PageSessions, type PageSession } from './page-sessions.ts';
 import { buildExport, describeImport, EXPORT_FORMATS, importExport, parseExport, type ExportFile, type ExportFormat } from './portability.ts';
 import type { PublicProfiles } from './public-profiles.ts';
+import { SpaceLinks } from './space-links.ts';
 import type { Social } from './social.ts';
 import type { EditionStore } from './editions.ts';
 import type { HandoffStore } from './handoffs.ts';
@@ -194,6 +196,8 @@ export async function deleteAccountData(accountId: string, deps: DeletionDeps, b
 
 export class AccountPage {
   private sessions: PageSessions;
+  /** /@handle pages, sharing these sessions (src/space-links.ts). */
+  private spaceLinks?: SpaceLinks;
   private downloads = new Map<string, { userId: string; format: ExportFormat; sessionKey?: string; expiresAt: number }>();
   private uploads = new Map<string, { userId: string; sessionKey?: string; expiresAt: number }>();
   private deps: AccountDeps;
@@ -203,6 +207,9 @@ export class AccountPage {
     this.deps = deps;
     this.now = deps.now ?? Date.now;
     this.sessions = new PageSessions('account', { publicUrl: deps.publicUrl, ttlMs: SESSION_MS, max: MAX_ENTRIES, now: this.now });
+    if (deps.publicProfiles && deps.social) {
+      this.spaceLinks = new SpaceLinks({ accounts: deps.accounts, oauth: deps.oauth, publicProfiles: deps.publicProfiles, social: deps.social, sessions: this.sessions, publicUrl: deps.publicUrl, log: deps.log });
+    }
   }
 
   get url(): string {
@@ -281,6 +288,7 @@ export class AccountPage {
   /** Returns true if it handled the request. */
   async handle(req: IncomingMessage, res: ServerResponse, url: URL): Promise<boolean> {
     const route = url.pathname.replace(/\/+$/, '') || '/';
+    if (this.spaceLinks && (await this.spaceLinks.handle(req, res, url))) return true;
 
     const token = route.match(/^\/download\/([A-Za-z0-9_-]{20,64})$/)?.[1];
     if (route.startsWith('/download/') && req.method === 'GET') {

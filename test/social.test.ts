@@ -161,6 +161,41 @@ test("canFollow: one share names the people on it the viewer doesn't follow yet:
   assert.equal((await social.feed('d'))[0]!.canFollow, undefined, 'only get says it, not every feed item');
 });
 
+test('space links: an intro is offered once, a newcomer is announced once they have a handle, and blocks clear both', async () => {
+  const { social, profiles, suspended, ctx } = await world();
+  assert.equal(await social.introduce('a', 'alice', false), 'self', 'your own link');
+  assert.equal(await social.introduce('d', 'alice', true), 'offered', 'dave is new, and has no handle yet');
+  assert.deepEqual(await social.takeIntros('d'), { offer: ['alice'], joined: [] });
+  assert.deepEqual(await social.takeIntros('d'), { offer: [], joined: [] }, 'said once');
+  assert.deepEqual((await social.takeIntros('a')).joined, [], 'no handle yet: nobody to name, so it waits');
+  await profiles.set('d', { handle: 'dave' });
+  assert.deepEqual(await social.takeIntros('a'), { offer: [], joined: ['dave'] }, 'once dave claims a handle, alice hears');
+  assert.deepEqual((await social.takeIntros('a')).joined, []);
+
+  await social.follow('b', 'alice');
+  assert.equal(await social.introduce('b', 'alice', false), 'following', 'nothing to offer someone who follows them');
+  assert.deepEqual((await social.takeIntros('b')).offer, []);
+
+  await social.introduce('c', 'bob', true);
+  await social.block('b', 'carol', true);
+  assert.deepEqual(await social.takeIntros('c'), { offer: [], joined: [] }, 'a block clears the offer');
+  assert.deepEqual((await social.takeIntros('b')).joined, [], "and bob isn't told carol joined");
+  await assert.rejects(social.introduce('c', 'bob', false), /No MCPortal profile/, 'a block hides the link both ways');
+
+  await social.introduce('d', 'carol', false);
+  suspended.add('c');
+  assert.deepEqual((await social.takeIntros('d')).offer, [], 'a suspended account is never offered');
+  await assert.rejects(social.introduce('d', 'carol', false), /No MCPortal profile/);
+  suspended.clear();
+
+  // open_room says it once, to the agent and the room, after setup.
+  await social.introduce('d', 'carol', false);
+  const first = await call(ctx('d'), 'open_room');
+  assert.deepEqual(first.structuredContent.intros, { offer: ['carol'], joined: [] });
+  assert.match(first.content[0]!.text, /came in through @carol's Space link: offer to follow/);
+  assert.equal((await call(ctx('d'), 'open_room')).structuredContent.intros, undefined);
+});
+
 test('reblogs: a removed or detached original leaves a tombstone; blocks and mutes hide reblogs', async () => {
   const { social, suspended } = await world();
   const gone = await social.share('a', { ...link('gone'), note: 'soon gone' });
