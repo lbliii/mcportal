@@ -13,7 +13,11 @@
   --mp-control-touch: 44px;
   --mp-duration-fast: 150ms;
   --mp-duration-feedback: 200ms;
+  --mp-duration-register: 900ms;
+  --mp-duration-swing: 1300ms;
+  --mp-ease-press: cubic-bezier(.2, .9, .3, 1);
   --mp-ease-standard: ease-out;
+  --mp-ease-swing: cubic-bezier(.65, 0, .35, 1);
   --mp-font-heading: "MCPortal Jost", Jost, Futura, sans-serif;
   --mp-font-mono: ui-monospace, "SF Mono", Menlo, monospace;
   --mp-font-ui: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;

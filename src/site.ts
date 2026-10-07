@@ -8,6 +8,7 @@ import { DESIGN_CSS, PRIMITIVES_CSS } from './design/generated.ts';
  * The privacy policy describes what this software stores and sends. It applies to
  * whoever runs the server; MCPORTAL_OPERATOR names them on the pages.
  */
+import { readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import type { ServerResponse } from 'node:http';
 import { fileURLToPath } from 'node:url';
@@ -18,6 +19,8 @@ const POLICY_UPDATED = '2026-10-03';   // bump when what's stored changes
 const TERMS_UPDATED = '2026-10-02';    // bump when the terms change (and announce material changes first)
 const IMAGE_DIR = fileURLToPath(new URL('./site/', import.meta.url));
 const TAGLINE = 'Your liminal webspace.';
+/** The hero's night sky, drawn by scripts/brand.ts with class hooks for the opening below. */
+const HERO_ART = readFileSync(new URL('../brand/hero.svg', import.meta.url), 'utf8').trim();
 const DESCRIPTION = 'MCPortal is a reading room that lives in your agent: the sites, feeds, channels, repos and docs you follow, one door away.';
 
 /** Every file served from src/site, by URL path. Nothing else in that folder is reachable. */
@@ -28,7 +31,6 @@ const FILES: Record<string, { file: string; type: string; maxAge: number }> = {
   '/site/chat-reblog.png': { file: 'chat-reblog.png', type: 'image/png', maxAge: 86_400 },
   '/site/og.png': { file: 'og.png', type: 'image/png', maxAge: 86_400 },
   '/site/lockup-on-dark.svg': { file: 'lockup-on-dark.svg', type: 'image/svg+xml', maxAge: 86_400 },
-  '/site/hero.svg': { file: 'hero.svg', type: 'image/svg+xml', maxAge: 86_400 },
   '/site/jost-bold.ttf': { file: 'jost-bold.ttf', type: 'font/ttf', maxAge: 604_800 },
   '/site/icon-512.png': { file: 'icon-512.png', type: 'image/png', maxAge: 86_400 },
   '/favicon.ico': { file: 'favicon.ico', type: 'image/x-icon', maxAge: 86_400 },
@@ -60,6 +62,61 @@ const HEADERS = {
 };
 
 /**
+ * The landing page in motion, all CSS (the pages run no scripts). The headline carries a teal
+ * keyline plate a few pixels off register. On load the hero's layers land like printing plates,
+ * the orbit draws itself and the door swings open on the moon (the hooks are classes in
+ * brand/hero.svg). Below, each screenshot develops out of a coarse halftone as it scrolls in,
+ * its colour block sliding out behind it; heading rules print in and step numbers stamp down.
+ * Scroll effects run only where the browser has scroll timelines; everywhere else, and with
+ * reduced motion, the page is simply in its finished state.
+ */
+const MOTION_CSS = `
+@supports (content:"a"/""){
+  .hero h1::after{content:attr(data-text)/"";position:absolute;inset:0;color:transparent;-webkit-text-stroke:1.5px var(--mp-brand-teal);opacity:.7;pointer-events:none;transform:translate(4px,-3px);transition:transform 600ms var(--mp-ease-press)}
+  .hero h1:hover::after{transform:translate(9px,-6px)}
+}
+@media (forced-colors:active){.hero h1::after{display:none}}
+@media (prefers-reduced-motion:no-preference){
+  .hero h1,.hero .lede,.hero .cta{animation:ink-in var(--mp-duration-register) var(--mp-ease-press) both}
+  .hero .lede{animation-delay:120ms}.hero .cta{animation-delay:220ms}
+  .hero h1::after{animation:plate-type var(--mp-duration-register) var(--mp-ease-press) 350ms both}
+  .hero .planet{animation:plate-planet var(--mp-duration-swing) var(--mp-ease-press) both}
+  .hero .door{animation:plate-door var(--mp-duration-register) var(--mp-ease-press) 100ms both}
+  .hero .keyline{animation:plate-keyline var(--mp-duration-register) var(--mp-ease-press) 500ms both}
+  .hero .orbit{stroke-dasharray:1 1;animation:draw var(--mp-duration-swing) var(--mp-ease-swing) 300ms both}
+  .hero .orbit-front{animation-delay:700ms}
+  .hero .leaf{transform-box:fill-box;transform-origin:0 50%;animation:swing-open var(--mp-duration-swing) var(--mp-ease-swing) 900ms both}
+  .hero .moon{animation:rise var(--mp-duration-register) var(--mp-ease-press) 1300ms both}
+  .hero .stars{animation:twinkle 6s ease-in-out infinite}.hero .stars-2{animation-delay:-2s}.hero .stars-3{animation:twinkle 7.5s ease-in-out -4s infinite}
+  @keyframes ink-in{from{opacity:0;transform:translateY(8px)}}
+  @keyframes plate-type{from{opacity:0;transform:translate(22px,-16px)}}
+  @keyframes plate-planet{from{opacity:0;transform:translate(-16px,10px)}}
+  @keyframes plate-door{from{opacity:0;transform:translate(18px,-12px)}}
+  @keyframes plate-keyline{from{opacity:0;transform:translate(40px,-28px)}}
+  @keyframes draw{from{stroke-dashoffset:1}to{stroke-dashoffset:0}}
+  @keyframes swing-open{from{opacity:1;transform:scaleX(1)}to{opacity:1;transform:scaleX(.06)}}
+  @keyframes rise{from{opacity:0;transform:translateY(46px)}}
+  @keyframes twinkle{50%{opacity:.4}}
+  @supports (animation-timeline:view()){
+    /* The first screenshot is at the fold on arrival, so it's already printed. */
+    figure:not(:first-child) .print,figure:not(:first-child) img,figure:not(:first-child) .print::after{animation-timing-function:linear;animation-fill-mode:both;animation-timeline:view();animation-range:entry 0% entry 160px}
+    figure .print{animation-name:plate-teal}figure.alt .print{animation-name:plate-mustard}figure.alt2 .print{animation-name:plate-brick}
+    figure img{animation-name:develop-image}
+    figure .print::after{content:"";position:absolute;inset:0;border-radius:calc(var(--mp-radius-card) - 2px);pointer-events:none;opacity:0;background:radial-gradient(circle,var(--mp-brand-ink) 46%,transparent 48%) 0 0/4px 4px;animation-name:develop}
+    h2::before{animation:print-rule steps(13,end) both;animation-timeline:view();animation-range:cover 0% cover 12%}
+    ol.steps li::before{animation:stamp linear both;animation-timeline:view();animation-range:cover 0% cover 14%}
+    @keyframes plate-teal{from{box-shadow:0 0 0 var(--mp-brand-teal)}}
+    @keyframes plate-mustard{from{box-shadow:0 0 0 var(--mp-brand-mustard)}}
+    @keyframes plate-brick{from{box-shadow:0 0 0 var(--mp-brand-brick)}}
+    @keyframes develop{from{opacity:.85;background-size:12px 12px}to{opacity:0;background-size:4px 4px}}
+    @keyframes develop-image{from{filter:contrast(1.6) grayscale(.6) brightness(1.05)}to{filter:none}}
+    @keyframes print-rule{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0)}}
+    @keyframes stamp{0%{transform:scale(1.5) rotate(-12deg)}60%{transform:scale(.94)}100%{transform:none}}
+  }
+}
+`;
+
+/**
  * The house style: a mid-century paperback. A night-sky band on top (dark in both schemes),
  * cream paper below (ink in dark mode), Jost for headings, halftone rules, and pictures
  * printed with an off-register block of colour behind them. Colours are brand/README.md's.
@@ -85,9 +142,9 @@ nav a.to{color:#D4C8AF;text-decoration:none}nav a.to:hover{color:var(--mp-brand-
 nav .brand{margin-right:auto;display:flex}@media (max-width:520px){nav{gap:18px}}nav .brand img{height:30px;width:auto;display:block}
 .sky .title{max-width:780px;position:relative;padding-top:24px;padding-bottom:56px}
 .sky .title h1{margin:0}
-.hero .art{display:block;width:100%;height:320px;object-fit:cover;object-position:100% 100%}
+.hero .art{display:block;width:100%;height:320px}
 .hero .pitch{position:relative;z-index:1;padding-top:24px;padding-bottom:40px}
-.hero h1{font-size:clamp(44px,7vw,76px);line-height:1}
+.hero h1{position:relative;font-size:clamp(44px,7vw,76px);line-height:1}
 .hero h1 span{color:var(--mp-brand-mustard)}
 .hero .lede{font-size:var(--mp-type-19);color:#DDD1B9;max-width:520px;margin:0 0 26px}
 .cta{display:flex;flex-wrap:wrap;align-items:center;gap:22px;font-size:16px}
@@ -101,8 +158,9 @@ nav .brand{margin-right:auto;display:flex}@media (max-width:520px){nav{gap:18px}
 .lede{font-size:var(--mp-type-19)}.muted{color:var(--mp-text-secondary);font-size:var(--mp-type-15)}
 code{background:var(--mp-surface-inset);padding:1px 6px;border-radius:4px;word-break:break-all;font-size:var(--mp-type-15)}
 figure{margin:40px 0}
-figure img{display:block;width:100%;height:auto;border:2px solid var(--mp-web-frame);border-radius:var(--mp-radius-card);box-shadow:9px 9px 0 var(--mp-brand-teal)}
-figure.alt img{box-shadow:9px 9px 0 var(--mp-brand-mustard)}figure.alt2 img{box-shadow:9px 9px 0 var(--mp-brand-brick)}
+figure .print{display:block;position:relative;border:2px solid var(--mp-web-frame);border-radius:var(--mp-radius-card);box-shadow:9px 9px 0 var(--mp-brand-teal)}
+figure img{display:block;width:100%;height:auto;border-radius:calc(var(--mp-radius-card) - 2px)}
+figure.alt .print{box-shadow:9px 9px 0 var(--mp-brand-mustard)}figure.alt2 .print{box-shadow:9px 9px 0 var(--mp-brand-brick)}
 figcaption{color:var(--mp-text-secondary);font-size:var(--mp-type-15);margin-top:16px}
 ol.steps{list-style:none;padding:0;margin:24px 0;counter-reset:step}
 ol.steps li{counter-increment:step;position:relative;padding-left:58px;margin:0 0 22px;min-height:40px}
@@ -116,6 +174,7 @@ footer{background:var(--mp-web-night);color:#D4C8AF;font-size:var(--mp-type-15)}
 footer .wrap{display:flex;flex-wrap:wrap;align-items:center;gap:8px 24px;padding-top:28px;padding-bottom:28px}
 footer .tag{margin-right:auto;color:var(--mp-brand-paper);font-size:17px}
 footer a{color:var(--mp-brand-paper)}
+${MOTION_CSS}
 ${PRIMITIVES_CSS}
 body{background:var(--mp-web-canvas);color:var(--mp-web-text);line-height:var(--mp-reader-line)}
 `;
@@ -137,7 +196,7 @@ function layout(title: string, head: string, body: string, site: SiteConfig, her
 <style>${STYLE}</style></head><body>
 <header class="sky${hero ? ' hero' : ''}">
 <nav class="wrap"><a class="brand" href="/"><picture><source media="(max-width:520px)" srcset="/favicon.svg" width="30" height="30"><img src="/site/lockup-on-dark.svg" alt="MCPortal" width="148" height="30"></picture></a><a class="to" href="/privacy">Privacy</a><a class="to" href="/support">Support</a><a class="to" href="/account">Account</a></nav>
-${head}${hero ? '\n<img class="art" src="/site/hero.svg" alt="" width="1500" height="640">' : ''}
+${head}${hero ? `\n${HERO_ART}` : ''}
 </header>
 <main class="wrap">${body}</main>
 <footer><div class="wrap"><span class="tag jost">${TAGLINE}</span>${by}<a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/security">Security</a><a href="/support">Support</a>${site.sourceUrl ? `<a href="${escapeHtml(site.sourceUrl)}">Source</a>` : ''}</div></footer>
@@ -154,11 +213,11 @@ function landing(site: SiteConfig): string {
     : '<p>Anyone with a GitHub account can sign in.</p>';
   return layout(`MCPortal: ${TAGLINE}`, `
 <div class="wrap pitch">
-<h1>Your liminal <span>webspace.</span></h1>
+<h1 data-text="Your liminal webspace.">Your liminal <span>webspace.</span></h1>
 <p class="lede">A door between your agent and everything you read. Ask for the sites, feeds, subreddits, channels, repos and docs you follow, and they open right in the chat, where you can read them, save them and talk about them.</p>
 <p class="cta"><a class="button" href="#get-it">Get it</a><a href="#how">How it works</a></p>
 </div>`, `
-<figure><img src="/site/chat-room.png" alt="A chat. The person asks for developer news with GitHub on the left and Julia Evans's blog next to it. The agent calls build_room, find_source, add_portal, arrange_room and open_room, and the room appears in the chat: the GitHub Blog, Julia Evans and Lobsters in columns." width="1600" height="1259"><figcaption>You ask in plain words. Your agent builds the room, and it opens in the chat.</figcaption></figure>
+<figure><span class="print"><img src="/site/chat-room.png" alt="A chat. The person asks for developer news with GitHub on the left and Julia Evans's blog next to it. The agent calls build_room, find_source, add_portal, arrange_room and open_room, and the room appears in the chat: the GitHub Blog, Julia Evans and Lobsters in columns." width="1600" height="1259"></span><figcaption>You ask in plain words. Your agent builds the room, and it opens in the chat.</figcaption></figure>
 
 <h2 id="how">How it works</h2>
 <ol class="steps">
@@ -166,15 +225,15 @@ function landing(site: SiteConfig): string {
   <li><b>Arrange it by talking.</b> “Put GitHub on the left.” “Make the blog wider.” “Show it as a river.” Starter packs fill a new room in seconds, and OPML import brings your subscriptions over from another reader.</li>
   <li><b>Read, ask and keep.</b> Stories open in a clean reader view with no ads, and your agent can read them with you. Save links for later. Say “clip that” to keep a quote, a table or part of the conversation, and find it again in any later chat.</li>
 </ol>
-<figure class="alt2"><img src="/site/chat-reader.png" alt="A chat. The person asks what to take from Julia Evans's post on running SQLite and to clip it. The post is open in the reader view in the chat, and the agent answers: run ANALYZE, and says it clipped the quote." width="1600" height="1323"><figcaption>Reader view in the chat: the article, your question, and a clip to keep.</figcaption></figure>
+<figure class="alt2"><span class="print"><img src="/site/chat-reader.png" alt="A chat. The person asks what to take from Julia Evans's post on running SQLite and to clip it. The post is open in the reader view in the chat, and the agent answers: run ANALYZE, and says it clipped the quote." width="1600" height="1323"></span><figcaption>Reader view in the chat: the article, your question, and a clip to keep.</figcaption></figure>
 
 <h2>Read the docs you work with</h2>
 <p>Give MCPortal a GitHub repo, a docs site or an <code>llms.txt</code>, and it opens the docs as a book: contents and search on the left, the page beside them. It reads a repo's markdown folder as it is, and uses the site's own index (<code>llms.txt</code>, Sphinx inventories, sitemaps) where there is one. Your agent reads the same pages you do, so you can ask about the page in front of you and get answers from the docs rather than from memory.</p>
-<figure><img src="/site/chat-docs.png" alt="A chat. The person asks to open the uv docs and explain workspaces. The agent calls open_docs and read_doc_page, and the uv docs from GitHub open in the chat, contents on the left and Using workspaces on the right. The agent answers from the page." width="1600" height="1395"><figcaption>The uv docs, read straight from the repo on GitHub.</figcaption></figure>
+<figure><span class="print"><img src="/site/chat-docs.png" alt="A chat. The person asks to open the uv docs and explain workspaces. The agent calls open_docs and read_doc_page, and the uv docs from GitHub open in the chat, contents on the left and Using workspaces on the right. The agent answers from the page." width="1600" height="1395"></span><figcaption>The uv docs, read straight from the repo on GitHub.</figcaption></figure>
 
 <h2>Share what you read</h2>
 <p>Sign in and you get a Space: a public page of what you choose to share, with your note on each post. Follow other readers and their posts arrive in your room. Reblog a post with your own note and it stays credited to the person who posted it. When you want more people to follow, your agent can suggest readers who share your sources and topics, and say why.</p>
-<figure class="alt"><img src="/site/chat-reblog.png" alt="A chat. The person asks what the people they follow are sharing and to reblog Ana's post with a note. The room shows the river: @ana's shared Hacker News story with her note, now marked Reblogged, then a post by @dee that reblogged @cy." width="1600" height="1363"><figcaption>The river: your feeds and the people you follow, in one stream.</figcaption></figure>
+<figure class="alt"><span class="print"><img src="/site/chat-reblog.png" alt="A chat. The person asks what the people they follow are sharing and to reblog Ana's post with a note. The room shows the river: @ana's shared Hacker News story with her note, now marked Reblogged, then a post by @dee that reblogged @cy." width="1600" height="1363"></span><figcaption>The river: your feeds and the people you follow, in one stream.</figcaption></figure>
 
 <h2>Private by design</h2>
 <p>MCPortal fetches feeds and pictures on its server, so the sites you read don't see you until you open the original. There are no ads, trackers or analytics. Sign-in is through GitHub, and from GitHub MCPortal keeps only your user ID and login. Your layout, sources, saved items and clips are yours: export them any time in open formats, or delete your account yourself. Details are in the <a href="/privacy">privacy policy</a>.</p>
