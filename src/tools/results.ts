@@ -9,7 +9,8 @@ import type { DocHit, DocPage, DocPageRef, DocSection, DocsToc } from '../adapte
 import type { Clip, ClipSummary } from '../clips.ts';
 import type { FetchedSource, SourceCandidate } from '../discover.ts';
 import type { Profile, ProfileDiff, SourceSettings } from '../profile.ts';
-import type { FeaturedSource, PublicProfile } from '../public-profiles.ts';
+import type { PublicProfile } from '../public-profiles.ts';
+import type { SpaceSections } from '../space.ts';
 import type { Reblogger, SharedItem } from '../social.ts';
 import type { Handoff } from '../handoffs.ts';
 import type { Candidate, HighlightPick, Lead, RoomEdition } from '../highlights.ts';
@@ -60,7 +61,7 @@ export type DocsPageResult = {
 
 /** Someone's space: their public profile, their posts and the sources they recommend. */
 export type SpaceResult = {
-  space: Omit<PublicProfile, 'accountId'> & { mine: boolean; followers: number; following: boolean; posts: SharedItem[]; sources: FeaturedSource[] };
+  space: Omit<PublicProfile, 'accountId' | 'sources'> & { mine: boolean; followers: number; following: boolean; posts: SharedItem[]; sectionPreview?: SpaceSections } & SpaceSections;
 };
 
 export type ToolResults = {

@@ -466,3 +466,14 @@
     .packs { grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr)); }
   }
   @container (max-width: 1080px) and (min-width: 761px) { .docs-grid { grid-template-columns: 220px minmax(0, 1fr); } .docs-otp { display: none; } }
+
+/* Space lists grow from opted-in activity; curation remains optional. */
+.space-section-settings { margin: 0 0 var(--mp-space-16); padding: var(--mp-space-12); border: 1px solid var(--mp-border-control); border-radius: 8px; }
+.space-visibility { display: flex; align-items: center; gap: var(--mp-space-8); font-weight: var(--mp-weight-strong); }
+.space-visibility input { accent-color: var(--mp-space-accent); }
+.space-section-preview { margin-top: var(--mp-space-10); }
+.space-section-preview .btn { margin: var(--mp-space-4) var(--mp-space-8) var(--mp-space-4) 0; }
+.space-curation summary { cursor: pointer; }
+.space-curation-entry { display: flex; align-items: center; flex-wrap: wrap; gap: var(--mp-space-6); margin: var(--mp-space-8) 0; }
+.space-curation-entry > span { flex: 1 1 180px; overflow-wrap: anywhere; }
+.space-pin { margin-left: var(--mp-space-8); font-size: var(--mp-type-11-5); color: var(--mp-space-accent); }

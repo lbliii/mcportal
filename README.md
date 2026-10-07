@@ -161,11 +161,11 @@ The `/preview` page never contains secrets. With a static token it asks for the 
 | `search_clips` | model | Find clips by words, kind or tag, newest first |
 | `get_clip` | model + app | One clip in full; renders as its own clip card |
 | `update_clip` / `delete_clip` | model | Change a clip's title, note or tags, or delete it |
-| `get_public_profile` / `set_public_profile` / `remove_public_profile` | model | Your opt-in public profile and space (handle, name, bio, space title, accent, featured sources), or someone else's by handle. Hosted only |
+| `get_public_profile` / `set_public_profile` / `remove_public_profile` | model | Your opt-in public profile and space (handle, name, bio, space title, accent, opt-in sources/follows and optional pins/order/hides), or someone else's by handle. Hosted only |
 | `export_data` | model | Everything as an MCPortal export, saved items as bookmarks, clips as Markdown, or sources as OPML: a one-time download link (hosted) or a file (local) |
 | `import_portal` | model | Add an MCPortal export to the room; only adds. Hosted: returns a one-time upload link, so the file never passes through the model (up to 60 MB). Local: reads a `.json` path |
 | `account_settings` | model | Link to `/account`, where people download everything or delete their account (never a tool) |
-| `open_space` | model + app | Someone's space (or yours): title, bio, Follow, "Sources I read" (one-click add) and their posts as a grid; renders as a card |
+| `open_space` | model + app | Someone's space (or yours): title, bio, Follow, "Sources I read" (one-click add), "Fellow travelers" and their posts as a grid; owners preview automatic sections before enabling them; renders as a card |
 | `share` / `unshare` | model | Share a saved link or clip with a note, or reblog someone's post (`reblogOf`), to followers (default) or everyone on MCPortal; needs a public profile. `unshare` also undoes a reblog |
 | `get_share` | model + app | One share or reblog in full, with who reblogged it; renders as a card |
 | `share_settings` | model | Who may reblog one of your posts (anyone, followers, nobody), or remove it from someone's reblog of it |
@@ -173,6 +173,10 @@ The `/preview` page never contains secrets. With a static token it asks for the 
 | `relationship` | model | Follow, unfollow, mute, unmute, block, unblock by handle; the first follow adds a Following portal |
 | `list_connections` | model | Who you follow, mute and block; your follower count |
 | `report` | model | Report a share or person to the admins (they hide shares or suspend accounts on `/admin`) |
+
+Space's **Sources I read** and **Fellow travelers** can grow from room subscriptions and MCPortal follows. Automatic lists stay private until the owner previews and enables each section in their Space. Existing featured sources keep their order and appear first; changing a profile never opts anyone in. Pins, order and hidden entries are optional preferences, independent of subscriptions and follows. Enabled sections update when the Space is next opened.
+
+Automatic sources include Hacker News, public RSS/Atom feeds and GitHub sources. Feeds and named repositories are checked without authentication; private integrations, saved items, clips, docs portals, local addresses, credentials and unrecognized query or opaque secret URLs are excluded. Recognized public feed selectors (including YouTube channel/playlist feeds) are supported. Availability checks are cached for one minute; unavailable feeds or repositories can temporarily disappear. Public accessibility checks cannot reliably distinguish every secret URL, so the owner preview is part of enabling the section. People who go private, are suspended or are blocked by the viewer are excluded. Curation survives layout/limit changes, handle changes, visibility changes and temporary unfollows.
 
 Limits: 8 columns, 4 portals per column, 30 items per portal, 200 saved items, 350 KB per picture. Clips: 32 KB of text, 500 KB per image, tables up to 50 × 500, and 1,000 clips or 50 MB per user. Freshness: HN 2 min, GitHub 5 min, RSS 10 min, reader 1 h, pictures 1 day.
 

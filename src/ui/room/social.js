@@ -152,6 +152,91 @@
     return [top, el('div', { class: 'pc' }, reblogged, body, post.note ? el('p', { class: 'pn' }, post.note) : null, el('div', { class: 'pm' }, meta.join(' · ')))];
   }
 
+  /** Owner-only preferences and a preview before turning private activity into a public list.
+   * @param {Space} space @param {'sources' | 'people'} section @param {boolean} withBack @param {(e: MouseEvent) => void} [back]
+   */
+  function spaceSectionSettings(space, section, withBack, back) {
+    const sources = section === 'sources';
+    const setting = sources ? 'showSources' : 'showPeople';
+    const curationKey = sources ? 'sourceCuration' : 'peopleCuration';
+    const candidates = space.sectionPreview?.[section] ?? [];
+    const label = sources ? 'Show sources I follow on my Space' : 'Show people I follow on my Space';
+    const saved = space[curationKey] ?? { pinned: candidates.filter((entry) => entry.pinned).map((entry) => entry.key), order: [], hidden: [] };
+    const enabled = space[setting] === true;
+    const visibleCandidates = candidates.filter((entry) => !saved.hidden.includes(entry.key));
+    const preview = el('div', { class: 'space-section-preview', hidden: true });
+    const toggle = el('input', { type: 'checkbox', checked: enabled, 'aria-label': label });
+    const box = el('div', { class: 'space-section-settings' });
+    /** @param {Record<string, unknown>} patch */
+    async function save(patch) {
+      const wasOpen = box.querySelector('details')?.open;
+      const scroll = $('reader').scrollTop;
+      const focus = document.activeElement?.getAttribute('aria-label');
+      const alternateFocus = focus?.startsWith('Pin ') ? focus.replace(/^Pin /, 'Unpin ')
+        : focus?.startsWith('Unpin ') ? focus.replace(/^Unpin /, 'Pin ')
+        : focus?.startsWith('Hide ') ? focus.replace(/^Hide /, 'Show ')
+        : focus?.startsWith('Show ') ? focus.replace(/^Show /, 'Hide ') : focus;
+      box.querySelectorAll('button, input').forEach((node) => node.setAttribute('disabled', ''));
+      try {
+        await callTool('set_public_profile', patch);
+        const next = (await callTool('open_space')).structuredContent.space;
+        showSpace(next, withBack, back);
+        const settings = [...$('reader').querySelectorAll('.space-section-settings')][sources ? 0 : 1];
+        const details = settings?.querySelector('details');
+        if (details) details.open = Boolean(wasOpen);
+        $('reader').scrollTop = scroll;
+        if (focus) for (const node of settings?.querySelectorAll('button, input') ?? []) {
+          if (node instanceof HTMLElement && (node.getAttribute('aria-label') === focus || node.getAttribute('aria-label') === alternateFocus)) { node.focus({ preventScroll: true }); break; }
+        }
+      } catch (error) {
+        toast(errorText(error)); toggle.checked = enabled;
+        box.querySelectorAll('button, input').forEach((node) => node.removeAttribute('disabled'));
+      }
+    }
+    toggle.addEventListener('change', () => {
+      if (!toggle.checked) { preview.hidden = true; if (enabled) save({ [setting]: false }); return; }
+      preview.hidden = false;
+      preview.replaceChildren(el('p', null, 'Preview — visible to signed-in MCPortal users after you enable this section.'),
+        visibleCandidates.length ? el('ul', null, visibleCandidates.map((entry) => el('li', null,
+          'title' in entry ? entry.title : `@${entry.handle}`))) : el('p', null, sources ? 'No eligible public sources yet. Add a public feed to your room and it will appear automatically.' : 'No people followed yet. Follow someone on MCPortal and they will appear automatically.'),
+        el('button', { class: 'btn', onclick: () => save({ [setting]: true }) }, sources ? 'Show these sources on my Space' : 'Show these people on my Space'),
+        el('button', { class: 'btn', onclick: () => { preview.hidden = true; toggle.checked = enabled; } }, 'Cancel'));
+    });
+    /** @param {string} key @param {'pinned' | 'hidden'} field */
+    function flip(key, field) {
+      const list = saved[field];
+      return save({ [curationKey]: { ...saved, [field]: list.includes(key) ? list.filter((value) => value !== key) : [...list, key] } });
+    }
+    /** @param {string} key @param {number} direction */
+    function move(key, direction) {
+      const pinned = saved.pinned.includes(key);
+      const keys = candidates.filter((entry) => saved.pinned.includes(entry.key) === pinned).map((entry) => entry.key);
+      const at = keys.indexOf(key), to = at + direction;
+      if (to < 0 || to >= keys.length) return;
+      [keys[at], keys[to]] = [keys[to], keys[at]];
+      save({ [curationKey]: { ...saved, [pinned ? 'pinned' : 'order']: keys } });
+    }
+    const personal = el('details', { class: 'space-curation' }, el('summary', null, 'Personalize this section (optional)'),
+      el('p', null, 'Pinned entries appear first. Hide entries here without unfollowing them. Other entries update automatically.'),
+      candidates.map((entry) => {
+        const hidden = saved.hidden.includes(entry.key), pinned = saved.pinned.includes(entry.key);
+        const peers = candidates.filter((candidate) => saved.pinned.includes(candidate.key) === pinned);
+        const at = peers.findIndex((candidate) => candidate.key === entry.key);
+        const title = 'title' in entry ? entry.title : `@${entry.handle}`;
+        return el('div', { class: 'space-curation-entry' }, el('span', null, `${title}${hidden ? ' (hidden)' : ''}`),
+          el('button', { class: 'btn', 'aria-label': `${pinned ? 'Unpin' : 'Pin'} ${title}`, onclick: () => flip(entry.key, 'pinned') }, pinned ? 'Unpin' : 'Pin'),
+          el('button', { class: 'btn', 'aria-label': `${hidden ? 'Show' : 'Hide'} ${title}`, onclick: () => flip(entry.key, 'hidden') }, hidden ? 'Show' : 'Hide'),
+          el('button', { class: 'btn', disabled: at === 0, 'aria-label': `Move ${title} up`, onclick: () => move(entry.key, -1) }, '↑'),
+          el('button', { class: 'btn', disabled: at === peers.length - 1, 'aria-label': `Move ${title} down`, onclick: () => move(entry.key, 1) }, '↓'));
+      }));
+    box.append(el('label', { class: 'space-visibility' }, toggle, label),
+      el('p', { class: 'byline' }, enabled ? 'Updates automatically as you follow and unfollow.' : sources
+        ? space.showSources === false ? 'This section is hidden. Preview sources from your room to show it again; your recommendations and curation are kept.'
+          : 'Room subscriptions are private. Preview eligible public sources before showing them here. Existing recommendations stay visible until you hide them.'
+        : 'Your following list stays private until you choose to show it here.'), preview, personal);
+    return box;
+  }
+
   /** @param {Space} space @param {boolean} withBack @param {(e: MouseEvent) => void} [back] */
   function spaceNodes(space, withBack, back) {
     const name = space.spaceTitle || space.displayName || `@${space.handle}`;
@@ -181,7 +266,7 @@
       });
       // An rss source carries an rss config: normalizeFeatured pairs them.
       return el('div', { class: 'source' }, el('span', { class: 'dot', style: `background:${loneColor(src.source, src.config)}` }),
-        el('div', { class: 'st' }, el('div', null, src.title), el('div', null, src.source === 'rss' ? (() => { try { return new URL(/** @type {Extract<PortalSpec, { source: 'rss' }>['config']} */ (src.config).url).hostname.replace(/^www\./, ''); } catch { return 'feed'; } })() : src.source === 'hn' ? 'Hacker News' : 'GitHub')), add);
+        el('div', { class: 'st' }, el('div', null, src.title, src.pinned ? el('span', { class: 'space-pin' }, 'Pinned') : null), el('div', null, src.source === 'rss' ? (() => { try { return new URL(/** @type {Extract<PortalSpec, { source: 'rss' }>['config']} */ (src.config).url).hostname.replace(/^www\./, ''); } catch { return 'feed'; } })() : src.source === 'hn' ? 'Hacker News' : 'GitHub')), add);
     });
     return present([
       withBack ? el('div', { class: 'reader-top' }, iconButton('back', 'Back to your room', back || closeReader, 'ib')) : null,
@@ -191,8 +276,14 @@
         space.bio ? el('p', { class: 'bio' }, space.bio) : null,
         el('div', { class: 'row' }, follow, el('span', null, `${space.followers} follower${space.followers === 1 ? '' : 's'}`), el('span', null, `· ${space.posts.length} post${space.posts.length === 1 ? '' : 's'}`),
           space.mine ? el('span', null, '· this is what visitors see (followers-only posts show only to followers)') : null)),
-      space.sources.length ? el('h2', null, 'Sources I read') : null,
-      space.sources.length ? el('div', { class: 'sources' }, sources) : null,
+      space.mine || space.sources.length ? el('h2', null, 'Sources I read') : null,
+      space.mine ? spaceSectionSettings(space, 'sources', withBack, back) : null,
+      space.sources.length ? el('div', { class: 'sources' }, sources) : space.mine ? el('p', { class: 'empty' }, 'Show sources from your room to grow this section automatically.') : null,
+      space.mine || space.people?.length ? el('h2', null, 'Fellow travelers') : null,
+      space.mine ? spaceSectionSettings(space, 'people', withBack, back) : null,
+      space.people?.length ? el('div', { class: 'sources' }, space.people.map((person) => el('div', { class: 'source' },
+        el('button', { class: 'link-btn', onclick: () => loadSpace(person.handle, false) }, person.displayName ? `${person.displayName} · @${person.handle}` : `@${person.handle}`),
+        person.pinned ? el('span', { class: 'space-pin' }, 'Pinned') : null))) : space.mine ? el('p', { class: 'empty' }, 'Show people you follow to grow this section automatically.') : null,
       el('h2', null, 'Posts'),
       posts.length ? el('div', { class: 'posts' }, posts) : el('div', { class: 'empty' }, space.mine ? 'Your space stands empty, waiting. Share a saved item or a clip to put something in it.' : 'Nothing shared that you can see yet.'),
     ]);

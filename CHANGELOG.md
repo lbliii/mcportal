@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Space can automatically show eligible public room sources and people followed on MCPortal, with independent opt-in visibility and owner previews. Optional pins, ordering and hides preserve existing recommendations and never change subscriptions; private curation stays out of visitor responses.
+
 ### Room layouts
 - River is available in the toolbar and in `arrange_room` and `build_room` without an experimental flag. Existing layouts and subscriptions are kept.
 - Reader and source controls stay visible while scrolling, stacking below the main toolbar. Rows wrap on narrow screens, and docs navigation and restored passages account for their height.

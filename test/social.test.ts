@@ -16,9 +16,9 @@ export async function world(store: SocialStore = new DocumentSocialStore()) {
   let now = Date.parse('2026-10-01T12:00:00Z');
   const suspended = new Set<string>();
   const profiles = new PublicProfiles(memoryPersistence());
-  const social = new Social({ store, profiles, hidden: (id) => suspended.has(id), now: () => (now += 1000) });
   for (const [id, handle] of [['a', 'alice'], ['b', 'bob'], ['c', 'carol']]) await profiles.set(id!, { handle });
   const portals = new MemoryProfileStore(Object.fromEntries(['a', 'b', 'c', 'd'].map((id) => [id, validateProfile({ ...defaultProfile(), onboarded: true, saved: [{ url: `https://example.com/${id}`, title: `${id}'s link` }] })])));
+  const social = new Social({ store, profiles, preferences: portals, fetcher: createFixtureFetcher(), hidden: (id) => suspended.has(id), now: () => (now += 1000) });
   const clips = new MemoryClipStore();
   // Reblogging is a lab: these accounts' server has it on (the lab test turns it off).
   const ctx = (userId: string): ToolContext => ({ store: portals, clips, publicProfiles: profiles, social, fetcher: createFixtureFetcher(), cache: new TtlCache(), userId, labs: ['reblog'] });

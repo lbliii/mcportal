@@ -9,7 +9,7 @@ import { readFile, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { clean } from '../lib/text.ts';
 import { describeImport, EXPORT_FORMATS, importExport, parseExport, type ExportFormat } from '../portability.ts';
-import { ACCENTS, MAX_FEATURED, suggestHandle, type PublicProfile } from '../public-profiles.ts';
+import { ACCENTS, MAX_FEATURED, SPACE_SETTINGS_SCHEMA, publicSpaceProfile, suggestHandle, type PublicProfile } from '../public-profiles.ts';
 import type { ToolResults } from './results.ts';
 import { describeIdentity, HOSTED_ONLY, identityOf, socialActive, socialEntry, ok, toolError, toolFailure, untrusted, type ToolDef } from './kit.ts';
 
@@ -41,11 +41,12 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
       if (typeof args.handle === 'string' && args.handle.trim()) {
         const found = await ctx.publicProfiles.byHandle(args.handle);
         if (!found) return toolError(`No MCPortal profile for @${clean(args.handle, 40).replace(/^@/, '')}.`, 'not_found');
-        const { accountId: _id, ...profile } = found.profile;
+        const sections = await ctx.social?.spaceSections(ctx.userId, found.profile.accountId);
+        const { accountId: _id, ...profile } = publicSpaceProfile({ ...found.profile, sources: sections?.sources ?? [] });
         const moved = found.movedFrom ? `@${found.movedFrom} is now @${profile.handle}.\n` : '';
         const stats = ctx.social && found.profile.accountId !== ctx.userId ? await ctx.social.stats(ctx.userId, found.profile.accountId) : undefined;
         const counts = stats ? `\n${stats.followers} follower(s), ${stats.shares} share(s) you can see.${stats.following ? ' You follow them.' : ''}` : '';
-        return ok(`${moved}${untrusted(`@${profile.handle}`, describeProfile(found.profile))}${counts}`, { profile, ...(stats ? { stats } : {}), ...(found.movedFrom ? { movedFrom: found.movedFrom } : {}) });
+        return ok(`${moved}${untrusted(`@${profile.handle}`, describeProfile({ ...profile, accountId: _id }))}${counts}`, { profile, ...(stats ? { stats } : {}), ...(found.movedFrom ? { movedFrom: found.movedFrom } : {}) });
       }
       const mine = await ctx.publicProfiles.get(ctx.userId);
       if (mine) return ok(`Your public profile (visible to signed-in MCPortal users):\n${describeProfile(mine)}`, { profile: mine });
@@ -58,11 +59,12 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
     title: 'Set your public profile and space',
     access: 'write',
     available: socialEntry,
-    description: "Create or change the user's public profile and Space, only when they ask: handle, name, bio, Space title, accent colour and featured portals ('Sources I read'). It's how other MCPortal users find them; nothing else in their room becomes public. An old handle keeps pointing to them for 30 days.",
+    description: "Change profile/Space only on request. Preview subscriptions and follows with open_space before opting in via showSources/showPeople. sourceCuration/peopleCuration pin, order or hide preview keys. featuredPortalIds keeps explicit recommendations. Old handles redirect for 30 days.",
     inputSchema: {
       type: 'object',
       additionalProperties: false,
       properties: {
+        ...SPACE_SETTINGS_SCHEMA,
         handle: { type: 'string', description: '2-30 letters, digits or underscores; needed the first time' },
         displayName: { type: 'string', maxLength: 50 },
         bio: { type: 'string', maxLength: 160 },
@@ -74,7 +76,7 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
     lab: {
       name: 'reblog',
       properties: { reblogs: { type: 'string', enum: ['anyone', 'followers', 'nobody'] } },
-      description: "Create or change the user's public profile and Space, only when they ask: handle, name, bio, Space title, accent colour, featured portals ('Sources I read') and who may reblog their posts by default. It's how other MCPortal users find them; nothing else in their room becomes public. An old handle keeps pointing to them for 30 days.",
+      description: "Change profile/Space only on request, including default reblog permissions. Preview subscriptions/follows with open_space before opting in via showSources/showPeople; curate preview keys with sourceCuration/peopleCuration. Old handles redirect for 30 days.",
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     async handler(args, ctx) {
@@ -95,6 +97,10 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
           spaceTitle: typeof args.spaceTitle === 'string' ? args.spaceTitle : undefined,
           accent: typeof args.accent === 'string' ? args.accent : undefined,
           sources,
+          showSources: typeof args.showSources === 'boolean' ? args.showSources : undefined,
+          showPeople: typeof args.showPeople === 'boolean' ? args.showPeople : undefined,
+          sourceCuration: args.sourceCuration as PublicProfile['sourceCuration'],
+          peopleCuration: args.peopleCuration as PublicProfile['peopleCuration'],
           reblogs: typeof args.reblogs === 'string' ? args.reblogs : undefined,
         });
         const skipped = sources ? sources.length - (profile.sources?.length ?? 0) : 0;

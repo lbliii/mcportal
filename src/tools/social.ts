@@ -4,6 +4,7 @@
  * clips) reaches the model fenced as untrusted: another user's note is exactly
  * where someone would try to plant instructions.
  */
+import { publicSpaceProfile } from '../public-profiles.ts';
 import { clean } from '../lib/text.ts';
 import { httpUrl } from '../profile.ts';
 import { clipText, type ClipData } from '../clips.ts';
@@ -78,8 +79,10 @@ export const SOCIAL_TOOLS: ToolDef[] = [
         const mine = profile.accountId === ctx.userId;
         const posts = await ctx.social.sharesOf(ctx.userId, profile.accountId, { limit: GRID_POSTS });
         const stats = await ctx.social.stats(ctx.userId, profile.accountId);
-        const { accountId: _id, ...pub } = profile;
-        const space = { ...pub, mine, followers: stats.followers, following: stats.following, posts: forGrid(posts), sources: profile.sources ?? [] };
+        const { accountId: _id, ...pub } = mine ? profile : publicSpaceProfile(profile);
+        const sections = await ctx.social.spaceSections(ctx.userId, profile.accountId);
+        const sectionPreview = mine ? await ctx.social.spaceSections(ctx.userId, profile.accountId, true) : undefined;
+        const space = { ...pub, mine, followers: stats.followers, following: stats.following, posts: forGrid(posts), ...sections, ...(sectionPreview ? { sectionPreview } : {}) };
         const title = profile.spaceTitle ?? `@${profile.handle}`;
         const text = [
           `Showing ${mine ? 'your space' : `@${profile.handle}'s space`} "${title}" in a card: ${posts.length} post(s)${mine ? '' : ' you can see'}, ${stats.followers} follower(s), ${space.sources.length} featured source(s).${!mine && !stats.following ? ' The user doesn\'t follow them yet.' : ''}`,

@@ -336,6 +336,7 @@ export function remoteProfiles(client: StateClient, accountId: string): ProfileD
 export function remoteSocial(client: StateClient, accountId: string): SocialService {
   const as = (viewer: string) => { if (viewer !== accountId) throw new Error('A linked MCPortal acts only as its linked account.'); };
   return {
+    async spaceSections(viewer, owner, preview = false) { as(viewer); return client.call('social.spaceSections', { accountId: owner, preview }); },
     async resolve(viewer, handle) { as(viewer); return client.call('social.resolve', { handle }); },
     async share(author, input) {
       as(author);

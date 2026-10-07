@@ -11,6 +11,7 @@
  * Like accounts, the state is one document (file or Postgres row) held in memory;
  * it moves to tables when sharing needs joins. One server instance.
  */
+import { createHash } from 'node:crypto';
 import type { AuthPersistence } from './auth/store.ts';
 import { DOCUMENT_MAX_AGE_MS, SharedDocument } from './lib/document.ts';
 import { AppError, type AppErrorOptions, type ErrorCode } from './lib/errors.ts';
@@ -36,7 +37,40 @@ export interface FeaturedSource {
   config: SourceConfigs['rss' | 'hn' | 'github'];
 }
 
+export const spaceKey = (kind: string, identity: string): string => `${kind}:${createHash('sha256').update(identity).digest('hex')}`;
+export function sourceKey(source: FeaturedSource): string {
+  const config = { ...source.config, limit: undefined };
+  if ('url' in config) {
+    try { const url = new URL(config.url); url.searchParams.sort(); config.url = url.href; } catch { /* validation handles malformed addresses */ }
+  }
+  return spaceKey('source', `${source.source}:${JSON.stringify(config)}`);
+}
+
 export const MAX_FEATURED = 12;
+
+/** Preferences use opaque identities, so layout moves and handle changes keep curation. */
+export interface SectionCuration { pinned: string[]; order: string[]; hidden: string[] }
+export const CURATION_SCHEMA = { type: 'object', additionalProperties: false, properties: Object.fromEntries(
+  ['pinned', 'order', 'hidden'].map((key) => [key, { type: 'array', maxItems: 500, items: { type: 'string', maxLength: 80 } }]),
+) };
+export const SPACE_SETTINGS_SCHEMA = {
+  showSources: { type: 'boolean', description: 'Show eligible public room subscriptions on your Space. Opt-in; preview in open_space first.' },
+  showPeople: { type: 'boolean', description: 'Show people you follow on your Space. Opt-in; preview in open_space first.' },
+  sourceCuration: CURATION_SCHEMA,
+  peopleCuration: CURATION_SCHEMA,
+};
+
+function curation(input: Partial<SectionCuration>): SectionCuration {
+  return Object.fromEntries(['pinned', 'order', 'hidden'].map((key) => [key,
+    [...new Set((input[key as keyof SectionCuration] ?? []).map((v) => clean(v, 80)))].filter(Boolean).slice(0, 500),
+  ])) as unknown as SectionCuration;
+}
+
+/** Remove private curation preferences before returning another person's profile. */
+export function publicSpaceProfile<P extends PublicProfile>(profile: P): Omit<P, 'sourceCuration' | 'peopleCuration'> {
+  const { sourceCuration: _sources, peopleCuration: _people, ...publicProfile } = profile;
+  return publicProfile;
+}
 
 export interface PublicProfile {
   accountId: string;
@@ -50,6 +84,11 @@ export interface PublicProfile {
   sources?: FeaturedSource[];
   /** Who may reblog their new posts, unless a post says otherwise. Absent: anyone. */
   reblogs?: 'followers' | 'nobody';
+  /** Absent preserves legacy featured sources without publishing room subscriptions. */
+  showSources?: boolean;
+  showPeople?: boolean;
+  sourceCuration?: SectionCuration;
+  peopleCuration?: SectionCuration;
   createdAt: string;
   updatedAt: string;
 }
@@ -64,10 +103,14 @@ export interface PublicProfileInput {
   sources?: Array<{ title?: string; source: string; config: unknown }> | undefined;
   /** Who may reblog new posts by default: anyone, followers or nobody. */
   reblogs?: string | undefined;
+  showSources?: boolean | undefined;
+  showPeople?: boolean | undefined;
+  sourceCuration?: Partial<SectionCuration> | undefined;
+  peopleCuration?: Partial<SectionCuration> | undefined;
 }
 
 /** Only sources MCPortal fetches itself can be featured; configs are re-validated. */
-export function normalizeFeatured(raw: PublicProfileInput['sources']): FeaturedSource[] {
+export function normalizeFeatured(raw: PublicProfileInput['sources'], max = MAX_FEATURED): FeaturedSource[] {
   const out: FeaturedSource[] = [];
   const seen = new Set<string>();
   for (const entry of raw ?? []) {
@@ -79,11 +122,11 @@ export function normalizeFeatured(raw: PublicProfileInput['sources']): FeaturedS
       if (error instanceof ProfileError) continue;
       throw error;
     }
-    const key = `${entry.source}:${JSON.stringify({ ...config, limit: undefined })}`;
+    const key = sourceKey({ title: '', source: entry.source, config });
     if (seen.has(key)) continue;
     seen.add(key);
     out.push({ title: clean(entry.title, 80) || entry.source, source: entry.source, config });
-    if (out.length >= MAX_FEATURED) break;
+    if (out.length >= max) break;
   }
   return out;
 }
@@ -224,6 +267,14 @@ export class PublicProfiles {
       if (accent) profile.accent = accent;
       if (sources?.length) profile.sources = sources;
       if (reblogs) profile.reblogs = reblogs;
+      for (const key of ['showSources', 'showPeople'] as const) {
+        const value = input[key] ?? current?.[key];
+        if (value !== undefined) profile[key] = value;
+      }
+      for (const key of ['sourceCuration', 'peopleCuration'] as const) {
+        const value = input[key] ? curation({ pinned: key === 'sourceCuration' ? (sources ?? []).map(sourceKey) : [], ...current?.[key], ...input[key] }) : current?.[key];
+        if (value) profile[key] = value;
+      }
       doc.profiles[accountId] = profile;
       return { profile: { ...profile }, created: !current, ...(released ? { released } : {}) };
     });

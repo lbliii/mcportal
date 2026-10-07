@@ -155,7 +155,13 @@ export class Page {
   }
 
   async close(): Promise<void> {
-    try { await this.send('Browser.close', {}, false); } catch { /* already gone */ }
+    // Chrome can exit before acknowledging Browser.close. Bound that wait so an
+    // otherwise passing browser test cannot leave its server and worker running.
+    let closeTimer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([this.send('Browser.close', {}, false), new Promise<void>((resolve) => { closeTimer = setTimeout(resolve, 3000); })]);
+    } catch { /* already gone */ }
+    finally { clearTimeout(closeTimer); }
     this.ws.close();
     if (this.chrome.exitCode === null) await new Promise((r) => { this.chrome.once('exit', r); setTimeout(r, 3000); });
     this.chrome.kill('SIGKILL');

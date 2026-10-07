@@ -95,6 +95,10 @@ export async function buildExport(format: ExportFormat, userId: string, from: Ex
       ...(p.spaceTitle ? { spaceTitle: p.spaceTitle } : {}),
       ...(p.accent ? { accent: p.accent } : {}),
       ...(p.sources ? { sources: p.sources } : {}),
+      ...(p.showSources !== undefined ? { showSources: p.showSources } : {}),
+      ...(p.showPeople !== undefined ? { showPeople: p.showPeople } : {}),
+      ...(p.sourceCuration ? { sourceCuration: p.sourceCuration } : {}),
+      ...(p.peopleCuration ? { peopleCuration: p.peopleCuration } : {}),
       ...(p.reblogs ? { reblogs: p.reblogs } : {}),
     } : null,
   };

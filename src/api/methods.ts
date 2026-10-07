@@ -23,6 +23,7 @@ import { clean } from '../lib/text.ts';
 import { httpUrl, validateProfile, type Profile } from '../profile.ts';
 import { validateReadingUpdate, type ReadingUpdate } from '../reading.ts';
 import { tracksSeen } from '../seen.ts';
+import { publicSpaceProfile, SPACE_SETTINGS_SCHEMA, type PublicProfile, type PublicProfileInput } from '../public-profiles.ts';
 import { AUDIENCES, REBLOG_RULES } from '../social.ts';
 import { SERVER_INFO } from '../mcp.ts';
 import { findTool } from '../tools/index.ts';
@@ -67,8 +68,10 @@ const portalsOf = (profile: Profile) => profile.columns.flatMap((c) => c.panels)
  * where a public profile would carry their id (the caller's own id stays, so tools
  * can tell "me" from "them").
  */
-function publicRef<P extends { accountId: string; handle: string }>(profile: P, ctx: ToolContext): P {
-  return profile.accountId === ctx.userId ? profile : { ...profile, accountId: `@${profile.handle}` };
+async function publicRef(profile: PublicProfile, ctx: ToolContext, includeSources = true): Promise<PublicProfile> {
+  if (profile.accountId === ctx.userId) return profile;
+  const sections = includeSources ? await ctx.social?.spaceSections(ctx.userId, profile.accountId) : undefined;
+  return { ...publicSpaceProfile(profile), sources: sections?.sources ?? [], accountId: `@${profile.handle}` };
 }
 
 /** An "@handle" from publicRef back to the account, as the caller may see it; or the caller's own id. */
@@ -188,12 +191,12 @@ export const API_METHODS: Record<string, ApiMethod> = {
   'profiles.byHandle': params<{ handle: string }>({ type: 'object', required: ['handle'], additionalProperties: false, properties: { handle } },
     async (p, ctx) => {
       const found = await profilesOf(ctx).byHandle(p.handle);
-      return found ? { ...found, profile: publicRef(found.profile, ctx) } : null;
+      return found ? { ...found, profile: await publicRef(found.profile, ctx) } : null;
     }),
   /** Featured sources must be portals in the room, as set_public_profile picks them. */
-  'profiles.set': params<{ handle?: string; displayName?: string; bio?: string; spaceTitle?: string; accent?: string; reblogs?: string; sources?: Array<{ title?: string; source: string; config: unknown }> }>(
+  'profiles.set': params<PublicProfileInput>(
     { type: 'object', additionalProperties: false, properties: {
-      handle, displayName: { type: 'string', maxLength: 50 }, bio: { type: 'string', maxLength: 160 }, spaceTitle: { type: 'string', maxLength: 60 }, accent: { type: 'string', maxLength: 20 }, reblogs: { type: 'string', enum: REBLOG_RULES },
+      ...SPACE_SETTINGS_SCHEMA, handle, displayName: { type: 'string', maxLength: 50 }, bio: { type: 'string', maxLength: 160 }, spaceTitle: { type: 'string', maxLength: 60 }, accent: { type: 'string', maxLength: 20 }, reblogs: { type: 'string', enum: REBLOG_RULES },
       sources: { type: 'array', maxItems: 12, items: { type: 'object', required: ['source', 'config'], additionalProperties: false, properties: { title: { type: 'string', maxLength: 80 }, source: { type: 'string', maxLength: 20 }, config: {} } } },
     } },
     async (input, ctx) => {
@@ -240,6 +243,9 @@ export const API_METHODS: Record<string, ApiMethod> = {
     async (p, ctx) => (await socialOf(ctx).get(ctx.userId, p.id)) ?? null),
   'social.feed': params<{ query?: { limit?: number; before?: string } }>({ type: 'object', additionalProperties: false, properties: { query: pageQuery } },
     (p, ctx) => socialOf(ctx).feed(ctx.userId, p.query)),
+  'social.spaceSections': params<{ accountId: string; preview?: boolean }>(
+    { type: 'object', required: ['accountId'], additionalProperties: false, properties: { accountId: id, preview: { type: 'boolean' } } },
+    async (p, ctx) => socialOf(ctx).spaceSections(ctx.userId, await accountOf(p.accountId, ctx), p.preview)),
   'social.sharesOf': params<{ accountId: string; query?: { limit?: number; before?: string } }>(
     { type: 'object', required: ['accountId'], additionalProperties: false, properties: { accountId: id, query: pageQuery } },
     async (p, ctx) => socialOf(ctx).sharesOf(ctx.userId, await accountOf(p.accountId, ctx), p.query)),
@@ -250,7 +256,7 @@ export const API_METHODS: Record<string, ApiMethod> = {
   'social.mute': params<{ handle: string; on: boolean }>({ type: 'object', required: ['handle', 'on'], additionalProperties: false, properties: { handle, on: { type: 'boolean' } } },
     async (p, ctx) => publicRef(await socialOf(ctx).mute(ctx.userId, p.handle, p.on), ctx), 'write'),
   'social.block': params<{ handle: string; on: boolean }>({ type: 'object', required: ['handle', 'on'], additionalProperties: false, properties: { handle, on: { type: 'boolean' } } },
-    async (p, ctx) => publicRef(await socialOf(ctx).block(ctx.userId, p.handle, p.on), ctx), 'write'),
+    async (p, ctx) => publicRef(await socialOf(ctx).block(ctx.userId, p.handle, p.on), ctx, false), 'write'),
   'social.uses': params(NO_PARAMS, (_p, ctx) => socialOf(ctx).uses(ctx.userId)),
   'social.connections': params(NO_PARAMS, (_p, ctx) => socialOf(ctx).connections(ctx.userId)),
   'social.stats': params<{ accountId: string }>({ type: 'object', required: ['accountId'], additionalProperties: false, properties: { accountId: id } },
