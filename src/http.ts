@@ -366,7 +366,7 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
     if (admin && (await admin.handle(req, res, url))) return;
     if (account && (await account.handle(req, res, url))) return;
 
-    if (req.method === 'GET' && (await serveSite(res, url.pathname, site))) return;
+    if (req.method === 'GET' && (await serveSite(res, url.pathname, site, req.headers.range))) return;
 
     if (url.pathname === '/preview' && req.method === 'GET') {
       // The page itself holds no secrets. With a static token, the page asks for it

@@ -17,6 +17,7 @@
 
 ### Landing page, README and docs
 - New screenshots show MCPortal in a chat: building a room by asking, reading and clipping an article, reading the uv docs straight from GitHub, and reblogging in the river. `scripts/screenshots.ts` takes them from the real room UI with live feeds; the old columns, shelves and reader shots are gone.
+- **A launch video on the landing page:** a 22-second tour (a door opens in a chat onto the room, then the uv docs, a clip and a reblog), made from the same real scenes. It waits for a click (no autoplay), plays from this server (the pages' CSP gains `media-src 'self'`), and the site's files answer `Range` requests, which Safari needs to play video.
 - The landing page has sections for docs and for sharing (Spaces, follows, reblogs, finding people). The tutorial adds a step for opening a project's docs and says what signing in adds. The tool reference covers `find_people`, `suggest_people`, `pass_person`, `listed` and the Lobby source. Docs no longer say the hosted service is invite-only.
 
 ## v0.9.0 — 2026-10-07
