@@ -911,3 +911,45 @@ test('browser: the People portal: suggested people with the agent\'s reason, Fol
     await profiles.put('default', room());
   }
 });
+
+test('browser: the Lobby in the river: a stranger\'s post says "not followed", and a story someone you don\'t follow also shared says so, once', { skip }, async () => {
+  const { identifier } = await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => {
+    const real = window.fetch;
+    window.fetch = async (url, init) => {
+      const body = init && typeof init.body === 'string' ? JSON.parse(init.body) : null;
+      const name = body && body.params && body.params.name;
+      const res = await real(url, init);
+      if (name !== 'open_room') return res;
+      const json = await res.json();
+      const room = json.result && json.result.structuredContent;
+      const hn = room && room.portals && room.portals.find((p) => p.portalId === 'hn-top');
+      if (hn) {
+        const now = new Date().toISOString();
+        room.identity = { mode: 'hosted', handle: 'reader' };
+        room.profile.columns.push({ width: 1, panels: [{ id: 'lobby', source: 'lobby', title: 'Lobby', config: {} }] });
+        room.portals.push({ portalId: 'lobby', source: 'lobby', title: 'Lobby', provenance: { source: 'lobby', endpoint: 'posts shared with everyone by listed people', fetchedAt: now, cached: false, ttlSeconds: 0 }, items: [
+          { id: 's_zoe', title: hn.items[0].title, url: hn.items[0].url, summary: 'Worth the read.', meta: ['@zoe', 'link', 'not followed'], publishedAt: now, share: { id: 's_zoe', kind: 'link', canReblog: true } },
+        ] });
+        room.alsoShared = hn.items.filter((i) => i.url).map((i) => ({ url: i.url, handle: 'yan' }));   // every HN story, the first one included
+      }
+      return new Response(JSON.stringify(json), { status: res.status, headers: { 'content-type': 'application/json' } });
+    };
+  })();` });
+  await profiles.put('default', validateProfile({ ...room(), layout: 'river' }));
+  const titles = (await tool('open_room', {})).portals.find((p: any) => p.portalId === 'hn-top').items.slice(0, 1).map((i: any) => i.title);
+  const context = (title: string) => page.eval<string | null>(`[...document.querySelectorAll('.river-feed > article')].find((n) => n.querySelector('.item-title').textContent.endsWith(${JSON.stringify(title)}))?.querySelector('.story-context')?.textContent ?? null`);
+  try {
+    page.problems.length = 0;
+    await page.goto(`${app.base}/preview`);
+    await page.waitFor(`document.querySelector('#grid.river .river-feed article') && !document.querySelector('.skeleton')`, 'the river');
+    assert.equal(await context(titles[0]), '@zoe shared · not followed', "the Lobby's share joins HN's story; its sharer wins over also-shared");
+    const contexts = await page.eval<string[]>(`[...document.querySelectorAll('.river-feed > article .story-context')].map((n) => n.textContent)`);
+    assert.ok(contexts.includes('also shared by @yan'), `another HN story names who else shared it (${contexts.join(' | ')})`);
+    assert.equal(contexts.filter((c) => c.includes('@zoe')).length, 1, 'one name per story: zoe, not yan, on the first');
+    assert.deepEqual([...new Set(await page.eval<string[]>(`[...document.querySelectorAll('.river-feed .story-context .handle')].map((b) => b.textContent)`))].sort(), ['@yan', '@zoe'], 'both are doors');
+    assert.deepEqual(page.problems, []);
+  } finally {
+    await page.send('Page.removeScriptToEvaluateOnNewDocument', { identifier });
+    await profiles.put('default', room());
+  }
+});

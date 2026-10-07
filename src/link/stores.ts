@@ -358,6 +358,7 @@ export function remoteSocial(client: StateClient, accountId: string): SocialServ
     async follow(viewer, handle) { as(viewer); return client.call('social.follow', { handle }); },
     async unfollow(viewer, handle) { as(viewer); return client.call('social.unfollow', { handle }); },
     async takeIntros(viewer) { as(viewer); return client.call('social.takeIntros', {}); },
+    async lobby(viewer, query = {}, options = {}) { as(viewer); return client.call('social.lobby', { query: dropUndefined({ ...query }), options: dropUndefined({ ...options }) }); },
     async findPeople(viewer, wanted, options = {}) { as(viewer); return client.call('social.findPeople', { wanted, options: dropUndefined({ ...options }) }); },
     async mute(viewer, handle, on) { as(viewer); return client.call('social.mute', { handle, on }); },
     async block(viewer, handle, on) { as(viewer); return client.call('social.block', { handle, on }); },

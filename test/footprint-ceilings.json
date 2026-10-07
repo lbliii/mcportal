@@ -1,14 +1,14 @@
 {
   "totals": {
-    "local": 4034,
-    "linked": 5524,
-    "hosted-new": 4838,
-    "hosted-active": 5461,
-    "hosted-labs": 5461
+    "local": 4038,
+    "linked": 5528,
+    "hosted-new": 4842,
+    "hosted-active": 5465,
+    "hosted-labs": 5465
   },
   "tools": {
     "account_settings": 64,
-    "add_portal": 128,
+    "add_portal": 130,
     "arrange_room": 411,
     "build_room": 150,
     "clip": 361,
@@ -34,7 +34,7 @@
     "pin_portal": 333,
     "read_article": 71,
     "read_doc_page": 172,
-    "read_source": 93,
+    "read_source": 95,
     "relationship": 119,
     "remove_portal": 83,
     "remove_public_profile": 56,

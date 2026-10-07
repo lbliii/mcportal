@@ -104,6 +104,7 @@ export interface SourceConfigs {
   clips: ClipsConfig;
   following: LimitConfig;
   people: LimitConfig;
+  lobby: LimitConfig;
 }
 
 export type SourceConfig = SourceConfigs[SourceKind];
@@ -137,7 +138,7 @@ export const PEOPLE = { picks: 12, passed: 200, why: 200, pickDays: 30, passDays
 
 /** Columns scroll sideways, so there can be more than fit on screen. */
 export const LIMITS = { columns: 8, portalsPerColumn: 4, items: 30, saved: 200 } as const;
-export const SOURCES: SourceKind[] = ['hn', 'rss', 'github', 'docs', 'saved', 'pinned', 'clips', 'following', 'people'];
+export const SOURCES: SourceKind[] = ['hn', 'rss', 'github', 'docs', 'saved', 'pinned', 'clips', 'following', 'people', 'lobby'];
 
 /** A profile, layout or source config that fails validation. Defaults to invalid_argument; pass a code when it's something else. */
 export class ProfileError extends AppError {
@@ -209,6 +210,7 @@ const NORMALIZERS: { [S in SourceKind]: Normalizer<S> } = {
   saved: itemsLimit,
   following: itemsLimit,
   people: itemsLimit,
+  lobby: itemsLimit,
   clips(config, where) {
     if (config.kind !== undefined && !(CLIP_KINDS as readonly unknown[]).includes(config.kind)) throw new ProfileError(`${where}: clips kind must be one of ${CLIP_KINDS.join(', ')}`);
     const tag = typeof config.tag === 'string' ? config.tag.toLowerCase().replace(/^#/, '').replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 30) : '';

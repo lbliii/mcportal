@@ -1,6 +1,6 @@
 # Plan: finding people
 
-**Status:** proposed 2026-10-06; phases 1–3b built 2026-10-06. Builds on the social layer (`src/social.ts`), public profiles (`src/public-profiles.ts`), [reblogs](../explanation/social.md#reblogs) and [the river](../explanation/social.md#the-river). It's the "discovery through people's Spaces" part of the [roadmap](README.md).
+**Status:** proposed 2026-10-06; phases 1–3b built 2026-10-06 and merged 2026-10-07; phase 4 built 2026-10-07. Builds on the social layer (`src/social.ts`), public profiles (`src/public-profiles.ts`), [reblogs](../explanation/social.md#reblogs) and [the river](../explanation/social.md#the-river). It's the "discovery through people's Spaces" part of the [roadmap](README.md).
 
 ## Where we are
 
@@ -119,7 +119,9 @@ An empty People portal says "Ask your agent who you might like to follow."
 - **`build_room`:** after starter packs, the result lists up to 3 listed people who feature those packs' sources. This is the agent's cue for an introduction in onboarding, when follows matter most.
 - **`open_space`:** "You both feature: Simon Willison, rustc-dev-guide."
 
-### 4. The Lobby
+### 4. The Lobby (built)
+
+**As built:** `Social.lobby` (also served over the state API) reads listed authors' posts with the everyone audience. Each item from someone the viewer doesn't follow carries `canFollow` and the meta "not followed". The Following and Lobby portals share one mapping (`sharesPortal`). "Also shared by" reuses `Social.lobby` with `unfollowedOnly`: `open_room` matches its links to the room's items by the river's story key and returns `alsoShared`, and the river shows a name only when nobody you follow shared the story. Admin hiding applies through `canSee`. The name stays "Lobby".
 
 A new house source kind, `lobby`: posts shared with **everyone on MCPortal** by listed people, newest first, minus muted and blocked. It gives the "everyone" audience its meaning: everyone who looks in the Lobby.
 
@@ -182,5 +184,5 @@ Phases 1 and 2 are worth shipping even if nothing else is: in an invite-driven c
 
 1. **Listing default at handle claim.** The plan asks with the box unchecked. A pre-checked box grows the directory faster in a small beta, at some cost to the "private unless you choose" stance.
 2. **Should you see who follows you?** Today you see a count only. Seeing your own followers (never anyone else's) enables follow-back, the biggest discovery loop on every social network, without revealing the graph to third parties. It means changing the privacy page and existing users' expectations.
-3. **The name "Lobby."** It fits rooms and portals. Alternatives: Commons, Square, Concourse.
+3. ~~**The name "Lobby."**~~ Kept: it fits rooms and portals.
 4. **Lobby moderation at scale.** The per-author cap and blocks are enough for the beta. A public stream may later need admin hiding at the Lobby level only.

@@ -6,9 +6,10 @@ import type { ErrorCode } from './lib/errors.ts';
  * 'clips' come from the clip store (src/clips.ts) and 'following' from shares of
  * people the user follows (src/social.ts); neither is fetched. 'docs' is a docs
  * site's table of contents (src/adapters/docs.ts). 'people' is the agent's suggestions of
- * whom to follow, kept in the profile (docs/plans/finding-people.md).
+ * whom to follow, kept in the profile, and 'lobby' posts shared with everyone by listed
+ * people (docs/plans/finding-people.md).
  */
-export type SourceKind = 'hn' | 'rss' | 'github' | 'docs' | 'saved' | 'pinned' | 'clips' | 'following' | 'people';
+export type SourceKind = 'hn' | 'rss' | 'github' | 'docs' | 'saved' | 'pinned' | 'clips' | 'following' | 'people' | 'lobby';
 
 export const CLIP_KINDS = ['quote', 'exchange', 'note', 'table', 'image', 'link'] as const;
 export type ClipKind = (typeof CLIP_KINDS)[number];

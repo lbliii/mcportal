@@ -517,3 +517,51 @@ test('People portal: suggest_people keeps only people find_people just returned,
   await portals.update('d', (p) => ({ profile: { ...p, people: { picks: [], passed: [] } }, result: null }));
   assert.match((await call(ctx('d'), 'list_new_items')).content[0]!.text, /People portal is empty: you could offer to look for people again/);
 });
+
+test('the Lobby: everyone-posts by listed people, 3 a person a day, minus muted and blocked; strangers say so; "also shared by" names one per story in the room', async () => {
+  const { social, profiles, suspended, ctx } = await world();
+  await profiles.set('a', { handle: 'alice', listed: true });
+  await profiles.set('b', { handle: 'bob', listed: true });
+  const post = (who: string, n: string, extra: Record<string, unknown> = {}) => social.share(who, { kind: 'link', title: `Post ${n}`, url: `https://example.com/lobby/${n}`, audience: 'mcportal', ...extra });
+  for (const n of ['a1', 'a2', 'a3', 'a4']) await post('a', n);
+  await post('a', 'private', { audience: 'followers' });
+  await post('b', 'b1');
+  await post('c', 'c1');   // carol isn't listed
+  const titles = async (viewer: string, options = {}) => (await social.lobby(viewer, {}, options)).map((s) => s.title);
+
+  assert.deepEqual(await titles('d'), ['Post b1', 'Post a4', 'Post a3', 'Post a2'], "newest first; alice's fourth post today is over the cap; followers-only and unlisted posts stay out");
+  assert.deepEqual((await social.lobby('d')).map((s) => s.canFollow), [['bob'], ['alice'], ['alice'], ['alice']], 'strangers can be followed from here');
+  await social.follow('d', 'alice');
+  assert.deepEqual((await social.lobby('d')).map((s) => s.canFollow ?? null), [['bob'], null, null, null]);
+  assert.deepEqual(await titles('d', { unfollowedOnly: true }), ['Post b1'], 'also-shared looks only at people you don\'t follow');
+  assert.deepEqual(await titles('a', { unfollowedOnly: true }), ['Post b1'], 'and never at your own posts');
+  await social.mute('d', 'bob', true);
+  assert.deepEqual(await titles('d'), ['Post a4', 'Post a3', 'Post a2']);
+  await social.mute('d', 'bob', false);
+  await profiles.set('d', { handle: 'dave' });
+  await social.block('b', 'dave', true);
+  assert.deepEqual(await titles('d'), ['Post a4', 'Post a3', 'Post a2'], 'a block hides both ways');
+  await social.block('b', 'dave', false);
+  suspended.add('a');
+  assert.deepEqual(await titles('d'), ['Post b1']);
+  suspended.clear();
+  await profiles.set('b', { listed: false });
+  assert.deepEqual(await titles('d'), ['Post a4', 'Post a3', 'Post a2'], 'unlisting takes your posts out at once');
+
+  // As a portal: added like any other, items say who and whether you follow them.
+  await profiles.set('b', { listed: true });
+  const added = await call(ctx('c'), 'add_portal', { source: 'lobby', config: {} });
+  assert.equal(added.isError, undefined, added.content[0]!.text);
+  assert.deepEqual(added.structuredContent.portal.items[0].meta, ['@bob', 'link', 'not followed']);
+  assert.equal(added.structuredContent.portal.items[0].share.id.startsWith('s'), true, 'opens as a share');
+
+  // "Also shared by": a story in carol's room that bob shared with everyone.
+  const room = await call(ctx('c'), 'open_room');
+  const story = room.structuredContent.portals.find((p: any) => p.source === 'hn').items[0];
+  assert.equal(room.structuredContent.alsoShared?.some((a: any) => a.url === story.url) ?? false, false, 'nobody shared it yet');
+  await social.share('b', { kind: 'link', title: story.title, url: `${story.url}${story.url.includes('?') ? '&' : '?'}utm_source=x`, audience: 'mcportal' });
+  const again = await call(ctx('c'), 'open_room');
+  assert.deepEqual(again.structuredContent.alsoShared.filter((a: any) => a.url === story.url), [{ url: story.url, handle: 'bob' }], 'matched despite tracking parameters');
+  await social.follow('c', 'bob');
+  assert.equal((await call(ctx('c'), 'open_room')).structuredContent.alsoShared?.some((a: any) => a.url === story.url) ?? false, false, 'once you follow them, their share is in Following instead');
+});

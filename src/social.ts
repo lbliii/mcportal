@@ -43,6 +43,9 @@ export type ReblogRule = (typeof REBLOG_RULES)[number];
 /** How long a resolved report is kept. */
 export const REPORT_DAYS = 180;
 
+/** The Lobby shows at most this many posts per person per day, so one prolific person can't fill it. */
+export const LOBBY_PER_DAY = 3;
+
 export const SOCIAL_LIMITS = { note: 500, sharesPerUser: 1000, follows: 2000, reason: 500, openReportsPerUser: 50 } as const;
 
 export interface Share {
@@ -168,7 +171,7 @@ export interface SocialDeps {
  */
 export type SocialService = Pick<Social,
   'resolve' | 'share' | 'unshare' | 'get' | 'feed' | 'sharesOf' | 'follow' | 'unfollow' | 'mute' | 'block' | 'uses' | 'connections' | 'stats' | 'report'
-  | 'reblog' | 'shareSettings' | 'reblogsOf' | 'takeIntros' | 'findPeople'>;
+  | 'reblog' | 'shareSettings' | 'reblogsOf' | 'takeIntros' | 'findPeople' | 'lobby'>;
 
 export class Social {
   private store: SocialStore;
@@ -416,6 +419,49 @@ export class Social {
       before = page[page.length - 1]!.createdAt;
     }
     return this.present(viewer, visible);
+  }
+
+  /**
+   * The Lobby (docs/plans/finding-people.md): posts shared with everyone by listed people,
+   * newest first, at most LOBBY_PER_DAY a person a day, minus anyone the viewer mutes or
+   * blocks (or who blocks them) and reblogs of muted people's posts. A post by someone the
+   * viewer doesn't follow carries canFollow. `unfollowedOnly` leaves out the viewer and the
+   * people they follow ("also shared by" in the river).
+   */
+  async lobby(viewer: string, query: PageQuery = {}, options: { unfollowedOnly?: boolean } = {}): Promise<SharedItem[]> {
+    const limit = limitOf(query);
+    const [follows, mutes, blocks, blockedBy] = await Promise.all([
+      this.store.outgoing('follows', viewer), this.store.outgoing('mutes', viewer), this.store.outgoing('blocks', viewer), this.store.incoming('blocks', viewer)]);
+    const following = new Set(follows);
+    const muted = new Set(mutes);
+    const skip = new Set([...mutes, ...blocks, ...blockedBy]);
+    const authors = (await this.profiles.listed())
+      .filter((p) => !skip.has(p.accountId) && !this.hidden(p.accountId) && !(options.unfollowedOnly && (p.accountId === viewer || following.has(p.accountId))))
+      .map((p) => p.accountId);
+    if (!authors.length) return [];
+    const perDay = new Map<string, number>();
+    const visible: Share[] = [];
+    let before = query.before;
+    for (let round = 0; round < 5 && visible.length < limit; round++) {
+      const page = await this.store.sharesBy(authors, { limit: 100, before });
+      for (const s of page) {
+        if (visible.length >= limit || s.audience !== 'mcportal' || !(await this.canSee(viewer, s))) continue;
+        if (s.reblogOf && muted.size && muted.has((await this.store.getShare(s.reblogOf.root))?.accountId ?? '')) continue;
+        const day = `${s.accountId} ${s.createdAt.slice(0, 10)}`;
+        const posted = perDay.get(day) ?? 0;
+        if (posted >= LOBBY_PER_DAY) continue;
+        perDay.set(day, posted + 1);
+        visible.push(s);
+      }
+      if (page.length < 100) break;
+      before = page[page.length - 1]!.createdAt;
+    }
+    const items = await this.present(viewer, visible);
+    items.forEach((item, i) => {
+      const author = visible[i]!.accountId;
+      if (author !== viewer && !following.has(author)) item.canFollow = [item.author.handle];
+    });
+    return items;
   }
 
   /** One person's shares that the viewer may see (all of them, for yourself). */

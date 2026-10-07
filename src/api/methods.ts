@@ -260,6 +260,10 @@ export const API_METHODS: Record<string, ApiMethod> = {
       options: { type: 'object', additionalProperties: false, properties: { limit: { type: 'integer', minimum: 1, maximum: 12 }, except: { type: 'string', maxLength: 40 } } },
     } },
     (p, ctx) => socialOf(ctx).findPeople(ctx.userId, p.wanted, p.options)),
+  /** The Lobby, and with unfollowedOnly, the posts "also shared by" draws on. */
+  'social.lobby': params<{ query?: { limit?: number; before?: string }; options?: { unfollowedOnly?: boolean } }>({
+    type: 'object', additionalProperties: false, properties: { query: pageQuery, options: { type: 'object', additionalProperties: false, properties: { unfollowedOnly: { type: 'boolean' } } } } },
+    (p, ctx) => socialOf(ctx).lobby(ctx.userId, p.query, p.options)),
   /** Space-link notes for open_room, each said once. */
   'social.takeIntros': params(NO_PARAMS, (_p, ctx) => socialOf(ctx).takeIntros(ctx.userId), 'write'),
   'social.stats': params<{ accountId: string }>({ type: 'object', required: ['accountId'], additionalProperties: false, properties: { accountId: id } },
