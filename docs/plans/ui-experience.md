@@ -41,12 +41,20 @@ The reading direction is a refinement of the incumbent system: restrained expres
 | Passage actions have unbounded width; Escape may also exit | Action bar wraps inside the viewport; local controls dismiss first | Preserve context on small screens and during repeated reading actions |
 | Previous page outline remains while loading another page | Outline clears during loading; page reports busy state | Avoid offering stale destinations |
 
+## Discovery pass
+
+| Before | After | Why |
+| --- | --- | --- |
+| Docs search only finds pages and symbols | Find searches the current title and authored content, with counts and Previous/Next | Locate a detail while staying in the page |
+| One fixed prose size and measure | Three text sizes and two line widths, shared across article/docs navigation in this session | Let readers choose their comfort without changing room controls |
+| Browser find and Escape have no page-specific workflow | Ctrl/Command+F from the reader, Enter/Shift+Enter, explicit Close and focus return | Keep repeated actions instant and predictable |
+
 ## Follow-up reading capabilities
 
-These need focused design and implementation beyond this refinement pass:
+The first discovery pass implements page find and session-local reading comfort. Remaining capabilities need focused design and implementation:
 
-1. **Find within the rendered page.** Search the text the user is actually reading, with result count, next/previous, keyboard controls, and a clear distinction from docs title/symbol search.
-2. **Reading preferences.** Assess type size and comfortable measure controls within the existing preference model before adding persistence or tools.
+1. **Find within the rendered page.** Implemented for titles and authored blocks, with match count, next/previous, keyboard controls, and a separate docs title/symbol search. Queries stay local; searches display at most 1,000 matches and report the cap.
+2. **Reading preferences.** Session-local text size and line width controls follow article/docs navigation, with Reset. The profile has no reading settings; durable preferences remain a future profile/tool proposal.
 3. **Better extraction coverage.** Evaluate syntax-rich examples, diagrams, math, admonitions, definitions, and complex tables against representative open source manuals. Preserve authored content before adding visual interpretation.
 4. **Website fallback and diagnosis.** Give unsupported or partially extracted pages clear source actions and recovery. Render extracted content faithfully without executing the publisher's application.
 5. **Stable navigation context.** Consider section position indicators and heading permalinks that can be carried into handoffs, without introducing a second competing history system.
