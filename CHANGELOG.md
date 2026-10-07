@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Preserve source descriptions and thumbnails on saved links and shares, and show them in Spaces, Following and RSS. Reblogs draw previews from the original so removal and privacy changes still take effect; personal notes stay separate.
 - Find text within an article or docs page with match counts and keyboard navigation, and adjust reading text size and line width for the current open session.
 - Refine article and documentation reading with clearer typography, Copy on every code block, narrow-view heading navigation, focused Contents controls, and keyboard-friendly section jumps and overflow.
 

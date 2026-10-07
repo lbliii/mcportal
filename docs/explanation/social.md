@@ -39,6 +39,7 @@ A **post** is anything in a Space. A **share** is a post about a saved link or a
 - **You approve the words.** The agent shares only when you ask, and asks you to approve any note it writes.
 - **You pick the audience:** your followers (the default) or everyone who can see your Space.
 - **The server looks everything up.** A share names a saved item or clip by ID; the title, link and content come from your own store, never from the request. The content is copied at share time, so later edits to the clip don't change the post.
+- **Keep the link's context.** Saving a feed item keeps its source description (up to 500 characters) and content thumbnail when available. A link share snapshots that preview separately from your personal note. Existing bookmarks without previews still work; saving them again from a feed can add the preview. Images load through the server's guarded thumbnail fetcher, including on public Spaces and in RSS.
 - **`unshare`** removes a post.
 
 ## Reblogs
@@ -48,6 +49,8 @@ A reblog passes someone's post through your Space to your followers, with an opt
 Each rule below exists because the obvious alternative goes wrong at scale.
 
 **Reference, never copy.** A reblog stores which post it reblogs and draws the original live. The original's author keeps control: deleting the post, blocking someone, or removing their post from one reblog reaches every reblog. A copy-based reblog can't offer that.
+
+The original's link description and thumbnail are drawn live too. They disappear from the reblog when the original is removed or no longer visible; the reblogger's own note stays.
 
 **Credit pools on the original.** Counts and "who reblogged" belong to the original. A reblog shows the original's count, never its own. Per-reblog counts fragment credit and turn every reblog into a scoreboard.
 

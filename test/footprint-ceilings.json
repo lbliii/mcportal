@@ -1,10 +1,10 @@
 {
   "totals": {
-    "local": 4029,
-    "linked": 5743,
-    "hosted-new": 5054,
-    "hosted-active": 5680,
-    "hosted-labs": 5680
+    "local": 4070,
+    "linked": 5784,
+    "hosted-new": 5095,
+    "hosted-active": 5721,
+    "hosted-labs": 5721
   },
   "tools": {
     "account_settings": 61,
@@ -40,7 +40,7 @@
     "remove_public_profile": 56,
     "remove_saved": 55,
     "report": 88,
-    "save_item": 132,
+    "save_item": 180,
     "search_clips": 144,
     "search_docs": 129,
     "set_public_profile": 488,

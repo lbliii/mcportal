@@ -815,12 +815,14 @@ test("browser: in the river, follows' shares and reblogs join their stories with
       if (hn) {
         const now = new Date().toISOString();
         const share = (id, extra) => ({ id, kind: 'link', canReblog: true, ...extra });
+        const plain = room.portals.find((p) => p.portalId === 'gh-mcp')?.items[0];
+        if (plain) { plain.summary = 'Feed source context'; plain.image = { url: 'https://img.example.com/cover.png', kind: 'thumb' }; }
         room.identity = { mode: 'hosted', handle: 'reader' };
 
         room.profile.columns.push({ width: 1, panels: [{ id: 'following', source: 'following', title: 'Following', config: {} }] });
         room.portals.push({ portalId: 'following', source: 'following', title: 'Following', provenance: { source: 'following', endpoint: 'shares from people you follow', fetchedAt: now, cached: false, ttlSeconds: 0 }, items: [
           { id: 's_ana', title: hn.items[0].title, url: hn.items[0].url, summary: 'Read the comments.', meta: ['@ana', 'link'], publishedAt: now, share: share('s_ana') },
-          { id: 's_ben', title: 'A post by cy', url: 'https://example.com/cy', summary: 'Ben agrees.', meta: ['@ben', 'reblogged @cy', 'link'], publishedAt: now, share: share('s_ben', { reblog: { root: 's_cy', by: 'cy', note: "Cy's own words." }, reblogs: 3 }) },
+          { id: 's_ben', title: 'A post by cy', url: 'https://example.com/cy', summary: 'Ben agrees.', meta: ['@ben', 'reblogged @cy', 'link'], publishedAt: now, share: share('s_ben', { description: 'Source context for cy', reblog: { root: 's_cy', by: 'cy', note: "Cy's own words." }, reblogs: 3 }) },
           { id: 's_dee', title: 'A post by cy', url: 'https://example.com/cy', meta: ['@dee', 'reblogged @cy', 'link'], publishedAt: now, share: share('s_dee', { reblog: { root: 's_cy', by: 'cy', note: "Cy's own words." }, reblogs: 3 }) },
           { id: 's_eve', title: 'Gone now', url: 'https://example.com/gone', summary: 'Still worth it.', meta: ['@eve', 'reblogged a removed post', 'link'], publishedAt: now, share: share('s_eve', { reblog: { root: 's_x', removed: 'removed' } }) },
           { id: 's_fay', title: 'Just for fay', url: 'https://example.com/fay', meta: ['@fay', 'link'], publishedAt: now, share: share('s_fay', { canReblog: false }) },
@@ -830,7 +832,10 @@ test("browser: in the river, follows' shares and reblogs join their stories with
     };
   })();` });
   await profiles.put('default', validateProfile({ ...room(), layout: 'river' }));
-  const hnTitle = (await tool('open_room', {})).portals.find((p: any) => p.portalId === 'hn-top').items[0].title;
+  const initial = await tool('open_room', {});
+  const hnTitle = initial.portals.find((p: any) => p.portalId === 'hn-top').items[0].title;
+  const existing = initial.portals.find((p: any) => p.portalId === 'gh-mcp').items[0];
+  await profiles.put('default', validateProfile({ ...initial.profile, saved: [...initial.profile.saved, { url: existing.url, title: 'My chosen bookmark title' }] }));
   /** The story with this title. */
   const find = (title: string) => `[...document.querySelectorAll('.river-feed > article')].find((n) => n.querySelector('.item-title').textContent.endsWith(${JSON.stringify(title)}))`;
   const read = (title: string) => page.eval<{ context: string | null; trail: string[]; removed: string | null; from: string; reblog: { label: string; disabled: boolean } | null } | null>(`(() => {
@@ -853,6 +858,7 @@ test("browser: in the river, follows' shares and reblogs join their stories with
     assert.equal(cy?.context, '@ben and @dee reblogged @cy', 'two reblogs of one post are one card');
     assert.deepEqual(cy?.trail, ["@cyCy's own words.", '@benBen agrees.'], "the original's note, then a reblog's: two voices");
     assert.equal(cy?.reblog?.label, 'Reblog (3 reblogs)', 'the count pools on the original');
+    assert.equal(await page.eval(`${find('A post by cy')}.querySelector('.item-summary').textContent`), 'Source context for cy');
     assert.equal((await read('Gone now'))?.removed, 'The original post was removed.');
     assert.deepEqual((await read('Just for fay'))?.reblog, { label: "You can't reblog this post", disabled: true });
 
@@ -884,7 +890,13 @@ test("browser: in the river, follows' shares and reblogs join their stories with
     await page.eval(`[...document.querySelectorAll('.reblog-menu [role="menuitem"]')].find((n) => n.textContent === 'Reblog with a note').click()`);
     await page.waitFor(`!document.getElementById('reader').hidden && document.querySelector('#reader .composer')`, 'the composer');
     assert.match(await page.eval<string>(`document.querySelector('#reader .composer').textContent`), new RegExp(`Reblog “${plain.replace(/^New/, '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}” to your space`));
-    assert.ok((await tool('open_room', {})).profile.saved.length > 1, 'saved first');
+    const saved = (await tool('open_room', {})).profile.saved;
+    assert.ok(saved.length > 1, 'saved first');
+    const preview = saved.find((s: any) => s.description === 'Feed source context');
+    assert.ok(preview, 'the feed description survives reblogging');
+    assert.deepEqual(preview.image, { url: 'https://img.example.com/cover.png', kind: 'thumb' });
+    assert.equal(preview.title, 'My chosen bookmark title', 'adding the preview preserves a chosen bookmark title');
+    assert.equal(preview.note, undefined, 'source descriptions are not personal notes');
     // No labs at all: the river is offered, and in columns every feed row has a reblog button too.
     assert.equal(await page.eval(`document.querySelector('[data-layout="river"]').hidden`), false);
     await page.eval(`document.querySelector('[data-layout="columns"]').click()`);
@@ -911,7 +923,9 @@ test('browser: every handle is a door: @names open their space and come back to 
       const args = body && body.params && body.params.arguments;
       if (url === '/mcp' && ['open_space', 'get_share', 'relationship'].includes(name)) {
         window.__calls.push({ name, args });
-        if (name === 'open_space') return answer({ content: [], structuredContent: { space: { handle: args.handle, displayName: args.handle.toUpperCase(), mine: false, followers: 2, following: false, posts: [], sources: [], createdAt: now, updatedAt: now } } });
+        if (name === 'open_space') return answer({ content: [], structuredContent: { space: { handle: args.handle, displayName: args.handle.toUpperCase(), mine: false, followers: 2, following: false,
+          posts: Array.from({ length: 8 }, (_, i) => ({ id: 's_preview_' + i, kind: 'link', title: 'Preview story ' + i, description: 'Source preview ' + i, image: { url: 'https://img.example.com/space-' + i + '.png', kind: 'thumb' }, note: 'Personal note ' + i, audience: 'everyone', createdAt: now, author: { handle: args.handle }, mine: false, reblogCount: 0, canReblog: true })),
+          sources: [], createdAt: now, updatedAt: now } } });
         if (name === 'relationship') return answer({ content: [], structuredContent: { handle: args.handle, layoutChanged: false } });
         if (args.id === 's_ben') return answer({ content: [], structuredContent: { share: { id: 's_ben', kind: 'link', title: 'A post by cy', url: 'https://example.com/cy', audience: 'everyone', createdAt: now,
           author: { handle: 'ben' }, mine: false, reblogCount: 1, canReblog: true, reblogOf: { root: 's_cy' }, original: { id: 's_cy', author: { handle: 'cy' }, note: "Cy's own words." }, canFollow: ['cy'] } } });
@@ -947,6 +961,11 @@ test('browser: every handle is a door: @names open their space and come back to 
     await page.eval(`${find('A post by cy')}.querySelector('.story-context .handle:last-child').click()`);
     await spaceOpen('cy');
     assert.deepEqual(await page.eval(`window.__calls.at(-1)`), { name: 'open_space', args: { handle: 'cy' } });
+    await page.waitFor(`document.querySelector('#reader .space-link-image')?.naturalWidth > 0`, 'the first Space preview image');
+    assert.equal(await page.eval(`document.querySelector('#reader .space-description').textContent`), 'Source preview 0');
+    assert.equal(await page.eval(`document.querySelector('#reader .post .pn').textContent`), 'Personal note 0');
+    await page.eval(`document.querySelector('#reader [data-post-id="s_preview_7"]').scrollIntoView()`);
+    await page.waitFor(`document.querySelector('#reader [data-post-id="s_preview_7"] .space-link-image')?.naturalWidth > 0`, 'Space previews beyond the first image batch');
     await page.eval(`document.querySelector('#reader .reader-top button').click()`);
     await page.waitFor(`document.getElementById('reader').hidden && !document.getElementById('grid').hidden`, 'back to the river');
 

@@ -78,7 +78,7 @@
     },
     {
       "name": "save_item",
-      "description": "Save a link for later (a bookmark), or change the title or note of one already saved."
+      "description": "Save or edit a bookmark with optional source description and thumbnail."
     },
     {
       "name": "remove_saved",

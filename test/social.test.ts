@@ -9,6 +9,7 @@ import { defaultProfile, validateProfile } from '../src/profile.ts';
 import { PublicProfiles } from '../src/public-profiles.ts';
 import { DocumentSocialStore, Social, type SocialStore } from '../src/social.ts';
 import { sourceSignal } from '../src/people.ts';
+import { followingPortal } from '../src/sources.ts';
 import { MemoryProfileStore } from '../src/store.ts';
 import type { ToolContext } from '../src/tools/kit.ts';
 
@@ -30,6 +31,43 @@ export async function call(c: ToolContext, name: string, args: Record<string, un
   const res = await handleMessage({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }, c);
   return res!.result as { content: Array<{ text: string }>; structuredContent?: any; isError?: boolean };
 }
+
+test('link previews: shares snapshot saved context separately from notes; reblogs resolve it live and lose it on removal', async () => {
+  const { social, ctx } = await world();
+  const image = { url: 'https://example.com/cover.png', kind: 'thumb' as const };
+  await call(ctx('a'), 'save_item', { url: 'https://example.com/a', description: 'Publisher description', imageUrl: image.url, note: 'Private bookmark note' });
+  const post = (await call(ctx('a'), 'share', { savedUrl: 'https://example.com/a', note: 'Alice commentary', audience: 'everyone' })).structuredContent.share;
+  assert.equal(post.description, 'Publisher description');
+  assert.deepEqual(post.image, image);
+  assert.equal(post.note, 'Alice commentary');
+  await call(ctx('a'), 'save_item', { url: 'https://example.com/a', description: 'Edited bookmark', imageUrl: 'https://example.com/new.png' });
+  assert.equal((await social.get('b', post.id))?.description, 'Publisher description', 'editing the bookmark does not alter the share');
+  const reblog = await social.reblog('b', { id: post.id, note: 'Bob commentary', audience: 'everyone' });
+  assert.equal(reblog.description, undefined, 'reblogs do not copy the source preview');
+  assert.equal(reblog.image, undefined);
+  assert.ok(reblog.original && 'author' in reblog.original);
+  assert.equal(reblog.original.description, 'Publisher description');
+  assert.deepEqual(reblog.original.image, image);
+  const portal = (posts: typeof reblog[]) => followingPortal({ id: 'following', source: 'following', config: {} }, posts);
+  const item = portal([reblog]).items[0]!;
+  assert.equal(item.share?.description, 'Publisher description');
+  assert.deepEqual(item.image, image);
+  assert.equal(item.summary, 'Bob commentary', 'source text is never attributed to the sharer');
+  const card = await call(ctx('c'), 'get_share', { id: reblog.id });
+  assert.match(card.content[0]!.text, /source description: Publisher description/);
+  assert.doesNotMatch(card.content[0]!.text, /Private bookmark note/);
+  await social.shareSettings('a', post.id, { detach: reblog.id });
+  const detached = (await social.get('c', reblog.id))!;
+  assert.deepEqual(detached.original, { removed: 'detached' });
+  assert.equal(portal([detached]).items[0]!.image, undefined);
+  assert.equal(portal([detached]).items[0]!.share?.description, undefined);
+  const another = await social.reblog('c', { id: post.id, note: 'My note stays', audience: 'everyone' });
+  await social.unshare('a', post.id);
+  const tombstone = (await social.get('b', another.id))!;
+  assert.deepEqual(tombstone.original, { removed: 'removed' });
+  assert.equal(tombstone.note, 'My note stays');
+  assert.equal(portal([tombstone]).items[0]!.image, undefined);
+});
 
 test('audiences: followers-only shares reach followers; everyone shares reach anyone who can see the Space', async () => {
   const { social, ctx } = await world();

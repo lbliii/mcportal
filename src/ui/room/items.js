@@ -118,7 +118,8 @@
     /** A line in a portal's list: title, summary, a thumbnail beside them, and every action. */
     row(item, portal, { color = '', from = false, why = '' }) {
       const { out, byline } = itemActions(item, portal);
-      const text = [itemTitle(item), item.summary ? el('span', { class: 'item-summary' }, item.summary) : null];
+      const text = [itemTitle(item), item.share?.description ? el('span', { class: 'item-summary' }, item.share.description) : null,
+        item.summary ? el('span', { class: 'item-summary' }, item.summary) : null];
       const main = el('button', { class: 'item-main', type: 'button', title: byline, onclick: (/** @type {MouseEvent} */ e) => openFrom(e, item, portal) },
         patchAvatar(item.person?.cover || item.share?.cover), item.image && item.image.kind === 'thumb' ? el('span', { class: 'item-row' }, thumbBox(item, portal), el('span', { class: 'item-text' }, text)) : text);
       return el('div', { class: 'item', onclick: openOnClick(item, portal) }, from ? itemFrom(portal, color) : null, main,
@@ -130,7 +131,8 @@
       const { out, byline } = itemActions(item, portal);
       const main = el('button', { class: 'item-main', type: 'button', title: byline, onclick: (/** @type {MouseEvent} */ e) => openFrom(e, item, portal) },
         patchAvatar(item.person?.cover || item.share?.cover), item.image && item.image.kind === 'thumb' ? thumbBox(item, portal) : null,
-        itemTitle(item), item.summary ? el('span', { class: 'item-summary' }, item.summary) : null);
+        itemTitle(item), item.share?.description ? el('span', { class: 'item-summary' }, item.share.description) : null,
+        item.summary ? el('span', { class: 'item-summary' }, item.summary) : null);
       return el('div', { class: 'item lead', style: `--mp-source-color:${color}`, onclick: openOnClick(item, portal) }, itemFrom(portal, color), main,
         out.length ? el('div', { class: 'item-meta' }, out) : null, why ? itemWhy(why) : null);
     },
@@ -154,7 +156,8 @@
         : illustrated ? thumbBox({ ...item, image: undefined }, portal) : null;
       const main = el('button', { class: 'item-main', type: 'button', title: byline, onclick: (/** @type {MouseEvent} */ e) => openFrom(e, item, portal) },
         picture, el('span', { class: 'story-copy' }, itemTitle(item),
-          item.summary && !following ? el('span', { class: 'item-summary' }, item.summary) : null));
+          following && item.share?.description ? el('span', { class: 'item-summary' }, item.share.description)
+            : item.summary && !following ? el('span', { class: 'item-summary' }, item.summary) : null));
       return el('article', { class: illustrated ? 'item story story-illustrated' : 'item story', style: `--mp-source-color:${color}`, onclick: openOnClick(item, portal) },
         context.length ? el('div', { class: 'story-context' }, context)
           : alsoBy ? el('div', { class: 'story-context' }, 'also shared by ', patchAvatar(alsoBy.cover), handleButton(alsoBy.handle)) : null,

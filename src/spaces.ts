@@ -32,16 +32,19 @@ function feedPost(post: SharedItem, spaceLink: string): string {
   const tombstone = Boolean(post.reblogOf && !original);
   const title = tombstone ? 'A post for MCPortal members' : original?.title || post.title;
   const clip = original?.clip || post.clip;
+  const preview = tombstone ? undefined : original || post;
   const content = [
     post.reblogOf ? (original ? `Reblogged @${original.author.handle}` : 'A post for MCPortal members. Sign in to see it.') : '',
     !tombstone && original?.note ? original.note : '',
+    preview?.description || '',
     !tombstone && clip?.data.kind === 'quote' ? clip.data.text.slice(0, 400) : (!tombstone && clip ? 'Sign in to see this clip.' : ''),
     post.note || '',
   ].filter(Boolean).join('\n\n');
   const link = tombstone ? `${spaceLink}/signin` : safeUrl(original?.url || post.url) || spaceLink;
-  return `<item><guid isPermaLink="false">${escapeHtml(`${spaceLink}#${post.id}`)}</guid><title>${escapeHtml(title)}</title><link>${escapeHtml(link)}</link><pubDate>${new Date(post.createdAt).toUTCString()}</pubDate><description>${escapeHtml(content)}</description></item>`;
+  const image = preview?.image && safeUrl(preview.image.url) ? `<media:thumbnail url="${escapeHtml(`${spaceLink}/image/${encodeURIComponent(post.id)}`)}"/>` : '';
+  return `<item><guid isPermaLink="false">${escapeHtml(`${spaceLink}#${post.id}`)}</guid><title>${escapeHtml(title)}</title><link>${escapeHtml(link)}</link><pubDate>${new Date(post.createdAt).toUTCString()}</pubDate><description>${escapeHtml(content)}</description>${image}</item>`;
 }
 export function publicSpaceFeed(space: ToolResults['open_space']['space'], origin: string): string {
   const link = new URL(`/@${space.handle}`, origin).href;
-  return `<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>${escapeHtml(space.spaceTitle || `@${space.handle}`)}</title><link>${escapeHtml(link)}</link><description>${escapeHtml(space.bio || `Posts from @${space.handle}`)}</description>${space.posts.slice(0, 50).map((post) => feedPost(post, link)).join('')}</channel></rss>`;
+  return `<?xml version="1.0" encoding="UTF-8"?><rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/"><channel><title>${escapeHtml(space.spaceTitle || `@${space.handle}`)}</title><link>${escapeHtml(link)}</link><description>${escapeHtml(space.bio || `Posts from @${space.handle}`)}</description>${space.posts.slice(0, 50).map((post) => feedPost(post, link)).join('')}</channel></rss>`;
 }

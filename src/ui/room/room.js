@@ -121,7 +121,7 @@
     const data = pictures.get(url);
     const img = /** @type {HTMLImageElement | null} */ (node.tagName === 'IMG' ? node : $first('img', node));
     if (data && img) { img.src = data; img.classList.add('on'); }
-    else if (!data && node.classList.contains('avatar')) node.classList.add('gone');
+    else if (!data && (node.classList.contains('avatar') || node.classList.contains('space-link-preview'))) node.classList.add('gone');
     return true;
   }
   const seen = new IntersectionObserver((entries) => {
@@ -217,7 +217,7 @@
   }
 
   // ------------------------------------------------------------ saving
-  /** Something that can be saved: a feed item, or a page the reader shows. @typedef {Pick<Item, 'url' | 'title'>} Saveable */
+  /** Something that can be saved: a feed item, or a page the reader shows. @typedef {Pick<Item, 'url' | 'title' | 'summary' | 'image' | 'share'>} Saveable */
   /** @param {Saveable} item @param {string} source */
   function saveButton(item, source, cls = 'mi save') {
     if (!item.url) return null;
@@ -241,13 +241,20 @@
 
   /** @param {Saveable} item one with a url @param {string} source */
   async function toggleSaved(item, source) {
+    return changeSaved(item, source, state.saved.has(item.url ?? ''));
+  }
+
+  /** Save or remove a bookmark; saving an existing one also keeps its latest source preview. @param {Saveable} item @param {string} source @param {boolean} [remove] */
+  async function changeSaved(item, source, remove = false) {
     const url = item.url ?? '';   // saveButton only offers it for items with a url
     const was = state.saved.has(url);
-    was ? state.saved.delete(url) : state.saved.add(url);   // optimistic
+    remove ? state.saved.delete(url) : state.saved.add(url);   // optimistic
     markSaved();
     try {
-      const result = await callTool(was ? 'remove_saved' : 'save_item',
-        was ? { url } : { url, title: item.title, source: source === 'saved' ? undefined : source });
+      const description = item.share ? item.share.description : source === 'saved' ? state.profile?.saved.find((s) => s.url === url)?.description : item.summary;
+      const result = await callTool(remove ? 'remove_saved' : 'save_item',
+        remove ? { url } : { url, title: item.title, source: source === 'saved' ? undefined : source, description,
+          imageUrl: item.image?.kind === 'thumb' ? item.image.url : undefined });
       const data = result.structuredContent;
       state.saved = new Set(data.saved.map((s) => s.url));
       if (state.profile) {
@@ -256,12 +263,15 @@
         if (data.layoutChanged) { drawLayout(); toast('Saved! A Saved portal has materialized in your room.'); }
         else if (data.portal) redrawPortal(data.portal.portalId);
       }
-      if (!was && !data.layoutChanged) toast('Saved!');
+      if (!remove && !was && !data.layoutChanged) toast('Saved!');
+      return true;
     } catch (error) {
       was ? state.saved.add(url) : state.saved.delete(url);
-      toast(`Curses! Couldn't ${was ? 'remove' : 'save'} that: ${errorText(error)}`);
+      toast(`Curses! Couldn't ${remove ? 'remove' : 'save'} that: ${errorText(error)}`);
+      return false;
+    } finally {
+      markSaved();
     }
-    markSaved();
   }
 
   // Pinned portals hold data the agent fetched with another tool, so only the agent can

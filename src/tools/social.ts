@@ -20,12 +20,13 @@ export function shareLine(s: SharedItem): string {
   const who = s.mine ? 'you' : `@${s.author.handle}`;
   const to = s.audience === 'everyone' ? 'everyone who can see their Space' : 'followers';
   const original = s.original && 'author' in s.original ? s.original : undefined;
+  const preview = s.reblogOf ? original : s;
   const what = s.reblogOf
     ? `reblogged ${original ? `@${original.author.handle}'s post` : s.original && 'removed' in s.original && s.original.removed === 'detached' ? 'a post its author removed from this reblog' : 'a post that was removed'}${s.via ? ` (via @${s.via})` : ''}`
     : `shared ${s.kind === 'clip' ? `a ${s.clip?.kind ?? 'clip'}` : 'a link'}`;
   const reblogs = [s.reblogCount ? `${s.reblogCount} reblog${s.reblogCount === 1 ? '' : 's'}` : '', s.reblogs && !s.reblogOf ? `reblogs: ${s.reblogs} only` : '', s.myReblog && !s.mine ? 'you reblogged it' : ''].filter(Boolean);
   return `- [${s.id}] ${who} ${what}: ${s.title}${s.url ? ` <${s.url}>` : ''} · to ${to} · ${s.createdAt.slice(0, 10)}${reblogs.map((r) => ` · ${r}`).join('')}${s.hiddenAt ? ' · hidden by an admin' : ''}`
-    + `${original?.note ? `\n  @${original.author.handle}'s note: ${clean(original.note, 300)}` : ''}${s.note ? `\n  note: ${clean(s.note, 300)}` : ''}`;
+    + `${preview?.description ? `\n  source description: ${clean(preview.description, 500)}` : ''}${original?.note ? `\n  @${original.author.handle}'s note: ${clean(original.note, 300)}` : ''}${s.note ? `\n  note: ${clean(s.note, 300)}` : ''}`;
 }
 
 /** "Reblogged by @a, @b and 3 more." */
@@ -243,7 +244,7 @@ export const SOCIAL_TOOLS: ToolDef[] = [
           const url = httpUrl(args.savedUrl);
           const saved = url ? (await ctx.store.get(ctx.userId)).saved.find((s) => s.url === url) : undefined;
           if (!saved) return toolError('Share a saved item (savedUrl, save it first with save_item) or a clip (clipId).');
-          input = { kind: 'link', title: saved.title, url: saved.url, note: args.note, audience: args.audience, reblogs: args.reblogs };
+          input = { kind: 'link', title: saved.title, url: saved.url, description: saved.description, image: saved.image, note: args.note, audience: args.audience, reblogs: args.reblogs };
         }
         const shared = await ctx.social.share(ctx.userId, input);
         return ok(`Shared (id ${shared.id}).\n${untrusted('your share', shareLine(shared))}`, { share: shared } satisfies ToolResults['share']);

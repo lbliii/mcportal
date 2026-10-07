@@ -18,13 +18,15 @@ import type { Accounts } from './accounts.ts';
 import type { OAuthServer } from './auth/oauth.ts';
 import { isAppError } from './lib/errors.ts';
 import type { Logger } from './lib/log.ts';
-import { escapeHtml, redirect, sendHtml } from './lib/web.ts';
+import { escapeHtml, PAGE_CSP, redirect, sendHtml } from './lib/web.ts';
 import { page } from './page.ts';
 import type { PageSessions } from './page-sessions.ts';
 import type { PublicProfiles } from './public-profiles.ts';
 import type { Social } from './social.ts';
+import type { SourceDeps } from './sources.ts';
+import { thumbnail } from './thumbnails.ts';
 
-const ROUTE = /^\/@([a-z0-9_]{2,30})(\/(?:signin|feed))?$/;
+const ROUTE = /^\/@([a-z0-9_]{2,30})(\/(?:signin|feed|image\/[a-z0-9_-]{1,80}))?$/;
 const HEADERS = { 'x-robots-tag': 'noindex, nofollow' };
 
 export interface SpaceLinkDeps {
@@ -32,6 +34,7 @@ export interface SpaceLinkDeps {
   oauth: OAuthServer;
   publicProfiles: PublicProfiles;
   social: Social;
+  images?: SourceDeps | undefined;
   /** The account page's sessions: one sign-in serves both. */
   sessions: PageSessions;
   publicUrl: string;
@@ -84,6 +87,20 @@ export class SpaceLinks {
     const viewer = current?.session.accountId;
     const outcome = viewer ? await this.introduce(viewer, handle, false) : undefined;
     if (outcome === 'hidden') return this.nobody(res, handle), true;
+    if (match[2]?.startsWith('/image/')) {
+      const post = !owner.profile.private ? await this.deps.social.get('', match[2].slice('/image/'.length)) : undefined;
+      const preview = post?.reblogOf ? (post.original && 'author' in post.original ? post.original : undefined) : post;
+      // Only a currently public post in this Space can supply an image; reblogs resolve
+      // their original live, so deletion, hiding, privacy and detachment revoke it too.
+      const image = post?.author.handle === owner.profile.handle ? preview?.image : undefined;
+      const data = image && this.deps.images ? await thumbnail(image.url, this.deps.images) : null;
+      if (!data) { this.nobody(res, handle); return true; }
+      const comma = data.indexOf(',');
+      const bytes = Buffer.from(data.slice(comma + 1), 'base64');
+      res.writeHead(200, { ...HEADERS, 'content-type': data.slice(5, data.indexOf(';')), 'content-length': String(bytes.length), 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', 'content-security-policy': "default-src 'none'" });
+      res.end(req.method === 'HEAD' ? undefined : bytes);
+      return true;
+    }
     if (!owner.profile.private) {
       const profile = owner.profile;
       // Check visibility anew before using any cached HTML: a hide, deletion, block or
@@ -106,7 +123,7 @@ export class SpaceLinks {
         res.writeHead(200, { ...HEADERS, 'content-type': 'application/rss+xml; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' });
         res.end(req.method === 'HEAD' ? undefined : cached.feed);
       } else {
-        sendHtml(res, 200, req.method === 'HEAD' ? '' : cached.page, HEADERS);
+        sendHtml(res, 200, req.method === 'HEAD' ? '' : cached.page, { ...HEADERS, 'content-security-policy': PAGE_CSP.replace('img-src data:', "img-src 'self' data:") });
       }
       return true;
     }

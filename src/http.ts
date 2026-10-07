@@ -237,7 +237,7 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
   const publicProfiles = oauth ? deps.publicProfiles : undefined;
   const social = oauth && publicProfiles ? deps.social : undefined;
   // The account page needs GitHub sign-in; without it, exports are written to the data directory.
-  const account = oauth ? new AccountPage({ accounts, oauth, store: deps.store, reading, handoffs, seen, editions, clips, publicProfiles, social, publicUrl: config.publicUrl, log, now: deps.now, trustProxy: config.trustProxy }) : undefined;
+  const account = oauth ? new AccountPage({ accounts, oauth, store: deps.store, reading, handoffs, seen, editions, clips, publicProfiles, social, images: { fetcher: deps.fetcher, cache: deps.cache }, publicUrl: config.publicUrl, log, now: deps.now, trustProxy: config.trustProxy }) : undefined;
   // Retention on a schedule: what's kept only for a while goes even on a quiet server.
   const stopHousekeeping = startHousekeeping(retentionTasks({ handoffs, editions, social, accounts, oauth }), log);
   const context = (userId: string, reqLog: Logger): ToolContext => ({

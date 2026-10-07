@@ -180,6 +180,7 @@
     const sheet = el('div');
     // spaceFormat escapes every authored value. Only the constant art engine supplies SVG.
     sheet.innerHTML = spaceFormat.render(space);
+    for (const image of $$('[data-img]', sheet)) watchPicture(image);
     for (const button of sheet.querySelectorAll('button')) {
       button.addEventListener('click', async () => {
         const postId = button.dataset.spacePost;
@@ -225,6 +226,7 @@
     reader.classList.add('space');
     $('grid').hidden = true; reader.hidden = false;
     reader.replaceChildren(...spaceNodes(space, withBack, back));
+    primePictures(reader);
     setStatus('');
   }
 
@@ -432,6 +434,7 @@
   function shareNodes(share, withBack, rebloggers = []) {
     const to = share.audience === 'everyone' ? 'everyone on MCPortal' : 'followers';
     const original = share.original && 'author' in share.original ? share.original : undefined;
+    const preview = share.reblogOf ? original : share;
     const top = el('div', { class: 'reader-top' },
       iconButton('back', withBack ? 'Back to your room' : 'Open your room', closeReader, 'ib'),
       share.url && isHttpUrl(share.url) ? iconButton('external', 'Open the original', () => openLink(share.url ?? ''), 'ib') : null);  // checked just before
@@ -449,6 +452,8 @@
     return present([top, el('h1', null, share.title),
       el('div', { class: 'byline' }, did, ` · with ${to} · ${ago(share.createdAt)}`),
       removed ? el('p', { class: 'story-removed' }, removed) : null,
+      preview?.image ? watchPicture(el('div', { class: 'space-link-preview', 'data-img': preview.image.url }, el('img', { class: 'space-link-image', alt: '', decoding: 'async' }))) : null,
+      preview?.description ? el('p', { class: 'item-summary' }, preview.description) : null,
       original?.note ? el('p', { class: 'story-note' }, handleButton(original.author.handle, 'story-note-by'), original.note) : null,
       share.note ? el('p', { class: share.reblogOf ? 'story-note' : 'share-note' }, share.reblogOf ? (share.mine ? el('span', { class: 'story-note-by' }, 'You') : handleButton(share.author.handle, 'story-note-by')) : null, share.note) : null,
       el('div', { class: 'body' }, body),
@@ -498,6 +503,7 @@
     const reader = $('reader');
     reader.hidden = false; reader.scrollTop = 0;
     reader.replaceChildren(...shareNodes(share, false, rebloggers));
+    primePictures(reader);
     setStatus('');
   }
 
@@ -531,6 +537,7 @@
       const nodes = shareNodes(share, true, rebloggers);
       if (back) nodes[0].replaceChildren(iconButton('back', 'Back to the space', () => back(scroll), 'ib'), ...[...nodes[0].children].slice(1));
       reader.replaceChildren(...nodes);
+      primePictures(reader);
     } catch (error) {
       reader.replaceChildren(el('div', { class: 'reader-top' }, iconButton('back', 'Back to your room', closeReader, 'ib')), el('h1', null, item.title),
         el('div', { class: 'error' }, `That share has vanished into another dimension (${errorText(error)}).`));
