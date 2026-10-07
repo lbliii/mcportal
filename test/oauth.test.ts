@@ -24,6 +24,9 @@ function fakeUpstreams(users: Record<string, { id: number; login: string }>): { 
     if (url === 'https://client.example/meta.json') {
       return reply(200, { client_id: 'https://client.example/meta.json', client_name: 'Example CIMD Client', redirect_uris: ['https://client.example/cb'] });
     }
+    if (url === 'https://chatgpt.com/oauth/codex/client.json') {
+      return reply(200, { client_id: url, client_name: 'Codex', application_type: 'native', redirect_uris: ['http://127.0.0.1/callback', 'http://localhost/callback'] });
+    }
     return fixtures(url, options);
   };
   return { fetcher, calls };
@@ -294,6 +297,25 @@ test('client ID metadata documents work without registration', async () => {
     assert.match(consent.body, /Example CIMD Client/);
     const q2 = new URLSearchParams({ ...Object.fromEntries(q), redirect_uri: 'https://evil.example/cb' });
     assert.equal((await raw(app.port, { path: `/oauth/authorize?${q2}` })).status, 400);
+  } finally {
+    await app.close();
+  }
+});
+
+test('loopback redirects match on any port, as native clients like Codex need (RFC 8252 7.3)', async () => {
+  const app = await startOAuth();
+  try {
+    const { challenge } = pkce();
+    const base = { response_type: 'code', client_id: 'https://chatgpt.com/oauth/codex/client.json', code_challenge: challenge, code_challenge_method: 'S256' };
+    const status = async (redirect_uri: string) => (await raw(app.port, { path: `/oauth/authorize?${new URLSearchParams({ ...base, redirect_uri })}` })).status;
+    assert.equal(await status('http://127.0.0.1:54321/callback'), 200);
+    assert.equal(await status('http://localhost:61000/callback'), 200);
+    assert.equal(await status('http://127.0.0.1:54321/elsewhere'), 400, 'path still has to match');
+    assert.equal(await status('http://localhost.evil.example:54321/callback'), 400);
+    assert.equal(await status('https://127.0.0.1:54321/callback'), 400, 'scheme still has to match');
+    const clientId = await register(app, ['https://client.example/cb']);
+    const https = await raw(app.port, { path: `/oauth/authorize?${new URLSearchParams({ ...base, client_id: clientId, redirect_uri: 'https://client.example:8443/cb' })}` });
+    assert.equal(https.status, 400, 'non-loopback ports stay exact');
   } finally {
     await app.close();
   }
