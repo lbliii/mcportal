@@ -88,7 +88,7 @@ test('everything exports full Space settings, private relationships and only the
   suspended = true;
   assert.deepEqual((await social.connections('alice-account')).blocked, [], 'regular social responses still hide suspended accounts');
   const data = parseExport((await buildExport('mcportal', 'alice-account', { store: new MemoryProfileStore(), publicProfile: own, social })).body.toString());
-  assert.equal(data.version, 2, 'Space appearance is included in version 2');
+  assert.equal(data.version, 3, 'Space appearance and store watches are included in version 3');
   assert.equal(data.publicProfile?.spaceTitle, 'Alice’s Space');
   assert.equal(data.publicProfile?.cover?.ink, 'atomic');
   assert.equal(data.publicProfile?.sources?.[0]?.title, 'News');

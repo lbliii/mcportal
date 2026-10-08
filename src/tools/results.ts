@@ -16,6 +16,8 @@ import type { Candidate, HighlightPick, Lead, RoomEdition } from '../highlights.
 import type { ReadingState } from '../reading.ts';
 import type { Article, Item, PortalResult, Provenance } from '../types.ts';
 import type { Identity } from './kit.ts';
+import type { WatchPreview } from '../store-watches.ts';
+import type { StoreScope } from '../adapters/shopify.ts';
 
 /** A starter pack as the welcome screen lists it. */
 export type PackSummary = { id: string; label: string; blurb: string; sources: string[] };
@@ -68,6 +70,8 @@ export type SpaceResult = {
 };
 
 export type ToolResults = {
+  watch: { preview?: WatchPreview; confirmed?: { id: string; displayName: string; origin: string; scope: StoreScope; paused: boolean }; profile?: Profile; portal?: PortalResult };
+  unwatch: { removed: boolean };
   open_room: RoomResult;
   build_room: { profile: Profile };
   arrange_room: { profile: Profile; changes: ProfileDiff };

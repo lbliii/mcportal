@@ -96,6 +96,7 @@ export interface ClipsConfig {
 
 /** Each source's validated settings. */
 export interface SourceConfigs {
+  watches: { kind: 'store'; limit: number };
   hn: HnConfig;
   rss: RssConfig;
   github: GithubConfig;
@@ -141,7 +142,7 @@ export const PEOPLE = { picks: 12, passed: 200, why: 200, pickDays: 30, passDays
 
 /** Columns scroll sideways, so there can be more than fit on screen. */
 export const LIMITS = { columns: 8, portalsPerColumn: 4, items: 30, saved: 200 } as const;
-export const SOURCES: SourceKind[] = ['hn', 'rss', 'github', 'docs', 'saved', 'pinned', 'clips', 'following', 'people', 'lobby'];
+export const SOURCES: SourceKind[] = ['hn', 'rss', 'github', 'docs', 'saved', 'pinned', 'clips', 'following', 'people', 'lobby', 'watches'];
 
 /** A profile, layout or source config that fails validation. Defaults to invalid_argument; pass a code when it's something else. */
 export class ProfileError extends AppError {
@@ -210,6 +211,10 @@ const itemsLimit = (config: Record<string, unknown>) => ({ limit: clampInt(confi
 const fetchLimit = (config: Record<string, unknown>) => clampInt(config.limit, 1, LIMITS.items, 10);
 
 const NORMALIZERS: { [S in SourceKind]: Normalizer<S> } = {
+  watches(config, where) {
+    if (config.kind !== 'store') throw new ProfileError(`${where}: watches currently supports kind=store`);
+    return { kind: 'store', ...itemsLimit(config) };
+  },
   saved: itemsLimit,
   following: itemsLimit,
   people: itemsLimit,

@@ -19,6 +19,7 @@
  *
  * Plain server-rendered forms: no scripts. Sessions live in memory for an hour.
  */
+import type { WatchStore } from './watches.ts';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Accounts } from './accounts.ts';
 import type { OAuthServer } from './auth/oauth.ts';
@@ -54,6 +55,7 @@ export interface AccountDeps {
   oauth: OAuthServer;
   store: ProfileStore;
   reading?: ReadingStore | undefined;
+  watchStore?: WatchStore | undefined;
   handoffs?: HandoffStore | undefined;
   seen?: SeenStore | undefined;
   editions?: EditionStore | undefined;
@@ -172,7 +174,7 @@ ${csrf}
 }
 
 /** What deleting an account needs: every store, and something that can revoke its sign-ins. */
-export type DeletionDeps = Pick<AccountDeps, 'accounts' | 'store' | 'reading' | 'handoffs' | 'seen' | 'editions' | 'clips' | 'publicProfiles' | 'social'> & {
+export type DeletionDeps = Pick<AccountDeps, 'accounts' | 'store' | 'watchStore' | 'reading' | 'handoffs' | 'seen' | 'editions' | 'clips' | 'publicProfiles' | 'social'> & {
   oauth: { revokeUser(userId: string): Promise<number> };
 };
 
@@ -186,6 +188,7 @@ export type DeletionDeps = Pick<AccountDeps, 'accounts' | 'store' | 'reading' | 
 export async function deleteAccountData(accountId: string, deps: DeletionDeps, by = accountId): Promise<{ clips: number; tokens: number }> {
   await deps.store.delete(accountId);
   await deps.reading?.deleteAll(accountId);
+  await deps.watchStore?.deleteAll(accountId);
   await deps.handoffs?.deleteAll(accountId);
   await deps.seen?.deleteAll(accountId);
   await deps.editions?.deleteAll(accountId);

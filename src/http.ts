@@ -8,6 +8,8 @@
  *     alone can't stop it because an attacker controls both headers);
  *   - never lets a malformed request crash the process.
  */
+import { StoreWatches } from './store-watches.ts';
+import { FileWatchStore, type WatchStore } from './watches.ts';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { OAuthServer } from './auth/oauth.ts';
 import { AuthStore, fileAuthPersistence, type AuthPersistence } from './auth/store.ts';
@@ -76,6 +78,7 @@ export interface AppConfig {
 export interface AppDeps {
   store: ProfileStore;
   reading?: ReadingStore | undefined;
+  watchStore?: WatchStore | undefined;
   handoffs?: HandoffStore | undefined;
   seen?: SeenStore | undefined;
   editions?: EditionStore | undefined;
@@ -229,6 +232,8 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
   const admin = oauth ? new AdminPanel(accounts, oauth, config.publicUrl, deps.now, { social: oauth && deps.publicProfiles ? deps.social : undefined, profiles: deps.publicProfiles, budget, metrics }) : undefined;
   const health = healthCheck(deps, log);
   const site: SiteConfig = { supportUrl: DEFAULT_SUPPORT_URL, ...config.site, publicUrl: config.publicUrl, inviteOnly: Boolean(oauth) && !accounts.openSignup };
+  const watchStore = deps.watchStore ?? new FileWatchStore(config.dataDir);
+  const watches = new StoreWatches(watchStore, deps, deps.now, deps.store);
   const reading = deps.reading ?? new FileReadingStore(config.dataDir);
   const handoffs = deps.handoffs ?? new FileHandoffStore(config.dataDir);
   const seen = deps.seen ?? new FileSeenStore(config.dataDir);
@@ -237,18 +242,18 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
   const publicProfiles = oauth ? deps.publicProfiles : undefined;
   const social = oauth && publicProfiles ? deps.social : undefined;
   // The account page needs GitHub sign-in; without it, exports are written to the data directory.
-  const account = oauth ? new AccountPage({ accounts, oauth, store: deps.store, reading, handoffs, seen, editions, clips, publicProfiles, social, images: { fetcher: deps.fetcher, cache: deps.cache }, publicUrl: config.publicUrl, log, now: deps.now, trustProxy: config.trustProxy }) : undefined;
+  const account = oauth ? new AccountPage({ accounts, oauth, store: deps.store, watchStore, reading, handoffs, seen, editions, clips, publicProfiles, social, images: { fetcher: deps.fetcher, cache: deps.cache }, publicUrl: config.publicUrl, log, now: deps.now, trustProxy: config.trustProxy }) : undefined;
   // Retention on a schedule: what's kept only for a while goes even on a quiet server.
   const stopHousekeeping = startHousekeeping(retentionTasks({ handoffs, editions, social, accounts, oauth }), log);
   const context = (userId: string, reqLog: Logger): ToolContext => ({
     log: reqLog,
-    store: deps.store, reading, handoffs, seen, editions, clips, publicProfiles, social, fetcher: deps.fetcher, cache: deps.cache, userId, budget, metrics, actor: accounts.actor(userId),
+    store: deps.store, watchStore, reading, handoffs, seen, editions, clips, publicProfiles, social, fetcher: deps.fetcher, cache: deps.cache, userId, watches, budget, metrics, actor: accounts.actor(userId),
     labs: deps.labs,
     accountUrl: account?.url,
     uploadLink: account ? () => account.uploadLink(userId) : undefined,
     localFiles: !account && config.allowUnauthenticated && isLoopbackHost(config.host),
     deliver: async (format) => {
-      if (!account) return deliverToFile(format, userId, { store: deps.store, reading, clips }, config.dataDir);
+      if (!account) return deliverToFile(format, userId, { store: deps.store, watchStore, reading, clips }, config.dataDir);
       // Built when the link is opened, so it's current and the big ones aren't built twice.
       const summary = { mcportal: 'everything', bookmarks: 'saved items', clips: 'clips as Markdown', opml: 'sources as OPML' }[format];
       return { kind: 'link', where: account.downloadLink(userId, format), summary };
@@ -314,7 +319,7 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
       if (url.pathname === API_EXPORT_PATH) {
         const format = url.searchParams.get('format') ?? 'mcportal';
         if (!EXPORT_FORMATS.includes(format as ExportFormat)) return json(400, { error: 'bad_request', error_description: `format must be one of ${EXPORT_FORMATS.join(', ')}` });
-        const file = await buildExport(format as ExportFormat, userId, { store: deps.store, reading, clips, publicProfile: await publicProfiles?.get(userId), social });
+        const file = await buildExport(format as ExportFormat, userId, { store: deps.store, watchStore, reading, clips, publicProfile: await publicProfiles?.get(userId), social });
         return send(res, 200, file.body, file.contentType, { ...server, 'content-disposition': `attachment; filename="${file.filename}"`, 'x-mcportal-summary': file.summary });
       }
       let text: string;
@@ -325,7 +330,7 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
         return json(tooLarge ? 413 : 400, { error: tooLarge ? 'too_large' : 'bad_request', error_description: tooLarge ? 'Over 60 MB' : 'Unreadable body' }, tooLarge ? { connection: 'close' } : {});
       }
       try {
-        const result = await importExport(parseExport(text), userId, { store: deps.store, reading, clips, publicProfiles: deps.publicProfiles });
+        const result = await importExport(parseExport(text), userId, { store: deps.store, watchStore, reading, clips, publicProfiles: deps.publicProfiles });
         return json(200, { result, summary: describeImport(result) });
       } catch (error) {
         if (!isAppError(error) || error.code === 'internal') throw error;

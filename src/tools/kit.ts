@@ -6,6 +6,8 @@
  * toolError with a code); the dispatcher in src/mcp.ts turns a thrown AppError into a
  * coded tool error and anything else into `internal`, logged with its stack.
  */
+import type { Watches } from '../store-watches.ts';
+import type { WatchStore } from '../watches.ts';
 import { randomBytes } from 'node:crypto';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { ACTIVE_LABS } from '../labs.ts';
@@ -33,6 +35,8 @@ export const ROOM_URI = 'ui://mcportal/room.html';
 export interface ToolContext extends SourceDeps {
   store: ProfileStore;
   reading?: ReadingStore | undefined;
+  watches?: Watches | undefined;
+  watchStore?: WatchStore | undefined;
   /** Pages sent from the room to a new chat. Absent where they aren't set up; the handoff tools then refuse. */
   handoffs?: HandoffStore | undefined;
   /** What the user has seen in each portal, for "new". Absent: nothing is marked new. */

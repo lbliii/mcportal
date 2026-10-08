@@ -14,6 +14,7 @@ import type { Article, Fetcher, Item, PortalResult, SourceKind } from './types.t
 
 /** Declared freshness per source, in seconds (Orrery-style freshness policy). */
 export const FRESHNESS: Record<SourceKind | 'reader', number> = {
+  watches: 86_400,
   saved: 0,
   pinned: 0,
   clips: 0,
@@ -41,7 +42,7 @@ function loadFailure(error: unknown, deps: SourceDeps, fields: LogFields): { err
   return { error: clean(userMessage(error, 'Unexpected error loading this source'), 200), errorCode: code };
 }
 
-const DEFAULT_TITLES: Record<SourceKind, string> = { hn: 'Hacker News', rss: 'Feed', github: 'GitHub', docs: 'Docs', saved: 'Saved', pinned: 'Pinned', clips: 'Clips', following: 'Following', people: 'People', lobby: 'Lobby' };
+const DEFAULT_TITLES: Record<SourceKind, string> = { watches: 'Shop', hn: 'Hacker News', rss: 'Feed', github: 'GitHub', docs: 'Docs', saved: 'Saved', pinned: 'Pinned', clips: 'Clips', following: 'Following', people: 'People', lobby: 'Lobby' };
 
 /** Saved items come from the profile, not the network. */
 export function savedPortal(portal: PortalInput, saved: SavedItem[]): PortalResult {
@@ -230,7 +231,7 @@ export function docsItems(site: DocSite, config: DocsConfig): Item[] {
 }
 
 export async function loadPortal(portal: PortalInput, deps: SourceDeps, force = false): Promise<PortalResult> {
-  if (portal.source === 'saved' || portal.source === 'pinned' || portal.source === 'clips' || portal.source === 'following' || portal.source === 'people' || portal.source === 'lobby') throw new AppError('invalid_argument', `${portal.source} portals are built from the profile, not fetched`);
+  if (portal.source === 'watches' || portal.source === 'saved' || portal.source === 'pinned' || portal.source === 'clips' || portal.source === 'following' || portal.source === 'people' || portal.source === 'lobby') throw new AppError('invalid_argument', `${portal.source} portals are built from the profile, not fetched`);
   const config = normalizeSourceConfig(portal.source, portal.config, portal.id);
   let endpoint = '';
   let title = portal.title ?? DEFAULT_TITLES[portal.source];
@@ -296,6 +297,7 @@ export async function loadArticle(url: string, deps: SourceDeps): Promise<Articl
 }
 
 export const SOURCE_DOCS = {
+  watches: { description: 'Private store follows, created with watch. Refresh checks supported public Shopify catalogues; no background monitoring.', config: { kind: 'store', limit: '1-30' } },
   hn: { description: 'Hacker News stories.', config: { feed: 'top | new | best | ask | show (default top)', limit: '1-30' } },
   github: {
     description: 'GitHub repositories (search) or a repo\'s releases.',

@@ -25,6 +25,11 @@ declare global {
     docsContents: HTMLElement;
     readerFind: HTMLDivElement;
     readerComfort: HTMLDivElement;
+    addFeed: HTMLButtonElement;
+    addStore: HTMLButtonElement;
+    storeCollection: HTMLInputElement;
+    storeSales: HTMLInputElement;
+    storeScope: HTMLDivElement;
     addForm: HTMLFormElement;
     addHint: HTMLDivElement;
     addInput: HTMLInputElement;

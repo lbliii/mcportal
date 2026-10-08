@@ -22,7 +22,7 @@ Ghost mode exists because some people want a reader that never reports to a serv
 
 ### Linked
 
-A linked computer runs every tool itself, exactly as in ghost mode. The difference is where the tools read and write. Its `ToolContext` holds remote versions of the stores (room, clips, reading, seen marks, handoffs, editions, social and public profiles), which call the hosted state API instead of touching files.
+A linked computer runs every tool itself, exactly as in ghost mode. The difference is where the tools read and write. Its `ToolContext` holds remote versions of the stores (room, clips, reading, seen marks, handoffs, editions, social and public profiles), which call the hosted state API instead of touching files. Store previews, confirmations and catalogue comparisons also run on the hosted side when linked, so preview tokens and private snapshots stay with that account. An unreachable host fails watch operations without creating local state.
 
 Fetching, the reader, docs pages, thumbnails and the room's assets stay on your computer.
 

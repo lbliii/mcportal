@@ -48,6 +48,7 @@ function observedHost(clientInfo: unknown): string {
 const INSTRUCTIONS = [
   'MCPortal is the user\'s room: portals onto sources they chose (sites with feeds, Hacker News, GitHub, docs), arranged as they asked. "My portal" or "my MCPortal" means the room; stored profiles still call portals panels (columns[].panels).',
   'open_room shows it; a new user gets starter packs (build_room). To follow something new: find_source, then add_portal with the candidate they pick. For docs: open_docs, search_docs, read_doc_page.',
+  'For Shopify stores: watch kind=store with url and optional scope previews; confirm the chosen preview with select to add Shop. unwatch removes or pauses a follow. Checks happen on demand.',
   'save_item keeps a link; clip keeps something from the chat itself; search_clips finds earlier clips.',
   'For "what\'s worth reading" or "catch me up": list_new_items, pick with what you know of the user, then show_highlights.',
   'Never move, retitle or remove portals the user didn\'t mention. To delete their account, give them the account_settings link: it only happens there.',
@@ -65,7 +66,7 @@ const UI_DIR = new URL('./ui/', import.meta.url);
 /** Files inlined into the room where it says <!--include:name--> or /*include:name*\/, so the page stays self-contained. */
 export const UI_INCLUDES = [
   'design/tokens.css', 'design/primitives.css', 'design/palettes.js', 'design/theme.js', 'space-inks.js', 'space-format.js', 'space.css', 'art.js', 'brand/icons.js', 'brand/mark-line.svg', 'brand/badge.svg', 'brand/wordmark.svg',
-  'room/room.css', 'room/bridge.js', 'room/dom.js', 'room/room.js', 'room/items.js', 'room/layouts.js', 'room/river.js', 'room/levels.js', 'room/seen.js', 'room/reader.js', 'room/reader-tools.js', 'room/reading.js', 'room/passage.js', 'room/handoff.js', 'room/highlights.js', 'room/docs.js', 'room/social.js', 'room/reblog.js', 'room/add.js', 'room/toolbar.js', 'room/boot.js',
+  'room/room.css', 'room/bridge.js', 'room/dom.js', 'room/room.js', 'room/items.js', 'room/layouts.js', 'room/river.js', 'room/levels.js', 'room/seen.js', 'room/reader.js', 'room/reader-tools.js', 'room/reading.js', 'room/passage.js', 'room/handoff.js', 'room/highlights.js', 'room/docs.js', 'room/social.js', 'room/reblog.js', 'room/add.js', 'room/shop.js', 'room/toolbar.js', 'room/boot.js',
 ];
 
 /** JSON that is safe to embed inside a <script> element. */

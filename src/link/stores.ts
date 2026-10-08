@@ -19,6 +19,8 @@ import type { ReadingState, ReadingStore, ReadingUpdate } from '../reading.ts';
 import type { SeenStore } from '../seen.ts';
 import type { SocialService } from '../social.ts';
 import type { ProfileChange, ProfileStore, Versioned } from '../store.ts';
+import type { Watches } from '../store-watches.ts';
+import type { StoreWatch, WatchDocument, WatchStore } from '../watches.ts';
 import type { StateClient } from './client.ts';
 
 /** How long a read of the room is reused before asking whether it changed (which is free when it hasn't). */
@@ -372,6 +374,23 @@ export function remoteSocial(client: StateClient, accountId: string): SocialServ
   };
 }
 
+/** Watches always resolve on the hosted account; offline writes never fall back to files. */
+export class RemoteWatchStore extends Linked implements WatchStore {
+  async list(userId:string):Promise<StoreWatch[]> {this.mine(userId);return this.client.call('watches.list');}
+  async update<T>(userId:string,_change:(state:WatchDocument)=>{state?:WatchDocument;result:T}):Promise<T> {this.mine(userId);throw onAccountPage('Editing raw watch data');}
+  async import(userId:string,_records:unknown[]):Promise<number> {this.mine(userId);throw onAccountPage('Importing store watches');}
+  async deleteAll(userId:string):Promise<void> {this.mine(userId);throw onAccountPage('Deleting all store watches');}
+}
+export function remoteWatches(client:StateClient,accountId:string):Watches {
+  const mine=(id:string)=>{if(id!==accountId)throw new Error('A linked MCPortal serves only its linked account.');};
+  return {
+    async preview(userId,url,scope){mine(userId);return client.call('watches.preview',{url,scope});},
+    async confirm(userId,select){mine(userId);return client.call('watches.confirm',{select});},
+    async unwatch(userId,id,paused){mine(userId);return client.call('watches.unwatch',dropUndefined({id,paused}));},
+    async portal(userId,portalId,_title,_limit,force=false){mine(userId);return client.call('watches.portal',{portalId,force});},
+  };
+}
+
 /** JSON drops undefined anyway, but the API's schemas refuse unknown or mistyped keys, so leave them out. */
 function dropUndefined<T extends object>(value: T): Record<string, unknown> {
   return Object.fromEntries(Object.entries(value).filter(([, v]) => v !== undefined));
@@ -381,6 +400,8 @@ function dropUndefined<T extends object>(value: T): Record<string, unknown> {
 export function linkedStores(client: StateClient, accountId: string, options: { now?: () => number } = {}) {
   return {
     store: new RemoteProfileStore(client, accountId, options.now),
+    watchStore: new RemoteWatchStore(client, accountId),
+    watches: remoteWatches(client, accountId),
     clips: new RemoteClipStore(client, accountId),
     reading: new RemoteReadingStore(client, accountId),
     seen: new RemoteSeenStore(client, accountId),

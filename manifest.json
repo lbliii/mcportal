@@ -73,6 +73,14 @@
       "description": "Import the user's subscriptions from another feed reader: pass their OPML export's text."
     },
     {
+      "name": "watch",
+      "description": "Follow a supported Shopify store."
+    },
+    {
+      "name": "unwatch",
+      "description": "Remove a store watch by id from open_room/Shop."
+    },
+    {
       "name": "read_article",
       "description": "Open a web page in reader view: clean title, byline and text, shown as a card."
     },

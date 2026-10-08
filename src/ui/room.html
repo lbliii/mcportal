@@ -46,6 +46,8 @@
   </div>
 </header>
 <section id="addSheet" class="add-sheet room-only" hidden>
+  <div class="add-row" role="group" aria-label="Source type"><button id="addFeed" class="btn" type="button" aria-pressed="true">Feed or site</button><button id="addStore" class="btn" type="button" aria-pressed="false">Shopify store</button></div>
+  <div id="storeScope" class="add-row" hidden><label>Collection handle (optional) <input id="storeCollection" type="text" maxlength="80" placeholder="new-arrivals"></label><label><input id="storeSales" type="checkbox"> Sales only</label></div>
   <form class="add-row" id="addForm">
     <input id="addInput" type="text" autocomplete="off" spellcheck="false" placeholder="theverge.com, r/LocalLLaMA, youtube.com/@channel, owner/repo…" aria-label="Site, feed, subreddit, channel or repo">
     <button class="btn" type="submit">Scan</button>
@@ -128,6 +130,7 @@
   /*include:room/social.js*/
   /*include:room/reblog.js*/
   /*include:room/add.js*/
+  /*include:room/shop.js*/
   /*include:room/toolbar.js*/
   /*include:room/boot.js*/
 })();

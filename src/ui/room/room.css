@@ -648,3 +648,26 @@
   .grid.shelves .card.media .mi { min-height: var(--mp-control-minimum); }
   .card-actions { display: inline-flex; flex-shrink: 0; gap: var(--mp-space-8); margin-left: auto; }
   .card-actions .go { margin-left: 0; }
+
+  .shop { min-width: 0; }
+  .shop .portal-head { flex-wrap: wrap; }
+  .shop-note, .shop-scope, .shop-manage { margin: var(--mp-space-12); color: var(--mp-text-secondary); }
+  .shop-manage summary { cursor: pointer; color: var(--mp-text-primary); }
+  .shop-manage .btn { margin-right: var(--mp-space-8); }
+  .shop-preview { list-style: none; padding-bottom: var(--mp-space-12); }
+  .shop-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); gap: var(--mp-space-12); list-style: none; padding: var(--mp-space-12); margin: 0; }
+  .grid .shop-card.item, .shop-card { display: flex; flex-direction: column; height: 100%; min-width: 0; padding: var(--mp-space-12); border: 1px solid var(--mp-border-divider); border-radius: var(--mp-radius-card); background: var(--mp-surface-card); }
+  .shop-open { display: flex; flex-direction: column; align-items: stretch; text-align: left; padding: 0; border: 0; background: none; cursor: pointer; }
+  .shop-picture { aspect-ratio: 4 / 3; width: 100%; position: relative; background: var(--mp-surface-inset); background-size: contain; background-position: center; background-repeat: no-repeat; margin-bottom: var(--mp-space-12); }
+  .shop-placeholder { position: absolute; inset: 0; display: grid; place-items: center; color: var(--mp-text-secondary); }
+  .shop-picture img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; opacity: 0; }
+  .shop-picture img.on { opacity: 1; }
+  .shop-picture:has(img.on) .shop-placeholder { display: none; }
+  .shop-store, .shop-checked, .shop-stock { font-size: var(--mp-type-12); color: var(--mp-text-secondary); }
+  .shop-title { font-size: var(--mp-type-14); font-weight: var(--mp-weight-strong); margin-top: var(--mp-space-4); }
+  .shop-price { display: flex; flex-wrap: wrap; gap: var(--mp-space-8); align-items: baseline; margin-top: var(--mp-space-12); }
+  .shop-finding { color: var(--mp-action-primary); font-size: var(--mp-type-12); }
+  .shop-stock, .shop-checked { margin-top: var(--mp-space-4); }
+  .shop-save { align-self: flex-start; display: inline-flex; align-items: center; gap: var(--mp-space-6); margin-top: var(--mp-space-12); }
+  .shop-save svg { width: var(--mp-icon-normal); height: var(--mp-icon-normal); fill: none; stroke: currentColor; }
+  .shop-open:focus-visible { outline: 2px solid var(--mp-border-selected); outline-offset: 2px; }

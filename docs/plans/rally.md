@@ -2,6 +2,8 @@
 
 The shared engine under [events](events.md) (artists and venues → shows near you) and [shops](shops.md) (stores and products → new arrivals, sales, restocks). It's the **Watches** item on the [roadmap](README.md), generalized. The artist plan in [events](events.md) is its first worked instance: its storage, linking, export, deletion and fetch rules apply to every kind here, not only artists. None of this is built yet.
 
+The first implementation is the on-demand Shopify store-follow slice, with account-owned snapshots and shared public catalogue caching. See [Following stores](../how-to/follow-stores.md). The generic multi-kind interface, resolve ladder, background collector and delivery loop below remain planned.
+
 ## The principle: a rally
 
 MCPortal and the agent each do what the other can't, and each pass leaves the next one better for the user:

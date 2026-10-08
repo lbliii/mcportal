@@ -9,7 +9,7 @@ import type { ErrorCode } from './lib/errors.ts';
  * whom to follow, kept in the profile, and 'lobby' posts shared with everyone by listed
  * people (docs/plans/finding-people.md).
  */
-export type SourceKind = 'hn' | 'rss' | 'github' | 'docs' | 'saved' | 'pinned' | 'clips' | 'following' | 'people' | 'lobby';
+export type SourceKind = 'hn' | 'rss' | 'github' | 'docs' | 'saved' | 'pinned' | 'clips' | 'following' | 'people' | 'lobby' | 'watches';
 
 export const CLIP_KINDS = ['quote', 'exchange', 'note', 'table', 'image', 'link'] as const;
 export type ClipKind = (typeof CLIP_KINDS)[number];
@@ -59,6 +59,8 @@ export interface Item {
   person?: { handle: string; following: boolean; cover?: import('./space-design.ts').Cover };
   /** Not yet seen by this user (src/seen.ts). */
   new?: true;
+  offer?: { amount: string; currency: string; availability: 'in_stock' | 'sold_out' | 'unknown'; store: string; variant: string; variantsPartial: boolean; observedAt?: string; previousPrice?: string };
+  finding?: { kind: 'new' | 'price_drop' | 'sale' | 'back'; noticedAt: string };
 }
 
 /** "Show your work": where a block's data came from and how fresh it is. */
@@ -84,6 +86,7 @@ export interface PortalResult {
   pin?: { from: string; recipe: string };
   /** How many of its items are new to this user (portals that track it; src/seen.ts). */
   newCount?: number;
+  watches?: Array<{ id: string; displayName: string; origin: string; collection?: string; salesOnly?: boolean; paused: boolean; checkedAt?: string; partial?: boolean; error?: string }>;
 }
 
 /** A run of inline text, with composable safe marks and an optional authored line break. */

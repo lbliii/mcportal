@@ -15,6 +15,7 @@
 
   /** @param {Item} item @param {PortalResult} portal @param {ItemForm} [form] @param {ItemLook} [look] */
   function renderItem(item, portal, form = 'row', look = {}) {
+    if(item.offer) return shopCard(item);
     return ITEM_FORMS[form](item, portal, look);
   }
 

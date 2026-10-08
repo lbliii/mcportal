@@ -14,6 +14,8 @@
  * Left out on purpose: anything that deletes everything or imports (deleteAll,
  * import), moderation and admin, and account deletion. Those stay on their pages.
  */
+import { WATCH_SCOPE_SCHEMA } from '../tools/watches.ts';
+import { storeScope } from '../adapters/shopify.ts';
 import { SPACE_INPUT } from '../space-input.ts';
 import type { PublicProfileInput } from '../public-profiles.ts';
 import { clipInput } from '../portability.ts';
@@ -106,6 +108,20 @@ export const API_METHODS: Record<string, ApiMethod> = {
       await ctx.store.put(ctx.userId, valid);
       return { rev: (await ctx.store.versioned(ctx.userId)).rev };
     }, 'write'),
+
+  // ---- private store watches, always as the authenticated account
+  'watches.list': params(NO_PARAMS, (_p,ctx)=>need(ctx.watchStore,'Store watches unavailable.').list(ctx.userId)),
+  'watches.preview': params<{url:string;scope?:unknown}>({type:'object',required:['url'],additionalProperties:false,properties:{url:{type:'string',maxLength:2048},scope:WATCH_SCOPE_SCHEMA}},
+    (p,ctx)=>need(ctx.watches,'Store watches unavailable.').preview(ctx.userId,p.url,storeScope(p.scope)),'read',8),
+  'watches.confirm': params<{select:string}>({type:'object',required:['select'],additionalProperties:false,properties:{select:{type:'string',maxLength:100}}},
+    (p,ctx)=>need(ctx.watches,'Store watches unavailable.').confirm(ctx.userId,p.select),'write',1),
+  'watches.unwatch': params<{id:string;paused?:boolean}>(toolSchema('unwatch'),
+    (p,ctx)=>need(ctx.watches,'Store watches unavailable.').unwatch(ctx.userId,p.id,p.paused),'write',1),
+  'watches.portal': params<{portalId:string;force?:boolean}>({type:'object',required:['portalId'],additionalProperties:false,properties:{portalId:{type:'string',maxLength:80},force:{type:'boolean'}}},async(p,ctx)=>{
+    const spec=portalsOf(await ctx.store.get(ctx.userId)).find(s=>s.id===p.portalId&&s.source==='watches');
+    if(!spec)throw new AppError('not_found','No Shop portal with that id in your room.');
+    return need(ctx.watches,'Store watches unavailable.').portal(ctx.userId,spec.id,spec.title??'Shop',(spec.config as {limit:number}).limit,p.force);
+  },'read',8),
 
   // ---- clips
   /** Rebuilt from its content, exactly like a new clip, with an id this server picks. */
