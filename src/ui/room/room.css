@@ -46,7 +46,8 @@
   .ib { display: inline-flex; align-items: center; justify-content: center; flex: none; width: var(--mp-control-height); height: var(--mp-control-height); padding: 0; border: 0; border-radius: var(--mp-radius-sm); background: none; color: var(--mp-text-secondary); cursor: pointer; }
   .ib:hover, .ib:focus-visible { background: var(--mp-surface-hover); color: var(--mp-text-primary); outline: none; }
   .ib[aria-pressed="true"] { color: var(--mp-action-primary); background: var(--mp-surface-selected); }
-  .ib svg, .mi svg { width: var(--mp-icon-normal); height: var(--mp-icon-normal); fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; }
+  .ib svg, .mi svg, .btn > svg { width: var(--mp-icon-normal); height: var(--mp-icon-normal); fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; }
+  .btn > svg { vertical-align: middle; }
   /* A state mark (reblog's moon) is drawn only while its button is pressed, so state never rests on colour alone. */
   .icon-state { display: none; }
   [aria-pressed="true"] .icon-state, .on > svg .icon-state { display: inline; }

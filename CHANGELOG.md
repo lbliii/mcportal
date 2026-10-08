@@ -4,6 +4,7 @@
 
 ### Core content loop
 - Integrate reader wave 2 with full-height reading, separate controls, bounded image retries and improved article extraction while preserving Recall, reading tabs, page find and reading preferences.
+- Size clip Share icons consistently with other controls.
 - Add a keyboard passage chooser, useful reader destination focus and stable Recall preview focus. Documentation search explains its coverage and GitHub pages show their actual version.
 - Keep retained handoff passages available when their source cannot load, with a live-page retry.
 - Ignore obsolete source previews and keep detailed OPML import reports. Concurrent imports and retries preserve completed subscriptions; remaining feeds and failures are named.
