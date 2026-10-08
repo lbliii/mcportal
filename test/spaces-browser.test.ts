@@ -9,7 +9,7 @@ import { findChrome, Page } from './browser.ts';
 import { startApp } from './helpers.ts';
 
 const chrome = findChrome();
-test('Spaces in a browser: live print shop, pins, native host modes, narrow/dark/forced colors and script-free web formats', { skip: !chrome && 'Chrome unavailable' }, async () => {
+test('Spaces in a browser: owner side panel, pins, native host modes, narrow/dark/forced colors and script-free web formats', { skip: !chrome && 'Chrome unavailable' }, async () => {
   const accounts = new Accounts(memoryPersistence(), makeBootstrap([], [], true));
   const admitted = await accounts.admit({ githubId: 101, login: 'Alice' }); assert.ok(admitted.ok);
   const id = admitted.account.id;
@@ -37,6 +37,15 @@ test('Spaces in a browser: live print shop, pins, native host modes, narrow/dark
         if (!msg?.id || !msg.method) return;
         event.stopImmediatePropagation();
         let result = {};
+        window.__writes ||= [];
+        if (msg.method === 'tools/call') {
+          const name = msg.params.name;
+          if (name === 'set_public_profile') window.__writes.push(msg.params.arguments);
+          if ((name === 'set_public_profile' && window.__failWrite) || (name === 'open_space' && window.__failRead)) {
+            window.__failWrite = window.__failRead = false;
+            window.postMessage({ jsonrpc: '2.0', id: msg.id, result: { isError: true, content: [{ type: 'text', text: 'Temporary fixture failure' }] } }, '*'); return;
+          }
+        }
         if (msg.method === 'ui/initialize') {
           result = { hostCapabilities: { serverTools: true }, hostContext: { theme: 'light', displayMode: 'inline', availableDisplayModes: ['inline', 'fullscreen'] } };
           setTimeout(() => window.postMessage({ jsonrpc: '2.0', method: 'ui/notifications/tool-result', params: { structuredContent: { space: ${JSON.stringify(space)} } } }, '*'), 50);
@@ -47,9 +56,13 @@ test('Spaces in a browser: live print shop, pins, native host modes, narrow/dark
         window.postMessage({ jsonrpc: '2.0', id: msg.id, result }, '*');
       });` });
     await page.goto(`${app.base}/preview`);
-    await page.waitFor(`document.querySelector('.space-printshop')`, 'the owner print shop');
+    await page.waitFor(`document.querySelector('.space-owner-view')`, 'the owner controls');
+    assert.equal(await page.eval(`document.getElementById('spaceCustomization').hidden`), true);
+    await page.click('.space-customize-toggle');
+    await page.waitFor(`!document.getElementById('spaceCustomization').hidden`, 'the side panel');
     for (const format of ['paperback', 'magazine', 'patch']) {
-      await page.eval(`(() => { const n = document.querySelector('select[aria-label="Format"]'); n.value = ${JSON.stringify(format)}; n.dispatchEvent(new Event('change')); })()`);
+      await page.click(`[data-space-format-choice="${format}"]`);
+      await page.waitFor(`document.querySelector('.space-owner-status').textContent === 'Saved' && !document.getElementById('spaceCustomization').hasAttribute('aria-busy')`, 'the completed save');
       await page.waitFor(`document.querySelector('[data-space-format="${format}"]')`, `the saved ${format}`);
       assert.equal((await profiles.get(id))?.format, format);
       for (const [width, mode] of [[480, 'inline'], [1280, 'fullscreen']] as const) {
@@ -68,6 +81,55 @@ test('Spaces in a browser: live print shop, pins, native host modes, narrow/dark
         }
       }
     }
+    // A page refresh must not replace the editor, draft fields, disclosures or focus.
+    await page.click('#space-tab-content');
+    await page.eval(`document.querySelector('[aria-label="Space title"]').value = 'Draft for later'; document.querySelector('.space-owner-stamps').open = true`);
+    await page.click('#space-tab-appearance');
+    await page.eval(`document.querySelector('[aria-label="pulp palette"]').focus(); document.querySelector('[aria-label="pulp palette"]').click()`);
+    await page.waitFor(`document.querySelector('.space-owner-status').textContent === 'Saved' && !document.getElementById('spaceCustomization').hasAttribute('aria-busy')`, 'appearance save');
+    assert.equal(await page.eval(`document.activeElement.getAttribute('aria-label')`), 'pulp palette');
+    assert.equal(await page.eval(`document.querySelector('[aria-label="Space title"]').value`), 'Draft for later');
+    assert.equal(await page.eval(`document.querySelector('.space-owner-stamps').open`), true);
+    await page.click('[data-space-post]');
+    await page.waitFor(`document.querySelector('[aria-label="Back to the space"]')`, 'the opened post');
+    await page.click('[aria-label="Back to the space"]');
+    assert.equal(await page.eval(`document.getElementById('spaceCustomization').hidden`), false);
+    assert.equal(await page.eval(`document.querySelector('[aria-label="Space title"]').value`), 'Draft for later');
+    // Rejected changes revert their controls and can be retried in place.
+    await page.click('#space-tab-visibility');
+    await page.eval(`window.__failWrite = true; document.querySelector('[aria-label="Include me in discovery"]').click()`);
+    await page.waitFor(`document.querySelector('.save-error') && !document.getElementById('spaceCustomization').hasAttribute('aria-busy')`, 'a rejected save');
+    assert.equal(await page.eval(`document.querySelector('[aria-label="Include me in discovery"]').checked`), false);
+    await page.click('.space-owner-retry');
+    await page.waitFor(`document.querySelector('.space-owner-status').textContent === 'Saved' && !document.getElementById('spaceCustomization').hasAttribute('aria-busy')`, 'the retry');
+    assert.equal((await profiles.get(id))?.listed, true);
+    await page.click('[aria-label="Include me in discovery"]');
+    await page.waitFor(`document.querySelector('.space-owner-status').textContent === 'Saved' && !document.getElementById('spaceCustomization').hasAttribute('aria-busy')`, 'discovery cleared');
+    assert.equal(await page.eval(`document.querySelector('[aria-label="Include me in discovery"]').checked`), false);
+    await page.click('[aria-label="Public Space"]');
+    await page.waitFor(`document.querySelector('.space-owner-status').textContent === 'Saved' && !document.getElementById('spaceCustomization').hasAttribute('aria-busy')`, 'private Space');
+    assert.equal(await page.eval(`document.querySelector('[aria-label="Public Space"]').checked`), false);
+    await page.click('[aria-label="Public Space"]');
+    await page.waitFor(`document.querySelector('.space-owner-status').textContent === 'Saved' && !document.getElementById('spaceCustomization').hasAttribute('aria-busy')`, 'public Space restored');
+    assert.equal(await page.eval(`document.querySelector('[aria-label="Public Space"]').checked`), true);
+    // If only the read fails, retry must not repeat a successful randomization.
+    await page.click('#space-tab-appearance');
+    await page.eval(`window.__failRead = true; [...document.querySelectorAll('#space-settings-appearance button')].find(n => n.textContent.includes('Shuffle composition')).click()`);
+    await page.waitFor(`document.querySelector('.save-error') && !document.getElementById('spaceCustomization').hasAttribute('aria-busy')`, 'failed preview refresh');
+    const writes = await page.eval<number>(`window.__writes.length`);
+    const committedSeed = (await profiles.get(id))!.cover!.seed;
+    await page.click('.space-owner-retry');
+    await page.waitFor(`document.querySelector('.space-owner-status').textContent === 'Saved' && !document.getElementById('spaceCustomization').hasAttribute('aria-busy')`, 'refresh retry');
+    assert.equal(await page.eval(`window.__writes.length`), writes);
+    assert.equal((await profiles.get(id))!.cover!.seed, committedSeed);
+    // Roving tabs and Escape preserve a predictable keyboard return path.
+    await page.eval(`document.getElementById('space-tab-appearance').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }))`);
+    assert.equal(await page.eval(`document.activeElement.id`), 'space-tab-content');
+    await page.eval(`document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))`);
+    assert.equal(await page.eval(`document.getElementById('spaceCustomization').hidden`), true);
+    assert.equal(await page.eval(`document.activeElement.classList.contains('space-customize-toggle')`), true);
+    await page.click('.space-customize-toggle');
+    await page.click('#space-tab-appearance');
     await page.click('[data-space-pin]');
     await page.waitFor(`document.querySelector('.space-pinned')`, 'the saved pinned post');
     assert.ok((await profiles.get(id))?.pinnedShareId);
@@ -75,7 +137,7 @@ test('Spaces in a browser: live print shop, pins, native host modes, narrow/dark
     assert.equal(await page.eval(`document.getElementById('space-travelers').hidden`), false);
     assert.equal(await page.eval(`document.getElementById('space-posts').hidden`), true);
     const seed = (await profiles.get(id))!.cover!.seed;
-    await page.eval(`[...document.querySelectorAll('.space-printshop button')].find(n => n.textContent === 'Re-roll').click()`);
+    await page.eval(`[...document.querySelectorAll('#space-settings-appearance button')].find(n => n.textContent.includes('Shuffle composition')).click()`);
     await page.waitFor(`document.getElementById('space-posts') && !document.getElementById('space-posts').hidden`, 'rerender after re-roll');
     assert.notEqual((await profiles.get(id))!.cover!.seed, seed);
     await page.send('Emulation.setEmulatedMedia', { features: [{ name: 'forced-colors', value: 'active' }] });
@@ -88,6 +150,7 @@ test('Spaces in a browser: live print shop, pins, native host modes, narrow/dark
       await page.send('Emulation.setDeviceMetricsOverride', { width: 480, height: 1000, deviceScaleFactor: 1, mobile: false });
       await page.goto(`${app.base}/@alice`);
       assert.equal(await page.eval(`document.querySelectorAll('script').length`), 0);
+      assert.equal(await page.eval(`document.querySelectorAll('.space-owner-view').length`), 0, 'the public page has no customization controls');
       assert.equal(await page.eval(`document.querySelector('.space-sheet').dataset.spaceFormat`), format);
       assert.ok(await page.eval(`document.documentElement.scrollWidth <= innerWidth + 1`), `public ${format} fits narrow width`);
       assert.equal(await page.eval(`document.querySelector('.space-sheet .follow').getAttribute('href')`), '/@alice/signin');

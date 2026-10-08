@@ -1085,8 +1085,8 @@ test('browser: Space links: the room offers a follow of whoever brought you, say
       if (url === '/mcp' && (name === 'relationship' || name === 'open_space' || name === 'set_public_profile')) {
         window.__calls.push({ name, args });
         if (name === 'relationship') return answer({ content: [], structuredContent: { handle: args.handle, layoutChanged: false } });
-        if (name === 'set_public_profile') return answer({ content: [], structuredContent: { profile: { handle: 'reader', ...(args.listed ? { listed: true } : {}), createdAt: now, updatedAt: now } } });
-        return answer({ content: [], structuredContent: { space: { handle: 'reader', mine: true, followers: 0, following: false, posts: [], sources: [], link: 'https://mcportal.example/@reader', createdAt: now, updatedAt: now } } });
+        if (name === 'set_public_profile') { window.__spaceListed = args.listed; return answer({ content: [], structuredContent: { profile: { handle: 'reader', listed: window.__spaceListed, createdAt: now, updatedAt: now } } }); }
+        return answer({ content: [], structuredContent: { space: { handle: 'reader', listed: window.__spaceListed, mine: true, followers: 0, following: false, posts: [], sources: [], link: 'https://mcportal.example/@reader', createdAt: now, updatedAt: now } } });
       }
       const res = await real(url, init);
       if (name !== 'open_room') return res;
@@ -1115,12 +1115,14 @@ test('browser: Space links: the room offers a follow of whoever brought you, say
     await page.eval(`document.querySelector('#intros .handle').click()`);
     await page.waitFor(`!document.getElementById('reader').hidden && document.querySelector('#reader .space-head')`, 'a space');
     assert.equal(await page.eval(`getComputedStyle(document.getElementById('intros')).display`), 'none');
-    assert.ok(await page.eval(`document.querySelector('#reader .space-printshop').textContent.includes('Copy link to your space')`), 'your own space offers its link');
+    assert.ok(await page.eval(`document.querySelector('#reader .space-owner-bar').textContent.includes('Copy link to your space')`), 'your own space offers its link');
     // Your space says whether you're findable, and switches it.
-    await page.eval(`[...document.querySelectorAll('#reader .space-printshop .btn')].find((b) => b.textContent === 'Unlisted: list me').click()`);
-    await page.waitFor(`[...document.querySelectorAll('#reader .space-printshop .btn')].some((b) => b.textContent.startsWith('Listed:'))`, 'listed');
-    assert.deepEqual(await page.eval(`window.__calls.at(-1)`), { name: 'set_public_profile', args: { listed: true } });
-    await page.eval(`[...document.querySelectorAll('#reader .space-printshop .btn')].find((b) => b.textContent.includes('Copy link')).click()`);
+    await page.click('.space-customize-toggle');
+    await page.click('#space-tab-visibility');
+    await page.click('[aria-label="Include me in discovery"]');
+    await page.waitFor(`document.querySelector('.space-owner-status').textContent === 'Saved'`, 'listed');
+    assert.deepEqual(await page.eval(`window.__calls.findLast((call) => call.name === 'set_public_profile')`), { name: 'set_public_profile', args: { listed: true } });
+    await page.eval(`[...document.querySelectorAll('#reader .space-owner-bar .btn')].find((b) => b.textContent.includes('Copy link')).click()`);
     await page.waitFor(`/mcportal\\.example\\/@reader|Copied your Space link/.test(document.getElementById('toast').textContent)`, 'the link copied or shown');
     await page.eval(`document.querySelector('#reader .reader-top button').click()`);
     await page.waitFor(`document.getElementById('reader').hidden`, 'back to the room');

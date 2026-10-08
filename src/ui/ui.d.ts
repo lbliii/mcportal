@@ -22,6 +22,13 @@ declare global {
 
   /** Every element of room.html that the script looks up by id, with its element type. */
   interface RoomElements {
+    spaceCustomization: HTMLElement;
+    "space-tab-appearance": HTMLButtonElement;
+    "space-tab-content": HTMLButtonElement;
+    "space-tab-visibility": HTMLButtonElement;
+    "space-settings-appearance": HTMLDivElement;
+    "space-settings-content": HTMLDivElement;
+    "space-settings-visibility": HTMLDivElement;
     docsContents: HTMLElement;
     readerFind: HTMLDivElement;
     readerComfort: HTMLDivElement;

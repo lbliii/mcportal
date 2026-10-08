@@ -129,54 +129,9 @@
   }
 
   // ------------------------------------------------------------ spaces
-  /** Print-shop choices are named plates; text is authored here or approved in chat. */
-  /** @param {Space} space @param {boolean} withBack @param {(e: MouseEvent) => void} [back] */
-  function printShop(space, withBack, back) {
-    const shop = el('section', { class: 'space-printshop', 'aria-label': 'Print shop' }, el('strong', null, 'Print shop'));
-    /** @param {Record<string, unknown>} input */
-    const save = async (input) => {
-      try { await callTool('set_public_profile', input); const updated = (await callTool('open_space', {})).structuredContent.space; showSpace(updated, withBack, back); }
-      catch (error) { toast(errorText(error)); }
-    };
-    for (const [field, label, values, value] of [
-      ['ink', 'Ink', spaceInks.sets.map((s) => s.name), space.cover?.ink],
-      ['motif', 'Motif', spaceInks.motifs, space.cover?.motif],
-      ['format', 'Format', spaceInks.formats, space.format || 'paperback'],
-    ]) {
-      const select = el('select', { 'aria-label': String(label) });
-      // The three named sets above are arrays; keep their values out of arbitrary markup.
-      if (Array.isArray(values)) for (const v of values) { const option = el('option', { value: v }, v.replace(/-/g, ' ')); option.selected = v === value; select.append(option); }
-      select.addEventListener('change', () => save({ [String(field)]: select.value }));
-      shop.append(el('label', null, String(label), select));
-    }
-    shop.append(el('button', { class: 'btn', type: 'button', onclick: () => save({ reroll: true }) }, 'Re-roll'),
-      el('button', { class: 'btn', type: 'button', disabled: !space.link, onclick: () => copySpaceLink(space.link || '') }, 'Copy link to your space'),
-      listingButton(space, withBack, back));
-    const publicBox = el('input', { type: 'checkbox', 'aria-label': 'Public Space' });
-    publicBox.checked = !space.private;
-    publicBox.addEventListener('change', () => save({ public: publicBox.checked }));
-    const settings = el('div', { class: 'space-printshop-settings' });
-    settings.append(el('label', null, publicBox, 'Public Space: anyone on the web can read it.'), el('p', { class: 'space-privacy-note' }, 'Followers-only posts stay within your followers. Copies, screenshots and feed caches made while public cannot be recalled.'));
-    const topics = el('input', { type: 'text', value: space.frequency?.join(', ') || '', 'aria-label': 'Transmitting on topics', placeholder: 'Up to four topics, separated by commas' });
-    const travelers = el('input', { type: 'text', value: (space.travelers || []).map((p) => p.handle).join(', '), 'aria-label': 'Fellow travelers', placeholder: 'Up to six listed handles' });
-    settings.append(el('label', null, 'Transmitting on', topics), el('label', null, 'Fellow travelers', travelers),
-      el('button', { class: 'btn', type: 'button', onclick: () => save({ frequency: topics.value.split(',').map((s) => s.trim()).filter(Boolean), travelers: travelers.value.split(',').map((s) => s.trim()).filter(Boolean) }) }, 'Save words and travelers'));
-    const stamps = el('details', null, el('summary', null, 'Visible stamps'));
-    for (const name of spaceInks.stamps) {
-      const box = el('input', { type: 'checkbox' }); box.checked = !space.hiddenStamps?.some((s) => s === name);
-      box.addEventListener('change', () => {
-        /** @type {Set<string>} */ const hidden = new Set(space.hiddenStamps || []); box.checked ? hidden.delete(name) : hidden.add(name);
-        void save({ hiddenStamps: [...hidden] });
-      });
-      stamps.append(el('label', null, box, name));
-    }
-    settings.append(stamps);
-    shop.append(el('details', null, el('summary', null, 'Words, travelers and privacy'), settings));
-    return shop;
-  }
-
-  /** @param {Space} space @param {boolean} withBack @param {(e: MouseEvent) => void} [back] */
-  function spaceNodes(space, withBack, back) {
+  /** @param {Space} space @param {boolean} withBack @param {(e: MouseEvent) => void} [back]
+   * @param {(input: Record<string, unknown>) => Promise<boolean>} [saveOwner] */
+  function spaceSheet(space, withBack, back, saveOwner) {
     const sheet = el('div');
     // spaceFormat escapes every authored value. Only the constant art engine supplies SVG.
     sheet.innerHTML = spaceFormat.render(space);
@@ -186,12 +141,19 @@
         const postId = button.dataset.spacePost;
         const pinId = button.dataset.spacePin;
         const handle = button.dataset.spaceHandle;
-        if (postId) { const post = [...space.posts, ...(space.pinned ? [space.pinned] : [])].find((p) => p.id === postId); if (post) openShare({ title: post.title, share: { id: post.id, kind: post.kind } }, (scroll) => { showSpace(space, withBack, back); $('reader').scrollTop = scroll; }); }
+        if (postId) { const post = [...space.posts, ...(space.pinned ? [space.pinned] : [])].find((p) => p.id === postId); if (post) {
+          const reader = $('reader'), nodes = [...reader.childNodes], className = reader.className, scroll = reader.scrollTop;
+          openShare({ title: post.title, share: { id: post.id, kind: post.kind } }, () => { reader.className = className; reader.replaceChildren(...nodes); reader.scrollTop = scroll; primePictures(reader); });
+        } }
         else if (handle) openSpaceFrom(handle);
         else {
           button.disabled = true;
           try {
-            if (pinId) { await callTool('set_public_profile', { pinnedShareId: space.pinnedShareId === pinId ? '' : pinId }); await loadSpace(space.mine ? '' : space.handle, false, back); }
+            if (pinId) {
+              const change = { pinnedShareId: space.pinnedShareId === pinId ? '' : pinId };
+              if (saveOwner) { if (!await saveOwner(change)) button.disabled = false; }
+              else { await callTool('set_public_profile', change); await loadSpace(space.mine ? '' : space.handle, false, back); }
+            }
             else if (button.hasAttribute('data-space-follow')) {
               await callTool('relationship', { handle: space.handle, action: space.following ? 'unfollow' : 'follow' });
               space.following = !space.following; space.followers += space.following ? 1 : -1;
@@ -215,9 +177,22 @@
         for (const tab of sheet.querySelectorAll('.space-tabs a')) tab.setAttribute('aria-current', String(tab === link));
       });
     }
+    return sheet;
+  }
+
+  /** @param {Space} space @param {boolean} withBack @param {(e: MouseEvent) => void} [back] */
+  function spaceNodes(space, withBack, back) {
+    const preview = el('div', { class: 'space-owner-preview' });
+    /** @type {ReturnType<typeof spaceCustomization> | undefined} */
+    let owner;
+    owner = space.mine ? spaceCustomization(space, () => {
+      preview.replaceChildren(spaceSheet(space, withBack, back, owner?.save)); primePictures(preview);
+    }) : undefined;
+    preview.append(spaceSheet(space, withBack, back, owner?.save));
     const toolbar = withBack ? el('div', { class: 'reader-top' }, iconButton('back', 'Back to your room', back || closeReader, 'ib')) : null;
     if (toolbar) trackReaderToolbar(toolbar);
-    return present([toolbar, space.mine ? printShop(space, withBack, back) : null, sheet]);
+    if (owner) owner.layout.append(preview);
+    return present([toolbar, owner ? el('div', { class: 'space-owner-view' }, owner.bar, owner.layout) : preview]);
   }
 
   /** @param {Space} space @param {boolean} withBack @param {(e: MouseEvent) => void} [back] */
@@ -350,24 +325,6 @@
       strip.append(el('div', { class: 'intro' }, el('span', null, ...intros.joined.flatMap((h, i) => [i ? ', ' : '', ...present([patchAvatar(intros.covers?.[h])]), handleButton(h)]), ` joined MCPortal through your Space link.`)));
     }
     $('grid').before(strip);
-  }
-
-  /**
-   * Your Space says whether people with similar sources can find you, and switches it.
-   * @param {Space} space @param {boolean} withBack @param {(e: MouseEvent) => void} [back]
-   */
-  function listingButton(space, withBack, back) {
-    const button = el('button', { class: 'btn', type: 'button', 'aria-pressed': String(Boolean(space.listed)) }, space.listed ? 'Listed: people with similar sources can find you' : 'Unlisted: list me');
-    button.addEventListener('click', async () => {
-      button.disabled = true;
-      try {
-        const { profile } = (await callTool('set_public_profile', { listed: !space.listed })).structuredContent;
-        space.listed = profile.listed;
-        toast(profile.listed ? 'Listed. People with similar sources can find you.' : "Unlisted. Your Space\'s public visibility is unchanged.");
-        showSpace(space, withBack, back);
-      } catch (error) { toast(errorText(error)); button.disabled = false; }
-    });
-    return button;
   }
 
   /**

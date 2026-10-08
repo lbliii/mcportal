@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Customize your Space in a compact side panel with Appearance, Content and Visibility sections. The page updates beside your controls, with retained drafts and focus, save feedback and safe retry when a preview refresh fails.
 - Continue reading shows source labels, readable titles and progress bars; room and reader navigation gain clearer control groups, visible Room destinations and responsive spacing.
 - Preserve source descriptions and thumbnails on saved links and shares, and show them in Spaces, Following and RSS. Reblogs draw previews from the original so removal and privacy changes still take effect; personal notes stay separate.
 - Find text within an article or docs page with match counts and keyboard navigation, and adjust reading text size and line width for the current open session.
