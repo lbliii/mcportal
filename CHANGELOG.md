@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Installation and upgrades
+- Package hosted and local MCPortal as Agent Plugins 1.0, with native Claude overlays and persistent plugin storage. Validate packaged startup and provide an explicit migration that retains existing rooms and account links.
+- Check hosted compatibility before local browser sign-in, with required-update and optional-update actions.
+- Add repeatable host installation/update probes and document restart and OAuth smoke checks.
+- Publish versioned plugin archives and checksums; gate minimum-client increases on replacement availability and a documented deprecation window.
+
 ## v0.11.0 — 2026-10-08
 
 - Add an "Ask your agent" setup prompt to the landing page, with manual connector and local installation options. Public `/install.md` and `/llms.txt` guides use the instance's URL and access policy, with Codex and Claude Code remote commands, browser sign-in and connection verification.

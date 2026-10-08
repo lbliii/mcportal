@@ -25,7 +25,8 @@
     "check": "npm run typecheck && npm run design:check && npm test",
     "footprint": "node scripts/footprint.ts",
     "eval:tools": "node scripts/eval-tools.ts",
-    "release": "node scripts/release.ts"
+    "release": "node scripts/release.ts",
+    "support:check": "node scripts/check-support.ts"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.131.0",
