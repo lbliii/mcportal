@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.11.0 — 2026-10-08
+
 - Add an "Ask your agent" setup prompt to the landing page, with manual connector and local installation options. Public `/install.md` and `/llms.txt` guides use the instance's URL and access policy, with Codex and Claude Code remote commands, browser sign-in and connection verification.
 
 - Refresh the public README with the 22-second promo video, Spaces, room layouts and a clearly marked preview of newer features on main. Add practical guides for reading collections, catch-up, reading watches and Space customization, and update tool, configuration and data references.
