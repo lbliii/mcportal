@@ -143,6 +143,26 @@
     {
       "name": "list_reading",
       "description": "What the user was reading: pages they opened and haven't finished, most recent first ('what was I in the middle of?')."
+    },
+    {
+      "name": "search_library",
+      "description": "Find saved links, clips and reading history together; opens Recall Shelf."
+    },
+    {
+      "name": "open_collection",
+      "description": "Open a private Topic Desk, kept comparison or reading trail by id, with evidence and live sources."
+    },
+    {
+      "name": "update_collection",
+      "description": "Create or edit private desks, comparisons (2–3 sources) and trails."
+    },
+    {
+      "name": "watch",
+      "description": "Watch a docs page, repository releases, public iCalendar, or resolved artist in a city."
+    },
+    {
+      "name": "show_comparison",
+      "description": "Render explicitly supplied agent interpretation of 2–3 sources under a question."
     }
   ],
   "tools_generated": false,

@@ -8,6 +8,7 @@
 <style>
   /*include:design/tokens.css*/
   /*include:room/room.css*/
+  /*include:room/experiences.css*/
   /*include:design/primitives.css*/
 </style>
 </head>
@@ -35,6 +36,15 @@
     <div class="who-menu" id="whoMenu" role="dialog" aria-label="Your account" hidden></div>
   </div>
 </header>
+<nav class="experience-nav" aria-label="Reading experiences">
+  <button type="button" id="btnExperienceRoom" aria-label="Room" title="Room" aria-current="page"><span class="experience-nav-icon" data-icon="room" aria-hidden="true"></span><span class="experience-nav-label">Room</span></button>
+  <button type="button" id="btnRecall" aria-label="Recall" title="Recall"><span class="experience-nav-icon" data-icon="recall" aria-hidden="true"></span><span class="experience-nav-label">Recall</span></button>
+  <button type="button" id="btnCollections" aria-label="Topic desks" title="Topic desks"><span class="experience-nav-icon" data-icon="desk" aria-hidden="true"></span><span class="experience-nav-label">Topic desks</span></button>
+  <button type="button" id="btnCompare" aria-label="Compare" title="Compare" disabled><span class="experience-nav-icon" data-icon="compare" aria-hidden="true"></span><span class="experience-nav-label">Compare</span></button>
+  <button type="button" id="btnCatchup" aria-label="Catch-up" title="Catch-up"><span class="experience-nav-icon" data-icon="catchup" aria-hidden="true"></span><span class="experience-nav-label">Catch-up</span></button>
+  <button type="button" id="btnChanges" aria-label="Changes" title="Changes"><span class="experience-nav-icon" data-icon="changes" aria-hidden="true"></span><span class="experience-nav-label">Changes</span></button>
+  <button type="button" id="btnUpcoming" aria-label="Upcoming" title="Upcoming"><span class="experience-nav-icon" data-icon="upcoming" aria-hidden="true"></span><span class="experience-nav-label">Upcoming</span></button>
+</nav>
 <section id="addSheet" class="add-sheet room-only" hidden>
   <form class="add-row" id="addForm">
     <input id="addInput" type="text" autocomplete="off" spellcheck="false" placeholder="theverge.com, r/LocalLLaMA, youtube.com/@channel, owner/repo…" aria-label="Site, feed, subreddit, channel or repo">
@@ -47,6 +57,7 @@
 <main id="grid" class="grid" aria-live="polite">
   <div class="col" style="flex-grow:1"><div class="portal"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div></div>
 </main>
+<section id="experiences" class="experiences" hidden></section>
 <section id="welcome" class="welcome" hidden></section>
 <input type="file" id="opmlFile" accept=".opml,.xml,text/xml,application/xml,text/x-opml" hidden>
 <article id="reader" class="reader" hidden></article>
@@ -71,7 +82,7 @@
   const $first = (selector, /** @type {ParentNode} */ from = document) => /** @type {HTMLElement | null} */ (from.querySelector(selector));
   /*include:art.js*/
 
-  // MCPortal icon set: 24px grid, 1.75px round strokes, 1.5px corner radius, drawn in currentColor.
+  // MCPortal icon set: 24px grid, 1.75px round strokes, 3px house corners, drawn in currentColor.
   // The icon set and its stroke come from scripts/brand.ts, so they match the Line mark.
   /*include:brand/icons.js*/
   /** An icon from the generated set, drawn in currentColor. @param {string} name */
@@ -100,9 +111,16 @@
 
   /*include:room/bridge.js*/
   /*include:room/dom.js*/
+  /*include:room/experiences.js*/
+  /*include:room/recall.js*/
+  /*include:room/collections.js*/
+  /*include:room/compare.js*/
+  /*include:room/catchup.js*/
+  /*include:room/watches.js*/
   /*include:room/room.js*/
   /*include:room/items.js*/
   /*include:room/layouts.js*/
+  /*include:room/views.js*/
   /*include:room/river.js*/
   /*include:room/levels.js*/
   /*include:room/seen.js*/

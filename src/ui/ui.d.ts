@@ -35,6 +35,15 @@ declare global {
     btnRefresh: HTMLButtonElement;
     btnSources: HTMLButtonElement;
     btnWho: HTMLButtonElement;
+    btnExperienceRoom: HTMLButtonElement;
+    btnRecall: HTMLButtonElement;
+    btnCollections: HTMLButtonElement;
+    btnCompare: HTMLButtonElement;
+    btnChanges: HTMLButtonElement;
+    btnUpcoming: HTMLButtonElement;
+    btnCatchup: HTMLButtonElement;
+    experiences: HTMLElement;
+    comparisonInterpretation: HTMLElement;
     whoMenu: HTMLDivElement;
     grid: HTMLElement;
     mainBar: HTMLElement;
@@ -77,6 +86,7 @@ declare global {
 
   type Profile = Profiles.Profile;
   type PortalSpec = Profiles.PortalSpec;
+  type PortalView = Profiles.PortalView;
   type PortalResult = Types.PortalResult;
   type Item = Types.Item;
   type Article = Types.Article;
@@ -86,6 +96,15 @@ declare global {
   type Clip = Clips.Clip;
   type ClipSummary = Clips.ClipSummary;
   type ClipData = Clips.ClipData;
+  type LibraryHit = import('../library.ts').LibraryHit;
+  type LibraryQuery = import('../library.ts').LibraryQuery;
+  type LibraryResult = import('../library.ts').LibraryResult;
+  type Collection = import('../collections.ts').Collection;
+  type CollectionEntry = import('../collections.ts').CollectionEntry;
+  type CollectionChange = import('../collections.ts').CollectionChange;
+  type CollectionData = import('../collection-service.ts').CollectionData;
+  type CatchupSession = import('../experiences.ts').CatchupSession;
+  type CapturedStory = import('../experiences.ts').CapturedStory;
   type SharedItem = Social.SharedItem;
   type Reblogger = Social.Reblogger;
   type DocSection = Docs.DocSection;

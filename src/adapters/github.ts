@@ -80,6 +80,7 @@ export async function fetchGithub(config: GithubConfig, fetcher: Fetcher): Promi
         return {
           id: String(r.id),
           title: clean(r.name, 200) || clean(r.tag_name, 100),
+          release: { repo: config.repo, version: clean(r.tag_name, 100) },
           ...(url !== undefined ? { url } : {}),
           meta: [clean(r.tag_name, 60), ...(r.prerelease ? ['pre-release'] : []), ...(r.author ? [`by ${clean(r.author.login, 40)}`] : [])],
           ...(r.published_at != null ? { publishedAt: r.published_at } : {}),

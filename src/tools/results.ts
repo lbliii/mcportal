@@ -17,6 +17,10 @@ import type { Candidate, HighlightPick, Lead, RoomEdition } from '../highlights.
 import type { ReadingState } from '../reading.ts';
 import type { Article, Item, PortalResult, Provenance } from '../types.ts';
 import type { Identity } from './kit.ts';
+import type { LibraryResult } from '../library.ts';
+import type { Collection } from '../collections.ts';
+import type { CollectionData } from '../collection-service.ts';
+import type { CatchupSession } from '../experiences.ts';
 
 /** A starter pack as the welcome screen lists it. */
 export type PackSummary = { id: string; label: string; blurb: string; sources: string[] };
@@ -65,6 +69,12 @@ export type SpaceResult = {
 };
 
 export type ToolResults = {
+  search_library: { library: LibraryResult };
+  open_collection: { collections: Collection[]; sources: Array<Pick<PortalResult, 'portalId' | 'title' | 'source'>>; desk?: CollectionData };
+  update_collection: { collections: Collection[]; collection?: Collection };
+  show_comparison: { comparison: import('../comparison.ts').ComparisonResult };
+  watch: { watches: import('../watches.ts').WatchResult };
+  catch_up: { session: CatchupSession | null };
   open_room: RoomResult;
   build_room: { profile: Profile };
   arrange_room: { profile: Profile; changes: ProfileDiff };

@@ -1,3 +1,4 @@
+import { validEvent } from './watches-state.ts';
 /**
  * The preference profile: the user's room, stated in plain language and
  * stored as structured data. Principle: the agent never moves anything the
@@ -12,11 +13,14 @@ import { clean } from './lib/text.ts';
 import { CLIP_KINDS, type ClipKind, type Item, type SourceKind } from './types.ts';
 
 /** A portal as stored: its config is the validated settings of its source. */
+export const PORTAL_VIEWS = ['default', 'list', 'cards', 'quotes', 'gallery', 'changelog'] as const;
+export type PortalView = typeof PORTAL_VIEWS[number];
 export interface PortalOf<S extends SourceKind> {
   id: string;
   source: S;
   title?: string;
   config: SourceConfigs[S];
+  view?: PortalView;
 }
 
 /** Any stored portal. Narrow on `source` to get its config type. */
@@ -28,6 +32,7 @@ export interface PortalInput {
   source: SourceKind;
   title?: string | undefined;
   config: unknown;
+  view?: PortalView;
 }
 
 export interface ColumnSpec {
@@ -65,6 +70,7 @@ export interface SavedItem {
   source?: string;
   note?: string;
   savedAt: string;
+  event?: import('./watches-state.ts').WatchedEvent;
 }
 
 /** The items of one pinned portal, as the agent last passed them. Untrusted, plain text. */
@@ -103,6 +109,8 @@ export interface SourceConfigs {
   pinned: PinnedConfig;
   clips: ClipsConfig;
   following: LimitConfig;
+  changes: LimitConfig;
+  upcoming: LimitConfig;
 }
 
 export type SourceConfig = SourceConfigs[SourceKind];
@@ -124,7 +132,7 @@ export interface Profile {
 
 /** Columns scroll sideways, so there can be more than fit on screen. */
 export const LIMITS = { columns: 8, portalsPerColumn: 4, items: 30, saved: 200 } as const;
-export const SOURCES: SourceKind[] = ['hn', 'rss', 'github', 'docs', 'saved', 'pinned', 'clips', 'following'];
+export const SOURCES: SourceKind[] = ['hn', 'rss', 'github', 'docs', 'saved', 'pinned', 'clips', 'following', 'changes', 'upcoming'];
 
 /** A profile, layout or source config that fails validation. Defaults to invalid_argument; pass a code when it's something else. */
 export class ProfileError extends AppError {
@@ -195,6 +203,8 @@ const fetchLimit = (config: Record<string, unknown>) => clampInt(config.limit, 1
 const NORMALIZERS: { [S in SourceKind]: Normalizer<S> } = {
   saved: itemsLimit,
   following: itemsLimit,
+  changes: itemsLimit,
+  upcoming: itemsLimit,
   clips(config, where) {
     if (config.kind !== undefined && !(CLIP_KINDS as readonly unknown[]).includes(config.kind)) throw new ProfileError(`${where}: clips kind must be one of ${CLIP_KINDS.join(', ')}`);
     const tag = typeof config.tag === 'string' ? config.tag.toLowerCase().replace(/^#/, '').replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 30) : '';
@@ -294,7 +304,12 @@ export function validateProfile(input: unknown, now = new Date()): Profile {
       let id = slug(typeof pRaw.id === 'string' && pRaw.id ? pRaw.id : title ?? `${source}-${ci}-${pi}`) || `${source}-${ci}-${pi}`;
       while (seen.has(id)) id = `${id}-2`;
       seen.add(id);
-      return portalOf(id, title, sourceSettings(source, pRaw.config, where));
+      const portal = portalOf(id, title, sourceSettings(source, pRaw.config, where));
+      if (pRaw.view !== undefined) {
+        if (!PORTAL_VIEWS.includes(pRaw.view as PortalView)) throw new ProfileError(`${where}: unknown portal view; update MCPortal before editing this room.`);
+        portal.view = pRaw.view as PortalView;
+      }
+      return portal;
     });
     return { width: clampInt(colRaw.width, 1, 4, 1), panels: portals };
   });
@@ -367,6 +382,7 @@ export function normalizeSaved(raw: unknown, now = new Date()): SavedItem[] {
     seen.add(url);
     const savedAt = typeof entry.savedAt === 'string' && !Number.isNaN(Date.parse(entry.savedAt)) ? new Date(entry.savedAt).toISOString() : now.toISOString();
     const item: SavedItem = { url, title: clean(entry.title, 200) || new URL(url).hostname, savedAt };
+    if (entry.event) item.event = validEvent(entry.event as import('./watches-state.ts').WatchedEvent);
     const source = clean(entry.source, 20);
     const note = clean(entry.note, 280);
     if (source) item.source = source;
@@ -429,7 +445,7 @@ export function diffProfiles(before: Profile, after: Profile): ProfileDiff {
     }
     if (was.column !== now.column || was.index !== now.index) diff.moved.push(`${id} (column ${was.column + 1} → ${now.column + 1})`);
     if ((was.portal.title ?? '') !== (now.portal.title ?? '')) diff.retitled.push(id);
-    if (JSON.stringify(was.portal.config) !== JSON.stringify(now.portal.config) || was.portal.source !== now.portal.source) diff.reconfigured.push(id);
+    if (JSON.stringify(was.portal.config) !== JSON.stringify(now.portal.config) || was.portal.source !== now.portal.source || was.portal.view !== now.portal.view) diff.reconfigured.push(id);
   }
   for (const id of b.keys()) if (!a.has(id)) diff.added.push(id);
   return diff;

@@ -6,6 +6,8 @@ import { constants } from 'node:fs';
 import { access, mkdir } from 'node:fs/promises';
 import { fileAuthPersistence, type AuthPersistence } from './auth/store.ts';
 import { FileClipStore, type ClipStore } from './clips.ts';
+import { DocumentCollectionStore, FileCollectionStore, type CollectionStore } from './collections.ts';
+import { DocumentExperienceStore, FileExperienceStore, type ExperienceStore } from './experiences.ts';
 import { FileEditionStore, type EditionStore } from './editions.ts';
 import { FileHandoffStore, type HandoffStore } from './handoffs.ts';
 import type { Logger } from './lib/log.ts';
@@ -21,6 +23,8 @@ export interface Storage {
   seen: SeenStore;
   editions: EditionStore;
   clips: ClipStore;
+  collections: CollectionStore;
+  experiences: ExperienceStore;
   /** OAuth state; absent with files, where it's auth.json in the data directory. */
   authPersistence?: AuthPersistence;
   accountsPersistence: AuthPersistence;
@@ -40,11 +44,11 @@ async function writableDir(dir: string): Promise<void> {
 
 export async function openStorage(dataDir: string, log: Logger): Promise<Storage> {
   const url = process.env.DATABASE_URL;
-  if (!url) return { store: new FileProfileStore(dataDir), reading: new FileReadingStore(dataDir), handoffs: new FileHandoffStore(dataDir), seen: new FileSeenStore(dataDir), editions: new FileEditionStore(dataDir), clips: new FileClipStore(dataDir), accountsPersistence: fileAuthPersistence(dataDir, 'accounts.json'), profilesPersistence: fileAuthPersistence(dataDir, 'public-profiles.json'), social: new DocumentSocialStore(fileAuthPersistence(dataDir, 'social.json')), storage: 'files', checkStorage: () => writableDir(dataDir), close: async () => {} };
+  if (!url) return { store: new FileProfileStore(dataDir), reading: new FileReadingStore(dataDir), handoffs: new FileHandoffStore(dataDir), seen: new FileSeenStore(dataDir), editions: new FileEditionStore(dataDir), clips: new FileClipStore(dataDir), collections: new FileCollectionStore(dataDir), experiences: new FileExperienceStore(dataDir), accountsPersistence: fileAuthPersistence(dataDir, 'accounts.json'), profilesPersistence: fileAuthPersistence(dataDir, 'public-profiles.json'), social: new DocumentSocialStore(fileAuthPersistence(dataDir, 'social.json')), storage: 'files', checkStorage: () => writableDir(dataDir), close: async () => {} };
   const { connect, ensureSchema, importFiles, PgClipStore, PgEditionStore, PgHandoffStore, PgReadingStore, PgSeenStore, PgProfileStore, PgSocialStore, pgAuthPersistence } = await import('./db.ts');
   const db = await connect(url);
   await ensureSchema(db);
   const imported = await importFiles(db, dataDir);
   if (!imported.skipped) log.info('storage.imported', { from: dataDir, profiles: imported.profiles, auth: imported.auth });
-  return { store: new PgProfileStore(db), reading: new PgReadingStore(db), handoffs: new PgHandoffStore(db), seen: new PgSeenStore(db), editions: new PgEditionStore(db), clips: new PgClipStore(db), authPersistence: pgAuthPersistence(db), accountsPersistence: pgAuthPersistence(db, 'accounts'), profilesPersistence: pgAuthPersistence(db, 'public-profiles'), social: new PgSocialStore(db), storage: 'postgres', checkStorage: async () => { await db.query('SELECT 1'); }, close: async () => { await db.end?.(); } };
+  return { store: new PgProfileStore(db), reading: new PgReadingStore(db), handoffs: new PgHandoffStore(db), seen: new PgSeenStore(db), editions: new PgEditionStore(db), clips: new PgClipStore(db), collections: new DocumentCollectionStore(pgAuthPersistence(db, 'collections')), experiences: new DocumentExperienceStore(pgAuthPersistence(db, 'reading-experiences')), authPersistence: pgAuthPersistence(db), accountsPersistence: pgAuthPersistence(db, 'accounts'), profilesPersistence: pgAuthPersistence(db, 'public-profiles'), social: new PgSocialStore(db), storage: 'postgres', checkStorage: async () => { await db.query('SELECT 1'); }, close: async () => { await db.end?.(); } };
 }

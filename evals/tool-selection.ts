@@ -22,6 +22,14 @@ export interface ToolCase {
 }
 
 export const TOOL_CASES: ToolCase[] = [
+  // Reading experiences: new cases; the existing prompts and intents remain frozen.
+  { prompt: 'Find the heartbeat explanation I kept somewhere in my saved links, clips or reading history', tool: 'search_library', args: { query: 'heartbeat' } },
+  { prompt: 'Show my Topic Desks and reading trails', tool: 'open_collection' },
+  { prompt: 'Create an empty Topic Desk called Agents that remember, to understand how work resumes', tool: 'update_collection', args: { action: 'create', title: 'Agents that remember' } },
+  { prompt: 'Present my hn-top portal as cards without moving it or changing its feed', tool: 'arrange_room', args: { view: [{ portal: 'hn-top', view: 'cards' }] } },
+  { prompt: 'Watch this documentation page for text changes: https://example.com/docs/persistence.md', tool: 'watch', args: { action: 'add', kind: 'page', url: 'https://example.com/docs/persistence.md' } },
+  { prompt: 'Find the artist Phoenix so I can confirm which one to watch for shows in my city', tool: 'watch', args: { action: 'find_artist', query: 'Phoenix' } },
+  { prompt: 'Open my retained Changes and Upcoming findings', tool: 'watch', args: { action: 'list' } },
   // The room
   { prompt: 'open my portal', tool: 'open_room' },
   { prompt: "what's new across my sources this morning?", tool: 'open_room' },

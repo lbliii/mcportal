@@ -6,6 +6,7 @@
  */
 import type { Accounts } from './accounts.ts';
 import type { OAuthServer } from './auth/oauth.ts';
+import type { ExperienceStore } from './experiences.ts';
 import type { EditionStore } from './editions.ts';
 import type { HandoffStore } from './handoffs.ts';
 import { errorMessage } from './lib/errors.ts';
@@ -20,6 +21,7 @@ export interface HousekeepingTask {
 
 /** The retention tasks for the stores a server has (a local one has no accounts, sign-ins or reports). */
 export function retentionTasks(s: {
+  experiences?: ExperienceStore | undefined;
   handoffs?: HandoffStore | undefined;
   editions?: EditionStore | undefined;
   social?: Pick<Social, 'purgeReports'> | undefined;
@@ -27,6 +29,7 @@ export function retentionTasks(s: {
   oauth?: Pick<OAuthServer, 'pruneStored'> | undefined;
 }): HousekeepingTask[] {
   const tasks: Array<HousekeepingTask | false | undefined> = [
+    s.experiences && { name: 'watches', run: () => s.experiences!.purgeExpired() },
     s.handoffs?.purgeExpired && { name: 'handoffs', run: () => s.handoffs!.purgeExpired!() },
     s.editions?.purgeExpired && { name: 'editions', run: () => s.editions!.purgeExpired!() },
     s.social && { name: 'reports', run: () => s.social!.purgeReports() },

@@ -11,6 +11,7 @@
  * re-exported from here.
  */
 import { randomBytes } from 'node:crypto';
+import { passageLocator, type PassageLocator } from './evidence.ts';
 import { httpUrl } from './profile.ts';
 import { AppError, type AppErrorOptions, type ErrorCode } from './lib/errors.ts';
 import { parseMarkdownLite } from './lib/markdown.ts';
@@ -53,6 +54,7 @@ export interface ClipSource {
   kind: 'conversation' | 'article' | 'web';
   url?: string;
   title?: string;
+  locator?: PassageLocator;
 }
 
 /** Everything about a clip except its content: what lists, portals and search return. */
@@ -140,7 +142,9 @@ function normalizeSource(raw: unknown): ClipSource {
   const url = httpUrl(input.url) ?? undefined;
   const kind = input.kind === 'article' || input.kind === 'web' ? input.kind : url ? 'web' : 'conversation';
   const title = clean(input.title, 200) || undefined;
-  return { kind, ...(url ? { url } : {}), ...(title ? { title } : {}) };
+  const locator = passageLocator(input.locator);
+  if (locator && !url) throw new ClipError('A passage locator needs its source URL.');
+  return { kind, ...(url ? { url } : {}), ...(title ? { title } : {}), ...(locator ? { locator } : {}) };
 }
 
 function splitRow(line: string): string[] {

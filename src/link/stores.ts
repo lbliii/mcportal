@@ -374,7 +374,42 @@ function dropUndefined<T extends object>(value: T): Record<string, unknown> {
 
 /** Everything a linked MCPortal's ToolContext reads from the hosted account, for one account. */
 export function linkedStores(client: StateClient, accountId: string, options: { now?: () => number } = {}) {
+  const assertCollectionOwner = (userId: string) => { if (userId !== accountId) throw new AppError('forbidden', 'Only this linked account can access collections.'); };
+  const experiences: import('../experiences.ts').ExperienceStore = {
+    async purgeExpired() { throw onAccountPage('Watch retention'); },
+    async owners() { throw onAccountPage('Enumerating watch owners'); },
+    async get(userId) { assertCollectionOwner(userId); return client.call('experiences.get'); },
+    async replaceIf(userId, state, rev) { assertCollectionOwner(userId); return client.call('experiences.put', { state, ifMatch: rev }); },
+    async update(userId, change) {
+      assertCollectionOwner(userId);
+      for (let attempt = 0; attempt < 4; attempt++) {
+        const { state, rev } = await experiences.get(userId), next = change(structuredClone(state));
+        if (!next.state) return next.result;
+        try { await experiences.replaceIf(userId, next.state, rev); return next.result; }
+        catch (error) { if (!(error instanceof AppError) || error.code !== 'conflict') throw error; }
+      }
+      throw new AppError('conflict', 'The reading session changed on another device. Reopen it.');
+    },
+    async import() { throw onAccountPage('Importing reading experiences'); },
+    async deleteAll() { throw onAccountPage('Deleting reading experiences'); },
+  };
   return {
+    experiences,
+    watch: (input: import('../watches.ts').WatchInput): Promise<import('../watches.ts').WatchResult> => client.call('watches.action', dropUndefined(input)),
+    catchup: (input: import('../catchup.ts').CatchupInput): Promise<import('../experiences.ts').CatchupSession | null> => client.call('catchup.action', dropUndefined(input)),
+    collections: {
+      async list(userId: string): Promise<import('../collections.ts').Collection[]> { assertCollectionOwner(userId); return client.call('collections.list'); },
+      async get(userId: string, id: string): Promise<import('../collections.ts').Collection | undefined> { assertCollectionOwner(userId); return (await client.call<import('../collections.ts').Collection | null>('collections.get', { id })) ?? undefined; },
+      async change(userId: string, input: import('../collections.ts').CollectionChange): Promise<import('../collections.ts').Collection | undefined> { assertCollectionOwner(userId); return (await client.call<import('../collections.ts').Collection | null>('collections.change', dropUndefined(input))) ?? undefined; },
+      async import(): Promise<number> { throw onAccountPage('Importing collections'); },
+      async deleteAll(): Promise<void> { throw onAccountPage('Deleting all collections'); },
+    },
+    library: {
+      async search(userId: string, query: import('../library.ts').LibraryQuery): Promise<import('../library.ts').LibraryResult> {
+        if (userId !== accountId) throw new AppError('forbidden', 'Only this linked account can be searched.');
+        return client.call('library.search', dropUndefined(query));
+      },
+    },
     store: new RemoteProfileStore(client, accountId, options.now),
     clips: new RemoteClipStore(client, accountId),
     reading: new RemoteReadingStore(client, accountId),

@@ -11,6 +11,8 @@ import { FileHandoffStore } from './handoffs.ts';
 import { FileReadingStore } from './reading.ts';
 import { FileSeenStore } from './seen.ts';
 import { FileClipStore } from './clips.ts';
+import { FileCollectionStore } from './collections.ts';
+import { FileExperienceStore } from './experiences.ts';
 import { deliverToFile } from './portability.ts';
 import { PublicProfiles } from './public-profiles.ts';
 import { Social } from './social.ts';
@@ -19,6 +21,7 @@ import { LocalSession } from './link/session.ts';
 import { TtlCache } from './lib/cache.ts';
 import { createFixtureFetcher } from './lib/fixture-fetch.ts';
 import { safeFetch } from './lib/safe-fetch.ts';
+import { startWatchWorker } from './watches.ts';
 import { retentionTasks, startHousekeeping } from './housekeeping.ts';
 import { handleMessage, RPC, rpcError, type JsonRpcResponse } from './mcp.ts';
 import { openStorage } from './storage.ts';
@@ -104,6 +107,8 @@ async function start(argv: string[]): Promise<void> {
     // Local, single user: always files, never the hosted database.
     const store = new FileProfileStore(dataDir);
     const clips = new FileClipStore(dataDir);
+    const collections = new FileCollectionStore(dataDir);
+    const experiences = new FileExperienceStore(dataDir);
     const reading = new FileReadingStore(dataDir);
     const handoffs = new FileHandoffStore(dataDir);
     const seen = new FileSeenStore(dataDir);
@@ -112,13 +117,14 @@ async function start(argv: string[]): Promise<void> {
     const session = new LocalSession({
       dataDir,
       localUser: userId,
-      local: { store, reading, handoffs, seen, editions, clips },
-      base: { fetcher, cache, log, deliver: (format) => deliverToFile(format, userId, { store, reading, clips }, dataDir) },
+      local: { store, reading, handoffs, seen, editions, clips, collections, experiences },
+      base: { fetcher, cache, log, deliver: (format) => deliverToFile(format, userId, { store, reading, clips, collections, experiences }, dataDir) },
       hostedUrl: process.env.MCPORTAL_HOSTED_URL || undefined,
       onLinked: stdioToolsChanged,
     });
     // This computer's own handoffs and highlights expire too (a linked account's are the hosted server's to purge).
-    startHousekeeping(retentionTasks({ handoffs, editions }), log);
+    startHousekeeping(retentionTasks({ handoffs, editions, experiences }), log);
+    startWatchWorker(experiences, owner => ({ store, reading, handoffs, seen, editions, clips, collections, experiences, userId: owner, fetcher, cache, log }), log, undefined, async () => !(await session.isLinked()));
     runStdio(() => session.context());
     return;
   }
@@ -131,7 +137,7 @@ async function start(argv: string[]): Promise<void> {
     process.exitCode = 1;
     return;
   }
-  const { store, reading, handoffs, seen, editions, clips, authPersistence, accountsPersistence, profilesPersistence, social: socialStore, storage, checkStorage } = await openStorage(dataDir, log);
+  const { store, reading, handoffs, seen, editions, clips, collections, experiences, authPersistence, accountsPersistence, profilesPersistence, social: socialStore, storage, checkStorage } = await openStorage(dataDir, log);
   const accounts = new Accounts(accountsPersistence, { ...bootstrapFromEnv(process.env) });
   await accounts.load();
   const suspended = (id: string) => accounts.actor(id).status !== 'active';
@@ -142,11 +148,11 @@ async function start(argv: string[]): Promise<void> {
   const session = local ? new LocalSession({
     dataDir,
     localUser: config.staticUser,
-    local: { store, reading, handoffs, seen, editions, clips },
-    base: { fetcher, cache, log, deliver: (format) => deliverToFile(format, config.staticUser, { store, reading, clips }, dataDir) },
+    local: { store, reading, handoffs, seen, editions, clips, collections, experiences },
+    base: { fetcher, cache, log, deliver: (format) => deliverToFile(format, config.staticUser, { store, reading, clips, collections, experiences }, dataDir) },
     hostedUrl: process.env.MCPORTAL_HOSTED_URL || undefined,
   }) : undefined;
-  const server = createApp(config, { store, reading, handoffs, seen, editions, clips, publicProfiles, social, fetcher, cache, log, authPersistence, storage, checkStorage, accounts, session });
+  const server = createApp(config, { store, reading, handoffs, seen, editions, clips, collections, experiences, publicProfiles, social, fetcher, cache, log, authPersistence, storage, checkStorage, accounts, session });
   server.listen(config.port, config.host, () => {
     const mode = config.github ? `GitHub OAuth${config.allowedGithubUsers.length ? ` (allowed: ${config.allowedGithubUsers.join(', ')})` : ' (any GitHub user)'}` : config.staticToken ? 'static token' : 'no auth (loopback only)';
     log.info('http.ready', { host: config.host, port: config.port, publicUrl: config.publicUrl, auth: mode, storage: storage === 'postgres' ? 'postgres' : dataDir });

@@ -7,7 +7,7 @@ import type { ErrorCode } from './lib/errors.ts';
  * people the user follows (src/social.ts); neither is fetched. 'docs' is a docs
  * site's table of contents (src/adapters/docs.ts).
  */
-export type SourceKind = 'hn' | 'rss' | 'github' | 'docs' | 'saved' | 'pinned' | 'clips' | 'following';
+export type SourceKind = 'hn' | 'rss' | 'github' | 'docs' | 'saved' | 'pinned' | 'clips' | 'following' | 'changes' | 'upcoming';
 
 export const CLIP_KINDS = ['quote', 'exchange', 'note', 'table', 'image', 'link'] as const;
 export type ClipKind = (typeof CLIP_KINDS)[number];
@@ -46,6 +46,10 @@ export interface Item {
   };
   /** Not yet seen by this user (src/seen.ts). */
   new?: true;
+  /** Structured GitHub release metadata, distinct from a search result or generic RSS. */
+  watch?: { id: string; findingId?: string };
+  event?: import('./watches-state.ts').WatchedEvent;
+  release?: { repo: string; version: string };
 }
 
 /** "Show your work": where a block's data came from and how fresh it is. */

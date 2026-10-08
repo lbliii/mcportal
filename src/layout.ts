@@ -5,7 +5,7 @@
  */
 import { AppError, type ErrorCode } from './lib/errors.ts';
 import { clean } from './lib/text.ts';
-import { findPortal, LIMITS, sourceSettings, validateProfile, type ColumnInput, type PortalInput, type PortalSpec, type Profile } from './profile.ts';
+import { findPortal, LIMITS, sourceSettings, validateProfile, type ColumnInput, type PortalInput, type PortalSpec, type PortalView, type Profile } from './profile.ts';
 
 /** A portal id from a title: lowercase words joined by dashes. */
 export function slugId(value: string): string {
@@ -82,6 +82,7 @@ export function addPortalTo(profile: Profile, spec: PortalInput, column?: number
 
 /** What arrange_room can change. Each part is optional; only what it names changes. */
 export interface Arrangement {
+  view?: Array<{ portal: string; view: PortalView }>;
   /** Portals to take out of the room (ids, or titles that match one portal). */
   remove?: string[];
   /** Portals to move: to a column (1-based, as the room was; one past the last makes a new column) and a position in it (1-based; default last). */
@@ -167,9 +168,11 @@ export function arrange(profile: Profile, change: Arrangement): Profile {
     edit(step.portal, (p) => {
       if (p.source === 'pinned') throw refuse('invalid_argument', `${p.id} is pinned: change it with pin_portal`);
       // Merged into what it has now, then validated like any stored portal.
-      return { id: p.id, ...(p.title !== undefined ? { title: p.title } : {}), ...sourceSettings(p.source, { ...p.config, ...step.config }, p.id) };
+      return { id: p.id, ...(p.title !== undefined ? { title: p.title } : {}), ...(p.view !== undefined ? { view: p.view } : {}), ...sourceSettings(p.source, { ...p.config, ...step.config }, p.id) };
     }, 'reconfigured');
   }
+
+  for (const step of change.view ?? []) edit(step.portal, p => ({ ...p, view: step.view }), 'presented differently');
 
   const kept = columns.filter((c) => c.panels.length);
   return withLayout(profile, {

@@ -17,6 +17,10 @@ import { LIMITS, normalizePinnedItems, normalizeSaved, ProfileError, validatePro
 import type { PublicProfile } from './public-profiles.ts';
 import type { SharedItem, SocialService, Social } from './social.ts';
 import type { ReadingStore, ReadingState } from './reading.ts';
+import { importedCollection, type Collection, type CollectionStore } from './collections.ts';
+import { sha256Hex } from './lib/ids.ts';
+import { currentSavedEvents } from './watches-state.ts';
+import { validateExperiences, type ExperienceState, type ExperienceStore } from './experiences.ts';
 import type { ProfileStore } from './store.ts';
 import { addPortalTo } from './layout.ts';
 import { escapeHtml } from './lib/web.ts';
@@ -41,6 +45,8 @@ export interface PortalExport {
   profile: Profile;
   clips: Clip[];
   reading?: ReadingState[];
+  collections?: Collection[];
+  experiences?: ExperienceState;
   publicProfile: Omit<PublicProfile, 'accountId' | 'createdAt' | 'updatedAt'> | null;
   /** Your shares (with the content as shared) and who you follow, by handle. Not imported. */
   shares?: Array<Omit<SharedItem, 'author' | 'mine'>>;
@@ -53,6 +59,8 @@ export interface PortalExport {
 export interface ExportSources {
   store: ProfileStore;
   reading?: ReadingStore | undefined;
+  collections?: CollectionStore | undefined;
+  experiences?: ExperienceStore | undefined;
   clips?: ClipStore | undefined;
   publicProfile?: PublicProfile | undefined;
   social?: (SocialService & Partial<Pick<Social, 'reportsFiled'>>) | undefined;
@@ -67,8 +75,16 @@ async function allClips(clips: ClipStore | undefined, userId: string): Promise<C
 
 const stamp = (now: Date) => now.toISOString().slice(0, 10);
 
+function exportExperiences(state: ExperienceState): ExperienceState {
+  const copy = structuredClone(state);
+  for (const w of copy.watches) delete w.lease;
+  return copy;
+}
+
 export async function buildExport(format: ExportFormat, userId: string, from: ExportSources, now = new Date()): Promise<ExportFile> {
-  const profile = await from.store.get(userId);
+  const storedProfile = await from.store.get(userId);
+  const experiences = from.experiences ? (await from.experiences.get(userId)).state : undefined;
+  const profile = currentSavedEvents(storedProfile, experiences);
   if (format === 'opml') {
     const { opml, count } = buildOpml(profile, now);
     return { filename: `mcportal-subscriptions-${stamp(now)}.opml`, contentType: 'text/x-opml; charset=utf-8', body: Buffer.from(opml), summary: `${count} source(s) as OPML` };
@@ -88,6 +104,8 @@ export async function buildExport(format: ExportFormat, userId: string, from: Ex
     profile,
     clips,
     reading: await from.reading?.list(userId, { limit: 1000 }) ?? [],
+    collections: await from.collections?.list(userId) ?? [],
+    ...(experiences ? { experiences: exportExperiences(experiences) } : {}),
     publicProfile: p ? {
       handle: p.handle,
       ...(p.displayName ? { displayName: p.displayName } : {}),
@@ -227,6 +245,7 @@ export interface ImportResult {
   clipsAdded: number;
   clipsSkipped: number;
   clipErrors: string[];
+  collectionsAdded?: number;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -304,7 +323,7 @@ function mergeProfile(before: Profile, incoming: Profile, counts: Pick<ImportRes
 }
 
 /** Add an export to a room. Never removes or rearranges anything. */
-export async function importExport(data: PortalExport, userId: string, to: { store: ProfileStore; reading?: ReadingStore | undefined; clips?: ClipStore | undefined }): Promise<ImportResult> {
+export async function importExport(data: PortalExport, userId: string, to: { store: ProfileStore; reading?: ReadingStore | undefined; clips?: ClipStore | undefined; collections?: CollectionStore | undefined; experiences?: ExperienceStore | undefined }): Promise<ImportResult> {
   const result: ImportResult = { portalsAdded: 0, portalsSkipped: [], layoutAdopted: false, savedAdded: 0, clipsAdded: 0, clipsSkipped: 0, clipErrors: [] };
   let incoming: Profile | undefined;
   try {
@@ -326,20 +345,25 @@ export async function importExport(data: PortalExport, userId: string, to: { sto
     result.savedAdded = merged.savedAdded;
   }
 
+  const clipIds = new Map<string, string>();
   if (to.clips && Array.isArray(data.clips)) {
     const existing = await to.clips.list(userId, { limit: 100_000 });
-    const seen = new Set(existing.map((c) => `${c.kind}|${c.title}|${c.createdAt}`));
+    const seen = new Map(existing.map((c) => [`${c.kind}|${c.title}|${c.createdAt}`, c.id]));
     for (const raw of data.clips) {
       if (!isRecord(raw) || !CLIP_KINDS.includes(raw.kind as never)) continue;
       const created = typeof raw.createdAt === 'string' && !Number.isNaN(Date.parse(raw.createdAt)) ? new Date(raw.createdAt) : new Date();
       try {
         const clip = buildClip(clipInput(raw), created);
-        if (seen.has(`${clip.kind}|${clip.title}|${clip.createdAt}`)) {
+        const key = `${clip.kind}|${clip.title}|${clip.createdAt}`;
+        const kept = seen.get(key);
+        if (kept) {
+          if (typeof raw.id === 'string') clipIds.set(raw.id, kept);
           result.clipsSkipped++;
           continue;
         }
-        await to.clips.add(userId, clip);
-        seen.add(`${clip.kind}|${clip.title}|${clip.createdAt}`);
+        const keptClip = await to.clips.add(userId, clip);
+        if (typeof raw.id === 'string') clipIds.set(raw.id, keptClip.id);
+        seen.set(key, keptClip.id);
         result.clipsAdded++;
       } catch (error) {
         if (!(error instanceof ClipError)) throw error;
@@ -349,6 +373,29 @@ export async function importExport(data: PortalExport, userId: string, to: { sto
     }
   }
   if (to.reading && Array.isArray(data.reading)) await to.reading.import(userId, data.reading);
+  if (to.collections && Array.isArray(data.collections)) {
+    const portals = (await to.store.get(userId)).columns.flatMap(c => c.panels);
+    const portalIds = new Map(incoming?.columns.flatMap(c => c.panels).map(p => [p.id, portals.find(existing => portalKey(existing) === portalKey(p))?.id]) ?? []);
+    const remap = (ref: string) => ref.startsWith('clip:') ? `clip:${clipIds.get(ref.slice(5)) ?? `unavailable_${sha256Hex(ref).slice(0, 24)}`}` : ref;
+    const collections = data.collections.map(importedCollection).map(c => ({ ...c,
+      entries: c.entries.map(e => ({ ...e, ref: remap(e.ref), ...(e.ref.startsWith('clip:') ? { excerpt: undefined } : {}) })),
+      livePortals: c.livePortals.map(id => portalIds.get(id) ?? `unavailable-${sha256Hex(id).slice(0,24)}`),
+      ...(c.orientation ? { orientation: { ...c.orientation, refs: c.orientation.refs.map(remap) } } : {}),
+    }));
+    result.collectionsAdded = await to.collections.import(userId, collections);
+  }
+  if (to.experiences && data.experiences) {
+    const experiences = validateExperiences(data.experiences);
+    const portals = (await to.store.get(userId)).columns.flatMap(c => c.panels);
+    const portalIds = new Map(incoming?.columns.flatMap(c => c.panels).map(p => [p.id, portals.find(existing => portalKey(existing) === portalKey(p))?.id]) ?? []);
+    const portalId = (id: string) => portalIds.get(id) ?? `unavailable-${sha256Hex(id).slice(0,24)}`;
+    if (experiences.catchup) for (const story of experiences.catchup.stories) {
+      story.portalId = portalId(story.portalId);
+      story.marks = story.marks.map(m => ({ ...m, portalId: portalId(m.portalId) }));
+      if (story.item.clip) story.item.clip.id = clipIds.get(story.item.clip.id) ?? `unavailable_${sha256Hex(story.item.clip.id).slice(0,24)}`;
+    }
+    await to.experiences.import(userId, experiences);
+  }
   return result;
 }
 
@@ -357,6 +404,7 @@ export function describeImport(r: ImportResult): string {
     r.layoutAdopted ? `took the exported layout (${r.portalsAdded} portals)` : `${r.portalsAdded} portal(s) added`,
     `${r.savedAdded} saved item(s) added`,
     `${r.clipsAdded} clip(s) added${r.clipsSkipped ? ` (${r.clipsSkipped} already here)` : ''}`,
+    ...(r.collectionsAdded ? [`${r.collectionsAdded} collection(s) added`] : []),
   ];
   const problems = [...r.portalsSkipped.map((p) => `portal skipped: ${p}`), ...r.clipErrors.slice(0, 5).map((c) => `clip skipped: ${c}`)];
   return `Imported: ${parts.join(', ')}.${problems.length ? `\n${problems.join('\n')}` : ''}`;

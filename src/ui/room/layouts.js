@@ -253,7 +253,16 @@
 
   /** One portal, as the current layout draws it. @param {string} portalId */
   function renderPortal(portalId) {
-    return (state.profile ? layoutOf(state.profile) : ROOM_LAYOUTS.columns).portal(portalId);
+    const portal = state.portals.get(portalId);
+    const custom = portal && portalViewItems(portal, portal.items);
+    if (portal && custom) {
+      const wrap = el('section', { class: 'portal portal-custom-view', 'data-portal': portalId }, el('div', { class: 'portal-head' }, ...portalLabel(portal), el('span', { class: 'tools' }, refreshButton(portal))), portalItems(portal, () => custom), portalFoot(portal, true));
+      primePictures(wrap); return wrap;
+    }
+    const wrap = (state.profile ? layoutOf(state.profile) : ROOM_LAYOUTS.columns).portal(portalId);
+    const preference = portalViewPreference(portalId);
+    if (portal && preference !== 'default' && !supportedPortalViews(portal).includes(preference)) wrap.append(el('p', { class: 'empty' }, `${preference} is unavailable for this source; showing its default view.`));
+    return wrap;
   }
 
   /** A portal's items changed (a refresh, a save): draw it again where the room shows it. @param {string} portalId */
@@ -281,6 +290,7 @@
       el('span', { class: 'dot', style: `background:${portalColor(portal)}` }),
       el('button', { class: 'portal-title', type: 'button', title: `Open ${portal.title}`, onclick: () => openPortal(portal.portalId) }, portal.title),
       el('span', { class: 'portal-count' }, portalCount(portal)),
+      portalViewSelector(portal),
     ];
   }
 

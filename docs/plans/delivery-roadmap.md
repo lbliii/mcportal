@@ -4,6 +4,8 @@ Status: proposed implementation sequence, agreed in product discussion on 30 Sep
 
 The product loop is: open your room, catch up, read something worthwhile, keep the useful part, and return to it later. Prioritize durable reading continuity and useful retrieval before proactive delivery or expanded social features.
 
+The [reading experiences plan](reading-experiences.md) makes Releases 2 and 4 concrete: Recall Shelf, Topic Desk, Comparison View, and per-portal views, followed by reading trails, Changes, and Upcoming. It builds on reading continuity already present in the current code and defines implementation slices and acceptance criteria without replacing the release gates below.
+
 ## Release sequence
 
 | Release | User promise | Scope | Effort |
@@ -123,7 +125,7 @@ Keep ordinary browsing and saving in direct UI tool calls. Invoke the agent for 
 
 Portal owns navigation within its app, storage, collections, search, and presentation. The host controls app lifetime, available bridge capabilities, conversation execution, and surrounding application chrome. Do not promise an indefinitely live iframe, universal background notifications, or graphical rooms in terminal clients merely because MCP tools connect.
 
-The repository currently uses a minimal request-response MCP implementation and does not implement a collection worker or server-initiated event stream. Adding proactive delivery is a distinct infrastructure project.
+The repository uses a request-response MCP implementation. The reading experiences add a bounded background worker for explicit page, release and calendar/artist watches. Broader collection refresh, agent digests and server-initiated event streams remain a distinct infrastructure project.
 
 Official references reviewed during the assessment:
 

@@ -4,6 +4,7 @@
   // ------------------------------------------------------------ welcome (first run, or "start over")
   /** @param {ToolResults['open_room']} data */
   function renderWelcome(data) {
+    leaveExperience();
     const { packs, maxPacks, rebuilding } = /** @type {NonNullable<ToolResults['open_room']['onboarding']>} */ (data.onboarding);   // renderRoom calls this only when it's set
     state.profile = /** @type {Profile} */ ({ layout: 'columns', openIn: 'card', saved: [], .../** @type {Partial<Profile>} */ (data.profile) });
     root.classList.add('welcome-view');
@@ -85,6 +86,7 @@
 
   /** @param {ToolResults['open_room']} data */
   function renderRoom(data) {
+    leaveExperience();
     if (data.onboarding) return renderWelcome(data);
     root.classList.remove('welcome-view', 'article-view');
     $('welcome').hidden = true;
@@ -179,7 +181,7 @@
   function artStyle(portal) {
     return state.art.has(portal.portalId) ? /** @type {number} */ (state.art.get(portal.portalId)) : portalArt.styles([portal.provenance.endpoint])[0];   // has() just said it's there
   }
-  const HOUSE_SOURCES = new Set(['saved', 'clips', 'following', 'pinned']);
+  const HOUSE_SOURCES = new Set(['saved', 'clips', 'following', 'pinned', 'changes', 'upcoming']);
   /**
    * A source's colour, for its dot and its cards' top edge. Your own portals take the house
    * inks; a feed takes the lead ink of its fallback art, so the dot, the cards and the
@@ -214,7 +216,7 @@
   }
 
   // ------------------------------------------------------------ saving
-  /** Something that can be saved: a feed item, or a page the reader shows. @typedef {Pick<Item, 'url' | 'title'>} Saveable */
+  /** Something that can be saved: a feed item, or a page the reader shows. @typedef {Pick<Item, 'url' | 'title' | 'event'>} Saveable */
   /** @param {Saveable} item @param {string} source */
   function saveButton(item, source, cls = 'mi save') {
     if (!item.url) return null;
@@ -244,7 +246,7 @@
     markSaved();
     try {
       const result = await callTool(was ? 'remove_saved' : 'save_item',
-        was ? { url } : { url, title: item.title, source: source === 'saved' ? undefined : source });
+        was ? { url } : { url, title: item.title, source: source === 'saved' ? undefined : source, ...('event' in item && item.event ? { event: item.event } : {}) });
       const data = result.structuredContent;
       state.saved = new Set(data.saved.map((s) => s.url));
       if (state.profile) {

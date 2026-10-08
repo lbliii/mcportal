@@ -5,6 +5,7 @@
  */
 import { buildClip, fromContent, CLIP_KINDS, CLIP_LIMITS, clampLimit, clipText, queryWords, summaryOf, type Clip, type ClipKind, type ClipStore, type ClipSummary } from '../clips.ts';
 import type { Profile } from '../profile.ts';
+import { LOCATOR_SCHEMA } from '../evidence.ts';
 import { clean } from '../lib/text.ts';
 import { clipsPortal, clipsQuery } from '../sources.ts';
 import { ensurePortal } from '../layout.ts';
@@ -53,7 +54,7 @@ export const CLIP_TOOLS: ToolDef[] = [
         source: {
           type: 'object',
           additionalProperties: false,
-          properties: { kind: { type: 'string', enum: ['conversation', 'article', 'web'] }, url: { type: 'string' }, title: { type: 'string' } },
+          properties: { kind: { type: 'string', enum: ['conversation', 'article', 'web'] }, url: { type: 'string' }, title: { type: 'string' }, locator: LOCATOR_SCHEMA },
           description: 'Where it came from, e.g. { kind: "article", url, title }',
         },
         content: { type: 'string', description: 'Every kind but exchange: the quote; a note in markdown; a markdown table; the link url; an image as SVG markup or a PNG, JPEG or WebP data: URI' },
@@ -190,4 +191,3 @@ export const CLIP_TOOLS: ToolDef[] = [
     },
   },
 ];
-

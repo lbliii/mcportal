@@ -10,6 +10,7 @@ import { after, before, test } from 'node:test';
 import { AuthStore } from '../src/auth/store.ts';
 import { connect, ensureSchema, importFiles, PgProfileStore, pgAuthPersistence, type Queryable } from '../src/db.ts';
 import { defaultProfile, validateProfile } from '../src/profile.ts';
+import { DocumentCollectionStore } from '../src/collections.ts';
 
 const URL = process.env.TEST_DATABASE_URL;
 const schema = `mcportal_test_${process.pid}_${Date.now()}`;
@@ -32,6 +33,21 @@ after(async () => {
 });
 
 const skip = !URL && 'set TEST_DATABASE_URL to run Postgres tests';
+
+test('pg collections: restart, concurrent edits across instances, caller isolation and deletion', { skip }, async () => {
+  const first = new DocumentCollectionStore(pgAuthPersistence(db, 'collections'));
+  const second = new DocumentCollectionStore(pgAuthPersistence(db, 'collections'));
+  const c = (await first.change('desk-owner', { action: 'create', title: 'A real desk' }))!;
+  await Promise.all([
+    first.change('desk-owner', { action: 'add', id: c.id, entries: [{ ref: 'url:https://example.com/one', title: 'One' }] }),
+    second.change('desk-owner', { action: 'add', id: c.id, entries: [{ ref: 'url:https://example.com/two', title: 'Two' }] }),
+  ]);
+  assert.equal((await new DocumentCollectionStore(pgAuthPersistence(db, 'collections')).get('desk-owner', c.id))!.entries.length, 2);
+  assert.equal(await second.get('other-owner', c.id), undefined);
+  await assert.rejects(second.change('other-owner', { action: 'delete', id: c.id }), { code: 'not_found' });
+  await second.deleteAll('desk-owner');
+  assert.deepEqual(await first.list('desk-owner'), []);
+});
 
 test('pg profiles: default for new users, round-trip, rev increments, schema is idempotent', { skip }, async () => {
   await ensureSchema(db);   // second run is a no-op
@@ -293,4 +309,31 @@ test('pg clips: full-text ranking, literal fallback, generated updates and v8 ba
   assert.deepEqual((await store.list('fts_owner', { query: 'backups' })).map((c) => c.id), [body.id], 'generated vector removes old title');
   assert.deepEqual((await store.list('fts_owner', { query: 'restore' })).map((c) => c.id), [title.id], 'updated note is indexed');
   assert.deepEqual((await store.get('fts_owner', title.id))?.data, title.data, 'migration leaves content intact');
+});
+
+test('db: reading sessions and watch leases survive instances, CAS protects changes and file migration is additive', { skip }, async () => {
+  const { DocumentExperienceStore, FileExperienceStore } = await import('../src/experiences.ts');
+  const { pgAuthPersistence } = await import('../src/db.ts');
+  const { watchAction, checkWatch } = await import('../src/watches.ts');
+  const { TtlCache } = await import('../src/lib/cache.ts');
+  const { MemoryProfileStore } = await import('../src/store.ts');
+  const dir = await mkdtemp(path.join(tmpdir(), 'mcportal-pg-experiences-'));
+  try {
+    const files = new FileExperienceStore(dir), now = Date.now();
+    const context = { experiences: files, store: new MemoryProfileStore(), userId: 'a', cache: new TtlCache(), fetcher: async (url: string) => ({status:200,url,contentType:'text/markdown',text:'# Real evidence\n\nA retained baseline.',truncated:false}) };
+    const id = (await watchAction({action:'add',kind:'page',url:'https://example.com/page.md'}, context,now)).watches[0]!.id;
+    await importFiles(db,dir);
+    const one = new DocumentExperienceStore(pgAuthPersistence(db,'reading-experiences')), two = new DocumentExperienceStore(pgAuthPersistence(db,'reading-experiences'));
+    assert.equal((await one.get('a')).state.watches[0]!.id,id);
+    const version = await one.get('a');
+    await one.update('a',state => ({state:{...state,watches:state.watches.map(w=>({...w,paused:true}))},result:undefined}));
+    await assert.rejects(two.replaceIf('a',version.state,version.rev),{code:'conflict'});
+    await importFiles(db,dir);assert.equal((await two.get('a')).state.watches[0]!.paused,true,'migration never overwrites database changes');
+    await watchAction({action:'pause',id,paused:false},{...context,experiences:one},now);
+    const checked = await Promise.all([checkWatch(id,{...context,experiences:one},now),checkWatch(id,{...context,experiences:two},now)]);
+    assert.equal(checked.filter(Boolean).length,1);
+    assert.ok((await two.get('a')).state.watches[0]!.baseline);
+    assert.equal((await one.get('b')).state.watches.length,0);
+    await one.deleteAll('a');assert.equal((await two.get('a')).state.watches.length,0);
+  } finally { await rm(dir,{recursive:true,force:true});  }
 });

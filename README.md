@@ -116,6 +116,14 @@ For an external authenticated availability probe, use `MCPORTAL_URL=https://<you
 
 **Logs** go to stderr, one event per line: `MCPORTAL_LOG_FORMAT=json` for a log platform, `MCPORTAL_LOG_LEVEL=debug|info|warn|error` (default `info`). Each HTTP request has an id, sent back as `x-request-id` and on every line it logs; a tool failure that is our bug says `reference <id>`, which finds its stack. Users appear only as a short hash.
 
+## Reading experiences
+
+Recall searches bookmarks, retained clip text and reading history together. Select two or three results for a comparison, or keep them in a Topic Desk. Desks have durable evidence, selected live portals, personal note clips and optional cited agent orientations. Reading trails add explicit finish/skip progress; catch-up captures a finite unseen story set and ends without marking articles read. Portal views offer lists, cards, quotes, gallery and GitHub changelogs.
+
+Changes keeps dated text differences and fetch failures from page/release watches. Upcoming arranges public calendar or verified artist events by date and timezone. Watch subscriptions stay private, work locally or on a hosted account, and can be paused/deleted. Background checks run while the server is running; overdue checks are visible. Public calendars need no key. Artist lookup needs `TICKETMASTER_API_KEY` on the server and currently filters by city/country. Recurring or ambiguous calendar dates are visibly omitted. See [reading experiences](docs/plans/reading-experiences.md) for bounds and validation. Run `node scripts/reading-demo.ts` for an isolated preview with fictional desks, comparisons, changes and events.
+
+Full exports include collections, catch-up and watches; importing is additive and imported watches begin paused. Removing collection membership leaves its underlying clip or bookmark. Account deletion removes the new stores too.
+
 ## Security model
 
 | Threat | Defense |
@@ -158,6 +166,12 @@ The `/preview` page never contains secrets. With a static token it asks for the 
 | `get_thumbnails` | app only | Fetch item pictures through the guarded fetcher as data URIs |
 | `import_opml` | model + app | Bring subscriptions from another reader: test-load each feed, build a new user's room from their folders or add to an existing one |
 | `clip` | model | Keep a quote, exchange, note, table, image (SVG, PNG, JPEG, WebP) or link from the conversation as `content` text (exchanges as `turns`); the first clip adds a Clips portal |
+| `search_library` | model and app | Search saved links, retained clips and reading history, with kind/site/tag/status filters |
+| `open_collection` | model and app | Open a private desk, comparison or reading trail |
+| `update_collection` | model and app | Keep, arrange, finish/skip steps and add a cited agent orientation |
+| `show_comparison` | model and app | Show an explicitly supplied interpretation with validated evidence references |
+| `watch` | model and app | Follow pages, releases, public calendars and resolved artists; inspect, check, pause, delete and acknowledge findings |
+| `catch_up` | app only | Capture/resume a finite reading session and explicitly end it |
 | `search_clips` | model | Find clips by words, kind or tag, newest first |
 | `get_clip` | model + app | One clip in full; renders as its own clip card |
 | `update_clip` / `delete_clip` | model | Change a clip's title, note or tags, or delete it |

@@ -193,7 +193,7 @@
   /** @param {string} url @param {boolean} withBack @param {string} [title] */
   function readerTop(url, withBack, title) {
     const toolbar = el('div', { class: 'reader-top', role: 'group', 'aria-label': 'Reader controls' },
-      iconButton('back', withBack ? 'Back to your room' : 'Open your room', closeReader, 'ib'),
+      iconButton('back', experienceReturn ? 'Back to your reading experience' : withBack ? 'Back to your room' : 'Open your room', closeReader, 'ib'),
       url ? iconButton('external', 'Open the original', () => openLink(url), 'ib') : null,
       title ? saveButton({ url, title }, 'reader', 'ib save') : null,
       title && (DEV || hostCapabilities.serverTools) ? iconButton('chat', 'Send to a new chat', () => sendToNewChat(null), 'ib') : null);
@@ -212,9 +212,11 @@
     readerGeneration++;
     if (stopReading) stopReading();
     articleUrl = null; clipId = null; docsArgs = null; spaceHandle = null; docsState = null;
+    pendingKeptLocator = null;
     root.classList.remove('article-view');
     $('reader').classList.remove('space', 'docs', 'toc-open');
     $('reader').hidden = true;
+    if (restoreExperience()) return;
     $('grid').hidden = false;
     if (!state.profile) { await loadRoom(); return; }
     $('roomName').textContent = state.profile.name;

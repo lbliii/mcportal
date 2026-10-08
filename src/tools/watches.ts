@@ -1,0 +1,7 @@
+import { watchAction, WATCH_SCHEMA, type WatchInput } from '../watches.ts';
+import { ok, ROOM_URI, untrusted, type ToolDef } from './kit.ts';
+import type { ToolResults } from './results.ts';
+export const WATCH_TOOLS: ToolDef[] = [{ name:'watch',title:'Changes and Upcoming',description:'Watch a docs page, repository releases, public iCalendar, or resolved artist in a city. List findings; open a finding by id for dated evidence; check, pause, delete or acknowledge. Artist: find_artist first, then add its verified id. No model runs in the worker.',access:'write',cost:2,inputSchema:WATCH_SCHEMA,annotations:{readOnlyHint:false,destructiveHint:true,openWorldHint:true},_meta:{ui:{resourceUri:ROOM_URI}},handler:async(args,ctx)=>{
+  const watches=ctx.watch ? await ctx.watch(args as unknown as WatchInput) : await watchAction(args as unknown as WatchInput,ctx);
+  return ok(untrusted('Watch findings',JSON.stringify({ watches:watches.watches.map(w=>({id:w.id,kind:w.kind,title:w.title,paused:w.paused,lastSuccess:w.lastSuccess,nextCheck:w.nextCheck,error:w.error})), inbox:watches.inbox.map(f=>({id:f.id,watchId:f.watchId,kind:f.kind,title:f.title,at:f.at,read:f.read})), ...(watches.finding?{finding:watches.finding}:{}),...(watches.artists?{artists:watches.artists}:{}),worker:watches.worker,artistAvailable:watches.artistAvailable })),{watches} satisfies ToolResults['watch']);
+} }];

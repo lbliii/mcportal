@@ -10,6 +10,10 @@ import { randomBytes } from 'node:crypto';
 import { ACTIVE_LABS } from '../labs.ts';
 import type { Action, Actor } from '../access.ts';
 import type { ClipStore } from '../clips.ts';
+import type { CollectionStore } from '../collections.ts';
+import type { ExperienceStore } from '../experiences.ts';
+import type { CatchupInput } from '../catchup.ts';
+import type { CatchupSession } from '../experiences.ts';
 import type { UsageBudget } from '../lib/budget.ts';
 import { AppError, ERROR_CODES, isAppError, type ErrorCode } from '../lib/errors.ts';
 import type { Logger } from '../lib/log.ts';
@@ -26,11 +30,14 @@ import type { ReadingStore } from '../reading.ts';
 import type { SocialService } from '../social.ts';
 import type { SourceDeps } from '../sources.ts';
 import type { ProfileStore } from '../store.ts';
+import type { LibrarySearch } from '../library.ts';
 
 export const ROOM_URI = 'ui://mcportal/room.html';
 
 export interface ToolContext extends SourceDeps {
   store: ProfileStore;
+  /** Linked accounts search their complete hosted records in one bounded request. */
+  library?: LibrarySearch | undefined;
   reading?: ReadingStore | undefined;
   /** Pages sent from the room to a new chat. Absent where they aren't set up; the handoff tools then refuse. */
   handoffs?: HandoffStore | undefined;
@@ -40,6 +47,10 @@ export interface ToolContext extends SourceDeps {
   editions?: EditionStore | undefined;
   /** The user's clips. Absent where clips aren't set up; the clip tools then refuse. */
   clips?: ClipStore | undefined;
+  collections?: CollectionStore | undefined;
+  experiences?: ExperienceStore | undefined;
+  watch?: ((input: import('../watches.ts').WatchInput) => Promise<import('../watches.ts').WatchResult>) | undefined;
+  catchup?: ((input: CatchupInput) => Promise<CatchupSession | null>) | undefined;
   /** Handles and public profiles: hosted only (local MCPortal has no social layer). */
   publicProfiles?: ProfileDirectory | undefined;
   /** Shares, follows, mutes, blocks and reports: hosted only. */

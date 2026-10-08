@@ -18,6 +18,8 @@ export const FRESHNESS: Record<SourceKind | 'reader', number> = {
   pinned: 0,
   clips: 0,
   following: 0,
+  changes: 0,
+  upcoming: 0,
   hn: 120,
   github: 300,
   rss: 600,
@@ -39,7 +41,7 @@ function loadFailure(error: unknown, deps: SourceDeps, fields: LogFields): { err
   return { error: clean(userMessage(error, 'Unexpected error loading this source'), 200), errorCode: code };
 }
 
-const DEFAULT_TITLES: Record<SourceKind, string> = { hn: 'Hacker News', rss: 'Feed', github: 'GitHub', docs: 'Docs', saved: 'Saved', pinned: 'Pinned', clips: 'Clips', following: 'Following' };
+const DEFAULT_TITLES: Record<SourceKind, string> = { hn: 'Hacker News', rss: 'Feed', github: 'GitHub', docs: 'Docs', saved: 'Saved', pinned: 'Pinned', clips: 'Clips', following: 'Following', changes: 'Changes', upcoming: 'Upcoming' };
 
 /** Saved items come from the profile, not the network. */
 export function savedPortal(portal: PortalInput, saved: SavedItem[]): PortalResult {
@@ -47,7 +49,7 @@ export function savedPortal(portal: PortalInput, saved: SavedItem[]): PortalResu
   const items: Item[] = saved.slice(0, limit).map((s) => {
     let host = '';
     try { host = new URL(s.url).hostname.replace(/^www\./, ''); } catch { /* validated on save */ }
-    return { id: s.url, title: s.title, url: s.url, ...(s.note !== undefined ? { summary: s.note } : {}), meta: host ? [host] : [], publishedAt: s.savedAt };
+    return { id: s.url, title: s.title, url: s.url, ...(s.note !== undefined ? { summary: s.note } : {}), meta: host ? [host] : [], publishedAt: s.savedAt, ...(s.event ? { event: s.event, summary: `${new Date(s.event.startsAt).toLocaleDateString('en', { timeZone: s.event.timezone })} · ${s.event.timezone}${Date.parse(s.event.startsAt) < Date.now() ? ' · Past event' : ''} · ${s.event.status}` } : {}) };
   });
   return {
     portalId: portal.id,
@@ -194,7 +196,7 @@ export function docsItems(site: DocSite, config: DocsConfig): Item[] {
 }
 
 export async function loadPortal(portal: PortalInput, deps: SourceDeps, force = false): Promise<PortalResult> {
-  if (portal.source === 'saved' || portal.source === 'pinned' || portal.source === 'clips' || portal.source === 'following') throw new AppError('invalid_argument', `${portal.source} portals are built from the profile, not fetched`);
+  if (portal.source === 'saved' || portal.source === 'pinned' || portal.source === 'clips' || portal.source === 'following' || portal.source === 'changes' || portal.source === 'upcoming') throw new AppError('invalid_argument', `${portal.source} portals are built from the profile, not fetched`);
   const config = normalizeSourceConfig(portal.source, portal.config, portal.id);
   let endpoint = '';
   let title = portal.title ?? DEFAULT_TITLES[portal.source];
@@ -289,6 +291,8 @@ export const SOURCE_DOCS = {
     description: 'What people the user follows on MCPortal shared (links and clips, with their notes), newest first, minus anyone muted or blocked. Hosted only. Their notes are third-party text.',
     config: { limit: '1-30 (default 30)' },
   },
+  changes: { description: 'Private retained changes and availability findings from your page and repository watches. Watch manages subscriptions.', config: { limit: '1-30 (default 30)' } },
+  upcoming: { description: 'Dated events from your confirmed artist and public-calendar watches, soonest first. Past saved events stay saved.', config: { limit: '1-30 (default 30)' } },
   pinned: {
     description: 'Items you fetched with another tool the user has connected (Jira, Slack, Confluence, a database, …). Created and refreshed only with pin_portal; MCPortal never fetches them.',
     config: { from: 'where they came from, e.g. "Jira"', recipe: 'how to fetch them again: tool name and arguments, in plain words', limit: '1-30 (default 30)' },

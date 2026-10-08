@@ -22,6 +22,8 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Accounts } from './accounts.ts';
 import type { OAuthServer } from './auth/oauth.ts';
 import type { ClipStore } from './clips.ts';
+import type { CollectionStore } from './collections.ts';
+import type { ExperienceStore } from './experiences.ts';
 import { AppError, errorCode, isAppError } from './lib/errors.ts';
 import { secretToken, sha256Hex } from './lib/ids.ts';
 import type { Logger } from './lib/log.ts';
@@ -42,8 +44,8 @@ const SESSION_MS = 3600 * 1000;
 const DOWNLOAD_MS = 15 * 60 * 1000;
 const MAX_ENTRIES = 500;
 const MAX_FORM = 2048;
-/** An export holds at most 50 MB of clips; leave room for the layout and JSON overhead. */
-export const MAX_UPLOAD = 60 * 1024 * 1024;
+/** An export holds 50 MB of clips and up to 12.8 MB of collections; allow JSON overhead. */
+export const MAX_UPLOAD = 80 * 1024 * 1024;
 
 export interface AccountDeps {
   accounts: Accounts;
@@ -54,6 +56,8 @@ export interface AccountDeps {
   seen?: SeenStore | undefined;
   editions?: EditionStore | undefined;
   clips?: ClipStore | undefined;
+  collections?: CollectionStore | undefined;
+  experiences?: ExperienceStore | undefined;
   publicProfiles?: PublicProfiles | undefined;
   social?: Social | undefined;
   publicUrl: string;
@@ -99,7 +103,7 @@ function sendFile(res: ServerResponse, file: ExportFile): void {
 }
 
 /** What deleting an account needs: every store, and something that can revoke its sign-ins. */
-export type DeletionDeps = Pick<AccountDeps, 'accounts' | 'store' | 'reading' | 'handoffs' | 'seen' | 'editions' | 'clips' | 'publicProfiles' | 'social'> & {
+export type DeletionDeps = Pick<AccountDeps, 'accounts' | 'store' | 'reading' | 'handoffs' | 'seen' | 'editions' | 'clips' | 'collections' | 'experiences' | 'publicProfiles' | 'social'> & {
   oauth: { revokeUser(userId: string): Promise<number> };
 };
 
@@ -113,6 +117,8 @@ export type DeletionDeps = Pick<AccountDeps, 'accounts' | 'store' | 'reading' | 
 export async function deleteAccountData(accountId: string, deps: DeletionDeps, by = accountId): Promise<{ clips: number; tokens: number }> {
   await deps.store.delete(accountId);
   await deps.reading?.deleteAll(accountId);
+  await deps.collections?.deleteAll(accountId);
+  await deps.experiences?.deleteAll(accountId);
   await deps.handoffs?.deleteAll(accountId);
   await deps.seen?.deleteAll(accountId);
   await deps.editions?.deleteAll(accountId);

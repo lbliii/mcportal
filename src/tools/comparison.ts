@@ -1,0 +1,4 @@
+import { comparison, COMPARISON_SCHEMA, type ComparisonInput } from '../comparison.ts';
+import { ok, ROOM_URI, type ToolDef } from './kit.ts';
+import type { ToolResults } from './results.ts';
+export const COMPARISON_TOOLS:ToolDef[]=[{name:'show_comparison',title:'Show a cited comparison',description:'Render explicitly supplied agent interpretation of 2–3 sources under a question. Cite only supplied clip:ID or url:URL refs. Separately identify agreements, differences and open questions. Temporary until the user keeps it.',access:'read',cost:1,inputSchema:COMPARISON_SCHEMA,annotations:{readOnlyHint:true,destructiveHint:false,openWorldHint:false},_meta:{ui:{resourceUri:ROOM_URI}},handler:async(args,ctx)=>{ const result=await comparison(args as unknown as ComparisonInput,ctx); return ok('Comparison shown; source citations are validated. It is temporary until kept.',{comparison:result} satisfies ToolResults['show_comparison']); }}];

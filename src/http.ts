@@ -31,6 +31,8 @@ import { handleMessage, RPC, rpcError, SERVER_INFO, roomHtml, type JsonRpcRespon
 import { API_EXPORT_PATH, API_IMPORT_PATH, API_PATH, CLIENT_HEADER, handleCalls, MIN_CLIENT_VERSION, versionAtLeast } from './api/calls.ts';
 import { API_METHODS } from './api/methods.ts';
 import { FileClipStore, type ClipStore } from './clips.ts';
+import { FileCollectionStore, type CollectionStore } from './collections.ts';
+import { FileExperienceStore, type ExperienceStore } from './experiences.ts';
 import { FileEditionStore, type EditionStore } from './editions.ts';
 import { FileHandoffStore, type HandoffStore } from './handoffs.ts';
 import { FileReadingStore, type ReadingStore } from './reading.ts';
@@ -38,6 +40,7 @@ import { FileSeenStore, type SeenStore } from './seen.ts';
 import type { ProfileStore } from './store.ts';
 import type { LocalSession } from './link/session.ts';
 import type { ToolContext } from './tools/kit.ts';
+import { startWatchWorker } from './watches.ts';
 import { retentionTasks, startHousekeeping } from './housekeeping.ts';
 import type { Fetcher } from './types.ts';
 
@@ -80,6 +83,8 @@ export interface AppDeps {
   editions?: EditionStore | undefined;
   /** Clips; defaults to files under the data directory. */
   clips?: ClipStore | undefined;
+  collections?: CollectionStore | undefined;
+  experiences?: ExperienceStore | undefined;
   /** The labs on (default MCPORTAL_LABS). */
   labs?: readonly string[] | undefined;
   /** Handles and public profiles (only with GitHub sign-in: a single-token server has no social layer). */
@@ -233,21 +238,23 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
   const seen = deps.seen ?? new FileSeenStore(config.dataDir);
   const editions = deps.editions ?? new FileEditionStore(config.dataDir);
   const clips = deps.clips ?? new FileClipStore(config.dataDir);
+  const collections = deps.collections ?? new FileCollectionStore(config.dataDir);
+  const experiences = deps.experiences ?? new FileExperienceStore(config.dataDir);
   const publicProfiles = oauth ? deps.publicProfiles : undefined;
   const social = oauth && publicProfiles ? deps.social : undefined;
   // The account page needs GitHub sign-in; without it, exports are written to the data directory.
-  const account = oauth ? new AccountPage({ accounts, oauth, store: deps.store, reading, handoffs, seen, editions, clips, publicProfiles, social, publicUrl: config.publicUrl, log, now: deps.now }) : undefined;
+  const account = oauth ? new AccountPage({ accounts, oauth, store: deps.store, reading, handoffs, seen, editions, clips, collections, experiences, publicProfiles, social, publicUrl: config.publicUrl, log, now: deps.now }) : undefined;
   // Retention on a schedule: what's kept only for a while goes even on a quiet server.
-  const stopHousekeeping = startHousekeeping(retentionTasks({ handoffs, editions, social, accounts, oauth }), log);
+  const stopHousekeeping = startHousekeeping(retentionTasks({ handoffs, editions, experiences, social, accounts, oauth }), log);
   const context = (userId: string, reqLog: Logger): ToolContext => ({
     log: reqLog,
-    store: deps.store, reading, handoffs, seen, editions, clips, publicProfiles, social, fetcher: deps.fetcher, cache: deps.cache, userId, budget, metrics, actor: accounts.actor(userId),
+    store: deps.store, reading, handoffs, seen, editions, clips, collections, experiences, publicProfiles, social, fetcher: deps.fetcher, cache: deps.cache, userId, budget, metrics, actor: accounts.actor(userId),
     labs: deps.labs,
     accountUrl: account?.url,
     uploadLink: account ? () => account.uploadLink(userId) : undefined,
     localFiles: !account && config.allowUnauthenticated && isLoopbackHost(config.host),
     deliver: async (format) => {
-      if (!account) return deliverToFile(format, userId, { store: deps.store, reading, clips }, config.dataDir);
+      if (!account) return deliverToFile(format, userId, { store: deps.store, reading, clips, collections, experiences }, config.dataDir);
       // Built when the link is opened, so it's current and the big ones aren't built twice.
       const summary = { mcportal: 'everything', bookmarks: 'saved items', clips: 'clips as Markdown', opml: 'sources as OPML' }[format];
       return { kind: 'link', where: account.downloadLink(userId, format), summary };
@@ -313,7 +320,7 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
       if (url.pathname === API_EXPORT_PATH) {
         const format = url.searchParams.get('format') ?? 'mcportal';
         if (!EXPORT_FORMATS.includes(format as ExportFormat)) return json(400, { error: 'bad_request', error_description: `format must be one of ${EXPORT_FORMATS.join(', ')}` });
-        const file = await buildExport(format as ExportFormat, userId, { store: deps.store, reading, clips, publicProfile: await publicProfiles?.get(userId), social });
+        const file = await buildExport(format as ExportFormat, userId, { store: deps.store, reading, clips, collections, experiences, publicProfile: await publicProfiles?.get(userId), social });
         return send(res, 200, file.body, file.contentType, { ...server, 'content-disposition': `attachment; filename="${file.filename}"`, 'x-mcportal-summary': file.summary });
       }
       let text: string;
@@ -324,7 +331,7 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
         return json(tooLarge ? 413 : 400, { error: tooLarge ? 'too_large' : 'bad_request', error_description: tooLarge ? 'Over 60 MB' : 'Unreadable body' }, tooLarge ? { connection: 'close' } : {});
       }
       try {
-        const result = await importExport(parseExport(text), userId, { store: deps.store, reading, clips });
+        const result = await importExport(parseExport(text), userId, { store: deps.store, reading, clips, collections, experiences });
         return json(200, { result, summary: describeImport(result) });
       } catch (error) {
         if (!isAppError(error) || error.code === 'internal') throw error;
@@ -428,6 +435,8 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
   server.on('clientError', (_error, socket) => {
     if (socket.writable) socket.end('HTTP/1.1 400 Bad Request\r\n\r\n');
   });
+  const stopWatches = startWatchWorker(experiences, owner => context(owner, log), log, undefined, async () => !(await deps.session?.isLinked()));
+  server.on('close', stopWatches);
   server.on('close', stopHousekeeping);
   server.requestTimeout = 300_000;   // room for an export upload on a slow connection; headersTimeout still guards slow-drip requests
   server.headersTimeout = 20_000;

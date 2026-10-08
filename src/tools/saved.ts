@@ -30,6 +30,7 @@ export const SAVED_TOOLS: ToolDef[] = [
         url: { type: 'string', description: 'http(s) URL' },
         title: { type: 'string', description: 'Short title; defaults to the site name' },
         note: { type: 'string', description: "Optional note in the user's words" },
+        event: { type: 'object', description: 'Dated public event metadata; validated before saving' },
         source: { type: 'string', description: 'Where it came from, e.g. hn, rss, github' },
       },
     },
@@ -37,6 +38,12 @@ export const SAVED_TOOLS: ToolDef[] = [
     async handler(args, ctx) {
       const url = httpUrl(args.url);
       if (!url) return toolError('save_item needs an http(s) "url"');
+      let event: import('../watches-state.ts').WatchedEvent | undefined;
+      if (args.event) {
+        const requested = args.event as { id?: unknown };
+        event = (await ctx.experiences?.get(ctx.userId))?.state.watches.flatMap(w => w.events).find(e => e.id === requested.id && e.url === url);
+        if (!event) return toolError('Save an event currently returned by your watched sources.');
+      }
       const { profile, added, existing } = await ctx.store.update(ctx.userId, (before) => {
         const existing = before.saved.find((s) => s.url === url);
         const entry: Record<string, unknown> = {
@@ -45,6 +52,7 @@ export const SAVED_TOOLS: ToolDef[] = [
           title: args.title ?? existing?.title,
           note: args.note ?? existing?.note,
           source: args.source ?? existing?.source,
+          event: event ?? existing?.event,
           savedAt: existing?.savedAt ?? new Date().toISOString(),
         };
         const withItem = validateProfile({ ...before, saved: [entry, ...before.saved.filter((s) => s.url !== url)] });

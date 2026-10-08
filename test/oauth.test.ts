@@ -634,7 +634,7 @@ test('import uploads: one-time links from import_portal and the account page, CS
 
     const big = new URL((await tool('import_portal')).structuredContent.uploadUrl);
     await raw(app.port, { path: big.pathname, headers: { cookie: session } });
-    const tooBig = await raw(app.port, { method: 'POST', path: big.pathname, headers: { cookie: session, ...sameOrigin(app.port), 'content-type': 'multipart/form-data; boundary=x', 'content-length': String(61 * 1024 * 1024) }, body: '' });
+    const tooBig = await raw(app.port, { method: 'POST', path: big.pathname, headers: { cookie: session, ...sameOrigin(app.port), 'content-type': 'multipart/form-data; boundary=x', 'content-length': String(81 * 1024 * 1024) }, body: '' });
     assert.equal(tooBig.status, 413);
 
     // The account page's import needs the session's CSRF token.
