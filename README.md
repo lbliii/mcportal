@@ -170,7 +170,7 @@ The `/preview` page never contains secrets. With a static token it asks for the 
 | `open_collection` | model and app | Open a private desk, comparison or reading trail |
 | `update_collection` | model and app | Keep, arrange, finish/skip steps and add a cited agent orientation |
 | `show_comparison` | model and app | Show an explicitly supplied interpretation with validated evidence references |
-| `watch` | model and app | Follow pages, releases, public calendars and resolved artists; inspect, check, pause, delete and acknowledge findings |
+| `watch_reading` | model and app | Follow pages, releases, public calendars and resolved artists; inspect, check, pause, delete and acknowledge findings |
 | `catch_up` | app only | Capture/resume a finite reading session and explicitly end it |
 | `search_clips` | model | Find clips by words, kind or tag, newest first |
 | `get_clip` | model + app | One clip in full; renders as its own clip card |

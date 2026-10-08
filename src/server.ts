@@ -21,7 +21,7 @@ import { LocalSession } from './link/session.ts';
 import { TtlCache } from './lib/cache.ts';
 import { createFixtureFetcher } from './lib/fixture-fetch.ts';
 import { safeFetch } from './lib/safe-fetch.ts';
-import { startWatchWorker } from './watches.ts';
+import { startWatchWorker } from './reading-watches.ts';
 import { retentionTasks, startHousekeeping } from './housekeeping.ts';
 import { handleMessage, RPC, rpcError, type JsonRpcResponse } from './mcp.ts';
 import { openStorage } from './storage.ts';

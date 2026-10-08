@@ -314,7 +314,7 @@ test('pg clips: full-text ranking, literal fallback, generated updates and v8 ba
 test('db: reading sessions and watch leases survive instances, CAS protects changes and file migration is additive', { skip }, async () => {
   const { DocumentExperienceStore, FileExperienceStore } = await import('../src/experiences.ts');
   const { pgAuthPersistence } = await import('../src/db.ts');
-  const { watchAction, checkWatch } = await import('../src/watches.ts');
+  const { watchAction, checkWatch } = await import('../src/reading-watches.ts');
   const { TtlCache } = await import('../src/lib/cache.ts');
   const { MemoryProfileStore } = await import('../src/store.ts');
   const dir = await mkdtemp(path.join(tmpdir(), 'mcportal-pg-experiences-'));

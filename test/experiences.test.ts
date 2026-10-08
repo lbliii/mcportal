@@ -5,7 +5,7 @@ import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { DocumentExperienceStore,FileExperienceStore,validateExperiences } from '../src/experiences.ts';
 import { catchup } from '../src/catchup.ts';
-import { watchAction,checkWatch,watchText,textDiff } from '../src/watches.ts';
+import { watchAction,checkWatch,watchText,textDiff } from '../src/reading-watches.ts';
 import { localInstant,parseCalendar } from '../src/adapters/events.ts';
 import { comparison } from '../src/comparison.ts';
 import { FileClipStore,buildClip } from '../src/clips.ts';

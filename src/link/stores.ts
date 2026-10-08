@@ -395,7 +395,7 @@ export function linkedStores(client: StateClient, accountId: string, options: { 
   };
   return {
     experiences,
-    watch: (input: import('../watches.ts').WatchInput): Promise<import('../watches.ts').WatchResult> => client.call('watches.action', dropUndefined(input)),
+    watch: (input: import('../reading-watches.ts').WatchInput): Promise<import('../reading-watches.ts').WatchResult> => client.call('reading_watches.action', dropUndefined(input)),
     catchup: (input: import('../catchup.ts').CatchupInput): Promise<import('../experiences.ts').CatchupSession | null> => client.call('catchup.action', dropUndefined(input)),
     collections: {
       async list(userId: string): Promise<import('../collections.ts').Collection[]> { assertCollectionOwner(userId); return client.call('collections.list'); },

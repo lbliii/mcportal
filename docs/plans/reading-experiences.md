@@ -157,7 +157,7 @@ The first milestone is Recall Shelf: keep a relevant page and quote, leave the c
 
 ## Delivered implementation and boundaries
 
-The implementation now includes all eight experiences, with private Collection and Experience stores in files/Postgres and owner-bound hosted state methods for linked clients. `search_library`, `open_collection`, `update_collection`, `show_comparison`, and `watch` serve the agent; `catch_up` is a direct app operation. Changes and Upcoming can also be ordinary room sources. Orientations and interpretations remain explicit agent output.
+The implementation now includes all eight experiences, with private Collection and Experience stores in files/Postgres and owner-bound hosted state methods for linked clients. `search_library`, `open_collection`, `update_collection`, `show_comparison`, and `watch_reading` serve the agent; `catch_up` is a direct app operation. Changes and Upcoming can also be ordinary room sources. Orientations and interpretations remain explicit agent output.
 
 Watches check every six hours while the server runs, with durable leases, retries and overdue status; the worker resumes missed checks at startup. Up to 20 watches per account retain the latest 24,000 characters of readable page text or the latest 30 release names/versions/dates. Diff displays are bounded to 12 KB. Forty findings and provider events expire after 30 days; scheduled retention also covers paused watches. Imported watches start paused. Ordinary article fetches are still not archives.
 

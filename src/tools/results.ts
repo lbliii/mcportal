@@ -73,7 +73,7 @@ export type ToolResults = {
   open_collection: { collections: Collection[]; sources: Array<Pick<PortalResult, 'portalId' | 'title' | 'source'>>; desk?: CollectionData };
   update_collection: { collections: Collection[]; collection?: Collection };
   show_comparison: { comparison: import('../comparison.ts').ComparisonResult };
-  watch: { watches: import('../watches.ts').WatchResult };
+  watch_reading: { watches: import('../reading-watches.ts').WatchResult };
   catch_up: { session: CatchupSession | null };
   open_room: RoomResult;
   build_room: { profile: Profile };

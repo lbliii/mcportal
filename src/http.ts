@@ -40,7 +40,7 @@ import { FileSeenStore, type SeenStore } from './seen.ts';
 import type { ProfileStore } from './store.ts';
 import type { LocalSession } from './link/session.ts';
 import type { ToolContext } from './tools/kit.ts';
-import { startWatchWorker } from './watches.ts';
+import { startWatchWorker } from './reading-watches.ts';
 import { retentionTasks, startHousekeeping } from './housekeeping.ts';
 import type { Fetcher } from './types.ts';
 

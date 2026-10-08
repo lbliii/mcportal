@@ -13,7 +13,7 @@ import { FileSeenStore } from '../src/seen.ts';
 import { TtlCache } from '../src/lib/cache.ts';
 import { silentLogger } from '../src/lib/log.ts';
 import { createFixtureFetcher } from '../src/lib/fixture-fetch.ts';
-import { watchAction, checkWatch } from '../src/watches.ts';
+import { watchAction, checkWatch } from '../src/reading-watches.ts';
 import type { Fetcher } from '../src/types.ts';
 
 const dir = await mkdtemp(path.join(tmpdir(),'mcportal-reading-demo-'));

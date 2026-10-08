@@ -157,7 +157,7 @@
       "description": "Create or edit private desks, comparisons (2–3 sources) and trails."
     },
     {
-      "name": "watch",
+      "name": "watch_reading",
       "description": "Watch a docs page, repository releases, public iCalendar, or resolved artist in a city."
     },
     {

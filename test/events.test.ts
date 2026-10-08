@@ -4,7 +4,7 @@ import { artistEvents,findArtists,resolveArtist,parseCalendar } from '../src/ada
 import { TtlCache } from '../src/lib/cache.ts';
 import { DocumentExperienceStore } from '../src/experiences.ts';
 import { currentSavedEvents,eventIsPast,type Watch,type WatchedEvent } from '../src/watches-state.ts';
-import { textDiff } from '../src/watches.ts';
+import { textDiff } from '../src/reading-watches.ts';
 import type { Fetcher } from '../src/types.ts';
 
 const event:WatchedEvent={id:'ics:festival',title:'Festival',url:'https://example.com/festival',startsAt:'2027-07-04T04:00:00.000Z',timezone:'America/New_York',allDay:true,venue:'Town Hall',city:'',status:'scheduled',provider:'calendar',updatedAt:'2027-07-01T00:00:00.000Z'};

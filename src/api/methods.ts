@@ -34,7 +34,7 @@ import { LIBRARY_SCHEMA, searchLibrary, type LibraryQuery } from '../library.ts'
 import { COLLECTION_CHANGE_SCHEMA, type CollectionChange } from '../collections.ts';
 import { changeCollection } from '../collection-service.ts';
 import { CATCHUP_SCHEMA, catchup, type CatchupInput } from '../catchup.ts';
-import { watchAction, WATCH_SCHEMA, type WatchInput } from '../watches.ts';
+import { watchAction, WATCH_SCHEMA, type WatchInput } from '../reading-watches.ts';
 import { validateExperiences, type ExperienceState } from '../experiences.ts';
 
 const NO_PARAMS = { type: 'object', additionalProperties: false, properties: {} };
@@ -89,7 +89,7 @@ async function accountOf(ref: string, ctx: ToolContext): Promise<string> {
 
 export const API_METHODS: Record<string, ApiMethod> = {
   'catchup.action': params<CatchupInput>(CATCHUP_SCHEMA, (p, ctx) => catchup(p, ctx), 'write', 2),
-  'watches.action': params<WatchInput>(WATCH_SCHEMA, (p, ctx) => watchAction(p, ctx), 'write'),
+  'reading_watches.action': params<WatchInput>(WATCH_SCHEMA, (p, ctx) => watchAction(p, ctx), 'write'),
   'experiences.get': params(NO_PARAMS, (_p, ctx) => need(ctx.experiences, 'Reading sessions are not available.').get(ctx.userId)),
   'experiences.put': params<{ state: ExperienceState; ifMatch: number }>({ type: 'object', required: ['state', 'ifMatch'], additionalProperties: false, properties: { state: { type: 'object' }, ifMatch: { type: 'integer', minimum: 0 } } }, (p, ctx) => need(ctx.experiences, 'Reading sessions are not available.').replaceIf(ctx.userId, validateExperiences(p.state), p.ifMatch), 'write'),
   'collections.list': params(NO_PARAMS, (_p, ctx) => need(ctx.collections, 'Collections are not available.').list(ctx.userId)),

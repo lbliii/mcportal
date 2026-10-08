@@ -18,7 +18,7 @@ import { SOURCE_TOOLS } from './sources.ts';
 import { LIBRARY_TOOLS } from './library.ts';
 import { COLLECTION_TOOLS } from './collections.ts';
 import { COMPARISON_TOOLS } from './comparison.ts';
-import { WATCH_TOOLS } from './watches.ts';
+import { READING_WATCH_TOOLS } from './reading-watches.ts';
 import { CATCHUP_TOOLS } from './catchup.ts';
 
 export const TOOLS: readonly ToolDef[] = [
@@ -36,7 +36,7 @@ export const TOOLS: readonly ToolDef[] = [
   ...LIBRARY_TOOLS,
   ...COLLECTION_TOOLS,
   ...CATCHUP_TOOLS,
-  ...WATCH_TOOLS,
+  ...READING_WATCH_TOOLS,
   ...COMPARISON_TOOLS,
 ];
 

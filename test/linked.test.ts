@@ -334,18 +334,18 @@ test('linked: catch-up, watch subscriptions and findings are hosted, survive ano
     assert.equal((await office.call('catch_up',{action:'open'})).structuredContent.session.id,session.id);
     assert.equal((await other.call('catch_up',{action:'open'})).structuredContent.session,null);
     if (!session.finishedAt) {const end=await office.call('catch_up',{action:'end',sessionId:session.id,index:0});assert.ok(end.structuredContent.session.acknowledgedAt);}
-    const added=await mac.call('watch',{action:'add',kind:'releases',repo:'acme/manual',title:'Manual releases'});
+    const added=await mac.call('watch_reading',{action:'add',kind:'releases',repo:'acme/manual',title:'Manual releases'});
     assert.ok(!added.isError,added.content[0]!.text);
     const id=added.structuredContent.watches.watches[0].id;
-    assert.equal((await office.call('watch',{action:'list'})).structuredContent.watches.watches[0].id,id);
-    assert.deepEqual((await other.call('watch',{action:'list'})).structuredContent.watches.watches,[]);
-    assert.equal((await other.call('watch',{action:'delete',id})).isError,true);
-    const checked=await office.call('watch',{action:'check',id});
+    assert.equal((await office.call('watch_reading',{action:'list'})).structuredContent.watches.watches[0].id,id);
+    assert.deepEqual((await other.call('watch_reading',{action:'list'})).structuredContent.watches.watches,[]);
+    assert.equal((await other.call('watch_reading',{action:'delete',id})).isError,true);
+    const checked=await office.call('watch_reading',{action:'check',id});
     assert.equal(checked.structuredContent.watches.inbox[0].kind,'availability','a provider failure is retained rather than a fake deletion');
-    await mac.call('watch',{action:'pause',id,paused:true});
-    assert.equal((await office.call('watch',{action:'list'})).structuredContent.watches.watches[0].paused,true);
+    await mac.call('watch_reading',{action:'pause',id,paused:true});
+    assert.equal((await office.call('watch_reading',{action:'list'})).structuredContent.watches.watches[0].paused,true);
     const changes = await mac.call('add_portal',{source:'changes',config:{}}); assert.ok(!changes.isError, changes.content[0]!.text); await mac.call('add_portal',{source:'upcoming',config:{}}); clock += 60000;
     const room=await office.call('open_room');assert.ok(room.structuredContent.portals.some((p:any)=>p.source==='changes'&&p.items.length===1));
-    await mac.call('watch',{action:'delete',id});assert.deepEqual((await office.call('watch',{action:'list'})).structuredContent.watches.inbox,[]);
+    await mac.call('watch_reading',{action:'delete',id});assert.deepEqual((await office.call('watch_reading',{action:'list'})).structuredContent.watches.inbox,[]);
   } finally {await h.app.close();}
 });

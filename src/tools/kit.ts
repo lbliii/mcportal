@@ -49,7 +49,7 @@ export interface ToolContext extends SourceDeps {
   clips?: ClipStore | undefined;
   collections?: CollectionStore | undefined;
   experiences?: ExperienceStore | undefined;
-  watch?: ((input: import('../watches.ts').WatchInput) => Promise<import('../watches.ts').WatchResult>) | undefined;
+  watch?: ((input: import('../reading-watches.ts').WatchInput) => Promise<import('../reading-watches.ts').WatchResult>) | undefined;
   catchup?: ((input: CatchupInput) => Promise<CatchupSession | null>) | undefined;
   /** Handles and public profiles: hosted only (local MCPortal has no social layer). */
   publicProfiles?: ProfileDirectory | undefined;

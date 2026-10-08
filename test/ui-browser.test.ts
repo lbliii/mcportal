@@ -928,7 +928,7 @@ test('browser: Changes keeps dated evidence and Upcoming renders real calendar d
   await page.send('Emulation.setDeviceMetricsOverride',{width:320,height:800,deviceScaleFactor:1,mobile:false});
   try {assert.equal(await page.eval(`document.documentElement.scrollWidth<=window.innerWidth`),true);} finally {await page.send('Emulation.setDeviceMetricsOverride',{width:1280,height:900,deviceScaleFactor:1,mobile:false});}
   await tool('remove_saved',{url:'https://venue.example.com/show'});
-  const all=(await experiences.get('default')).state.watches;for(const w of all) await tool('watch',{action:'delete',id:w.id});
+  const all=(await experiences.get('default')).state.watches;for(const w of all) await tool('watch_reading',{action:'delete',id:w.id});
   assert.deepEqual(page.problems,[]);
 });
 
