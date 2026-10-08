@@ -94,7 +94,8 @@
         gotInitialResult = true;
         const message = (/** @type {Array<{ type?: string, text?: string }>} */ (params.content || [])).filter((c) => c.type === 'text').map((c) => c.text).join(' ');
         showAppError('The tool could not open this view', new Error(message || 'No error details returned'));
-      } else if (data && data.preview && data.preview.select) { gotInitialResult = true; showStorePreview(data.preview); }
+      } else if (data?.unavailable && pendingHandoff) { gotInitialResult = true; showUnavailableHandoff(pendingHandoff); }
+      else if (data && data.preview && data.preview.select) { gotInitialResult = true; showStorePreview(data.preview); }
       else if (data && data.confirmed && data.profile && data.portal) { gotInitialResult = true; callTool('open_room').then(result => renderRoom(result.structuredContent)).catch(error => showAppError('Could not load your room', error)); }
       else if (data && data.site && Array.isArray(data.site.sections)) { gotInitialResult = true; showDocsCard(data); }
       else if (data && data.comparison) { gotInitialResult = true; showComparisonResult(data.comparison); }
@@ -129,7 +130,7 @@
     $('welcome').hidden = true;
     const reader = $('reader');
     reader.hidden = false;
-    reader.replaceChildren(el('div', { class: 'error', role: 'alert' }, `${context}: ${errorText(error)}. Ask your agent to open it again.`));
+    renderReader(el('div', { class: 'error', role: 'alert' }, `${context}: ${errorText(error)}. Ask your agent to open it again.`));
     setStatus('View failed');
   }
 

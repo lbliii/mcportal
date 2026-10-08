@@ -65,11 +65,16 @@
 
   /** @param {string[]} packIds */
   async function buildRoom(packIds) {
-    const note = el('div', { class: 'building' }, packIds.length ? 'Forging your room in the star-furnace…' : 'Cracking open a sample room…');
+    if (setupBusy) { toast('Please wait for the current setup to finish.'); return; }
+    setupBusy = true;
+    const note = el('div', { class: 'building', role: 'status' }, packIds.length ? 'Forging your room in the star-furnace…' : 'Cracking open a sample room…');
     $('welcome').append(note);
-    for (const b of $('welcome').querySelectorAll('button')) b.disabled = true;
+    const buttons = [...$('welcome').querySelectorAll('button')].map(button => ({ button, disabled: button.disabled }));
+    for (const { button } of buttons) button.disabled = true;
+    let builtRoom = false;
     try {
       const built = (await callTool('build_room', { packs: packIds })).structuredContent;
+      builtRoom = true;
       note.textContent = 'Receiving transmissions…';
       const result = await callTool('open_room');
       renderRoom(result.structuredContent);
@@ -79,9 +84,10 @@
         }, 5000).catch(() => {});
       }
     } catch (error) {
-      note.textContent = `Curses! That didn't work: ${errorText(error)}`;
-      for (const b of $('welcome').querySelectorAll('button')) b.disabled = false;
-    }
+      note.textContent = builtRoom ? 'Your room was saved, but could not be displayed. Refresh to open it.' : `Setup failed: ${errorText(error)}`;
+      if (builtRoom) note.append(el('button', { class: 'btn', onclick: () => { loading = null; loadRoom(); } }, 'Refresh room'));
+      else for (const { button, disabled } of buttons) button.disabled = disabled;
+    } finally { setupBusy = false; }
   }
 
   /** @param {ToolResults['open_room']} data */
@@ -110,54 +116,145 @@
   // ------------------------------------------------------------ pictures
   // The server fetches images (get_thumbnails) and returns data: URIs, so this view
   // never contacts third parties. Requested in batches as they scroll into view.
-  /** @type {Map<string, string | null>} */
-  const pictures = new Map();   // image url -> data URI, or null when unavailable
-  /** @type {Set<string>} */
+  /** @type {Map<string, string>} */
+  const pictures = new Map();   // successes only; a transient failure must be recoverable
+  /** @typedef {{ url: string, observer: IntersectionObserver, active: boolean, attempts: number, retryAt: number }} PictureWatch */
+  /** @type {Map<HTMLElement, PictureWatch>} */
+  const pictureWatches = new Map();
+  /** @type {Set<HTMLElement>} */
   const wanted = new Set();
-  let pictureTimer = 0, pictureBusy = false;
+  let pictureTimer = 0, pictureBusy = false, pictureBytes = 0;
 
   /** @param {HTMLElement} node a picture element, with data-img */
   function showPicture(node) {
-    const url = (node.dataset.img ?? '');   // only picture elements (with data-img) come here
-    if (!pictures.has(url)) return false;
-    const data = pictures.get(url);
+    const data = pictures.get(node.dataset.img ?? '');
+    if (!data) return false;
     const img = /** @type {HTMLImageElement | null} */ (node.tagName === 'IMG' ? node : $first('img', node));
-    if (data && img) { img.src = data; img.classList.add('on'); }
-    else if (!data && (node.classList.contains('avatar') || node.classList.contains('space-link-preview'))) node.classList.add('gone');
+    if (img) { img.src = data; img.classList.add('on'); node.classList.remove('gone'); }
     return true;
   }
-  const seen = new IntersectionObserver((entries) => {
-    for (const e of entries) {
-      if (!e.isIntersecting) continue;
-      const node = /** @type {HTMLElement} */ (e.target);   // only picture elements are observed
-      seen.unobserve(node);
-      if (!showPicture(node)) { wanted.add((node.dataset.img ?? '')); clearTimeout(pictureTimer); pictureTimer = setTimeout(loadPictures, 60); }
-    }
-  }, { rootMargin: '200px' });
 
-  async function loadPictures() {
-    if (pictureBusy || !wanted.size) return;
-    pictureBusy = true;
-    const batch = [...wanted].slice(0, 24);
-    batch.forEach((u) => wanted.delete(u));
-    try {
-      const { images } = (await callTool('get_thumbnails', { urls: batch })).structuredContent;
-      for (const u of batch) pictures.set(u, images[u] || null);
-    } catch {
-      for (const u of batch) pictures.set(u, null);
-    }
-    for (const node of $$('[data-img]')) if (batch.includes((node.dataset.img ?? ''))) showPicture(node);   // selected by data-img
-    pictureBusy = false;
-    if (wanted.size) loadPictures();
+  /** @param {HTMLElement} node */
+  function forgetPicture(node) {
+    pictureWatches.get(node)?.observer.unobserve(node);
+    pictureWatches.delete(node);
+    wanted.delete(node);
   }
 
-  // The first few pictures in each portal are what's on screen: ask for them now,
-  // without waiting on visibility (which never fires in a hidden or background frame).
+  /** @param {IntersectionObserverEntry[]} entries */
+  function seePictures(entries) {
+    for (const e of entries) {
+      const node = /** @type {HTMLElement} */ (e.target);   // only picture elements are observed
+      const watch = pictureWatches.get(node);
+      if (!watch) continue;
+      if (!node.isConnected) { forgetPicture(node); continue; }
+      watch.active = e.isIntersecting;
+      if (!watch.active) { wanted.delete(node); continue; }
+      if (showPicture(node)) forgetPicture(node);
+      else if (watch.attempts < 2) wanted.add(node);
+    }
+    schedulePictures();
+  }
+  const seen = new IntersectionObserver(seePictures, { rootMargin: '200px' });
+  const readerSeen = new IntersectionObserver(seePictures, { root: $('reader'), rootMargin: '200px' });
+
+  // Figures are created before their article is attached. Rebind them to its actual
+  // scroller after insertion; release old observations and queued work on navigation.
+  const pictureChanges = new MutationObserver(() => {
+    for (const [node, watch] of pictureWatches) {
+      if (!node.isConnected || node.dataset.img !== watch.url) { forgetPicture(node); continue; }
+      const observer = $('reader').contains(node) ? readerSeen : seen;
+      if (watch.observer !== observer) {
+        watch.observer.unobserve(node);
+        wanted.delete(node);
+        watch.active = false;
+        watch.observer = observer;
+        observer.observe(node);
+      }
+    }
+    schedulePictures();
+  });
+  pictureChanges.observe(root, { childList: true, subtree: true });
+
+  function schedulePictures() {
+    if (pictureBusy) return;
+    clearTimeout(pictureTimer);
+    let next = Infinity;
+    for (const node of wanted) {
+      const watch = pictureWatches.get(node);
+      if (!watch || !node.isConnected || !watch.active || watch.attempts >= 2) { wanted.delete(node); continue; }
+      next = Math.min(next, Math.max(60, watch.retryAt - Date.now()));
+    }
+    if (next !== Infinity) pictureTimer = setTimeout(loadPictures, next);
+  }
+
+  /** @param {string} url @param {string} data */
+  function cachePicture(url, data) {
+    if (pictures.has(url)) return;
+    pictures.set(url, data);
+    pictureBytes += data.length;
+    // Bound the browser's data URI storage as well as each tool request.
+    while (pictures.size > 64 || pictureBytes > 8_000_000) {
+      const oldest = pictures.keys().next().value;
+      if (oldest === undefined) break;
+      pictureBytes -= pictures.get(oldest)?.length ?? 0;
+      pictures.delete(oldest);
+    }
+  }
+
+  async function loadPictures() {
+    if (pictureBusy) return;
+    /** @type {Map<string, HTMLElement[]>} */
+    const batch = new Map();
+    for (const node of wanted) {
+      const watch = pictureWatches.get(node);
+      if (!watch || !node.isConnected || node.dataset.img !== watch.url) { forgetPicture(node); continue; }
+      if (showPicture(node)) { forgetPicture(node); continue; }
+      if (!watch.active || watch.attempts >= 2) { wanted.delete(node); continue; }
+      if (watch.retryAt > Date.now() || (!batch.has(watch.url) && batch.size >= 24)) continue;
+      wanted.delete(node);
+      watch.attempts++;
+      const nodes = batch.get(watch.url) ?? [];
+      nodes.push(node);
+      batch.set(watch.url, nodes);
+    }
+    if (!batch.size) { schedulePictures(); return; }
+    pictureBusy = true;
+    /** @type {Record<string, string | null>} */
+    let images = {};
+    try { images = (await callTool('get_thumbnails', { urls: [...batch.keys()] })).structuredContent?.images ?? {}; }
+    catch { /* Tool failures get the same bounded retry as unavailable images. */ }
+    for (const [url, nodes] of batch) {
+      const data = images[url];
+      // Only raster data URIs can become image sources, including across host bridges.
+      const safe = typeof data === 'string' && data.length <= 466_700 && /^data:image\/(?:png|jpeg|gif|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(data);
+      if (safe) cachePicture(url, data);
+      for (const node of nodes) {
+        const watch = pictureWatches.get(node);
+        if (!watch || !node.isConnected || watch.url !== url || node.dataset.img !== url) continue;
+        if (safe && showPicture(node)) forgetPicture(node);
+        else if (watch.attempts >= 2) {
+          if (node.classList.contains('avatar')) node.classList.add('gone');
+          forgetPicture(node);
+        } else {
+          watch.retryAt = Date.now() + 2000;
+          if (watch.active) wanted.add(node);
+        }
+      }
+    }
+    pictureBusy = false;
+    schedulePictures();
+  }
+
+  // Prime portal cards even in background frames. Reader figures stay visibility-driven.
   /** @param {HTMLElement} portalNode */
   function primePictures(portalNode, count = 6) {
-    const urls = [...new Set([...$$('[data-img]', portalNode)].map((n) => (n.dataset.img ?? '')))].slice(0, count);   // selected by data-img
-    for (const u of urls) if (!pictures.has(u)) wanted.add(u);
-    if (wanted.size) { clearTimeout(pictureTimer); pictureTimer = setTimeout(loadPictures, 30); }
+    const nodes = [...$$('[data-img]', portalNode)].slice(0, count);
+    for (const node of nodes) {
+      const watch = pictureWatches.get(node);
+      if (watch && !showPicture(node)) { watch.active = true; wanted.add(node); }
+    }
+    schedulePictures();
   }
 
   /**
@@ -166,7 +263,11 @@
    * @returns {T}
    */
   function watchPicture(node) {
-    if (!showPicture(node)) seen.observe(node);
+    if (!showPicture(node)) {
+      const observer = $('reader').contains(node) ? readerSeen : seen;
+      pictureWatches.set(node, { url: node.dataset.img ?? '', observer, active: false, attempts: 0, retryAt: 0 });
+      observer.observe(node);
+    }
     return node;
   }
   // Each portal gets its own fallback art style, in layout order, so no two sources on

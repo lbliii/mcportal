@@ -94,14 +94,22 @@ test('standalone card home clears card routing and loads a room', async () => {
 
 test('a late article result cannot replace the view after home navigation', async () => {
   let resolveTool!: (value: unknown) => void;
-  const replaced: unknown[] = [];
+  const replaced: unknown[][] = [];
+  const controls: unknown[][] = [];
+  class ReaderControls {
+    classList = { contains: (name: string) => name === 'reader-top' };
+    setAttribute() {}
+  }
   const reader = { hidden: true, scrollTop: 0, replaceChildren: (...children: unknown[]) => replaced.push(children) };
-  const context = vm.createContext({ pendingKeptLocator: null, restoreExperience: () => false, stopReading: null, $: (id: string) => id === 'reader' ? reader : {}, rememberRoomNavigation() {}, window: { scrollTo() {} }, readerTop() {}, el() {}, $first: () => null, takeZoomSource: () => null, transition: async (update: () => void) => update(), callTool: () => new Promise((resolve) => { resolveTool = resolve; }), articleNodes: () => { throw new Error('Stale article rendered'); } });
-  vm.runInContext(`let readerGeneration = 0; ${shipped('openReader')}`, context);
+  const context = vm.createContext({ pendingKeptLocator: null, restoreExperience: () => false, stopReading: null, $: (id: string) => id === 'reader' ? reader : id === 'readerControls' ? { replaceChildren: (...children: unknown[]) => controls.push(children) } : {}, HTMLElement: ReaderControls, rememberRoomNavigation() {}, window: { scrollTo() {} }, readerTop: () => new ReaderControls(), el() {}, $first: () => null, takeZoomSource: () => null, transition: async (update: () => void) => update(), callTool: () => new Promise((resolve) => { resolveTool = resolve; }), articleNodes: () => { throw new Error('Stale article rendered'); } });
+  vm.runInContext(`let readerGeneration = 0; ${shipped('renderReader')} ${shipped('setReaderControls')} ${shipped('openReader')}`, context);
   const opened = vm.runInContext(`openReader({url:'https://example.com'}, {title:'News'})`, context);
   await new Promise((done) => setImmediate(done));   // past the transition, waiting on read_article
   vm.runInContext('readerGeneration++', context);
   resolveTool({ structuredContent: { article: {} } });
   await opened;
   assert.equal(replaced.length, 1);
+  assert.equal(controls.length, 1, 'the late result cannot replace the control row either');
+  assert.equal(controls[0]!.length, 1, 'the real shell helper separates controls from article content');
+  assert.equal(replaced[0]!.some((node) => node instanceof ReaderControls), false, 'controls are outside the content scroll owner');
 });

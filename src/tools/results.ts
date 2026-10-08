@@ -93,7 +93,7 @@ export type ToolResults = {
   show_highlights: { highlights: { title: string; intro?: string; picks: HighlightPick[] } };
   find_source: { candidates: Array<SourceSettings<FetchedSource> & Omit<SourceCandidate, 'source' | 'config'> & { preview: Item[] }>; hint?: string | undefined };
   add_portal: { profile: Profile; portal: PortalResult; portalId: string };
-  import_opml: { profile: Profile; imported: number; failed: Array<{ url: string; title: string; error?: string | undefined }>; total: number };
+  import_opml: { profile: Profile; imported: number; added: Array<{ url: string; title: string }>; alreadyPresent: number; deferred: Array<{ url: string; title: string }>; failed: Array<{ url: string; title: string; error?: string | undefined }>; total: number };
   read_article: { article: Article; saved: boolean };
   get_thumbnails: { images: Record<string, string | null> };
   save_item: SavedResult;
@@ -101,7 +101,7 @@ export type ToolResults = {
   open_docs: DocsSiteResult;
   read_doc_page: DocsPageResult;
   search_docs: { hits: DocHit[]; site: { title: string; toc: DocsToc } };
-  open_handoff: (ToolResults['read_article'] | (DocsSiteResult & { page: string })) & { handoff: Handoff };
+  open_handoff: (ToolResults['read_article'] | (DocsSiteResult & { page: string }) | { unavailable: true }) & { handoff: Handoff };
   create_handoff: { handoff: Handoff; prompt: string };
   get_clip: { clip: Clip };
   clip: { clip: ClipSummary; profile: Profile; layoutChanged: boolean; portals: PortalResult[] };

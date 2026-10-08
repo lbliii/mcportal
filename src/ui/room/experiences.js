@@ -55,23 +55,21 @@
     const reader = $('reader');
     const generation = ++readerGeneration;
     $('grid').hidden = true; reader.hidden = false; reader.scrollTop = 0; window.scrollTo(0, 0);
-    reader.replaceChildren(readerTop(hit.url || '', true), el('h1', null, hit.title), el('p', { class: 'byline' }, 'Opening…'));
+    renderReader(readerTop(hit.url || '', true), el('h1', null, hit.title), el('p', { class: 'byline' }, 'Opening…'));
     try {
       if (hit.clipId && !atPassage) {
         const { clip } = (await callTool('get_clip', { id: hit.clipId })).structuredContent;
         if (generation !== readerGeneration) return;
-        reader.replaceChildren(...clipNodes(clip, true));
-        const back = reader.querySelector('button');
-        if (back) back.setAttribute('aria-label', 'Back to your reading experience');
+        renderReader(...clipNodes(clip, true));
       } else if (hit.url) {
         const { article } = (await callTool('read_article', { url: hit.url })).structuredContent;
         if (generation !== readerGeneration) return;
-        reader.replaceChildren(...articleNodes(article, hit.source, true));
+        renderReader(...articleNodes(article, hit.source, true));
         trackReading(article.url, article.title, reader);
       } else throw new Error('This item has no readable source.');
     } catch (error) {
       if (generation !== readerGeneration) return;
-      reader.replaceChildren(...present([readerTop(hit.url || '', true), el('h1', null, hit.title), el('p', { class: 'error', role: 'alert' }, errorText(error)),
+      renderReader(...present([readerTop(hit.url || '', true), el('h1', null, hit.title), el('p', { class: 'error', role: 'alert' }, errorText(error)),
         hit.url ? el('button', { class: 'btn', onclick: () => openLink(hit.url || '') }, 'Open the original') : null]));
     }
   }

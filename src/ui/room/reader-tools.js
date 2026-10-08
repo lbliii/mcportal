@@ -13,8 +13,7 @@
     requestAnimationFrame(() => {
       if (!anchor?.isConnected) return;
       const delta = anchor.getBoundingClientRect().top - readerVisibleTop(reader) - offset;
-      if (root.classList.contains('fullscreen')) window.scrollBy(0, delta);
-      else reader.scrollTop += delta;
+      reader.scrollTop += delta;
     });
   }
 
@@ -52,6 +51,7 @@
    */
   function readerTools(top, body, title) {
     applyReaderComfort(body, title);
+    top.append(passagePicker(body));
     const findToggle = el('button', { class: 'btn reader-find-toggle', 'aria-expanded': 'false', 'aria-controls': 'readerFind' }, 'Find');
     const comfortToggle = el('button', { class: 'btn reader-comfort-toggle', 'aria-expanded': 'false', 'aria-controls': 'readerComfort' }, 'Reading');
     const input = el('input', { type: 'search', class: 'reader-find-input', placeholder: 'Find in this page', 'aria-label': 'Find in this page', maxlength: '200', autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false' });
@@ -97,8 +97,7 @@
         if (container.classList.contains('table-wrap')) container.scrollTop += mark.getBoundingClientRect().top - container.getBoundingClientRect().top - 48;
       }
       const reader = $('reader');
-      if (root.classList.contains('fullscreen')) mark.scrollIntoView({ block: 'start', behavior: 'auto' });
-      else reader.scrollTop += mark.getBoundingClientRect().top - readerVisibleTop(reader) - 12;
+      reader.scrollTop += mark.getBoundingClientRect().top - readerVisibleTop(reader) - 12;
       updateCount();
     }
     function search() {
@@ -175,7 +174,7 @@
       if (e.target instanceof HTMLDetailsElement && e.target.open) toggleFind(false, false);
     }, true);
     // Keep this listener on the current view: replacing its content also retires shortcuts.
-    $('reader').onkeydown = (e) => {
+    $('reader').onkeydown = $('readerControls').onkeydown = (e) => {
       if (e.defaultPrevented || !body.isConnected || $('reader').hidden) return;
       if (e.key === 'Escape' && passageBar) return;
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f' && !e.altKey && !e.shiftKey) { e.preventDefault(); toggleFind(true); }

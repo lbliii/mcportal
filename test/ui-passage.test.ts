@@ -160,6 +160,29 @@ test('handoff: the new chat\'s card opens with the sent passage, and a way to it
   assert.deepEqual(page.problems, []);
 });
 
+test('handoff: an unavailable source keeps its quote visible and retries the live page', { skip }, async () => {
+  const sent = await ctx.handoffs!.create('reader', { url: ARTICLE, title: 'Retained evidence', place: { kind: 'article' }, passage: 'I often stream games with friends on Discord' });
+  const fetcher = ctx.fetcher, cache = ctx.cache;
+  ctx.cache = new TtlCache();
+  ctx.fetcher = async (url) => ({ url, status: 503, contentType: 'text/plain', truncated: false, text: 'offline' });
+  page.problems.length = 0;
+  try {
+    await page.goto(`${base}/?caps=serverTools&tool=open_handoff&args=${encodeURIComponent(JSON.stringify({ code: sent.code }))}`);
+    await page.waitFor(`${IN_FRAME}.document.querySelector('#reader blockquote')?.textContent === ${JSON.stringify(sent.passage)}`, 'retained quote despite the outage');
+    assert.match(await page.eval<string>(`${IN_FRAME}.document.querySelector('#reader [role="status"]').textContent`), /live page is unavailable/);
+    assert.equal(await page.eval(`${IN_FRAME}.document.activeElement.tagName`), 'H1');
+    const retry = `[...${IN_FRAME}.document.querySelectorAll('#reader button')].find(b => b.textContent === 'Retry live page').click()`;
+    await page.eval(retry);
+    await page.waitFor(`${IN_FRAME}.document.querySelector('#toast').textContent.includes('still unavailable')`, 'failed retry preserves the quote');
+    assert.equal(await page.eval(`${IN_FRAME}.document.querySelector('#reader blockquote').textContent`), sent.passage);
+    ctx.fetcher = fetcher;
+    await page.eval(retry);
+    await page.waitFor(`${IN_FRAME}.document.querySelector('[data-passage-url]')`, 'live source recovery');
+    assert.equal(await page.eval(`${IN_FRAME}.document.querySelector('.handoff-note blockquote').textContent`), sent.passage);
+    assert.deepEqual(page.problems, []);
+  } finally { ctx.fetcher = fetcher; ctx.cache = cache; }
+});
+
 test('highlights: the card shows each pick as the source\'s item with the agent\'s reason; "Not for me" marks it seen', { skip }, async () => {
   const listed = await handleMessage({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'list_new_items', arguments: {} } }, ctx) as { result: { structuredContent: { items: Array<{ ref: string; portalId: string; item: { id: string; title: string } }> } } };
   const [a, b] = listed.result.structuredContent.items;

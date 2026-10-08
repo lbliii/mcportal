@@ -58,7 +58,9 @@ declare global {
     layoutMenu: HTMLDivElement;
     mainBar: HTMLElement;
     opmlFile: HTMLInputElement;
+    importReport: HTMLElement;
     reader: HTMLElement;
+    readerControls: HTMLDivElement;
     roomName: HTMLDivElement;
     status: HTMLSpanElement;
     toast: HTMLDivElement;
