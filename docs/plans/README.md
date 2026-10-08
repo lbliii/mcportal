@@ -1,5 +1,7 @@
 # Roadmap
 
+The live execution backlog is in [GitHub Issues](https://github.com/lbliii/mcportal/issues), grouped by epics and [milestones](https://github.com/lbliii/mcportal/milestones). See the [tracking guide](../how-to/track-work.md) and [8 October code reconciliation](../research/content-platform/current-baseline.md) before translating an older proposal into new implementation work.
+
 Plans are proposals, and they change. What MCPortal does today is described in the [explanation docs](../explanation/); this page lists only open work, roughly in the order it will happen.
 
 The loop everything serves: open your room, catch up, read something worthwhile, keep the useful part, and find it again later. Reading continuity and retrieval come before proactive delivery or more social features.

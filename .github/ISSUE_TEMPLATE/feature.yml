@@ -1,0 +1,28 @@
+name: Feature or improvement
+description: Explain a user need and the outcome that would help.
+labels: [enhancement, needs-triage]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: User and problem
+      description: Who is trying to do what? Describe a real example and the current workaround.
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: What should become possible or easier? Keep the user outcome separate from a preferred implementation.
+    validations:
+      required: true
+  - type: textarea
+    id: approach
+    attributes:
+      label: Proposed approach and alternatives
+      description: Optional. Link related issues, evidence, or designs and mention tradeoffs.
+  - type: textarea
+    id: success
+    attributes:
+      label: How we would know it works
+      description: Observable behavior or a concrete example; include important failure or fallback behavior.
