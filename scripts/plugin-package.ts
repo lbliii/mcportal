@@ -1,5 +1,6 @@
+import { lstatSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 /** Build self-contained Agent Plugins directories; no user data or development dependencies. */
-import { cp, mkdir, readFile, lstat, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -21,17 +22,32 @@ export function pluginMcp(variant: PluginVariant) {
     : { type: 'stdio', command: 'node', args: ['${PLUGIN_ROOT}/bin/mcportal.mjs', '--stdio'],
         env: { MCPORTAL_DATA_DIR: '${PLUGIN_DATA}/mcportal' } } } };
 }
+function copyPackageFile(source: string, destination: string): void {
+  const info = lstatSync(source);
+  if (info.isSymbolicLink() || (!info.isDirectory() && !info.isFile())) throw new Error(`Package refuses symlinks and special files: ${source}`);
+  if (info.isDirectory()) {
+    mkdirSync(destination, { recursive: true });
+    for (const name of readdirSync(source)) copyPackageFile(path.join(source, name), path.join(destination, name));
+  } else {
+    writeFileSync(destination, readFileSync(source), { mode: info.mode & 0o777 });
+  }
+}
 export async function buildPlugin(variant: PluginVariant, destination: string, root = ROOT): Promise<void> {
   // Exclusive directory creation prevents overwriting an installed plugin or another build.
   await mkdir(path.dirname(destination), { recursive: true });
   await mkdir(destination);
   const files = ['skills', 'LICENSE', ...(variant === 'local' ? ['src', 'bin', 'brand', 'package.json'] : [])];
   for (const file of files) {
-    await cp(path.join(root, file), path.join(destination, file), { recursive: true, filter: async (source) => {
-      if ((await lstat(source)).isSymbolicLink()) throw new Error(`Package cannot contain symlinks: ${source}`);
-      return true;
-    } });
+    copyPackageFile(path.join(root, file), path.join(destination, file));
   }
+  const metadata = await pluginMetadata(variant, root);
+  const { $schema: _schema, ...claudeMetadata } = metadata;
+  await mkdir(path.join(destination, '.claude-plugin'));
+  await writeFile(path.join(destination, '.claude-plugin/plugin.json'), `${JSON.stringify(claudeMetadata, null, 2)}\n`);
+  await writeFile(path.join(destination, '.mcp.json'), `${JSON.stringify({ mcpServers: { mcportal: variant === 'hosted'
+    ? { type: 'http', url: 'https://mcportal.lol/mcp' }
+    : { command: 'node', args: ['${CLAUDE_PLUGIN_ROOT}/bin/mcportal.mjs', '--stdio'],
+        env: { MCPORTAL_DATA_DIR: '${CLAUDE_PLUGIN_DATA}/mcportal' } } } }, null, 2)}\n`);
   for (const [name, content] of Object.entries({ 'plugin.json': await pluginMetadata(variant, root), 'mcp.json': pluginMcp(variant) })) {
     await writeFile(path.join(destination, name), `${JSON.stringify(content, null, 2)}\n`);
   }
