@@ -32,6 +32,14 @@ The **Lobby** is a portal you add yourself (`add_portal` with `source: lobby`). 
 
 A **handle** is how people find you. It's 2 to 30 letters, digits or underscores, unique regardless of case, and suggested from your GitHub login without being tied to it. Words like `admin` and `api` are reserved. A handle you give up is held for 30 days, so nobody can take it to pose as you.
 
+## Automatic Space sections
+
+Automatic sections are currently on `main` under [Unreleased](../../CHANGELOG.md#unreleased). Owners preview eligible public room sources and people they follow in their Space, then enable each list independently for signed-in visitors. Both switches start off. Existing featured sources keep their order and visibility. Optional pins, order and hidden entries curate the lists without changing subscriptions or follows, and private curation stays out of visitor responses.
+
+Automatic sources include Hacker News, public RSS/Atom feeds and public GitHub sources. Feeds and named repositories are checked without credentials. Private integrations, saved items, clips, docs portals, Shop follows, local addresses and credential-bearing or unrecognized secret feed URLs are excluded. Eligibility checks cannot identify every secret URL, so the owner preview matters. People who go private, are suspended or are blocked by the viewer are excluded.
+
+Automatic lists currently appear in the signed-in Space view. Public web pages keep explicitly published recommendations and the authored traveler list. See [Customize your Space](../how-to/customize-space.md) for cover, visibility and audience choices.
+
 ## Shares
 
 A **post** is anything in a Space. A **share** is a post about a saved link or a clip, with a note.
@@ -98,7 +106,12 @@ The room has one **layout** that arranges its portals. Each layout is a renderer
 | **Columns** | A sideways lane of columns, each holding up to four portals |
 | **Shelves** | One sideways row per portal; a picture row when most items have pictures |
 | **River** | Every portal merged into one stream, newest and unseen first |
+| **Catalogue** | Compact illustrated rows, grouped by portal |
+| **Editorial** | A lead story per portal with smaller features below |
+| **Paperback** | A grid of illustrated covers |
 | **Front page** | The agent's lead story and picks, then each portal's top stories. A lab, off unless `MCPORTAL_LABS=frontpage` |
+
+Choose **Layout** in the room toolbar or ask your agent to switch. The preference is saved with your room. Individual portals can separately choose their [presentation](../how-to/organize-reading.md#choose-how-a-portal-looks).
 
 These principles hold across all of them:
 

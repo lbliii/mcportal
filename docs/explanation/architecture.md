@@ -9,15 +9,16 @@ MCPortal is one Node.js program. It speaks the Model Context Protocol (MCP) to y
 | Piece | What it does |
 |---|---|
 | MCP server | Answers JSON-RPC over stdio (the local plugin) or streamable HTTP at `/mcp` (the hosted connector). One protocol core serves both. |
-| Tools | Nearly fifty tools in a dozen areas: room, sources, saved items, reader, docs, clips, reading, highlights, handoffs, account and social. Each is one action. |
+| Tools | Grouped by room, sources, saved items, reader, docs, clips, reading, highlights, handoffs, account, social, collections, comparison and watches. The registry owns their schemas, annotations and costs. |
 | The room | A single self-contained HTML page at `ui://mcportal/room.html`. The host draws it in an iframe; it talks back through the MCP Apps bridge. |
-| Adapters | Hacker News, GitHub, RSS/Atom, docs sites and the reader view. Each turns a fetched page into plain-text items or blocks. |
+| Adapters | Hacker News, GitHub, RSS/Atom, docs sites, the reader view and supported Shopify catalogues. Each turns fetched source data into items or blocks. |
 | Discovery | Turns "theverge.com", `r/LocalLLaMA`, `owner/repo` or a profile URL into sources that load. |
 | Fetch boundary | Every outbound request goes through one guarded fetcher. See [security](security.md). |
 | OAuth server | Hosted only. An OAuth 2.1 authorization server and resource server, with GitHub as the sign-in. |
 | Storage | Files in a data directory, or Postgres when `DATABASE_URL` is set. Every store has both. See [local and hosted](local-and-hosted.md). |
 | State API | Hosted only. `/api/v1/call` lets a signed-in local MCPortal keep its state in the hosted account. |
-| Web pages | Hosted only. Landing, privacy, terms, support, the account page, the admin page and the OAuth consent screen. |
+| Reading watch worker | Checks due page, release, calendar and artist watches, with durable leases and bounded retries. No model runs in it; Shop checks separately on demand. |
+| Web pages | Hosted only. Landing and promo video, privacy, terms, support, security, public Spaces and RSS, the account page, the admin page and the OAuth consent screen. |
 
 The local server has no runtime dependencies, so the plugin installs without `npm install`. The hosted server adds one, `pg`, loaded only when `DATABASE_URL` is set.
 
@@ -107,6 +108,9 @@ Some state lives in memory on purpose: the usage budget, rate limiters, tool cou
 | `src/discover.ts`, `src/packs.ts` | Source discovery; starter packs |
 | `src/profile.ts`, `src/layout.ts`, `src/store.ts` | The room as validated data; layout operations; profile stores |
 | `src/clips.ts`, `src/reading.ts`, `src/seen.ts`, `src/editions.ts`, `src/handoffs.ts`, `src/highlights.ts` | Clips, reading state, seen marks, editions, handoffs, highlights |
+| `src/library.ts`, `src/collections.ts`, `src/collection-service.ts`, `src/comparison.ts` | Unified retrieval, private collections and cited comparisons |
+| `src/experiences.ts`, `src/catchup.ts`, `src/reading-watches.ts`, `src/watches-state.ts`, `src/adapters/events.ts` | Durable catch-up sessions, reading watches, findings, providers and background worker |
+| `src/store-watches.ts`, `src/watches.ts`, `src/adapters/shopify.ts` | Confirmed store follows, snapshots and on-demand product comparisons |
 | `src/social.ts`, `src/public-profiles.ts` | Shares, reblogs, follows, mutes, blocks, reports; handles and Spaces |
 | `src/db/`, `src/storage.ts` | Postgres stores and schema; choosing files or Postgres at startup |
 | `src/api/`, `src/link/` | The hosted state API; the linked computer's client, remote stores and sign-in |
@@ -114,6 +118,6 @@ Some state lives in memory on purpose: the usage budget, rate limiters, tool cou
 | `src/ui/room.html`, `src/ui/room/` | The room app, split into fragments that are inlined at serve time |
 | `src/ui/design/`, `src/design/` | Generated design tokens and host theme handling |
 | `src/admin.ts`, `src/admin-cli.ts`, `src/account.ts` | The `/admin` page, the `mcportal admin` CLI, the `/account` page |
-| `src/housekeeping.ts` | Scheduled retention: expired handoffs and editions, old reports, invites and sign-ins |
+| `src/housekeeping.ts` | Scheduled retention: expired handoffs, editions and watch findings, old reports, invites and sign-ins |
 | `.claude-plugin/`, `skills/portal/`, `commands/portal.md` | Claude Code and Cowork plugin, the `portal` skill and `/portal` command |
 | `Dockerfile`, `.railway/railway.ts` | The hosted image and Railway infrastructure as code |

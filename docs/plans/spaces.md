@@ -156,7 +156,7 @@ More stamps come only with a reason, and each one gets this table's test: is it 
 - [Tools](../reference/tools.md): `set_public_profile` and `open_space`.
 - [Data](../reference/data.md): the new profile fields and the export version.
 - [Configuration](../reference/configuration.md), if the feed or page cache gets settings.
-- The privacy page and terms (`/privacy` and `/terms`, in `src/site.ts`): public Spaces. The [social](../explanation/social.md#publishing-is-native) section "Publishing is native" becomes "Read anywhere, publish through your agent".
+- The privacy page and terms (`/privacy` and `/terms`, in `src/site.ts`): public Spaces. The [social](../explanation/social.md#read-anywhere-publish-through-your-agent) section explains reading on the web and publishing through your agent.
 
 ## Open questions
 

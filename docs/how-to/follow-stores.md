@@ -1,5 +1,7 @@
 # Following stores
 
+Store follows are currently on `main` under [Unreleased](../../CHANGELOG.md#unreleased); hosted and plugin installs need a release and deployment that includes them. For page changes, repository releases, calendars and artists, use [reading watches](watch-reading.md).
+
 Shop follows supported public Shopify catalogues. Ask your agent to follow a store, or use **+ → Shopify store** in your room. Paste the store’s HTTPS URL, optionally enter a collection handle from `/collections/handle`, and choose **Sales only** if desired. Scan shows up to four products and the exact scope. Nothing is followed until you choose **Follow this store**.
 
 Shop appears after confirmation. The first catalogue is your baseline. Later checks can show new arrivals, price drops, a sale starting, and restocks of saved product URLs. Variant IDs and currencies must match before prices are compared. A product created before the last check is not called a new arrival merely because it entered a bounded result. Price rises clear obsolete price-drop comparisons. Cards name the priced variant, currency, stock and observation time. Product links open at the store; **Save** keeps the link in Saved.

@@ -2,6 +2,8 @@
 
 MCPortal brings the material already in a room into views for finding, understanding and finishing a bounded amount of reading. Source material and agent interpretation remain visibly separate.
 
+These features are currently on `main` under [Unreleased](../../CHANGELOG.md#unreleased). For practical steps, see [Organize reading](../how-to/organize-reading.md) and [Watch reading and events](../how-to/watch-reading.md).
+
 ## Find and keep
 
 **Recall Shelf** searches saved links, retained clip text and reading history together. Filters cover kind, site, tags and reading status. Results distinguish retained material from links that must be fetched again. Kept passages carry locators: reopening highlights an exact, unique text match; changed or ambiguous passages show a notice rather than guessing.
@@ -49,8 +51,4 @@ Collections and reading experience state belong to the caller. Files and Postgre
 
 The agent tools are `search_library`, `open_collection`, `update_collection`, `show_comparison` and `watch_reading`. `catch_up` is app-only. Collection evidence refs use `clip:ID` or `url:URL`.
 
-## Automatic Space sections
-
-An owner can preview eligible public room subscriptions and people followed on MCPortal, then enable each list independently for signed-in visitors. Optional pins, order and hides do not alter subscriptions or follows. Previously published recommendations retain their order and visibility; private curation never enters visitor responses. New automatic sources are checked without credentials, and private integrations, saved content, clips, local addresses and unrecognized secret feed URLs are excluded.
-
-These automatic lists are currently part of the signed-in Space view. Public web pages keep the explicitly published recommendations and authored traveler list.
+For automatic sources and people on a Space, see [Social](social.md#automatic-space-sections). Those lists are separate from private reading collections and watches.

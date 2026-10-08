@@ -139,3 +139,9 @@ Clips are a commonplace book beside your reading. Say "clip that" and your agent
 - **Search.** On Postgres, clips use full-text ranking with a literal fallback; locally, a plain text match.
 
 Limits are generous but firm: see [data](../reference/data.md).
+
+## Bring reading together
+
+The newer [reading experiences](reading-experiences.md), currently under [Unreleased](../../CHANGELOG.md#unreleased), use the same material in Recall Shelf, private Topic Desks, comparisons, ordered trails and finite catch-up sessions. Recall searches kept text and metadata without fetching bookmarked pages. Collection and catch-up progress stay separate from an article's explicit **Mark as read** state.
+
+For practical steps, see [Organize reading](../how-to/organize-reading.md). [Watch reading and events](../how-to/watch-reading.md) covers the background collector for Changes and Upcoming; it collects source evidence without calling a model.

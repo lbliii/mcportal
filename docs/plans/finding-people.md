@@ -15,7 +15,7 @@ Following works, but only if you already know someone's handle. Every way in (`r
 
 Every social network tries to solve "who should I follow?" with a ranking model over a huge graph. We have neither, and we don't need them. We have something better: the agent already knows what the user cares about, from the conversation and its own memory. MCPortal knows who publicly features, shares and reads which sources. Neither can make a good introduction alone.
 
-The rally ([watches.md](watches.md)) applied to people:
+The rally ([rally.md](rally.md)) applied to people:
 
 1. **Agent → MCPortal.** The user mentions they've been deep in Rust compilers this week. The agent asks MCPortal who on MCPortal is into that, passing topics, sites and feeds, not the conversation.
 2. **MCPortal → agent.** MCPortal matches deterministically against what people chose to make public (featured sources, bios, posts shared with everyone) and returns a few people, each with **reasons**: "features 3 feeds you follow", "shared 4 posts from rustc-dev-guide".

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Refresh the public README with the 22-second promo video, Spaces, room layouts and a clearly marked preview of newer features on main. Add practical guides for reading collections, catch-up, reading watches and Space customization, and update tool, configuration and data references.
+
 - Space can automatically show eligible public room sources and people followed on MCPortal, with independent opt-in visibility and owner previews. Optional pins, ordering and hides preserve existing recommendations and never change subscriptions; private curation stays out of visitor responses.
 
 ### Reading experiences
