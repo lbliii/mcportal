@@ -1,6 +1,6 @@
 # M1 Codex host validation
 
-October 8, 2026. The candidate's reading, clipping and retrieval loop ran in the actual Codex MCP Apps host. A second chat retrieved the exact UI-created handoff and clip. The remaining checks are the reopened handoff's rendered position and agent receipt of the passage sent with Ask; this report does not yet certify the entire loop or other hosts.
+October 8, 2026. The candidate's reading, clipping and retrieval loop ran in the actual Codex MCP Apps host. A second chat retrieved the exact UI-created handoff and clip. The Ask action also delivered the selected paragraph to the agent on a subsequent model turn. The reopened handoff's rendered position and fresh-resource verification of the icon repair remain; this report does not yet certify the entire loop or other hosts.
 
 ## Environment and scope
 
@@ -19,7 +19,7 @@ October 8, 2026. The candidate's reading, clipping and retrieval loop ran in the
 | Clip | Clip quote produced its success notice. Search returned clip `c7d51f4f47460` with the exact passage, source URL and block-1 locator. |
 | Handoff creation | Send to new chat produced code `qqeuz4`, created at 14:44:24 UTC, expiring October 15 at the same time. |
 | Separate chat | A real second Codex chat used only candidate tools to open that handoff and retrieve that clip. Both returned the original source and exact quotation; handoff anchor and clip locator were block 1. Text was fenced as untrusted source content. That chat had no expanded UI. |
-| Ask | Ask about this displayed “Asking your agent…” after the context and message requests resolved. The next model turn and its exact context have not been observed; successful bridge feedback alone does not prove model receipt. |
+| Ask | Ask about this displayed “Asking your agent…” after the context and message requests resolved. On a subsequent model turn, the host delivered both model context and the fixed message “Let's talk about the passage I just highlighted in MCPortal.” The context contained the exact selected paragraph, source URL and title, with the paragraph inside an untrusted-content fence; structuredContent.passage matched the same source and text. This directly verifies agent receipt, beyond bridge feedback. |
 | Docs navigation | Architecture opened through Contents with its heading focused and its own raw-source URL. Open the original opened the corresponding GitHub page in Codex's browser. No consent dialog was observed. |
 | Room | Open your room reached onboarding; Skip hydrated the isolated morning room, including an observable pending state. |
 | Recall | Searching “These docs follow main” returned the clip. Read kept material showed the exact retained quotation. Back preserved the query and focused the same result action. |
@@ -52,6 +52,8 @@ The actual host accepted server tool calls, source links, context/message reques
 
 Hosted sign-in, its permission/expiry/import paths, inline visual layout and raw initialization capabilities remain unverified here. Claude desktop/web/mobile, Claude Code and ChatGPT remain untested for this candidate. Their historical usage status is not changed by this Codex run.
 
-Finish the rendered handoff return-location check, verify the icon repair in a fresh resource, and observe the Ask-generated model turn before declaring the selected-passage-to-agent chain complete. The [compatibility checklist](../docs/reference/host-compatibility.md#certifying-a-host) remains the broader host-certification contract.
+The selected-passage-to-agent delivery check is complete. Finish the rendered handoff return-location check and verify the icon repair in a fresh resource before closing the remaining host work. The [compatibility checklist](../docs/reference/host-compatibility.md#certifying-a-host) remains the broader host-certification contract.
 
 After the CSS repair, server/UI type checking and generated design checks passed. The existing passage, reader and host-navigation tests passed: 28 tests, 28 passed, none failed or skipped. The prior full candidate suite passed 550 of 576 with 26 documented skips; see the [integration report](m1-core-content-loop.md#validation).
+
+The full [CI check at `3778c73`](https://github.com/lbliii/mcportal/actions/runs/37797387855) passed after the icon repair.
