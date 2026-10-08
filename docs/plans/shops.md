@@ -1,6 +1,14 @@
 # Plan: shops, following the brands you like
 
-Built on [the rally engine](rally.md), which supplies the watch list, `watch`/`unwatch`, collection, the diff and handing back. This plan covers only what's specific to shopping, and none of it is built yet. Proposed as the engine's **first kind** because Shopify needs no key, no location and no provider agreement.
+Built on [the rally engine](rally.md), which supplies the watch list, `watch`/`unwatch`, collection, the diff and handing back. This plan covers what's specific to shopping. The first Shopify store-follow slice is implemented for review; see [Following stores](../how-to/follow-stores.md) for its supported surface and limits. Product watches, other providers and background collection remain planned. Proposed as the engine's **first kind** because Shopify needs no key, no location and no provider agreement.
+
+## First delivery, for review
+
+The first slice uses Shopify’s [documented tokenless Storefront API](https://shopify.dev/docs/api/storefront/latest), version 2026-10. It reads public Products and Collections with prices, currencies and stable variant IDs. It checks robots.txt, shares only public responses, and collects on demand. An unavailable API, blocked store or unknown collection produces a diagnostic without creating a follow.
+
+`watch` previews an HTTPS origin and an optional collection handle or sales-only scope. A ten-minute, account-bound selection confirms precisely that preview. The first result is a baseline. Shop uses a product gallery, saves links through Saved, supports pause/resume/removal and retains observations with their dates after failures. Restocks apply only to saved product URLs. File storage, PostgreSQL, linked accounts, export version 3, import and account deletion carry the same watch data.
+
+Coverage is bounded: 100 products per query, ten variants per product, 200 observations and 30 findings per follow, 20 follows per account. It is not a whole-store inventory monitor. The roadmap below describes broader future behavior; UCP discovery, `/products.json`, Atom/page fallbacks, grouped drops, product thresholds and background jobs are not part of this delivery.
 
 ## Two intents, two kinds
 

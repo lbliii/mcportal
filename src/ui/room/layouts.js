@@ -309,6 +309,8 @@
 
   /** One portal, as the current layout draws it. @param {string} portalId */
   function renderPortal(portalId) {
+    const portal = state.portals.get(portalId);
+    if (portal?.source === 'watches') return renderShopPortal(portal);
     return (state.profile ? layoutOf(state.profile) : ROOM_LAYOUTS.columns).portal(portalId);
   }
 

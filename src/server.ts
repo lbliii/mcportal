@@ -1,3 +1,5 @@
+import { FileWatchStore } from './watches.ts';
+import { StoreWatches } from './store-watches.ts';
 /**
  * MCPortal entry point.
  *
@@ -112,6 +114,8 @@ async function start(argv: string[]): Promise<void> {
     const store = new FileProfileStore(dataDir);
     const clips = new FileClipStore(dataDir);
     const reading = new FileReadingStore(dataDir);
+    const watchStore = new FileWatchStore(dataDir);
+    const watches = new StoreWatches(watchStore, { fetcher, cache, log }, Date.now, store);
     const handoffs = new FileHandoffStore(dataDir);
     const seen = new FileSeenStore(dataDir);
     const editions = new FileEditionStore(dataDir);
@@ -119,8 +123,8 @@ async function start(argv: string[]): Promise<void> {
     const session = new LocalSession({
       dataDir,
       localUser: userId,
-      local: { store, reading, handoffs, seen, editions, clips },
-      base: { fetcher, cache, log, deliver: (format) => deliverToFile(format, userId, { store, reading, clips }, dataDir) },
+      local: { store, watchStore, watches, reading, handoffs, seen, editions, clips },
+      base: { fetcher, cache, log, deliver: (format) => deliverToFile(format, userId, { store, watchStore, reading, clips }, dataDir) },
       hostedUrl: process.env.MCPORTAL_HOSTED_URL || undefined,
       onLinked: stdioToolsChanged,
     });
@@ -138,7 +142,7 @@ async function start(argv: string[]): Promise<void> {
     process.exitCode = 1;
     return;
   }
-  const { store, reading, handoffs, seen, editions, clips, authPersistence, accountsPersistence, profilesPersistence, social: socialStore, storage, checkStorage } = await openStorage(dataDir, log);
+  const { store, watchStore, reading, handoffs, seen, editions, clips, authPersistence, accountsPersistence, profilesPersistence, social: socialStore, storage, checkStorage } = await openStorage(dataDir, log);
   const accounts = new Accounts(accountsPersistence, { ...bootstrapFromEnv(process.env) });
   await accounts.load();
   const suspended = (id: string) => accounts.actor(id).status !== 'active';
@@ -146,14 +150,15 @@ async function start(argv: string[]): Promise<void> {
   const social = new Social({ preferences: store, store: socialStore, profiles: publicProfiles, hidden: suspended, accountCreatedAt: (id) => accounts.createdAt(id) });
   // Running locally without auth (npm start): a local MCPortal that can sign in, like the stdio one.
   const local = storage === 'files' && !config.github && !config.staticToken && config.allowUnauthenticated;
+  const watches = new StoreWatches(watchStore, { fetcher, cache, log }, Date.now, store);
   const session = local ? new LocalSession({
     dataDir,
     localUser: config.staticUser,
-    local: { store, reading, handoffs, seen, editions, clips },
-    base: { fetcher, cache, log, deliver: (format) => deliverToFile(format, config.staticUser, { store, reading, clips }, dataDir) },
+    local: { store, watchStore, watches, reading, handoffs, seen, editions, clips },
+    base: { fetcher, cache, log, deliver: (format) => deliverToFile(format, config.staticUser, { store, watchStore, reading, clips }, dataDir) },
     hostedUrl: process.env.MCPORTAL_HOSTED_URL || undefined,
   }) : undefined;
-  const server = createApp(config, { store, reading, handoffs, seen, editions, clips, publicProfiles, social, fetcher, cache, log, authPersistence, storage, checkStorage, accounts, session });
+  const server = createApp(config, { store, watchStore, reading, handoffs, seen, editions, clips, publicProfiles, social, fetcher, cache, log, authPersistence, storage, checkStorage, accounts, session });
   server.listen(config.port, config.host, () => {
     const mode = config.github ? `GitHub OAuth${config.allowedGithubUsers.length ? ` (allowed: ${config.allowedGithubUsers.join(', ')})` : ' (any GitHub user)'}` : config.staticToken ? 'static token' : 'no auth (loopback only)';
     log.info('http.ready', { host: config.host, port: config.port, publicUrl: config.publicUrl, auth: mode, storage: storage === 'postgres' ? 'postgres' : dataDir });

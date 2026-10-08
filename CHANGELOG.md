@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Follow supported Shopify stores through a preview and confirmed collection or sales-only scope. Shop shows product cards, prices, new arrivals, price drops, sales and saved-product restocks; refresh checks on demand, with partial and stale observations labeled. Follows support pause, resume and removal. Private snapshots work in files, PostgreSQL and linked accounts, export/import version 3 and account deletion.
+
 - Sharing and quick reblogging show a Public / Followers only switch beside submission, with an explanation of public Space visibility. An explicit audience selection is remembered privately across sessions and devices; existing posts and reblog restrictions are preserved.
 - For hosts and agents: new shares and reblogs without an audience use the saved explicit preference, or `everyone` (Public) if none exists. Pass `followers` for Followers only. The existing audience values are unchanged.
 

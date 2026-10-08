@@ -47,7 +47,7 @@ export async function connect(url: string, options: { searchPath?: string } = {}
   return pool as unknown as Queryable;
 }
 
-export const SCHEMA_VERSION = '10';
+export const SCHEMA_VERSION = '11';
 
 export async function ensureSchema(db: Queryable): Promise<void> {
   await db.query(`CREATE TABLE IF NOT EXISTS mcportal_meta (key text PRIMARY KEY, value text NOT NULL)`);
@@ -64,6 +64,8 @@ export async function ensureSchema(db: Queryable): Promise<void> {
     updated_at timestamptz NOT NULL DEFAULT now()
   )`);
   await db.query(`CREATE TABLE IF NOT EXISTS mcportal_reading (user_id text NOT NULL, url text NOT NULL, data jsonb NOT NULL, PRIMARY KEY(user_id, url))`);
+  // v11: private watch subscriptions, bounded snapshots and findings, locked per account.
+  await db.query(`CREATE TABLE IF NOT EXISTS mcportal_watches (user_id text PRIMARY KEY, data jsonb NOT NULL)`);
   // v2: clips. Content in `data`; `summary` is everything but the content, for lists.
   await db.query(`CREATE TABLE IF NOT EXISTS mcportal_clips (
     id text PRIMARY KEY,

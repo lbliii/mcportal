@@ -10,6 +10,7 @@
  * Imports only ever add: portals that aren't there yet, saved items by URL, clips
  * that aren't already kept. Everything in an import is untrusted and re-validated.
  */
+import { validateWatchDocument, type StoreWatch, type WatchStore } from './watches.ts';
 import { gzipSync } from 'node:zlib';
 import { buildClip, ClipError, CLIP_KINDS, clipText, type Clip, type ClipStore } from './clips.ts';
 import { buildOpml } from './opml.ts';
@@ -25,7 +26,7 @@ import type { ArticleBlock } from './types.ts';
 
 export const EXPORT_FORMATS = ['mcportal', 'bookmarks', 'clips', 'opml'] as const;
 export type ExportFormat = (typeof EXPORT_FORMATS)[number];
-export const EXPORT_VERSION = 2;
+export const EXPORT_VERSION = 3;
 
 export interface ExportFile {
   filename: string;
@@ -42,6 +43,7 @@ export interface PortalExport {
   profile: Profile;
   clips: Clip[];
   reading?: ReadingState[];
+  watches?: StoreWatch[];
   publicProfile: Omit<PublicProfile, 'accountId' | 'createdAt' | 'updatedAt'> | null;
   /** Your shares (with the content as shared) and who you follow, by handle. Not imported. */
   shares?: Array<Omit<SharedItem, 'author' | 'mine'>>;
@@ -54,6 +56,7 @@ export interface PortalExport {
 export interface ExportSources {
   store: ProfileStore;
   reading?: ReadingStore | undefined;
+  watchStore?: WatchStore | undefined;
   clips?: ClipStore | undefined;
   publicProfile?: PublicProfile | undefined;
   social?: (SocialService & Partial<Pick<Social, 'reportsFiled'>>) | undefined;
@@ -89,6 +92,7 @@ export async function buildExport(format: ExportFormat, userId: string, from: Ex
     profile,
     clips,
     reading: await from.reading?.list(userId, { limit: 1000 }) ?? [],
+    watches: await from.watchStore?.list(userId) ?? [],
     publicProfile: p ? {
       handle: p.handle,
       ...(p.displayName ? { displayName: p.displayName } : {}),
@@ -120,7 +124,7 @@ export async function buildExport(format: ExportFormat, userId: string, from: Ex
     filename: `mcportal-export-${stamp(now)}.json`,
     contentType: 'application/json; charset=utf-8',
     body: Buffer.from(`${JSON.stringify(data, null, 2)}\n`),
-    summary: `${portals} portal(s), ${profile.saved.length} saved item(s) and ${clips.length} clip(s)`,
+    summary: `${portals} portal(s), ${profile.saved.length} saved item(s) and ${clips.length} clip(s), ${(data.watches ?? []).length} store watch(es)`,
   };
 }
 
@@ -225,6 +229,7 @@ export function clipsArchive(clips: Clip[], now = new Date()): Buffer {
 // ---- import -------------------------------------------------------------------
 
 export interface ImportResult {
+  watchesAdded?: number;
   spaceAppearanceRestored?: true;
   spaceError?: string;
   portalsAdded: number;
@@ -315,8 +320,11 @@ function mergeProfile(before: Profile, incoming: Profile, counts: Pick<ImportRes
 }
 
 /** Add an export to a room. Never removes or rearranges anything. */
-export async function importExport(data: PortalExport, userId: string, to: { store: ProfileStore; reading?: ReadingStore | undefined; clips?: ClipStore | undefined; publicProfiles?: ProfileDirectory | undefined }): Promise<ImportResult> {
+export async function importExport(data: PortalExport, userId: string, to: { store: ProfileStore; watchStore?: WatchStore | undefined; reading?: ReadingStore | undefined; clips?: ClipStore | undefined; publicProfiles?: ProfileDirectory | undefined }): Promise<ImportResult> {
   const result: ImportResult = { portalsAdded: 0, portalsSkipped: [], layoutAdopted: false, savedAdded: 0, clipsAdded: 0, clipsSkipped: 0, clipErrors: [] };
+  const watches = data.watches === undefined ? undefined : validateWatchDocument({ version: 1, watches: data.watches });
+  if (watches && !to.watchStore && watches.watches.length) throw new ProfileError('Update this MCPortal to restore its store watches.');
+  if (watches && to.watchStore) result.watchesAdded = await to.watchStore.import(userId, watches.watches);
   let incoming: Profile | undefined;
   try {
     incoming = isRecord(data.profile) ? validateProfile(data.profile) : undefined;
@@ -372,6 +380,7 @@ export function describeImport(r: ImportResult): string {
     r.layoutAdopted ? `took the exported layout (${r.portalsAdded} portals)` : `${r.portalsAdded} portal(s) added`,
     `${r.savedAdded} saved item(s) added`,
     `${r.clipsAdded} clip(s) added${r.clipsSkipped ? ` (${r.clipsSkipped} already here)` : ''}`,
+    ...(r.watchesAdded !== undefined ? [`${r.watchesAdded} store watch(es) added`] : []),
     ...(r.spaceAppearanceRestored ? ['Space cover and format restored'] : []),
   ];
   const problems = [...r.portalsSkipped.map((p) => `portal skipped: ${p}`), ...r.clipErrors.slice(0, 5).map((c) => `clip skipped: ${c}`), ...(r.spaceError ? [`Space appearance skipped: ${r.spaceError}`] : [])];

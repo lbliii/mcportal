@@ -2,6 +2,15 @@
 
 Every tool MCPortal offers your agent, grouped by area. The registry is [`src/tools/index.ts`](../../src/tools/index.ts); each area has its own module beside it. Tool descriptions in the code are what the model reads; this page summarizes them.
 
+## Store follows
+
+| Tool | Hints | What it does | Inputs |
+|---|---|---|---|
+| `watch` | `OW` | Preview a supported Shopify catalogue without writing; confirm the user’s chosen preview to follow it and add Shop. Checks happen on demand. | `kind*` (`store`), `url`, `scope` (`collection`, `salesOnly`), or `select` |
+| `unwatch` | `D` | Remove a follow or pause/resume it. Saved links stay saved. | `id*`, `paused` |
+
+Shop is the private `watches` source, created by confirmation. Use `open_room` for watch IDs and `refresh_portal` for an explicit check. [Following stores](../how-to/follow-stores.md) lists coverage and limits.
+
 ## Reading the tables
 
 **Hints** are the MCP tool annotations every tool declares. Hosts use them to decide when to ask before running a tool.

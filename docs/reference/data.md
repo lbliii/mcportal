@@ -9,6 +9,7 @@ What MCPortal stores, where, and for how long; how to export it and delete it; a
 | Account | GitHub numeric user id and login, role, how the account joined, dates | Until the account is deleted |
 | Room | Name, layout, portals and their settings, saved items, pinned results | Until changed or deleted |
 | Saved items | Link, title, source, date, note | Until removed (200 at most) |
+| Store watches | HTTPS store origin, collection/sales scope, pause state, product observations and detected changes | Until removed or account deletion; 20 follows, 200 observations and 30 findings per follow, 5 MB per account |
 | Clips | Content, title, note, tags, source | Until deleted (1,000 or 50 MB at most) |
 | Reading history | URLs seen, opened or read, with title, time, progress and a resume anchor | The newest 1,000 per account |
 | Seen marks | Per portal, 12-character hashes of item ids | Until the portal or account goes |
@@ -21,6 +22,8 @@ What MCPortal stores, where, and for how long; how to export it and delete it; a
 | Sign-in tokens | One-way hashes, with the app that asked | Access 1 hour, refresh 30 days. Unused app registrations: 180 days |
 | Invites and audit log | Who invited whom; account creation, deletion, suspension, reinstatement | Invites lapse after 90 days. Log entries: a year at most, newest 2,000 |
 
+Store previews are account-bound in memory for ten minutes. Public catalogues are cached for one day; account snapshots and findings are not shared. Export version 3 includes watches and accepts earlier exports; restoring watches validates the complete incoming watch list before writing it. The PostgreSQL `mcportal_watches` row is locked per account across replicas, and file-to-database startup import has its own migration marker.
+
 Rate-limit counters, account-page and admin sessions, and sign-ins in progress live in memory only. Fetched feeds, pages and pictures are cached in memory (2 minutes to 1 day) and never written to storage. MCPortal stores no email address, name or password.
 
 ## Local storage
@@ -29,6 +32,7 @@ A local MCPortal keeps everything in one folder: `MCPORTAL_DATA_DIR`, or `~/.mcp
 
 | Path | Contents |
 |---|---|
+| `watches/<sha256(user)>.json` | Private store follows and snapshots; atomic writes, invalid files are refused without being overwritten |
 | `<user>.json` | The room: layout, portals, saved items, pinned results (`default.json` unless `MCPORTAL_USER` is set) |
 | `clips/<user>.json` | Clips |
 | `reading/<hash>.json` | Reading history |

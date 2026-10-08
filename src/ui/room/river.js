@@ -15,7 +15,7 @@
   /** Coming back to the river checks for new stories at most this often, and only in portals past their freshness. */
   const RIVER_RECHECK_MS = 5 * 60 * 1000;
   /** Portals that aren't streams of stories (tables of contents, the agent's data): named at the end instead. */
-  const OFF_RIVER = new Set(['docs', 'pinned', 'people']);
+  const OFF_RIVER = new Set(['docs', 'pinned', 'people', 'watches']);
   /** Portals of people's posts: their stories join the feeds' copies, credited to who shared them. */
   const SHARE_PORTALS = new Set(['following', 'lobby']);
 
@@ -270,7 +270,8 @@
         ' ', el('button', { class: 'link-btn', type: 'button', onclick: () => refreshAll() }, 'Refresh')));
     }
 
-    const aside = portals.filter((p) => OFF_RIVER.has(p.source) && !p.error);
+    for(const shop of portals.filter(p=>p.source==='watches'))col.append(renderShopPortal(shop));
+    const aside = portals.filter((p) => p.source!=='watches' && OFF_RIVER.has(p.source) && !p.error);
     if (aside.length) col.append(el('p', { class: 'river-aside' }, 'Also in your room: ', ...aside.flatMap((p, i) => [i ? ', ' : '',
       el('button', { class: 'link-btn', type: 'button', onclick: () => openPortal(p.portalId) }, p.title)])));
     primePictures(col);

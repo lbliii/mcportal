@@ -80,7 +80,8 @@
     if (method === 'ui/notifications/tool-input' || method === 'ui/notifications/tool-input-partial') {
       toolRunning = true;   // the host is running our tool: wait for its result
       const args = params.arguments || {};
-      if (typeof args.docs === 'string' || (typeof args.portalId === 'string' && typeof args.url !== 'string')) { docsArgs = typeof args.docs === 'string' ? { docs: args.docs } : { portalId: args.portalId }; root.classList.add('article-view'); }
+      if (args.kind === 'store') { root.classList.remove('article-view'); }
+      else if (typeof args.docs === 'string' || (typeof args.portalId === 'string' && typeof args.url !== 'string')) { docsArgs = typeof args.docs === 'string' ? { docs: args.docs } : { portalId: args.portalId }; root.classList.add('article-view'); }
       else if (typeof args.url === 'string') { articleUrl = args.url; root.classList.add('article-view'); }
       else if (typeof args.id === 'string') { clipId = args.id; root.classList.add('article-view'); }
       else if (typeof args.handle === 'string') { spaceHandle = args.handle; root.classList.add('article-view'); }
@@ -93,7 +94,9 @@
         gotInitialResult = true;
         const message = (/** @type {Array<{ type?: string, text?: string }>} */ (params.content || [])).filter((c) => c.type === 'text').map((c) => c.text).join(' ');
         showAppError('The tool could not open this view', new Error(message || 'No error details returned'));
-      } else if (data && data.site && Array.isArray(data.site.sections)) { gotInitialResult = true; showDocsCard(data); }
+      } else if (data && data.preview && data.preview.select) { gotInitialResult = true; showStorePreview(data.preview); }
+      else if (data && data.confirmed && data.profile && data.portal) { gotInitialResult = true; callTool('open_room').then(result => renderRoom(result.structuredContent)).catch(error => showAppError('Could not load your room', error)); }
+      else if (data && data.site && Array.isArray(data.site.sections)) { gotInitialResult = true; showDocsCard(data); }
       else if (data && data.space && data.space.handle) { gotInitialResult = true; showSpaceCard(data.space); }
       else if (data && data.share && data.share.id) { gotInitialResult = true; if (Array.isArray(data.labs)) state.labs = data.labs; showShareCard(data.share, data.rebloggers); }
       else if (data && data.clip && data.clip.data) { gotInitialResult = true; showClipCard(data.clip); }

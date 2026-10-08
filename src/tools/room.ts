@@ -13,12 +13,13 @@ import { describeDiff, describeLayout, diffProfiles, findPortal, normalizeSource
 import { clipsPortal, clipsQuery, followingPortal, loadPortal, lobbyPortal, peoplePortal, pinnedPortal, savedPortal } from '../sources.ts';
 import type { Intros } from '../social.ts';
 import type { PortalResult } from '../types.ts';
-import { identityOf, labsOf, ok, toolError, toolFailure, untrusted, ROOM_URI, type CallToolResult, type ToolContext, type ToolDef } from './kit.ts';
+import { identityOf, labsOf, need, ok, toolError, toolFailure, untrusted, ROOM_URI, type CallToolResult, type ToolContext, type ToolDef } from './kit.ts';
 import { featuredBy, suggestedPeople } from './social.ts';
 import type { ToolResults } from './results.ts';
 
 /** Any portal's current items: profile-backed ones from the profile and stores, the rest fetched (cached unless `force`). */
 export async function portalFor(spec: PortalInput, profile: Profile, ctx: ToolContext, force = false): Promise<PortalResult> {
+  if (spec.source === 'watches') return need(ctx.watches, 'Store watches are unavailable on this server.').portal(ctx.userId, spec.id, spec.title ?? 'Shop', spec.config && typeof spec.config === 'object' ? Number((spec.config as { limit?: number }).limit) || 30 : 30, force);
   if (spec.source === 'saved') return savedPortal(spec, profile.saved);
   if (spec.source === 'pinned') return pinnedPortal(spec, profile.pins);
   if (spec.source === 'clips') return clipsPortal(spec, ctx.clips ? await ctx.clips.list(ctx.userId, clipsQuery(spec)) : []);
@@ -36,7 +37,7 @@ export async function portalFor(spec: PortalInput, profile: Profile, ctx: ToolCo
 
 /** One item as a line of text for the model. */
 export function itemLine(item: PortalResult['items'][number]): string {
-  return `- ${item.title}${item.meta.length ? ` (${item.meta.join(', ')})` : ''}${item.url ? ` <${item.url}>` : ''}`;
+  return `- ${item.title}${item.finding ? ` [${item.finding.kind}${item.offer?.previousPrice ? `; previously ${item.offer.previousPrice} ${item.offer.currency}` : ''}; noticed ${item.finding.noticedAt}]` : ''}${item.meta.length ? ` (${item.meta.join(', ')})` : ''}${item.url ? ` <${item.url}>` : ''}`;
 }
 
 /** Layouts the tools accept: a lab's only while it's on. */
@@ -58,6 +59,7 @@ function summarizePortals(profile: Profile, portals: PortalResult[], notice?: st
       lines.push(`\n[${portal.portalId}] could not load: ${clean(portal.error, 200)}`);
       continue;
     }
+    if(portal.watches) lines.push(untrusted('your store watches', portal.watches.map(w=>`${w.id}: ${w.displayName} <${w.origin}>${w.collection?' collection='+w.collection:''}${w.salesOnly?' sales only':''}${w.paused?' paused':''}${w.partial?' partial catalogue':''}${w.error?' refresh failed: '+w.error:''}`).join('\n')));
     const fresh = portal.newCount ? `, ${portal.newCount} new` : '';
     if (portal.pin) {
       lines.push(`\n[${portal.portalId}] ${portal.items.length} items${fresh} pinned from ${portal.pin.from}, updated ${portal.provenance.fetchedAt}. To refresh: ${portal.pin.recipe}; then pin_portal with portalId ${portal.portalId}.`);

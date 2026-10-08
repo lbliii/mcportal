@@ -86,6 +86,6 @@
   $('addForm').addEventListener('submit', (e) => {
     e.preventDefault();
     const q = $('addInput').value.trim();
-    if (q) findSources(q);
+    if (q) $('addStore').getAttribute('aria-pressed') === 'true' ? previewStore(q) : findSources(q);
   });
   $('addInput').addEventListener('keydown', (e) => { if (e.key === 'Escape') toggleAdd(false); });

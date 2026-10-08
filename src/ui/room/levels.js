@@ -104,6 +104,7 @@
 
   /** @param {PortalResult} portal */
   function renderPortalLevel(portal) {
+    if (portal.source === 'watches') return renderShopPortal(portal, true);
     const wrap = el('section', { class: 'level', 'data-portal-level': portal.portalId, style: `--mp-source-color:${portalColor(portal)}` },
       el('div', { class: 'level-head', role: 'group', 'aria-label': 'Source controls' },
         roomBackButton(closePortal),

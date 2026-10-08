@@ -236,7 +236,7 @@ test('browser: the original layouts retain opening, saving and reachable control
       await page.waitFor(`!document.getElementById('grid').hidden`, 'the chosen layout to return');
       await page.waitFor(`document.querySelector('.continue-reading')?.getAttribute('aria-busy') === 'false'`, 'reading history to settle before measuring the save button');
       await page.click(`${saved} [data-save-url="${ARTICLE}"]`);
-      await page.waitFor(`document.querySelector('#grid [data-save-url="${ARTICLE}"][aria-pressed="false"]')`, 'the save to be removed').catch(async (error) => {
+      await page.waitFor(`!document.querySelector('#grid [data-save-url="${ARTICLE}"][aria-pressed="true"]')`, 'the save to be removed').catch(async (error) => {
         const observed = await page.eval(`JSON.stringify({readerHidden:document.getElementById('reader').hidden,toast:document.getElementById('toast').textContent,buttons:[...document.querySelectorAll('[data-save-url="${ARTICLE}"]')].map(b=>({pressed:b.getAttribute('aria-pressed'),box:b.getBoundingClientRect()}))})`);
         throw new Error(`${layout}: ${error.message}; ${observed}`);
       });

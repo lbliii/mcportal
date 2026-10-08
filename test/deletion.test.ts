@@ -8,6 +8,7 @@ import { mkdtemp, readdir, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
+import { FileWatchStore, newStoreWatch } from '../src/watches.ts';
 import { deleteAccountData } from '../src/account.ts';
 import { runAdmin } from '../src/admin-cli.ts';
 import { Accounts, makeBootstrap } from '../src/accounts.ts';
@@ -42,7 +43,7 @@ test('deleting an account leaves nothing that names it', async () => {
   const social = new Social({ store: socialStore, profiles: publicProfiles });
   const deps = {
     accounts, oauth: auth, publicProfiles, social,
-    store: new FileProfileStore(dir), reading: new FileReadingStore(dir), handoffs: new FileHandoffStore(dir),
+    watchStore: new FileWatchStore(dir), store: new FileProfileStore(dir), reading: new FileReadingStore(dir), handoffs: new FileHandoffStore(dir),
     seen: new FileSeenStore(dir), editions: new FileEditionStore(dir), clips: new FileClipStore(dir),
   };
 
@@ -58,6 +59,8 @@ test('deleting an account leaves nothing that names it', async () => {
   assert.ok(friendAdmitted.ok);
   const friend = friendAdmitted.account.id;
 
+  await deps.watchStore.import(me,[newStoreWatch({origin:'https://lawrence.example.com',name:'Lawrence shop',products:[],partial:false,pages:1},{})]);
+  await deps.watchStore.import(friend,[newStoreWatch({origin:'https://friend.example.com',name:'Friend shop',products:[],partial:false,pages:1},{})]);
   // Everything lawrence can have.
   await deps.store.put(me, validateProfile({ ...defaultProfile(), name: "Lawrence's room", saved: [{ url: 'https://example.com/a', title: 'Saved' }] }));
   await writeFile(path.join(dir, `${safeFileId(me)}.corrupt-1700000000000.json`), '{"name": "Lawrence\'s broken room"');
@@ -87,6 +90,8 @@ test('deleting an account leaves nothing that names it', async () => {
   await deleteAccountData(me, deps);
 
   // Nothing names him: not his id (his GitHub id), login, name, computer, or anything he wrote.
+  assert.equal((await deps.watchStore.list(me)).length,0);
+  assert.equal((await deps.watchStore.list(friend)).length,1);
   const traces = ['4242', 'lawrence', 'Lawrence', 'Lawrences-MacBook', 'spam from them'];
   const after = await filesUnder(dir);
   const found = after.flatMap((f) => traces.filter((t) => f.text.includes(t)).map((t) => `${f.file}: ${t}`));

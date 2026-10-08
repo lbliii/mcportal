@@ -1,3 +1,5 @@
+import type { WatchStore } from '../watches.ts';
+import type { Watches } from '../store-watches.ts';
 /**
  * A local MCPortal, linked or not. Each request asks for its ToolContext here, which
  * is the local files when there's no link.json, or the hosted account's state (remote
@@ -50,6 +52,8 @@ export interface LocalStores {
   store: ProfileStore;
   clips: ClipStore;
   reading: ReadingStore;
+  watchStore?: WatchStore;
+  watches?: Watches;
   seen: SeenStore;
   handoffs: HandoffStore;
   editions: EditionStore;
@@ -170,7 +174,7 @@ export class LocalSession {
     const { local, localUser } = this.options;
     const profile = await local.store.get(localUser);
     const clips = (await local.clips.usage(localUser)).count;
-    if (!profile.onboarded && !profile.saved.length && !clips) return undefined;
+    if (!profile.onboarded && !profile.saved.length && !clips && !(await local.watchStore?.list(localUser))?.length) return undefined;
     const file = await buildExport('mcportal', localUser, local);
     const { summary } = await client.upload(file.body.toString('utf8'));
     const note = `This computer's portal was added to your account. ${summary.replace(/^Imported: /, '')}`;

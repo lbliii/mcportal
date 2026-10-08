@@ -87,6 +87,6 @@ test('compat: an export made before the rename imports, and new exports keep the
 
   const again = JSON.parse((await buildExport('mcportal', 'u2', { store })).body.toString());
   assert.equal(again.format, 'mcportal-export');
-  assert.equal(again.version, 2);
+  assert.equal(again.version, 3);
   assert.deepEqual(Object.keys(again.profile.columns[0]), ['width', 'panels']);
 });

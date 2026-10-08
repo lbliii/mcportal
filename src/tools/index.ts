@@ -15,11 +15,13 @@ import { ROOM_TOOLS } from './room.ts';
 import { SAVED_TOOLS } from './saved.ts';
 import { SOCIAL_TOOLS } from './social.ts';
 import { SOURCE_TOOLS } from './sources.ts';
+import { WATCH_TOOLS } from './watches.ts';
 
 export const TOOLS: readonly ToolDef[] = [
   ...ROOM_TOOLS,
   ...HIGHLIGHT_TOOLS,
   ...SOURCE_TOOLS,
+  ...WATCH_TOOLS,
   ...READER_TOOLS,
   ...SAVED_TOOLS,
   ...DOCS_TOOLS,
