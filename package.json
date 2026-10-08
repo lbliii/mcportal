@@ -1,6 +1,6 @@
 {
   "name": "mcportal",
-  "version": "0.10.1",
+  "version": "0.11.0",
   "description": "MCPortal: a personal, agent-composed workspace delivered as an MCP server with an MCP Apps UI.",
   "type": "module",
   "private": true,
