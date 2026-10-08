@@ -10,7 +10,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { Accounts, makeBootstrap } from '../src/accounts.ts';
 import { AuthStore } from '../src/auth/store.ts';
-import { buildClip, FileClipStore, MemoryClipStore } from '../src/clips.ts';
+import { buildClip, CLIP_LIMITS, FileClipStore, MemoryClipStore } from '../src/clips.ts';
 import { FileEditionStore, MemoryEditionStore } from '../src/editions.ts';
 import { FileHandoffStore, MemoryHandoffStore } from '../src/handoffs.ts';
 import { TtlCache } from '../src/lib/cache.ts';
@@ -144,6 +144,25 @@ test('linked: the room, saved items and clips live on the hosted account; tools 
   } finally {
     await h.app.close();
   }
+});
+
+test('linked: clip quota failures keep their code and metadata across the state API', async () => {
+  const h = await hosted();
+  try {
+    const { accountId, tokens } = await h.signIn(42, 'lawrence');
+    const mac = device(h.app, accountId, fixed(tokens.access_token));
+    const clip = await h.clips.add(accountId, buildClip({ kind: 'quote', text: 'Kept passage', note: 'Removable' }));
+    // Test stored-byte accounting without filling the HTTP fixture with 50 MB of content.
+    await h.clips.add(accountId, { ...buildClip({ kind: 'quote', text: 'Quota fixture' }), bytes: CLIP_LIMITS.bytesPerUser - clip.bytes });
+    const refused = await mac.call('update_clip', { id: clip.id, note: 'More context than fits' });
+    assert.equal(refused.isError, true);
+    assert.equal(refused.structuredContent.error.code, 'limit_exceeded');
+    assert.deepEqual(await h.clips.get(accountId, clip.id), clip);
+    await assert.rejects(mac.ctx.clips!.add(accountId, buildClip({ kind: 'quote', text: 'Too much' })), { code: 'limit_exceeded' });
+    const shrunk = await mac.call('update_clip', { id: clip.id, note: '' });
+    assert.equal(shrunk.isError, undefined);
+    assert.ok((await h.clips.usage(accountId)).bytes < CLIP_LIMITS.bytesPerUser);
+  } finally { await h.app.close(); }
 });
 
 test('linked: two devices on one account; concurrent edits both land, and a stale cache is caught by revisions', async () => {

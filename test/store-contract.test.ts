@@ -8,8 +8,8 @@ import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { after, before, test } from 'node:test';
-import { FileClipStore, MemoryClipStore, type ClipStore } from '../src/clip-stores.ts';
-import { buildClip } from '../src/clips.ts';
+import { clipQuotaProblem, FileClipStore, MemoryClipStore, type ClipStore } from '../src/clip-stores.ts';
+import { buildClip, CLIP_LIMITS } from '../src/clips.ts';
 import { memoryPersistence } from '../src/lib/document.ts';
 import type { AppError } from '../src/lib/errors.ts';
 import { defaultProfile, validateProfile } from '../src/profile.ts';
@@ -102,6 +102,14 @@ const BACKENDS: Backend[] = [
 let n = 0;
 const user = (label: string) => `${label}-${process.pid}-${++n}`;
 
+test('clip quota: existing over-limit accounts can shrink or keep the same size', () => {
+  const usage = { count: CLIP_LIMITS.perUser + 1, bytes: CLIP_LIMITS.bytesPerUser + 100 };
+  assert.equal(clipQuotaProblem(usage, -1, 0), undefined);
+  assert.equal(clipQuotaProblem(usage, 0, 0), undefined);
+  assert.ok(clipQuotaProblem(usage, 1, 0));
+  assert.ok(clipQuotaProblem(usage, 1));
+});
+
 for (const b of BACKENDS) {
   test(`contract (${b.name}): expired handoffs and editions are purged`, { skip: b.skip || (!b.expiring && 'file stores purge by file age (test/retention.test.ts)') }, async () => {
     let now = new Date(Date.UTC(2026, 0, 1));
@@ -187,6 +195,49 @@ for (const b of BACKENDS) {
     assert.ok(usage.bytes > 0);
     assert.equal(await store.deleteAll(u), 4);
     assert.equal((await store.usage(u)).count, 0);
+  });
+
+  test(`contract (${b.name}): concurrent clips respect the count cap; edits at the cap work`, { skip: b.skip }, async () => {
+    const store = await b.clips();
+    const u = user('clip-count');
+    const first = await store.add(u, buildClip({ kind: 'quote', text: 'First' }));
+    for (let i = 1; i < CLIP_LIMITS.perUser - 1; i++) await store.add(u, buildClip({ kind: 'quote', text: `${i}` }));
+    const incoming = ['A', 'B'].map(text => buildClip({ kind: 'quote', text }));
+    const results = await Promise.allSettled(incoming.map(clip => store.add(u, clip)));
+    assert.equal(results.filter(r => r.status === 'fulfilled').length, 1);
+    assert.equal(results.find(r => r.status === 'rejected')?.reason.code, 'limit_exceeded');
+    assert.equal((await store.usage(u)).count, CLIP_LIMITS.perUser);
+    assert.equal((await Promise.all(incoming.map(c => store.get(u, c.id)))).filter(Boolean).length, 1);
+    assert.equal((await store.update(u, first.id, { note: 'Still editable' }))?.note, 'Still editable');
+    await store.delete(u, first.id);
+    await store.add(u, buildClip({ kind: 'quote', text: 'Space freed by deletion' }));
+    assert.equal(await store.deleteAll(u), CLIP_LIMITS.perUser);
+  });
+
+  test(`contract (${b.name}): concurrent clips respect the byte cap and refused edits change nothing`, { skip: b.skip }, async () => {
+    const store = await b.clips();
+    const u = user('clip-bytes');
+    const first = await store.add(u, buildClip({ kind: 'quote', text: 'First', note: 'Removable context' }));
+    const incoming = ['A', 'B'].map(text => buildClip({ kind: 'quote', text }));
+    // Synthetic stored size tests quota arithmetic without writing 50 MB to each backend.
+    await store.add(u, { ...buildClip({ kind: 'quote', text: 'Quota fixture' }), bytes: CLIP_LIMITS.bytesPerUser - first.bytes - incoming[0]!.bytes });
+    const results = await Promise.allSettled(incoming.map(clip => store.add(u, clip)));
+    assert.equal(results.filter(r => r.status === 'fulfilled').length, 1);
+    assert.equal(results.find(r => r.status === 'rejected')?.reason.code, 'limit_exceeded');
+    assert.deepEqual(await store.usage(u), { count: 3, bytes: CLIP_LIMITS.bytesPerUser });
+    for (const patch of [{ title: 'A longer title' }, { note: 'A considerably longer note' }, { tags: ['extra'] }]) {
+      await assert.rejects(store.update(u, first.id, patch), { code: 'limit_exceeded' });
+      assert.deepEqual(await store.get(u, first.id), first, 'a refused edit preserves metadata and timestamps');
+    }
+    assert.equal(await store.update(user('not-owner'), first.id, { note: 'Wrong owner' }), undefined);
+    assert.equal(await store.update(u, 'missing', { note: 'Missing' }), undefined);
+    assert.ok(await store.update(u, first.id, { title: first.title }), 'an unchanged size is allowed at the byte cap');
+    const smaller = (await store.update(u, first.id, { note: '' }))!;
+    assert.ok(smaller.bytes < first.bytes);
+    assert.equal((await store.usage(u)).bytes, CLIP_LIMITS.bytesPerUser - first.bytes + smaller.bytes);
+    assert.equal((await store.update(u, first.id, { note: first.note }))?.note, first.note, 'freed bytes can be reused');
+    assert.equal((await store.usage(u)).bytes, CLIP_LIMITS.bytesPerUser);
+    await store.deleteAll(u);
   });
 
   test(`contract (${b.name}): social`, { skip: b.skip }, async () => {

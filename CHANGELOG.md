@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Storage
+- Enforce clip count and byte quotas atomically per account in Postgres, including concurrent saves and metadata edits. Local stores also check metadata growth; edits that reduce size remain available at the limit.
+
 ### Core content loop
 - Integrate reader wave 2 with full-height reading, separate controls, bounded image retries and improved article extraction while preserving Recall, reading tabs, page find and reading preferences.
 - Size clip Share icons consistently with other controls.

@@ -18,6 +18,7 @@ export interface ClipStore {
   get(userId: string, id: string): Promise<Clip | undefined>;
   /** Newest first, without content. */
   list(userId: string, query?: ClipQuery): Promise<ClipSummary[]>;
+  /** Metadata growth counts toward the byte cap; shrinking existing clips is always allowed. */
   update(userId: string, id: string, patch: ClipPatch): Promise<Clip | undefined>;
   delete(userId: string, id: string): Promise<boolean>;
   /** Every clip of the user (account deletion). Returns how many. */
@@ -39,10 +40,11 @@ export function filterClips(clips: Clip[], query: ClipQuery = {}): ClipSummary[]
     .map(summaryOf);
 }
 
-/** Why a user at `usage` can't add `adding` more bytes of clips, or undefined if they can. Every store applies it. */
-export function clipQuotaProblem(usage: { count: number; bytes: number }, adding: number): string | undefined {
-  if (usage.count >= CLIP_LIMITS.perUser) return `You have ${CLIP_LIMITS.perUser} clips, the most MCPortal keeps. Delete some first.`;
-  if (usage.bytes + adding > CLIP_LIMITS.bytesPerUser) return `Your clips use ${Math.round(usage.bytes / 1e6)} MB of the ${CLIP_LIMITS.bytesPerUser / 1e6} MB allowed. Delete some (large images first).`;
+/** Every store checks growth against the same caps. Updates pass a byte delta and zero new clips. */
+export function clipQuotaProblem(usage: { count: number; bytes: number }, adding: number, addingCount = 1): string | undefined {
+  if (addingCount > 0 && usage.count + addingCount > CLIP_LIMITS.perUser) return `You have ${CLIP_LIMITS.perUser} clips, the most MCPortal keeps. Delete some first.`;
+  // Previously over-limit accounts must still be able to reduce their usage.
+  if (adding > 0 && usage.bytes + adding > CLIP_LIMITS.bytesPerUser) return `Your clips use ${Math.round(usage.bytes / 1e6)} MB of the ${CLIP_LIMITS.bytesPerUser / 1e6} MB allowed. Delete some (large images first).`;
   return undefined;
 }
 
@@ -83,6 +85,8 @@ abstract class DocumentClipStore implements ClipStore {
       const at = clips.findIndex((c) => c.id === id);
       if (at === -1) return { result: undefined };
       const next = patchClip(clips[at]!, patch, this.now());
+      const refused = clipQuotaProblem({ count: clips.length, bytes: clips.reduce((sum, c) => sum + c.bytes, 0) }, next.bytes - clips[at]!.bytes, 0);
+      if (refused) throw new ClipError(refused, 'limit_exceeded');
       return { clips: clips.map((c, i) => (i === at ? next : c)), result: structuredClone(next) };
     });
   }

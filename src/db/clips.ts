@@ -1,7 +1,7 @@
 /** Clips in mcportal_clips: content in `data`, everything else in `summary` for lists. */
 import { clipQuotaProblem } from '../clip-stores.ts';
 import { CLIP_LIMITS, ClipError, clampLimit, normalizeTags, patchClip, queryWords, searchTextOf, summaryOf, type Clip, type ClipPatch, type ClipQuery, type ClipStore, type ClipSummary } from '../clips.ts';
-import type { Queryable } from './schema.ts';
+import { transaction, type Queryable } from './schema.ts';
 
 /** Escape LIKE wildcards so a search word matches literally. */
 function likeWord(word: string): string {
@@ -16,15 +16,26 @@ export class PgClipStore implements ClipStore {
     this.db = db;
   }
 
-  async add(userId: string, clip: Clip): Promise<Clip> {
-    const refused = clipQuotaProblem(await this.usage(userId), clip.bytes);
-    if (refused) throw new ClipError(refused, 'limit_exceeded');
-    await this.db.query(
-      `INSERT INTO mcportal_clips (id, user_id, kind, title, data, summary, tags, search_text, bytes, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-      [clip.id, userId, clip.kind, clip.title, JSON.stringify(clip.data), JSON.stringify(summaryOf(clip)), clip.tags, searchTextOf(clip), clip.bytes, clip.createdAt, clip.updatedAt],
-    );
-    return clip;
+  /** All account writes share a transaction lock, including the first clip (no row yet). */
+  private edit<T>(userId: string, change: (store: PgClipStore) => Promise<T>): Promise<T> {
+    return transaction(this.db, async tx => {
+      await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [`clips:${userId}`]);
+      // Reads and writes must use this connection after acquiring the lock.
+      return change(new PgClipStore(tx));
+    });
+  }
+
+  add(userId: string, clip: Clip): Promise<Clip> {
+    return this.edit(userId, async store => {
+      const refused = clipQuotaProblem(await store.usage(userId), clip.bytes);
+      if (refused) throw new ClipError(refused, 'limit_exceeded');
+      await store.db.query(
+        `INSERT INTO mcportal_clips (id, user_id, kind, title, data, summary, tags, search_text, bytes, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+        [clip.id, userId, clip.kind, clip.title, JSON.stringify(clip.data), JSON.stringify(summaryOf(clip)), clip.tags, searchTextOf(clip), clip.bytes, clip.createdAt, clip.updatedAt],
+      );
+      return clip;
+    });
   }
 
   async get(userId: string, id: string): Promise<Clip | undefined> {
@@ -66,25 +77,33 @@ export class PgClipStore implements ClipStore {
     return rows.map((r) => r.summary);
   }
 
-  async update(userId: string, id: string, patch: ClipPatch): Promise<Clip | undefined> {
-    const clip = await this.get(userId, id);
-    if (!clip) return undefined;
-    const next = patchClip(clip, patch);
-    await this.db.query(
-      `UPDATE mcportal_clips SET title = $3, summary = $4, tags = $5, search_text = $6, bytes = $7, updated_at = $8 WHERE user_id = $1 AND id = $2`,
-      [userId, id, next.title, JSON.stringify(summaryOf(next)), next.tags, searchTextOf(next), next.bytes, next.updatedAt],
-    );
-    return next;
+  update(userId: string, id: string, patch: ClipPatch): Promise<Clip | undefined> {
+    return this.edit(userId, async store => {
+      const clip = await store.get(userId, id);
+      if (!clip) return undefined;
+      const next = patchClip(clip, patch);
+      const refused = clipQuotaProblem(await store.usage(userId), next.bytes - clip.bytes, 0);
+      if (refused) throw new ClipError(refused, 'limit_exceeded');
+      await store.db.query(
+        `UPDATE mcportal_clips SET title = $3, summary = $4, tags = $5, search_text = $6, bytes = $7, updated_at = $8 WHERE user_id = $1 AND id = $2`,
+        [userId, id, next.title, JSON.stringify(summaryOf(next)), next.tags, searchTextOf(next), next.bytes, next.updatedAt],
+      );
+      return next;
+    });
   }
 
-  async delete(userId: string, id: string): Promise<boolean> {
-    const r = await this.db.query(`DELETE FROM mcportal_clips WHERE user_id = $1 AND id = $2`, [userId, id]);
-    return (r.rowCount ?? 0) > 0;
+  delete(userId: string, id: string): Promise<boolean> {
+    return this.edit(userId, async store => {
+      const r = await store.db.query(`DELETE FROM mcportal_clips WHERE user_id = $1 AND id = $2`, [userId, id]);
+      return (r.rowCount ?? 0) > 0;
+    });
   }
 
-  async deleteAll(userId: string): Promise<number> {
-    const r = await this.db.query(`DELETE FROM mcportal_clips WHERE user_id = $1`, [userId]);
-    return r.rowCount ?? 0;
+  deleteAll(userId: string): Promise<number> {
+    return this.edit(userId, async store => {
+      const r = await store.db.query(`DELETE FROM mcportal_clips WHERE user_id = $1`, [userId]);
+      return r.rowCount ?? 0;
+    });
   }
 
   async usage(userId: string): Promise<{ count: number; bytes: number }> {
