@@ -65,3 +65,7 @@ Final standalone and picker audit runs each recorded zero browser console/except
 ## Remaining evidence limits
 
 Actual VoiceOver/NVDA output, real MCP host iframe behavior, touch assistive technology, speech input, OS/browser zoom, and usability with people remain untested. Agent emulation can expose mechanical blockers and support a scoped milestone decision; it cannot supply human comprehension, satisfaction, or week-long retention measurements.
+
+## User-directed VoiceOver skip
+
+On October 8, the user approved a temporary VoiceOver audit, then explicitly requested: “lets skip voiceover testing. can you disable it again?” The attempted audit used candidate `303e8e9` in an isolated Chrome Guest window and disposable local fixture server. VoiceOver's caption application could not be inspected, and no actual spoken-output evidence was obtained. System Settings subsequently showed VoiceOver **off**; that state was reverified after the user's request. The Guest audit window was closed and the fixture server exited successfully. VoiceOver testing is skipped by user direction, not passed or represented by the prior AX checks. The earlier native non-default option limitation remains separately recorded.
