@@ -19,6 +19,8 @@ import type { ClipStore } from '../clip-stores.ts';
 import type { EditionStore } from '../editions.ts';
 import type { HandoffStore } from '../handoffs.ts';
 import type { ReadingStore } from '../reading.ts';
+import { FileCollectionStore, type CollectionStore } from '../collections.ts';
+import { FileExperienceStore, type ExperienceStore } from '../experiences.ts';
 import type { SeenStore } from '../seen.ts';
 import type { ToolContext } from '../tools/kit.ts';
 import { versionAtLeast } from '../api/calls.ts';
@@ -51,6 +53,8 @@ export interface LinkControl {
 export interface LocalStores {
   store: ProfileStore;
   clips: ClipStore;
+  collections?: CollectionStore;
+  experiences?: ExperienceStore;
   reading: ReadingStore;
   watchStore?: WatchStore;
   watches?: Watches;
@@ -86,10 +90,13 @@ export class LocalSession {
   private nudged = false;
 
   constructor(options: LocalSessionOptions) {
-    this.options = options;
+    this.options = { ...options, local: { ...options.local, collections: options.local.collections ?? new FileCollectionStore(options.dataDir), experiences: options.local.experiences ?? new FileExperienceStore(options.dataDir) } };
     this.link = new LinkFile(options.dataDir);
     this.server = hostedOrigin(options.hostedUrl ?? DEFAULT_HOSTED_URL);
   }
+
+  /** Used by the local worker without consuming request notices. */
+  async isLinked(): Promise<boolean> { return Boolean(await this.link.read()); }
 
   /** The context for one request: local, or linked when link.json says so. */
   async context(): Promise<ToolContext> {
@@ -174,7 +181,9 @@ export class LocalSession {
     const { local, localUser } = this.options;
     const profile = await local.store.get(localUser);
     const clips = (await local.clips.usage(localUser)).count;
-    if (!profile.onboarded && !profile.saved.length && !clips && !(await local.watchStore?.list(localUser))?.length) return undefined;
+    const collections = await local.collections?.list(localUser) ?? [];
+    const experiences = (await local.experiences?.get(localUser))?.state;
+    if (!profile.onboarded && !profile.saved.length && !clips && !collections.length && !experiences?.catchup && !experiences?.watches.length && !(await local.watchStore?.list(localUser))?.length) return undefined;
     const file = await buildExport('mcportal', localUser, local);
     const { summary } = await client.upload(file.body.toString('utf8'));
     const note = `This computer's portal was added to your account. ${summary.replace(/^Imported: /, '')}`;

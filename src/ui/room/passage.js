@@ -201,7 +201,7 @@
   async function clipPassage(p) {
     hidePassageBar();
     try {
-      const data = (await callTool('clip', { kind: 'quote', content: p.text, source: { kind: 'article', url: p.url, title: p.title } })).structuredContent;
+      const data = (await callTool('clip', { kind: 'quote', content: p.text, source: { kind: 'article', url: p.url, title: p.title, locator: { block: p.block, ...(p.heading ? { heading: p.heading } : {}), text: p.text.slice(0, 300) } } })).structuredContent;
       if (state.profile) {
         state.profile = data.profile;
         for (const portal of data.portals) state.portals.set(portal.portalId, portal);

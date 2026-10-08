@@ -24,6 +24,8 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Accounts } from './accounts.ts';
 import type { OAuthServer } from './auth/oauth.ts';
 import type { ClipStore } from './clips.ts';
+import type { CollectionStore } from './collections.ts';
+import type { ExperienceStore } from './experiences.ts';
 import { AppError, errorCode, isAppError } from './lib/errors.ts';
 import { secretToken, sha256Hex } from './lib/ids.ts';
 import type { Logger } from './lib/log.ts';
@@ -31,7 +33,7 @@ import { boundaryOf, parseMultipart } from './lib/multipart.ts';
 import { escapeHtml, PAGE_CSP, readBody, readForm, redirect, sameOrigin, sendHtml } from './lib/web.ts';
 import { page } from './page.ts';
 import { PageSessions, type PageSession } from './page-sessions.ts';
-import { buildExport, describeImport, EXPORT_FORMATS, importExport, parseExport, type ExportFile, type ExportFormat } from './portability.ts';
+import { buildExport, describeImport, EXPORT_MAX_BYTES, EXPORT_FORMATS, importExport, parseExport, type ExportFile, type ExportFormat } from './portability.ts';
 import type { PublicProfiles } from './public-profiles.ts';
 import { SpaceLinks } from './space-links.ts';
 import type { Social } from './social.ts';
@@ -46,8 +48,8 @@ const SESSION_MS = 3600 * 1000;
 const DOWNLOAD_MS = 15 * 60 * 1000;
 const MAX_ENTRIES = 500;
 const MAX_FORM = 2048;
-/** An export holds at most 50 MB of clips; leave room for the layout and JSON overhead. */
-export const MAX_UPLOAD = 60 * 1024 * 1024;
+/** An export holds 50 MB of clips and up to 12.8 MB of collections; allow JSON overhead. */
+export const MAX_UPLOAD = EXPORT_MAX_BYTES;
 
 export interface AccountDeps {
   trustProxy?: boolean | undefined;
@@ -60,6 +62,8 @@ export interface AccountDeps {
   seen?: SeenStore | undefined;
   editions?: EditionStore | undefined;
   clips?: ClipStore | undefined;
+  collections?: CollectionStore | undefined;
+  experiences?: ExperienceStore | undefined;
   publicProfiles?: PublicProfiles | undefined;
   social?: Social | undefined;
   images?: SourceDeps | undefined;
@@ -174,7 +178,7 @@ ${csrf}
 }
 
 /** What deleting an account needs: every store, and something that can revoke its sign-ins. */
-export type DeletionDeps = Pick<AccountDeps, 'accounts' | 'store' | 'watchStore' | 'reading' | 'handoffs' | 'seen' | 'editions' | 'clips' | 'publicProfiles' | 'social'> & {
+export type DeletionDeps = Pick<AccountDeps, 'accounts' | 'store' | 'watchStore' | 'reading' | 'handoffs' | 'seen' | 'editions' | 'clips' | 'collections' | 'experiences' | 'publicProfiles' | 'social'> & {
   oauth: { revokeUser(userId: string): Promise<number> };
 };
 
@@ -188,6 +192,8 @@ export type DeletionDeps = Pick<AccountDeps, 'accounts' | 'store' | 'watchStore'
 export async function deleteAccountData(accountId: string, deps: DeletionDeps, by = accountId): Promise<{ clips: number; tokens: number }> {
   await deps.store.delete(accountId);
   await deps.reading?.deleteAll(accountId);
+  await deps.collections?.deleteAll(accountId);
+  await deps.experiences?.deleteAll(accountId);
   await deps.watchStore?.deleteAll(accountId);
   await deps.handoffs?.deleteAll(accountId);
   await deps.seen?.deleteAll(accountId);

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, writeFile } from 'node:fs/promises';
+import { mkdtemp, writeFile, truncate, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
@@ -195,4 +195,21 @@ test('import_portal: a local path, and an upload link when hosted', async () => 
   assert.match((await call(portal(), 'import_portal', { path: file })).content[0]!.text, /only works with a local MCPortal/, 'a hosted server never reads its own disk');
   const hosted = { ...portal('u6'), uploadLink: () => 'http://localhost/upload/abc' };
   assert.equal((await call(hosted, 'import_portal')).structuredContent.uploadUrl, 'http://localhost/upload/abc');
+});
+
+test('local import accepts full exports above the old 60 MB limit and refuses oversized files before parsing', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'mcportal-import-size-'));
+  try {
+    const src = portal();
+    await src.clips.add('u1', buildClip({ kind: 'quote', text: 'retained evidence' }));
+    const file = path.join(dir, 'export.json');
+    const exported = (await buildExport('mcportal', 'u1', src)).body.toString('utf8');
+    await writeFile(file, exported.padEnd(61 * 1024 * 1024, ' '));
+    const local = { ...portal('restored'), localFiles: true };
+    const result = await call(local, 'import_portal', { path: file });
+    assert.ok(!result.isError, result.content[0]!.text);
+    assert.equal(result.structuredContent.result.clipsAdded, 1);
+    await truncate(file, 81 * 1024 * 1024);
+    assert.match((await call(local, 'import_portal', { path: file })).content[0]!.text, /over 80 MB/);
+  } finally { await rm(dir, { recursive: true, force: true }); }
 });

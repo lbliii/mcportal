@@ -59,8 +59,9 @@ const spaceFormat = (() => {
       const pin = space.mine && !publicView ? `<button type="button" class="btn space-pin" data-space-pin="${h(post.id)}" aria-pressed="${post.id === space.pinnedShareId}">${post.id === space.pinnedShareId ? 'Unpin' : 'Pin'}</button>` : '';
       return `<article class="post" data-post-id="${h(post.id)}">${post.reblogOf ? `<p class="pr">Reblogged ${original ? person(original.author) : 'a post kept within MCPortal'}</p>` : ''}<h3 class="pt">${heading}</h3>${text}${original?.note ? `<p class="pn">${h(original.note)}</p>` : ''}${post.note ? `<p class="pn">${h(post.note)}</p>` : ''}<div class="pm">${h(post.createdAt.slice(0, 10))}${post.mine && post.audience === 'followers' ? ' · followers only' : ''}${post.hiddenAt ? ' · hidden by an admin' : ''}</div>${pin}${publicView ? `<a class="space-reblog" href="${signin}">Reblog through your agent</a>` : ''}</article>`;
     }
-    const sources = space.sources.map((source, i) => `<div class="source"><div class="st"><b>${h(source.title)}</b><small>${h(source.source)}</small></div>${publicView ? `<a class="btn" href="${signin}">Add through your agent</a>` : space.mine ? '' : `<button class="btn" type="button" data-space-source="${i}">Add</button>`}</div>`).join('');
-    const travelers = (space.travelers || []).map(person).join('');
+    const sources = space.sources.map((source, i) => `<div class="source"><div class="st"><b>${h(source.title)}${'pinned' in source && source.pinned ? '<span class="space-pin">Pinned</span>' : ''}</b><small>${h(source.source)}</small></div>${publicView ? `<a class="btn" href="${signin}">Add through your agent</a>` : space.mine ? '' : `<button class="btn" type="button" data-space-source="${i}">Add</button>`}</div>`).join('');
+    const authored = space.travelers || [];
+    const travelers = [...authored, ...(publicView ? [] : (space.people || []).filter(p => !authored.some(a => a.handle === p.handle)))].map(person).join('');
     const stamps = (space.stamps || []).map((stamp) => `<span class="space-stamp" data-stamp="${h(stamp.name)}">${h(stamp.label)}</span>`).join('');
     const pinned = space.pinned;
     const regular = posts.filter((post) => post.id !== pinned?.id);

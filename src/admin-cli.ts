@@ -41,7 +41,7 @@ async function deleteAccount(who: string, confirmed: boolean, actor: string, dat
   try {
     const publicProfiles = new PublicProfiles(storage.profilesPersistence);
     const done = await deleteAccountData(account.id, {
-      accounts, store: storage.store, reading: storage.reading, watchStore: storage.watchStore, handoffs: storage.handoffs, seen: storage.seen, editions: storage.editions, clips: storage.clips,
+      accounts, store: storage.store, reading: storage.reading, watchStore: storage.watchStore, handoffs: storage.handoffs, seen: storage.seen, editions: storage.editions, clips: storage.clips, collections: storage.collections, experiences: storage.experiences,
       publicProfiles, social: new Social({ store: storage.social, profiles: publicProfiles }),
       oauth: new AuthStore(storage.authPersistence ?? dataDir),
     }, actor);

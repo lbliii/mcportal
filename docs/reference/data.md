@@ -8,6 +8,8 @@ What MCPortal stores, where, and for how long; how to export it and delete it; a
 |---|---|---|
 | Account | GitHub numeric user id and login, role, how the account joined, dates | Until the account is deleted |
 | Room | Name, layout, portals and their settings, saved items, pinned results | Until changed or deleted |
+| Private collections | Links, clip refs, notes, orientations and trail progress | Until removed; 50 per account, 200 entries each |
+| Reading experiences | Captured catch-up, page/release/calendar/artist watches, baselines and inbox | 20 watches; 40 findings retained 30 days; 2 MB |
 | Saved items | Link, title, source, date, note | Until removed (200 at most) |
 | Store watches | HTTPS store origin, collection/sales scope, pause state, product observations and detected changes | Until removed or account deletion; 20 follows, 200 observations and 30 findings per follow, 5 MB per account |
 | Clips | Content, title, note, tags, source | Until deleted (1,000 or 50 MB at most) |
@@ -35,6 +37,8 @@ A local MCPortal keeps everything in one folder: `MCPORTAL_DATA_DIR`, or `~/.mcp
 | `watches/<sha256(user)>.json` | Private store follows and snapshots; atomic writes, invalid files are refused without being overwritten |
 | `<user>.json` | The room: layout, portals, saved items, pinned results (`default.json` unless `MCPORTAL_USER` is set) |
 | `clips/<user>.json` | Clips |
+| `collections/data.json` | Account-owned collections with atomic shared-document updates |
+| `experiences/data.json` | Account-owned reading sessions, subscriptions and findings with revisions |
 | `reading/<hash>.json` | Reading history |
 | `seen/<hash>.json` | Seen marks |
 | `editions/<hash>.json` | Highlights (24 hours) |
@@ -79,7 +83,7 @@ Caps (reading history, handoffs, seen marks) are enforced on write.
 
 | Format | File | Contents |
 |---|---|---|
-| `mcportal` | `mcportal-export-<time>.json` | Room, clips, reading history (newest 1,000), public profile, shares, follows, mutes, blocks and reports filed. Another MCPortal can import it with `import_portal` |
+| `mcportal` | `mcportal-export-<time>.json` | Room, clips, private collections, captured catch-up and reading watches, store watches, reading history (newest 1,000), public profile, shares, follows, mutes, blocks and reports filed. Another MCPortal can import it with `import_portal` |
 | `bookmarks` | `mcportal-bookmarks-<time>.html` | Saved items, in the Netscape bookmarks format browsers import |
 | `clips` | `mcportal-clips-<time>.tar.gz` | Clips as Markdown |
 | `opml` | `mcportal-subscriptions-<time>.opml` | Feed sources as OPML |
@@ -88,7 +92,7 @@ Hosted, the tool returns a one-time download link that expires in 15 minutes. Lo
 
 ## Deletion
 
-Deleting an account removes, in order: the room, reading history, handoffs, seen marks, highlights, clips, social data (shares, follows, mutes, blocks), the public profile, every sign-in token, and the account itself ([`deleteAccountData`](../../src/account.ts)). People delete their own account on the account page; there is no tool for it. An operator can do the same with [`mcportal admin delete`](configuration.md#admin-commands).
+Deleting an account removes, in order: the room, store watches, private collections, reading experiences, reading history, handoffs, seen marks, highlights, clips, social data (shares, follows, mutes, blocks), the public profile, every sign-in token, and the account itself ([`deleteAccountData`](../../src/account.ts)). People delete their own account on the account page; there is no tool for it. An operator can do the same with [`mcportal admin delete`](configuration.md#admin-commands).
 
 What outlasts an account names nobody: reports keep no reporter or subject (and resolved ones lose the reason), the audit log keeps a record that an account was deleted, and the account's handles stay reserved for 30 days.
 
@@ -112,3 +116,5 @@ The user reference is an HMAC of the user id under a key generated at startup. I
 MCPortal exports use version 2 and include every Space field. Version 1 exports remain readable; an old `accent` maps to the nearest named ink set at import. Import restores a validated cover and format onto an existing Space. It does not claim a handle, change its visibility or discovery setting, publish text, re-post shares, feature travelers or trust exported stamp claims. Other exported social data is retained for your own records.
 
 Space profiles remain one document; these optional fields require no database migration. Stamps are computed from account creation, share weeks and Space age. Only the anonymous brought-aboard count is retained after join notes are consumed. Public HTML is cached in memory for at most a minute, with fresh visibility checks before reuse. Public pages and feeds expose only the owner's chosen public fields and everyone posts; private switches, moderation and removal affect subsequent requests. Copies already made outside MCPortal may persist.
+
+Private collections and reading experiences use the `collections` and `reading-experiences` PostgreSQL shared-document namespaces. Startup migration imports the corresponding files. Full imports pause reading watches for review, remap clip/portal references and retain missing evidence visibly; full upload limits are 80 MB. [Detailed limits](../explanation/reading-experiences.md#state-and-limits).

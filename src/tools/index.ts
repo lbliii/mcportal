@@ -15,6 +15,11 @@ import { ROOM_TOOLS } from './room.ts';
 import { SAVED_TOOLS } from './saved.ts';
 import { SOCIAL_TOOLS } from './social.ts';
 import { SOURCE_TOOLS } from './sources.ts';
+import { LIBRARY_TOOLS } from './library.ts';
+import { COLLECTION_TOOLS } from './collections.ts';
+import { COMPARISON_TOOLS } from './comparison.ts';
+import { READING_WATCH_TOOLS } from './reading-watches.ts';
+import { CATCHUP_TOOLS } from './catchup.ts';
 import { WATCH_TOOLS } from './watches.ts';
 
 export const TOOLS: readonly ToolDef[] = [
@@ -30,6 +35,11 @@ export const TOOLS: readonly ToolDef[] = [
   ...ACCOUNT_TOOLS,
   ...SOCIAL_TOOLS,
   ...READING_TOOLS,
+  ...LIBRARY_TOOLS,
+  ...COLLECTION_TOOLS,
+  ...CATCHUP_TOOLS,
+  ...READING_WATCH_TOOLS,
+  ...COMPARISON_TOOLS,
 ];
 
 const BY_NAME = new Map(TOOLS.map((t) => [t.name, t]));

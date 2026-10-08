@@ -35,6 +35,7 @@ For contributors and curious readers who want the reasoning.
 - [Architecture](explanation/architecture.md): the pieces, how a request flows, and the shape of the tool surface.
 - [Local and hosted](explanation/local-and-hosted.md): ghost, local, linked and hosted modes, and how storage works.
 - [Security](explanation/security.md): threat model, auth, tokens, SSRF and the access gate.
+- [Reading experiences](explanation/reading-experiences.md): Recall, desks, comparisons, trails, catch-up, Changes and Upcoming.
 - [Reading](explanation/reading.md): reader view, docs portals, reading state, highlights and clips.
 - [Social](explanation/social.md): Spaces, shares, reblogs, follows and room layouts.
 

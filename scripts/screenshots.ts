@@ -23,7 +23,7 @@ import { safeFetch } from '../src/lib/safe-fetch.ts';
 import { escapeHtml } from '../src/lib/web.ts';
 import type { ToolContext } from '../src/tools/kit.ts';
 
-const PORT = 8798;
+const PORT = Number(process.env.MCPORTAL_SCREENSHOT_PORT || 8798);
 const WIDTH = 1000;
 const SCALE = 1.6;
 const now = new Date().toISOString();

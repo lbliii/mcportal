@@ -9,6 +9,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { after, before, test } from 'node:test';
+import { DocumentExperienceStore } from '../src/experiences.ts';
 import { FileClipStore } from '../src/clips.ts';
 import { FileEditionStore } from '../src/editions.ts';
 import { FileHandoffStore } from '../src/handoffs.ts';
@@ -57,7 +58,15 @@ const LONG_DOC = '# Deploy\n\n' + Array.from({ length: 45 }, (_, i) => `## Step 
 const GITHUB_DOC = 'https://raw.githubusercontent.com/acme/manual/HEAD/docs/guides/deploy.md';
 
 /** Fixtures for the feeds and the article, plus a small docs site. */
+let passageDoc = '';
+let watchedText = '# Watched docs\n\nKeep state in a file.';
+const CALENDAR = 'https://venue.example.com/calendar.ics';
+const eventDate = new Date(Date.now()+7*86400000).toISOString().replace(/[-:]/g,'').replace(/\.\d{3}/,'');
 const fetcher: Fetcher = async (url, options) => {
+  if (url === `${DOCS}/passage.md`) return {status:200,url,contentType:'text/markdown',text:passageDoc,truncated:false};
+  if (url === 'https://api.github.com/repos/acme/manual/releases?per_page=10') return {status:200,url,contentType:'application/json',text:JSON.stringify([{id:1,tag_name:'v1.2.3',name:'Reliable persistence',html_url:'https://github.com/acme/manual/releases/tag/v1.2.3',published_at:'2026-10-01T00:00:00Z',body:'Retained reading state.'}]),truncated:false};
+  if (url === `${DOCS}/watch.md`) return {status:200,url,contentType:'text/markdown',text:watchedText,truncated:false};
+  if (url === CALENDAR) return {status:200,url,contentType:'text/calendar',text:['BEGIN:VCALENDAR','BEGIN:VEVENT','UID:live-show',`DTSTART:${eventDate}`,'SUMMARY:Town Hall live show','LOCATION:Town Hall','URL:https://venue.example.com/show','END:VEVENT','END:VCALENDAR'].join('\r\n'),truncated:false};
   if (url === LONG_ARTICLE) return { status: 200, url, contentType: 'text/html', text: `<article><h1>A long read</h1>${Array.from({ length: 80 }, (_, i) => `<p>Paragraph ${i + 1}. Keep the reader controls within reach while this article scrolls. This is enough text to give the paragraph several lines on a narrow screen.</p>`).join('')}</article>`, truncated: false };
   if (url === 'https://api.github.com/repos/acme/manual/git/trees/HEAD?recursive=1') return { status: 200, url, contentType: 'application/json', text: JSON.stringify({ tree: [{ type: 'blob', path: 'docs/README.md' }, { type: 'blob', path: 'docs/guides/deploy.md' }] }), truncated: false };
   if (url === GITHUB_DOC) return { status: 200, url, contentType: 'text/markdown; charset=utf-8', text: LONG_DOC, truncated: false };
@@ -87,14 +96,17 @@ let app: Running;
 const seen = new FileSeenStore(null);
 let readings: FileReadingStore;
 let readingDir: string;
+const experiences = new DocumentExperienceStore();
 const profiles = new MemoryProfileStore({ default: room() });
 let page: Page;
+let cacheOffset = 0;
+const browserCache = new TtlCache({now:()=>Date.now()+cacheOffset});
 
 before(async () => {
   if (skip) return;
   readingDir = await mkdtemp(path.join(tmpdir(), 'mcportal-browser-reading-'));
   readings = new FileReadingStore(readingDir);
-  app = await startApp({ allowUnauthenticated: true, limits: { perMinute: 10000, perDay: 100000, globalPerDay: 1000000 } }, fetcher, { store: profiles, seen, reading: readings, labs: [] });
+  app = await startApp({ allowUnauthenticated: true, limits: { perMinute: 10000, perDay: 100000, globalPerDay: 1000000 } }, fetcher, { store: profiles, cache: browserCache, experiences, seen, reading: readings, labs: [] });
   page = await Page.open(chrome!);
 });
 
@@ -141,6 +153,69 @@ test('browser: the room draws every portal from real tool results', { skip }, as
     assert.ok(p.items > 0, `${p.id} has items`);
   }
   assert.equal(await page.eval(`document.getElementById('roomName').textContent`), 'Smoke test');
+  assert.deepEqual(page.problems, []);
+});
+
+test('browser: Recall opens retained pages and returns with query, filters and focus intact', { skip }, async () => {
+  await openRoom();
+  await page.click('#btnRecall');
+  await page.waitFor(`document.querySelector('.recall-hit')`, 'Recall results');
+  await page.eval(`document.querySelector('[aria-label="Search your library"]').value = 'Hijacking'; document.querySelector('[aria-label="Filter by kind"]').value = 'saved'; document.querySelector('.recall-search').requestSubmit()`);
+  await page.waitFor(`document.querySelector('#recallCount').textContent.includes('1 match for')`, 'the filtered result');
+  await page.click('.recall-hit .link-btn');
+  await page.waitFor(`!document.querySelector('#reader').hidden && document.querySelector('#reader .body')`, 'the recalled page');
+  await page.click('#reader .reader-top button');
+  await page.waitFor(`!document.querySelector('#experiences').hidden`, 'return to Recall');
+  assert.equal(await page.eval(`document.querySelector('[aria-label="Search your library"]').value`), 'Hijacking');
+  assert.equal(await page.eval(`document.querySelector('[aria-label="Filter by kind"]').value`), 'saved');
+  assert.equal(await page.eval(`document.activeElement.className`), 'link-btn');
+  await page.click('#btnExperienceRoom');
+  await page.waitFor(`!document.querySelector('#grid').hidden`, 'return to the room');
+  assert.deepEqual(page.problems, []);
+});
+
+test('browser: selected Recall material creates a desk, supports a trail and compares real sources on a narrow screen', { skip }, async () => {
+  await profiles.update('default', profile => ({ profile: { ...profile, saved: [...profile.saved, { url: `${DOCS}/install.md`, title: 'Install Example Docs', savedAt: new Date().toISOString() }] }, result: undefined }));
+  await openRoom();
+  await page.click('#btnRecall');
+  await page.eval(`document.querySelector('[aria-label="Filter by kind"]').value = 'saved'; document.querySelector('.recall-search').requestSubmit()`);
+  await page.waitFor(`document.querySelectorAll('.recall-hit').length === 2`, 'both kept sources');
+  await page.eval(`document.querySelectorAll('[data-select-ref]').forEach(button => button.click())`);
+  await page.click('.selection-tray .btn');
+  await page.eval(`document.querySelector('[aria-label="New desk title"]').value = 'Understanding deployment'; document.querySelector('[aria-label="New desk purpose"]').value = 'Evidence and an introduction'; document.querySelector('.collection-create').requestSubmit()`);
+  await page.waitFor(`document.querySelectorAll('.desk-entry').length === 2`, 'the new desk to keep its sources');
+  assert.equal(await page.eval(`document.querySelector('.experience-heading h1').textContent`), 'Understanding deployment');
+  await page.eval(`[...document.querySelectorAll('.experience-heading button')].find(b => b.textContent === 'Read as a trail').click()`);
+  await page.waitFor(`document.querySelector('.desk-entry .experience-kicker').textContent.includes('STEP 1')`, 'the ordered trail');
+  await page.eval(`[...document.querySelectorAll('.desk-entry button')].find(b => b.textContent === 'Finish step').click()`);
+  await page.waitFor(`document.querySelector('.desk-entry .experience-kicker').textContent.includes('COMPLETED')`, 'explicit step completion');
+  await page.eval(`document.querySelectorAll('.desk-entry [data-select-ref]').forEach(button => button.click())`);
+  await page.click('#btnCompare');
+  await page.waitFor(`document.querySelectorAll('.comparison-source-body').length === 2 && !document.querySelector('.comparison-source-body').textContent.includes('Opening source…')`, 'both comparison readers');
+  assert.equal(await page.eval(`document.querySelectorAll('.comparison-interpretation .agent-writing').length`), 0, 'no invented interpretation');
+  await page.send('Emulation.setDeviceMetricsOverride', { width: 320, height: 800, deviceScaleFactor: 1, mobile: false });
+  try {
+    assert.equal(await page.eval(`document.documentElement.scrollWidth <= window.innerWidth`), true, 'no narrow-screen page overflow');
+    await page.click('#comparisonTab1');
+    assert.equal(await page.eval(`document.querySelector('#comparisonSource1').classList.contains('compact-active')`), true);
+    await page.click('#comparisonSource1 .experience-row button');
+    await page.waitFor(`!document.querySelector('#reader').hidden && document.querySelector('#reader .body')`, 'the compared source in the reader');
+    await page.click('#reader .reader-top button');
+    await page.waitFor(`!document.querySelector('#experiences').hidden`, 'comparison continuity');
+    assert.equal(await page.eval(`document.querySelector('#comparisonSource1').classList.contains('compact-active')`), true);
+  } finally { await page.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false }); }
+  assert.deepEqual(page.problems, []);
+});
+
+test('browser: per-portal cards persist through refresh and a new room view without changing its source', { skip }, async () => {
+  await openRoom();
+  await page.eval(`const select = document.querySelector('[data-portal="hn-top"] .portal-view-select'); select.value = 'cards'; select.dispatchEvent(new Event('change'))`);
+  await page.waitFor(`document.querySelector('[data-portal="hn-top"] .portal-view-cards .card')`, 'the portal card view');
+  assert.equal((await profiles.get('default')).columns[0]!.panels[0]!.view, 'cards');
+  await openRoom();
+  assert.equal(await page.eval(`document.querySelector('[data-portal="hn-top"] .portal-view-select').value`), 'cards');
+  await page.eval(`const select = document.querySelector('[data-portal="hn-top"] .portal-view-select'); select.value = 'default'; select.dispatchEvent(new Event('change'))`);
+  await page.waitFor(`document.querySelector('[data-portal="hn-top"] .items .item')`, 'the default source view');
   assert.deepEqual(page.problems, []);
 });
 
@@ -1137,6 +1212,163 @@ test('browser: a local first run offers signing in from the welcome screen, and 
     await ghost.close();
     await rm(dataDir, { recursive: true, force: true });
   }
+});
+
+
+test('browser: finite catch-up resumes a captured set, ends explicitly and preserves reading state on a narrow screen', { skip }, async () => {
+  await openRoom(); await page.click('#btnCatchup');
+  await page.waitFor(`document.querySelector('.catchup-start')`, 'catch-up choices');
+  await page.eval(`document.querySelector('.catchup-start select').value='3'; document.querySelectorAll('.catchup-start input[type=checkbox]').forEach(c=>c.checked=c.value==='hn-top'); document.querySelector('.catchup-start').requestSubmit()`);
+  await page.waitFor(`document.querySelector('.catchup-story') || document.querySelector('.catchup-end')`, 'captured catch-up session');
+  const session=(await experiences.get('default')).state.catchup!;
+  assert.ok(session.stories.length<=3);
+  await page.send('Emulation.setDeviceMetricsOverride',{width:320,height:800,deviceScaleFactor:1,mobile:false});
+  try {
+    assert.equal(await page.eval(`document.documentElement.scrollWidth<=window.innerWidth`),true);
+    if (!session.finishedAt) {
+      await page.goto(`${app.base}/preview`); await page.click('#btnCatchup');
+      await page.waitFor(`document.querySelector('.catchup-story')`,'resumed story');
+      assert.equal((await experiences.get('default')).state.catchup!.id,session.id);
+      const reading=await readings.list('default');
+      await page.click('.catchup-finish');await page.waitFor(`document.querySelector('.catchup-end')`,'finite end');
+      assert.deepEqual(await readings.list('default'),reading,'finish is not article completion');
+    }
+  } finally {await page.send('Emulation.setDeviceMetricsOverride',{width:1280,height:900,deviceScaleFactor:1,mobile:false});}
+  assert.deepEqual(page.problems,[]);
+});
+
+test('browser: Changes keeps dated evidence and Upcoming renders real calendar dates, saves events and supports narrow screens', { skip }, async () => {
+  await openRoom(); await page.click('#btnChanges');
+  await page.waitFor(`document.querySelector('.watch-setup')`, 'watch setup');
+  await page.eval(`document.querySelector('[aria-label="Watch title"]').value='Persistence notes'; document.querySelector('[aria-label="Watch address"]').value='${DOCS}/watch.md'; document.querySelector('.watch-setup').requestSubmit()`);
+  await page.waitFor(`document.querySelector('.watch-card h3')?.textContent==='Persistence notes'`, 'kept watch');
+  const watch=(await experiences.get('default')).state.watches.find(w=>w.title==='Persistence notes')!;
+  await page.click('.watch-card .btn');await page.waitFor(`document.querySelector('.watch-card').textContent.includes('Last successful check')`,'baseline check');
+  watchedText='# Watched docs\n\nKeep state in a database.';
+  await experiences.update('default',state=>{state.watches.find(w=>w.id===watch.id)!.lastAttempt=new Date(Date.now()-61000).toISOString();return {state,result:undefined};});
+  await page.click('.watch-card .btn');await page.waitFor(`document.querySelector('.change-card details')`,'actual change evidence');
+  await page.click('.change-card summary');
+  assert.match(await page.eval<string>(`document.querySelector('.change-diff').textContent`),/file.*database|database.*file/s);
+  await page.click('#btnUpcoming');await page.waitFor(`document.querySelector('.watch-setup')`,'calendar setup');
+  await page.eval(`document.querySelector('[aria-label="Watch title"]').value='Town Hall'; document.querySelector('[aria-label="Watch address"]').value='${CALENDAR}'; document.querySelector('.watch-setup').requestSubmit()`);
+  await page.waitFor(`document.querySelector('.watch-card h3')?.textContent==='Town Hall'`, 'calendar watch');
+  await page.click('.watch-card .btn');await page.waitFor(`document.querySelector('.event-card')`, 'dated event');
+  assert.match(await page.eval<string>(`document.querySelector('.event-card').textContent`),/Town Hall live show.*UTC/s);
+  await page.click('.event-card [data-save-url]');await page.waitFor(`document.querySelector('.event-card [data-save-url]').getAttribute('aria-pressed')==='true'`,'saved event');
+  assert.ok((await profiles.get('default')).saved.find(s=>s.url==='https://venue.example.com/show')!.event);
+  await page.send('Emulation.setDeviceMetricsOverride',{width:320,height:800,deviceScaleFactor:1,mobile:false});
+  try {assert.equal(await page.eval(`document.documentElement.scrollWidth<=window.innerWidth`),true);} finally {await page.send('Emulation.setDeviceMetricsOverride',{width:1280,height:900,deviceScaleFactor:1,mobile:false});}
+  await tool('remove_saved',{url:'https://venue.example.com/show'});
+  const all=(await experiences.get('default')).state.watches;for(const w of all) await tool('watch_reading',{action:'delete',id:w.id});
+  assert.deepEqual(page.problems,[]);
+});
+
+test('browser: agent comparison output validates refs, renders separately and keeps existing pane positions', { skip }, async () => {
+  await profiles.put('default',room());const host=await attachHost();
+  try {
+    const data=await tool('show_comparison',{question:'How is deployment described?',sources:[{ref:`url:${DOCS}/install.md`,title:'Install',docs:DOCS},{ref:`url:${DOCS}/deploy.md`,title:'Deploy',docs:DOCS}],interpretation:{text:'Agreements: both provide steps. Differences: deployment has more stages. Open questions: runtime guarantees.',refs:[`url:${DOCS}/install.md`,`url:${DOCS}/deploy.md`]}});
+    await page.goto(`${app.base}/preview`);await page.waitFor(`document.querySelector('[data-portal]')`,'the host room');
+    await page.eval(`window.postMessage({jsonrpc:'2.0',method:'ui/notifications/tool-result',params:{structuredContent:${JSON.stringify(data)}}},'*')`);
+    await page.waitFor(`document.querySelector('.comparison-interpretation .agent-writing')`,'explicit interpretation');
+    await page.waitFor(`document.querySelector('#comparisonSource1 .comparison-source-body h2')`,'the longer source');
+    await page.eval(`document.querySelector('#comparisonSource1 .comparison-source-body').scrollTop=200`);
+    const position=await page.eval<number>(`document.querySelector('#comparisonSource1 .comparison-source-body').scrollTop`);
+    await page.eval(`window.postMessage({jsonrpc:'2.0',method:'ui/notifications/tool-result',params:{structuredContent:${JSON.stringify(data)}}},'*')`);
+    assert.equal(await page.eval(`document.querySelector('#comparisonSource1 .comparison-source-body').scrollTop`),position);
+    assert.deepEqual(page.problems,[]);
+  } finally {await page.send('Page.removeScriptToEvaluateOnNewDocument',{identifier:host});}
+});
+
+
+test('browser: kept passage follows moved text, declines duplicates and changed text, and keeps the original quote', {skip}, async()=>{
+  const quote='This unique kept passage survives a move.';
+  const source=`${DOCS}/passage.md`;
+  const kept=await tool('clip',{kind:'quote',title:'Durable locator example',content:quote,source:{kind:'article',url:source,title:'Passage source',locator:{block:1,text:quote}}});
+  try {
+    for (const mode of ['moved','duplicate','changed']) {
+      cacheOffset += 25*3600000;
+      passageDoc='# Passage source\n\n'+Array.from({length:30},(_,i)=>`Paragraph ${i}. Supporting prose with enough text to scroll down to the kept material.\n\n`).join('')+(mode==='changed'?'This passage has changed.':quote)+(mode==='duplicate'?'\n\n'+quote:'');
+      await profiles.put('default',room());await openRoom();await page.click('#btnRecall');
+      await page.eval(`document.querySelector('[aria-label="Search your library"]').value='Durable locator example';document.querySelector('.recall-search').requestSubmit()`);
+      await page.waitFor(`document.querySelector('.recall-hit')?.textContent.includes('Durable locator example')`,'the retained quote');
+      await page.click('.recall-hit .recall-title');
+      await page.waitFor(`document.querySelector('#recallPreview .btn')`,'the quote preview');
+      await page.eval(`[...document.querySelectorAll('#recallPreview button')].find(b=>b.textContent==='Return to passage').click()`);
+      await page.waitFor(`!document.querySelector('#reader').hidden && document.querySelector('#reader .body')`,'the passage reader');
+      if (mode==='moved') {
+        await page.waitFor(`window.scrollY>500 || document.querySelector('#reader').scrollTop>500`,'unique text relocated beyond obsolete block');
+        assert.equal(await page.eval(`Boolean(document.querySelector('#reader .handoff-note'))`),false);
+      } else {
+        await page.waitFor(`document.querySelector('#reader .handoff-note')?.textContent.includes('could not be located')`,'honest unresolved passage');
+      }
+      const stored=await tool('get_clip',{id:kept.clip.id});assert.equal(stored.clip.data.text,quote);
+      assert.deepEqual(page.problems,[]);
+    }
+  } finally {await tool('delete_clip',{id:kept.clip.id});await profiles.put('default',room());}
+});
+
+test('browser: quote, gallery and release presentations use retained content and fit a narrow room', {skip}, async()=>{
+  const quote=await tool('clip',{kind:'quote',title:'A retained principle',content:'Keep the evidence in view.'});
+  const image=await tool('clip',{kind:'image',title:'A visual note',content:'<svg xmlns="http://www.w3.org/2000/svg" width="120" height="80"><rect width="120" height="80" fill="#567568"/></svg>'});
+  const profile=room();profile.columns.push({width:1,panels:[{id:'kept-clips',source:'clips',title:'Kept clips',view:'quotes',config:{limit:10}},{id:'releases',source:'github',title:'Manual releases',view:'changelog',config:{mode:'releases',repo:'acme/manual',limit:10}}]});
+  try {
+    await profiles.put('default',profile);await page.goto(`${app.base}/preview`);
+    await page.waitFor(`document.querySelector('[data-portal="kept-clips"] .portal-view-quotes .clip-quote')`,'a quote with its full retained text');
+    assert.equal(await page.eval(`document.querySelectorAll('[data-portal="kept-clips"] .portal-clip-card').length`),1);
+    await page.waitFor(`document.querySelector('[data-portal="releases"] .release-entry h3')?.textContent==='v1.2.3'`,'a versioned release entry');
+    await page.eval(`const s=document.querySelector('[data-portal="kept-clips"] .portal-view-select');s.value='gallery';s.dispatchEvent(new Event('change'))`);
+    await page.waitFor(`document.querySelector('[data-portal="kept-clips"] .portal-view-gallery img')?.getAttribute('alt')==='A visual note'`,'the kept visual with accessible title');
+    await page.send('Emulation.setDeviceMetricsOverride',{width:320,height:800,deviceScaleFactor:1,mobile:false});
+    assert.equal(await page.eval(`document.documentElement.scrollWidth<=window.innerWidth`),true,'portal views fit the narrow room');
+    assert.deepEqual(page.problems,[]);
+  } finally {await page.send('Emulation.setDeviceMetricsOverride',{width:1280,height:900,deviceScaleFactor:1,mobile:false});await tool('delete_clip',{id:quote.clip.id});await tool('delete_clip',{id:image.clip.id});await profiles.put('default',room());}
+});
+
+
+test('browser: a comparison with a removed source remains accessible for repair', {skip}, async()=>{
+  await profiles.put('default',room());
+  const {collection}=await tool('update_collection',{action:'create',kind:'comparison',title:'Repairable comparison',entries:[{ref:`url:${DOCS}/install.md`,title:'Install'},{ref:`url:${DOCS}/deploy.md`,title:'Deploy'}]});
+  try {
+    await tool('update_collection',{action:'remove',id:collection.id,refs:[`url:${DOCS}/deploy.md`]});
+    await openRoom();await page.click('#btnCollections');
+    await page.waitFor(`[...document.querySelectorAll('.collection-card')].some(c=>c.textContent.includes('Repairable comparison'))`,'the kept comparison');
+    await page.eval(`[...document.querySelectorAll('.collection-card')].find(c=>c.textContent.includes('Repairable comparison')).querySelector('button').click()`);
+    await page.waitFor(`document.querySelector('.desk-kept .watch-warning')?.textContent.includes('needs another source')`,'an actionable incomplete comparison');
+    assert.equal(await page.eval(`document.querySelectorAll('.desk-entry').length`),1);assert.deepEqual(page.problems,[]);
+  } finally {await tool('update_collection',{action:'delete',id:collection.id});}
+});
+
+
+test('browser: reading navigation uses labelled custom icons and fits all destinations at 320px', {skip}, async()=>{
+  const profile=room();profile.saved.push({url:`${DOCS}/install.md`,title:'Install Example Docs',savedAt:new Date().toISOString()});
+  await profiles.put('default',profile);
+  await openRoom();
+  const buttons=await page.eval<Array<{label:string;title:string;path:string;hidden:boolean}>>(`[...document.querySelectorAll('.experience-nav button')].map(b=>({label:b.getAttribute('aria-label'),title:b.title,path:b.querySelector('svg path')?.getAttribute('d'),hidden:getComputedStyle(b.querySelector('.experience-nav-label')).display==='none'}))`);
+  assert.deepEqual(buttons.map(b=>b.label),['Room','Recall','Topic desks','Compare','Catch-up','Changes','Upcoming']);
+  assert.ok(buttons.every(b=>b.title===b.label && b.path && !b.hidden));
+  await page.send('Emulation.setDeviceMetricsOverride',{width:320,height:800,deviceScaleFactor:1,mobile:false});
+  try {
+    const geometry=await page.eval<{fits:boolean;labelsHidden:boolean;targets:boolean}>(`(()=>{const nav=document.querySelector('.experience-nav'),buttons=[...nav.querySelectorAll('button')];return {fits:nav.scrollWidth<=nav.clientWidth && document.documentElement.scrollWidth<=innerWidth,labelsHidden:buttons.every(b=>getComputedStyle(b.querySelector('.experience-nav-label')).display==='none'),targets:buttons.every(b=>b.getBoundingClientRect().width>=44 && b.getBoundingClientRect().height>=44)}})()`);
+    assert.deepEqual(geometry,{fits:true,labelsHidden:true,targets:true});
+    await page.click('#btnRecall');await page.waitFor(`document.querySelector('.recall-hit')`,'Recall through its icon');
+    assert.equal(await page.eval(`document.querySelector('#btnRecall').getAttribute('aria-current')`),'page');
+    assert.equal(await page.eval(`getComputedStyle(document.querySelector('#btnRecall')).backgroundColor`),'rgba(0, 0, 0, 0)');
+    assert.equal(await page.eval(`getComputedStyle(document.querySelector('#btnRecall'),'::before').width`),'24px');
+    assert.equal(await page.eval(`document.querySelector('#btnRecall').matches(':focus-visible')`),false,'pointer selection has no keyboard focus ring');
+    await page.send('Emulation.setFocusEmulationEnabled',{enabled:true});
+    await page.eval(`document.querySelector('#btnChanges').focus()`);
+    assert.equal(await page.eval(`document.activeElement.id`),'btnChanges');await page.send('Input.dispatchKeyEvent',{type:'keyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13,text:'\r',unmodifiedText:'\r'});await page.send('Input.dispatchKeyEvent',{type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
+    await page.waitFor(`document.querySelector('.experience-heading h1')?.textContent==='Changes'`,'keyboard navigation through a compact icon');
+    assert.equal(await page.eval(`document.querySelector('#btnChanges').getAttribute('aria-current')`),'page');
+    assert.equal(await page.eval(`document.querySelector('#btnChanges').matches(':focus-visible')`),true,'keyboard navigation retains its focus ring');
+    assert.deepEqual(page.problems,[]);
+  } finally {await page.send('Emulation.setDeviceMetricsOverride',{width:1280,height:900,deviceScaleFactor:1,mobile:false});}
+  // Selection changes must update the accessible count without replacing the icon.
+  await page.click('#btnRecall');await page.waitFor(`document.querySelectorAll('[data-select-ref]').length>=2`,'selectable evidence');
+  await page.eval(`[...document.querySelectorAll('[data-select-ref]')].slice(0,2).forEach(b=>b.click())`);
+  assert.equal(await page.eval(`document.querySelector('#btnCompare').getAttribute('aria-label')`),'Compare (2)');
+  assert.equal(await page.eval(`document.querySelector('#btnCompare').dataset.count`),'2');
+  assert.equal(await page.eval(`Boolean(document.querySelector('#btnCompare svg path'))`),true);
 });
 
 test('browser: Space links: the room offers a follow of whoever brought you, says who joined through yours, and your space copies its link', { skip }, async () => {

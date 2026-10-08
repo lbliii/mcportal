@@ -35,7 +35,10 @@ The script also writes what the public pages serve (`src/site/`): the favicon an
 
 ## Icons
 
-Icons sit on the Line mark's 24-unit grid, with its 1.75 stroke and round caps and joins. Corners have a radius of 3. Where an icon has a frame, it borrows from the mark: columns are two doorways, the bookmark and the "open original" frame have arched tops, a Space is someone's doorway, refresh runs around a tilted orbit, and the feed icon's dot is the moon's size. Icons are one colour (`currentColor`); the brick moon belongs to the mark alone.
+The workspace's icons are drawn by the same script (`src/ui/brand/icons.js`), on the Line mark's 24-unit grid with its 1.75 stroke, round caps and joins. Rounded corners use a radius of 3. Where an icon has a frame, it borrows from the mark: columns are two doorways, the bookmark and the "open original" frame have arched tops, a space is someone's doorway, refresh runs around a tilted orbit, and the feed icon's dot is the moon's size. Icons are one colour (currentColor); the brick moon belongs to the mark alone.
+Reading navigation adds a doorway for Room, a shelf/search lens for Recall, stacked papers for Topic desks, paired arched pages for Compare, a clock/check for Catch-up, a plus/minus page for Changes, and a calendar with a moon-sized date dot for Upcoming. Labels accompany these on wide screens; compact navigation keeps accessible names and tooltips.
+
+- Give the mark clear space of at least a quarter of its width on every side.
 
 ## Wordmark
 

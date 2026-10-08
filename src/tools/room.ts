@@ -9,8 +9,10 @@ import { leadOf, resolveEdition, type RoomEdition } from '../highlights.ts';
 import { ACTIVE_LABS } from '../labs.ts';
 import { MAX_PACKS, packSummaries, STARTER_PACKS } from '../packs.ts';
 import { SEEN_BATCH, tracksSeen, withNews } from '../seen.ts';
-import { describeDiff, describeLayout, diffProfiles, findPortal, normalizeSourceConfig, offeredLayouts, type Layout, type PortalInput, type Profile, type ProfileDiff } from '../profile.ts';
+import { describeDiff, describeLayout, diffProfiles, findPortal, normalizeSourceConfig, offeredLayouts, PORTAL_VIEWS, type Layout, type PortalInput, type Profile, type ProfileDiff } from '../profile.ts';
 import { clipsPortal, clipsQuery, followingPortal, loadPortal, lobbyPortal, peoplePortal, pinnedPortal, savedPortal } from '../sources.ts';
+import { currentSavedEvents } from '../watches-state.ts';
+import { watchPortal } from '../watch-portals.ts';
 import type { Intros } from '../social.ts';
 import type { PortalResult } from '../types.ts';
 import { identityOf, labsOf, need, ok, toolError, toolFailure, untrusted, ROOM_URI, type CallToolResult, type ToolContext, type ToolDef } from './kit.ts';
@@ -20,7 +22,8 @@ import type { ToolResults } from './results.ts';
 /** Any portal's current items: profile-backed ones from the profile and stores, the rest fetched (cached unless `force`). */
 export async function portalFor(spec: PortalInput, profile: Profile, ctx: ToolContext, force = false): Promise<PortalResult> {
   if (spec.source === 'watches') return need(ctx.watches, 'Store watches are unavailable on this server.').portal(ctx.userId, spec.id, spec.title ?? 'Shop', spec.config && typeof spec.config === 'object' ? Number((spec.config as { limit?: number }).limit) || 30 : 30, force);
-  if (spec.source === 'saved') return savedPortal(spec, profile.saved);
+  if (spec.source === 'changes' || spec.source === 'upcoming') return watchPortal(spec, ctx);
+  if (spec.source === 'saved') return savedPortal(spec, currentSavedEvents(profile, profile.saved.some(s => s.event) ? (await ctx.experiences?.get(ctx.userId))?.state : undefined).saved);
   if (spec.source === 'pinned') return pinnedPortal(spec, profile.pins);
   if (spec.source === 'clips') return clipsPortal(spec, ctx.clips ? await ctx.clips.list(ctx.userId, clipsQuery(spec)) : []);
   if (spec.source === 'people') return peoplePortal(spec, await suggestedPeople(profile, ctx));
@@ -144,7 +147,8 @@ export const ROOM_TOOLS: ToolDef[] = [
     _meta: { ui: { resourceUri: ROOM_URI } },
     async handler(args, ctx) {
       // The room first: on a linked MCPortal, reading it is what finds out whether the hosted server is reachable.
-      const profile = await ctx.store.get(ctx.userId);
+      const storedProfile = await ctx.store.get(ctx.userId);
+      const profile = currentSavedEvents(storedProfile, storedProfile.saved.some(s => s.event) ? (await ctx.experiences?.get(ctx.userId))?.state : undefined);
       const identity = await identityOf(ctx);
       const notice = ctx.store.takeNotice?.(ctx.userId);
       if (!profile.onboarded || args.setup === true) {
@@ -220,6 +224,7 @@ export const ROOM_TOOLS: ToolDef[] = [
       additionalProperties: false,
       properties: {
         move: { type: 'array', items: { type: 'object', required: ['portal', 'column'], additionalProperties: false, properties: { portal: { type: 'string' }, column: { type: 'integer', minimum: 1 }, position: { type: 'integer', minimum: 1, description: 'top = 1; default last' } } } },
+        view: { type: 'array', maxItems: 40, items: { type: 'object', required: ['portal', 'view'], additionalProperties: false, properties: { portal: { type: 'string' }, view: { type: 'string', enum: PORTAL_VIEWS } } } },
         width: { type: 'array', items: { type: 'object', required: ['column', 'width'], additionalProperties: false, properties: { column: { type: 'integer', minimum: 1 }, width: { type: 'integer', minimum: 1, maximum: 4 } } } },
         retitle: { type: 'array', items: { type: 'object', required: ['portal', 'title'], additionalProperties: false, properties: { portal: { type: 'string' }, title: { type: 'string' } } } },
         configure: { type: 'array', items: { type: 'object', required: ['portal', 'config'], additionalProperties: false, properties: { portal: { type: 'string' }, config: { type: 'object', description: 'Settings to change (list_sources)' } } } },

@@ -10,8 +10,8 @@ import { homedir } from 'node:os';
 import { SPACE_INPUT } from '../space-input.ts';
 import type { PublicProfileInput } from '../public-profiles.ts';
 import { clean } from '../lib/text.ts';
-import { describeImport, EXPORT_FORMATS, importExport, parseExport, type ExportFormat } from '../portability.ts';
-import { MAX_FEATURED, suggestHandle, type PublicProfile } from '../public-profiles.ts';
+import { describeImport, EXPORT_MAX_BYTES, EXPORT_FORMATS, importExport, parseExport, type ExportFormat } from '../portability.ts';
+import { SPACE_SETTINGS_SCHEMA, publicSpaceProfile, MAX_FEATURED, suggestHandle, type PublicProfile } from '../public-profiles.ts';
 import type { ToolResults } from './results.ts';
 import { describeIdentity, HOSTED_ONLY, identityOf, socialActive, socialEntry, ok, toolError, toolFailure, untrusted, type ToolDef } from './kit.ts';
 
@@ -48,11 +48,12 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
       if (typeof args.handle === 'string' && args.handle.trim()) {
         const found = await ctx.publicProfiles.byHandle(args.handle);
         if (!found) return toolError(`No MCPortal profile for @${clean(args.handle, 40).replace(/^@/, '')}.`, 'not_found');
-        const { accountId: _id, broughtAboard: _brought, ...profile } = found.profile;
+        const sections = await ctx.social?.spaceSections(ctx.userId, found.profile.accountId);
+        const { accountId: _id, broughtAboard: _brought, ...profile } = publicSpaceProfile({ ...found.profile, sources: sections?.sources ?? [] });
         const moved = found.movedFrom ? `@${found.movedFrom} is now @${profile.handle}.\n` : '';
         const stats = ctx.social && found.profile.accountId !== ctx.userId ? await ctx.social.stats(ctx.userId, found.profile.accountId) : undefined;
         const counts = stats ? `\n${stats.followers} follower(s), ${stats.shares} share(s) you can see.${stats.following ? ' You follow them.' : ''}` : '';
-        return ok(`${moved}${untrusted(`@${profile.handle}`, describeProfile(found.profile))}${counts}`, { profile, ...(stats ? { stats } : {}), ...(found.movedFrom ? { movedFrom: found.movedFrom } : {}) });
+        return ok(`${moved}${untrusted(`@${profile.handle}`, describeProfile({ ...profile, accountId: _id }))}${counts}`, { profile, ...(stats ? { stats } : {}), ...(found.movedFrom ? { movedFrom: found.movedFrom } : {}) });
       }
       const mine = await ctx.publicProfiles.get(ctx.userId);
       if (mine) return ok(`Your public profile (public on the web unless made members-only):\n${describeProfile(mine)}`, { profile: mine });
@@ -70,6 +71,7 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
       type: 'object',
       additionalProperties: false,
       properties: {
+        ...SPACE_SETTINGS_SCHEMA,
         handle: { type: 'string', description: '2-30 letters, digits or underscores; needed the first time' },
         displayName: { type: 'string', maxLength: 50 },
         bio: { type: 'string', maxLength: 160 },
@@ -99,6 +101,10 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
           spaceTitle: typeof args.spaceTitle === 'string' ? args.spaceTitle : undefined,
           ...Object.fromEntries(Object.keys(SPACE_INPUT).filter((k) => args[k] !== undefined).map((k) => [k, args[k]])) as PublicProfileInput,
           sources,
+          showSources: typeof args.showSources === 'boolean' ? args.showSources : undefined,
+          showPeople: typeof args.showPeople === 'boolean' ? args.showPeople : undefined,
+          sourceCuration: args.sourceCuration as PublicProfile['sourceCuration'],
+          peopleCuration: args.peopleCuration as PublicProfile['peopleCuration'],
           reblogs: typeof args.reblogs === 'string' ? args.reblogs : undefined,
           listed: typeof args.listed === 'boolean' ? args.listed : undefined,
         });
@@ -167,7 +173,7 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
         if (!/\.json$/i.test(file)) return toolError('path must be a .json MCPortal export file.');
         const info = await stat(file).catch(() => undefined);
         if (!info?.isFile()) return toolError(`No file at ${clean(file, 200)}.`, 'not_found');
-        if (info.size > 60 * 1024 * 1024) return toolError('That file is over 60 MB; it isn\'t an MCPortal export.');
+        if (info.size > EXPORT_MAX_BYTES) return toolError('That file is over 80 MB; it isn\'t an MCPortal export.');
         text = await readFile(file, 'utf8');
       } else if (ctx.uploadLink) {
         const link = ctx.uploadLink();

@@ -671,3 +671,13 @@
   .shop-save { align-self: flex-start; display: inline-flex; align-items: center; gap: var(--mp-space-6); margin-top: var(--mp-space-12); }
   .shop-save svg { width: var(--mp-icon-normal); height: var(--mp-icon-normal); fill: none; stroke: currentColor; }
   .shop-open:focus-visible { outline: 2px solid var(--mp-border-selected); outline-offset: 2px; }
+/* Space lists grow from opted-in activity; curation remains optional. */
+.space-section-settings { margin: 0 0 var(--mp-space-16); padding: var(--mp-space-12); border: 1px solid var(--mp-border-control); border-radius: 8px; }
+.space-visibility { display: flex; align-items: center; gap: var(--mp-space-8); font-weight: var(--mp-weight-strong); }
+.space-visibility input { accent-color: var(--mp-space-accent); }
+.space-section-preview { margin-top: var(--mp-space-10); }
+.space-section-preview .btn { margin: var(--mp-space-4) var(--mp-space-8) var(--mp-space-4) 0; }
+.space-curation summary { cursor: pointer; }
+.space-curation-entry { display: flex; align-items: center; flex-wrap: wrap; gap: var(--mp-space-6); margin: var(--mp-space-8) 0; }
+.space-curation-entry > span { flex: 1 1 180px; overflow-wrap: anywhere; }
+.space-pin { margin-left: var(--mp-space-8); font-size: var(--mp-type-11-5); color: var(--mp-space-accent); }

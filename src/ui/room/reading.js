@@ -92,6 +92,7 @@
     if (stopReading) stopReading();
     const body = reader.querySelector('.body');
     if (!(body instanceof HTMLElement)) return;
+    if (applyKeptLocator(body)) resume = false;
     const blocks = () => logicalBlocks(body);
     let read = false;
     let ready = false;   // the stored position is known: saves may go out

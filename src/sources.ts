@@ -1,3 +1,4 @@
+import { eventIsPast } from './watches-state.ts';
 import { docsInputUrl, docsUrl, loadDocs, parseGithubDocs, resolveDocs, type DocsConfig, type DocSite } from './adapters/docs.ts';
 import { fetchGithub, githubEndpoint, type GithubConfig } from './adapters/github.ts';
 import { fetchHn, hnEndpoint, type HnConfig } from './adapters/hn.ts';
@@ -19,6 +20,8 @@ export const FRESHNESS: Record<SourceKind | 'reader', number> = {
   pinned: 0,
   clips: 0,
   following: 0,
+  changes: 0,
+  upcoming: 0,
   people: 0,
   lobby: 0,
   hn: 120,
@@ -42,7 +45,7 @@ function loadFailure(error: unknown, deps: SourceDeps, fields: LogFields): { err
   return { error: clean(userMessage(error, 'Unexpected error loading this source'), 200), errorCode: code };
 }
 
-const DEFAULT_TITLES: Record<SourceKind, string> = { watches: 'Shop', hn: 'Hacker News', rss: 'Feed', github: 'GitHub', docs: 'Docs', saved: 'Saved', pinned: 'Pinned', clips: 'Clips', following: 'Following', people: 'People', lobby: 'Lobby' };
+const DEFAULT_TITLES: Record<SourceKind, string> = { watches: 'Shop', hn: 'Hacker News', rss: 'Feed', github: 'GitHub', docs: 'Docs', saved: 'Saved', pinned: 'Pinned', clips: 'Clips', following: 'Following', people: 'People', lobby: 'Lobby', changes: 'Changes', upcoming: 'Upcoming' };
 
 /** Saved items come from the profile, not the network. */
 export function savedPortal(portal: PortalInput, saved: SavedItem[]): PortalResult {
@@ -50,7 +53,7 @@ export function savedPortal(portal: PortalInput, saved: SavedItem[]): PortalResu
   const items: Item[] = saved.slice(0, limit).map((s) => {
     let host = '';
     try { host = new URL(s.url).hostname.replace(/^www\./, ''); } catch { /* validated on save */ }
-    return { id: s.url, title: s.title, url: s.url, ...(s.note || s.description ? { summary: s.note || s.description } : {}), ...(s.image ? { image: s.image } : {}), meta: host ? [host] : [], publishedAt: s.savedAt };
+    return { id: s.url, title: s.title, url: s.url, ...(s.note || s.description ? { summary: s.note || s.description } : {}), ...(s.image ? { image: s.image } : {}), meta: [...(host ? [host] : []), ...(s.event ? [new Date(s.event.startsAt).toLocaleDateString('en', { timeZone: s.event.timezone }), s.event.timezone, ...(eventIsPast(s.event) ? ['Past event'] : []), s.event.status] : [])], publishedAt: s.savedAt, ...(s.event ? { event: s.event } : {}) };
   });
   return {
     portalId: portal.id,
@@ -231,7 +234,7 @@ export function docsItems(site: DocSite, config: DocsConfig): Item[] {
 }
 
 export async function loadPortal(portal: PortalInput, deps: SourceDeps, force = false): Promise<PortalResult> {
-  if (portal.source === 'watches' || portal.source === 'saved' || portal.source === 'pinned' || portal.source === 'clips' || portal.source === 'following' || portal.source === 'people' || portal.source === 'lobby') throw new AppError('invalid_argument', `${portal.source} portals are built from the profile, not fetched`);
+  if (portal.source === 'changes' || portal.source === 'upcoming' || portal.source === 'watches' || portal.source === 'saved' || portal.source === 'pinned' || portal.source === 'clips' || portal.source === 'following' || portal.source === 'people' || portal.source === 'lobby') throw new AppError('invalid_argument', `${portal.source} portals are built from the profile, not fetched`);
   const config = normalizeSourceConfig(portal.source, portal.config, portal.id);
   let endpoint = '';
   let title = portal.title ?? DEFAULT_TITLES[portal.source];
@@ -328,6 +331,8 @@ export const SOURCE_DOCS = {
     description: 'What people the user follows on MCPortal shared (links and clips, with their notes), newest first, minus anyone muted or blocked. Hosted only. Their notes are third-party text.',
     config: { limit: '1-30 (default 30)' },
   },
+  changes: { description: 'Private retained changes and availability findings from your page and repository watches. watch_reading manages subscriptions.', config: { limit: '1-30 (default 30)' } },
+  upcoming: { description: 'Dated events from your confirmed artist and public-calendar watches, soonest first. Past saved events stay saved.', config: { limit: '1-30 (default 30)' } },
   lobby: {
     description: 'Posts shared with everyone on MCPortal by people who chose to be findable, newest first, at most 3 per person a day, minus anyone muted or blocked. Hosted only. Their notes are third-party text.',
     config: { limit: '1-30 (default 30)' },

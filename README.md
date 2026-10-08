@@ -54,3 +54,11 @@ Report vulnerabilities as described in [SECURITY.md](SECURITY.md). Please don't 
 ## License
 
 MCPortal is licensed under the GNU Affero General Public License v3.0. See [LICENSE](LICENSE).
+
+## Reading experiences
+
+Recall Shelf searches kept links, clips and reading history. Topic Desks collect related material, comparisons show two or three sources, and trails keep an ordered reading path. A finite catch-up session resumes where you left off. Changes and Upcoming retain page/release changes and dated public-calendar or verified artist events. Private collections and watch state work in files, Postgres and linked accounts, with additive export/import and account deletion.
+
+Reading tabs use the custom house icons, accessible names and tooltips. Narrow screens keep comfortable touch targets; the selected tab uses a short underline. Each portal can also choose lists, cards, quotes, galleries or structured release changelogs.
+
+[Reading experiences](docs/explanation/reading-experiences.md).

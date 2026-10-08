@@ -97,6 +97,11 @@
       } else if (data && data.preview && data.preview.select) { gotInitialResult = true; showStorePreview(data.preview); }
       else if (data && data.confirmed && data.profile && data.portal) { gotInitialResult = true; callTool('open_room').then(result => renderRoom(result.structuredContent)).catch(error => showAppError('Could not load your room', error)); }
       else if (data && data.site && Array.isArray(data.site.sections)) { gotInitialResult = true; showDocsCard(data); }
+      else if (data && data.comparison) { gotInitialResult = true; showComparisonResult(data.comparison); }
+      else if (data && data.watches) { gotInitialResult = true; showWatches(data.watches); }
+      else if (data && data.library && Array.isArray(data.library.hits)) { gotInitialResult = true; showRecall(data.library); }
+      else if (data && Array.isArray(data.collections)) { gotInitialResult = true; collectionList = data.collections; if (Array.isArray(data.sources)) collectionSources = data.sources; if (data.desk) showDesk(data.desk); else if (data.collection) openDesk(data.collection.id); else showCollections(); }
+      else if (data && 'session' in data) { gotInitialResult = true; showCatchup(data.session); }
       else if (data && data.space && data.space.handle) { gotInitialResult = true; showSpaceCard(data.space); }
       else if (data && data.share && data.share.id) { gotInitialResult = true; if (Array.isArray(data.labs)) state.labs = data.labs; showShareCard(data.share, data.rebloggers); }
       else if (data && data.clip && data.clip.data) { gotInitialResult = true; showClipCard(data.clip); }

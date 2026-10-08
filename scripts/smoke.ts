@@ -4,13 +4,15 @@
  *   npm run smoke                       # in-process, default profile
  *   MCPORTAL_URL=https://…/mcp npm run smoke   # against a deployed server
  */
+import { defaultProfile } from '../src/profile.ts';
+import { fetchGithub } from '../src/adapters/github.ts';
 import { TtlCache } from '../src/lib/cache.ts';
 import { safeFetch } from '../src/lib/safe-fetch.ts';
 import { handleMessage } from '../src/mcp.ts';
 import { MemoryProfileStore } from '../src/store.ts';
 
 const remote = process.env.MCPORTAL_URL;
-const ctx = { store: new MemoryProfileStore(), fetcher: safeFetch, cache: new TtlCache(), userId: 'smoke' };
+const ctx = { store: new MemoryProfileStore({smoke:{...defaultProfile(),onboarded:true}}), fetcher: safeFetch, cache: new TtlCache(), userId: 'smoke' };
 let id = 0;
 
 async function rpc(method: string, params: Record<string, unknown> = {}): Promise<any> {
@@ -40,6 +42,14 @@ if (first?.url) {
   const a = article.result.structuredContent?.article;
   console.log(`  reader: ${a ? `"${a.title}" ${a.blocks.length} blocks, ${a.wordCount} words` : article.result.content[0].text}`);
   if (!a) failed = true;
+}
+
+if (!remote) {
+  try {
+    const releases = await fetchGithub({mode:'releases',repo:'modelcontextprotocol/typescript-sdk',limit:3}, safeFetch);
+    console.log(`  releases: ${releases.length} items from modelcontextprotocol/typescript-sdk`);
+    if (!releases.length || !releases[0]?.release?.version) failed = true;
+  } catch { console.log('  releases: upstream unavailable'); failed = true; }
 }
 
 console.log(`${failed ? 'FAILED' : 'OK'} in ${Date.now() - started}ms`);

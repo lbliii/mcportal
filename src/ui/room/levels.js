@@ -111,8 +111,11 @@
         el('span', { class: 'dot', style: `background:${portalColor(portal)}` }),
         el('h1', { class: 'level-title', tabindex: '-1' }, portal.title),
         el('span', { class: 'portal-count' }, portalCount(portal)),
+        portalViewSelector(portal),
         el('span', { class: 'tools' }, refreshButton(portal))));
     const items = portalItems(portal, () => {
+      const custom = portalViewItems(portal, portal.items);
+      if (custom) return custom;
       const list = el('ul', { class: 'items' });
       const more = el('button', { class: 'link-btn fp-more', type: 'button' });
       let count = 0;

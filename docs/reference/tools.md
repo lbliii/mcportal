@@ -167,3 +167,16 @@ On a hosted server each call spends units from the per-user budget ([`MCPORTAL_L
 Cache lifetimes: Hacker News 2 minutes, GitHub 5 minutes, feeds 10 minutes, reader pages 1 hour, docs indexes 1 day. Saved, clips, pinned and Following portals are never cached.
 
 Space inks: `atomic`, `space-age`, `pulp`, `olive-drab`, `pink-moon`, `mars`, `mission`, `harbor`. Motifs: `arches`, `orbits`, `portal`, `gravity`, `doorway`. Formats: `paperback`, `magazine`, `patch`. `reroll: true` changes the stored seed only. `frequency` is up to four topics of 24 characters; `travelers` up to six listed handles. An empty `pinnedShareId` unpins. `hiddenStamps` accepts `charter`, `brought`, `signal`, `volume`. The agent must get approval for exact bio and topic wording. `public: false` withdraws the web page and feed immediately, but cannot recall copies or feed-reader caches. `listed` controls discovery separately.
+
+## Reading experiences
+
+| Tool | Behavior | Main arguments |
+|---|---|---|
+| `search_library` | Search saved links, retained clips and reading history | `query`, kind/site/tag/status filters, pagination |
+| `open_collection` | Open or list private desks, comparisons and trails | `id` |
+| `update_collection` | Keep and arrange evidence, notes, progress and a cited orientation | `action`, `id`, entries and evidence `refs` |
+| `show_comparison` | Show two or three sources beside explicit agent interpretation | sources, question, interpretation and citations |
+| `watch_reading` | Manage page/release/calendar/artist reading watches and findings | `action`, `kind`, address or confirmed artist, `id` |
+| `catch_up` (app-only) | Capture, resume, finish/skip and explicitly end a finite session | `action`, count, portal IDs, session ID and index |
+
+`arrange_room.view` chooses a source-supported portal presentation. `save_item.event` retains validated public event metadata. [Behavior, evidence and limits](../explanation/reading-experiences.md).

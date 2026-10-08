@@ -4,6 +4,8 @@
   /** @typedef {(href: string) => unknown} LinkHandler  opens an http(s) link from reader text */
   /** @param {Item} item @param {PortalResult} portal */
   function openItem(item, portal) {
+    if (item.watch && portal.source === 'changes') { openWatches('changes'); return; }
+    if (item.event) { if (item.url) openLink(item.url); return; }
     if (item.offer) return openLink(item.url ?? '');
     if (item.new) queueSeen(portal.portalId, item.id);
     if (item.person) return openSpaceFrom(item.person.handle);

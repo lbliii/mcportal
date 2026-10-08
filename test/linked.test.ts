@@ -10,7 +10,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { Accounts, makeBootstrap } from '../src/accounts.ts';
 import { AuthStore } from '../src/auth/store.ts';
-import { FileClipStore, MemoryClipStore } from '../src/clips.ts';
+import { buildClip, FileClipStore, MemoryClipStore } from '../src/clips.ts';
 import { FileEditionStore, MemoryEditionStore } from '../src/editions.ts';
 import { FileHandoffStore, MemoryHandoffStore } from '../src/handoffs.ts';
 import { TtlCache } from '../src/lib/cache.ts';
@@ -38,10 +38,11 @@ async function hosted() {
   const clips = new MemoryClipStore();
   const publicProfiles = new PublicProfiles(memoryPersistence());
   const social = new Social({ store: new DocumentSocialStore(), profiles: publicProfiles, preferences: store });
+  const reading = new FileReadingStore(await mkdtemp(path.join(tmpdir(), 'mcportal-linked-')));
   const app = await startApp({ github: { clientId: 'gh-client', clientSecret: 'gh-secret' } }, createFixtureFetcher(), {
     store, clips, publicProfiles, social, authPersistence,
     accounts: new Accounts(memoryPersistence(), makeBootstrap([], [])),
-    reading: new FileReadingStore(await mkdtemp(path.join(tmpdir(), 'mcportal-linked-'))),
+    reading,
     seen: new FileSeenStore(null),
     handoffs: new MemoryHandoffStore(),
     editions: new MemoryEditionStore(),
@@ -52,7 +53,7 @@ async function hosted() {
     const tokens = await auth.issueTokens({ userId: `github-${githubId}`, githubId, login }, 'mcpc_test_device', RESOURCE, 'mcportal');
     return { accountId: `github-${githubId}`, tokens };
   };
-  return { app, store, clips, auth, signIn };
+  return { app, store, clips, reading, auth, signIn };
 }
 
 /** A linked device: its own client, cache and stores, as one local MCPortal process would have. */
@@ -86,6 +87,28 @@ async function linkedLocal(link: Partial<LinkRecord> & { server: string }, fetch
 
 const fixed = (token: string): LinkAuth => ({ token: async () => token, refresh: async () => undefined });
 
+test('linked: Recall searches beyond linked list caps and refuses another account', async () => {
+  const h = await hosted();
+  try {
+    const { accountId, tokens } = await h.signIn(42, 'lawrence');
+    const clip = buildClip({ kind: 'quote', text: 'An older heartbeat passage' });
+    await h.clips.add(accountId, clip);
+    await h.reading.record(accountId, { url: 'https://example.com/older', title: 'Heartbeat page', status: 'opened' });
+    for (let i = 0; i < 110; i++) {
+      await h.clips.add(accountId, buildClip({ kind: 'note', markdown: `Unrelated ${i}` }));
+      await h.reading.record(accountId, { url: `https://example.com/${i}`, status: 'opened' });
+    }
+    const mac = device(h.app, accountId, fixed(tokens.access_token));
+    const result = await mac.call('search_library', { query: 'heartbeat' });
+    assert.ok(!result.isError, result.content[0]?.text);
+    assert.equal(result.structuredContent.library.total, 2);
+    assert.ok(result.structuredContent.library.hits.some((hit: any) => hit.clipId === clip.id));
+    await assert.rejects(mac.ctx.library!.search('github-7', {}), { code: 'forbidden' });
+    const other = await h.signIn(7, 'friend');
+    assert.equal((await device(h.app, other.accountId, fixed(other.tokens.access_token)).call('search_library', { query: 'heartbeat' })).structuredContent.library.total, 0);
+  } finally { await h.app.close(); }
+});
+
 test('linked: the room, saved items and clips live on the hosted account; tools behave as they do locally', async () => {
   const h = await hosted();
   try {
@@ -112,6 +135,12 @@ test('linked: the room, saved items and clips live on the hosted account; tools 
     assert.ok(handoff.structuredContent.handoff.code);
     assert.equal((await mac.call('record_reading', { url: 'https://example.com/kept', status: 'opened' })).isError, undefined);
     assert.equal((await mac.call('list_reading')).structuredContent.reading.length, 1);
+    const desk = await mac.call('update_collection', { action: 'create', title: 'Linked desk', entries: [{ ref: `clip:${id}`, title: 'Laptop quote' }] });
+    assert.equal(desk.isError, undefined, desk.content[0]?.text);
+    const deskId = desk.structuredContent.collection.id;
+    const reopened = await mac.call('open_collection', { id: deskId });
+    assert.equal(reopened.structuredContent.desk.collection.title, 'Linked desk');
+    assert.equal(reopened.structuredContent.desk.collection.entries[0].ref, `clip:${id}`);
   } finally {
     await h.app.close();
   }
@@ -316,6 +345,36 @@ test('hosted end to end: three accounts over /mcp share, follow, reblog, see it 
   } finally {
     await h.app.close();
   }
+});
+
+test('linked: catch-up, watch subscriptions and findings are hosted, survive another device and isolate accounts', async () => {
+  const h = await hosted();
+  try {
+    const a = await h.signIn(31,'reader'), b = await h.signIn(32,'other');
+    let clock = Date.now();
+    const mac = device(h.app,a.accountId,fixed(a.tokens.access_token)), office = device(h.app,a.accountId,fixed(a.tokens.access_token), { now: () => clock }), other = device(h.app,b.accountId,fixed(b.tokens.access_token));
+    // Use the same LinkAuth contract as the surrounding tests.
+    await mac.call('build_room',{packs:[]});
+    const start=await mac.call('catch_up',{action:'start',count:3,portalIds:['hn-top']});
+    assert.ok(!start.isError,start.content[0]!.text);
+    const session=start.structuredContent.session;
+    assert.equal((await office.call('catch_up',{action:'open'})).structuredContent.session.id,session.id);
+    assert.equal((await other.call('catch_up',{action:'open'})).structuredContent.session,null);
+    if (!session.finishedAt) {const end=await office.call('catch_up',{action:'end',sessionId:session.id,index:0});assert.ok(end.structuredContent.session.acknowledgedAt);}
+    const added=await mac.call('watch_reading',{action:'add',kind:'releases',repo:'acme/manual',title:'Manual releases'});
+    assert.ok(!added.isError,added.content[0]!.text);
+    const id=added.structuredContent.watches.watches[0].id;
+    assert.equal((await office.call('watch_reading',{action:'list'})).structuredContent.watches.watches[0].id,id);
+    assert.deepEqual((await other.call('watch_reading',{action:'list'})).structuredContent.watches.watches,[]);
+    assert.equal((await other.call('watch_reading',{action:'delete',id})).isError,true);
+    const checked=await office.call('watch_reading',{action:'check',id});
+    assert.equal(checked.structuredContent.watches.inbox[0].kind,'availability','a provider failure is retained rather than a fake deletion');
+    await mac.call('watch_reading',{action:'pause',id,paused:true});
+    assert.equal((await office.call('watch_reading',{action:'list'})).structuredContent.watches.watches[0].paused,true);
+    const changes = await mac.call('add_portal',{source:'changes',config:{}}); assert.ok(!changes.isError, changes.content[0]!.text); await mac.call('add_portal',{source:'upcoming',config:{}}); clock += 60000;
+    const room=await office.call('open_room');assert.ok(room.structuredContent.portals.some((p:any)=>p.source==='changes'&&p.items.length===1));
+    await mac.call('watch_reading',{action:'delete',id});assert.deepEqual((await office.call('watch_reading',{action:'list'})).structuredContent.watches.inbox,[]);
+  } finally {await h.app.close();}
 });
 
 test('linked, hosted side down: initialize and tools/list answer at once; calls say they can\'t reach it', async () => {

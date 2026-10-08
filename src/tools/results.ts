@@ -11,11 +11,16 @@ import type { FetchedSource, SourceCandidate } from '../discover.ts';
 import type { Profile, ProfileDiff, SourceSettings } from '../profile.ts';
 import type { FeaturedSource, PublicProfile } from '../public-profiles.ts';
 import type { SocialService, Intros, PersonMatch, Reblogger, SharedItem } from '../social.ts';
+import type { SpaceSections } from '../space.ts';
 import type { Handoff } from '../handoffs.ts';
 import type { Candidate, HighlightPick, Lead, RoomEdition } from '../highlights.ts';
 import type { ReadingState } from '../reading.ts';
 import type { Article, Item, PortalResult, Provenance } from '../types.ts';
 import type { Identity } from './kit.ts';
+import type { LibraryResult } from '../library.ts';
+import type { Collection } from '../collections.ts';
+import type { CollectionData } from '../collection-service.ts';
+import type { CatchupSession } from '../experiences.ts';
 import type { WatchPreview } from '../store-watches.ts';
 import type { StoreScope } from '../adapters/shopify.ts';
 
@@ -66,12 +71,18 @@ export type DocsPageResult = {
 
 /** Someone's space: their public profile, their posts and the sources they recommend. */
 export type SpaceResult = {
-  space: Omit<PublicProfile, 'accountId' | 'travelers'> & Awaited<ReturnType<SocialService['spaceDetails']>> & { mine: boolean; followers: number; following: boolean; posts: SharedItem[]; sources: FeaturedSource[]; link?: string };
+  space: Omit<PublicProfile, 'accountId' | 'travelers'> & Awaited<ReturnType<SocialService['spaceDetails']>> & { mine: boolean; followers: number; following: boolean; posts: SharedItem[]; sources: FeaturedSource[]; link?: string; sectionPreview?: SpaceSections } & Partial<Pick<SpaceSections, 'people'>>;
 };
 
 export type ToolResults = {
   watch: { preview?: WatchPreview; confirmed?: { id: string; displayName: string; origin: string; scope: StoreScope; paused: boolean }; profile?: Profile; portal?: PortalResult };
   unwatch: { removed: boolean };
+  search_library: { library: LibraryResult };
+  open_collection: { collections: Collection[]; sources: Array<Pick<PortalResult, 'portalId' | 'title' | 'source'>>; desk?: CollectionData };
+  update_collection: { collections: Collection[]; collection?: Collection };
+  show_comparison: { comparison: import('../comparison.ts').ComparisonResult };
+  watch_reading: { watches: import('../reading-watches.ts').WatchResult };
+  catch_up: { session: CatchupSession | null };
   open_room: RoomResult;
   build_room: { profile: Profile };
   arrange_room: { profile: Profile; changes: ProfileDiff };

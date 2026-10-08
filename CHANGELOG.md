@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- Space can automatically show eligible public room sources and people followed on MCPortal, with independent opt-in visibility and owner previews. Optional pins, ordering and hides preserve existing recommendations and never change subscriptions; private curation stays out of visitor responses.
+
+### Reading experiences
+- Reading tabs use custom icons from the generated house set: icons with text on wide screens, icon-only navigation below 640px, accessible names/tooltips and 44px touch targets. Selection uses a short underline without a filled pill; keyboard focus remains visible. Comparison selection counts preserve their icon.
+- Recall Shelf searches saved links, clip text and reading history together, including older linked records. New kept quotes carry conservative passage locators.
+- Private Topic Desks keep source links and clips together, selected live portals, notes and cited agent orientations. Reading trails add ordered steps with explicit finish, skip and undo. Membership removal leaves source material intact.
+- Comparison View opens two or three sources with independent panes and compact tabs, keeps selected passages, validates citations in explicit agent interpretations, and saves comparisons as collections.
+- Per-portal lists, cards, quotes, gallery and structured GitHub changelogs preserve source settings and placement. Finite catch-up resumes its captured set across restart and acknowledges only that set when finished.
+- Changes and Upcoming include private watches, durable worker leases, retry/overdue status, dated text diffs, calendars and verified Ticketmaster artist lookup with a server key. Coverage limits are visible; failures are availability events and missing provider results never imply cancellation.
+- Files/Postgres, linked API, additive export/import, sign-out copying, account deletion and scheduled retention support the new stores. Imports pause watches for review; private collections never enter public Spaces.
+
+### For hosts and agents
+- Additive tools: `search_library`, `open_collection`, `update_collection`, `show_comparison`, `watch_reading`, and app-only `catch_up`. Collection citations use stable `clip:ID` or `url:URL` refs. `arrange_room.view` changes portal presentation; older linked writers preserve omitted views and saved event metadata.
+- `changes` and `upcoming` are account-owned room source kinds. Full exports include collections and reading experiences, with an 80 MB upload limit and bounded individual documents. Versions remain owned by the release script.
 - Follow supported Shopify stores through a preview and confirmed collection or sales-only scope. Shop shows product cards, prices, new arrivals, price drops, sales and saved-product restocks; refresh checks on demand, with partial and stale observations labeled. Follows support pause, resume and removal. Private snapshots work in files, PostgreSQL and linked accounts, export/import version 3 and account deletion.
 
 - Sharing and quick reblogging show a Public / Followers only switch beside submission, with an explanation of public Space visibility. An explicit audience selection is remembered privately across sessions and devices; existing posts and reblog restrictions are preserved.

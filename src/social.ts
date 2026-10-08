@@ -28,11 +28,16 @@ import { randomBytes } from 'node:crypto';
 import { ClipError, cleanText, type Clip } from './clips.ts';
 import { AppError, type AppErrorOptions, type ErrorCode } from './lib/errors.ts';
 import { clean } from './lib/text.ts';
+import { normalizeFeatured, type PublicProfile, type PublicProfiles } from './public-profiles.ts';
+import { TtlCache } from './lib/cache.ts';
+import { safeFetch } from './lib/safe-fetch.ts';
+import { curate, publicSources, sourceKey, spaceKey, type SpaceSections } from './space.ts';
+import type { Fetcher } from './types.ts';
 import type { ProfileStore } from './store.ts';
 import { normalizeLinkPreview } from './profile.ts';
 import type { LinkPreview } from './types.ts';
 import type { Cover, SpaceStamp } from './space-design.ts';
-import type { PublicProfileInput, PublicProfile, PublicProfiles } from './public-profiles.ts';
+import type { PublicProfileInput } from './public-profiles.ts';
 import { limitOf, type SocialStore } from './social-store.ts';
 
 export { DocumentSocialStore, type SocialStore } from './social-store.ts';
@@ -162,8 +167,11 @@ export interface SharedItem extends Omit<Share, 'accountId'> {
 export interface Reblogger { cover?: Cover; handle: string; reblogId: string; createdAt: string; note?: string; detached?: true }
 
 export interface SocialDeps {
+  fetcher?: Fetcher;
+  cache?: TtlCache;
   store: SocialStore;
   profiles: PublicProfiles;
+  /** Private, account-owned audience preference, shared by hosted and linked clients. */
   preferences?: ProfileStore;
   /** Accounts that can't be seen (suspended). */
   hidden?: (accountId: string) => boolean;
@@ -179,12 +187,14 @@ export interface SocialDeps {
  */
 export type SocialService = Pick<Social,
   'resolve' | 'share' | 'unshare' | 'get' | 'feed' | 'sharesOf' | 'follow' | 'unfollow' | 'mute' | 'block' | 'uses' | 'connections' | 'stats' | 'report'
-  | 'setSpace' | 'spaceDetails' | 'reblog' | 'shareSettings' | 'reblogsOf' | 'takeIntros' | 'findPeople' | 'lobby'>;
+  | 'spaceSections' | 'setSpace' | 'spaceDetails' | 'reblog' | 'shareSettings' | 'reblogsOf' | 'takeIntros' | 'findPeople' | 'lobby'>;
 
 export class Social {
   private store: SocialStore;
   private profiles: PublicProfiles;
   private preferences: ProfileStore | undefined;
+  private fetcher: Fetcher;
+  private cache: TtlCache;
   private hidden: (accountId: string) => boolean;
   private now: () => number;
   private accountCreatedAt: (accountId: string) => number | undefined;
@@ -193,6 +203,8 @@ export class Social {
     this.store = deps.store;
     this.profiles = deps.profiles;
     this.preferences = deps.preferences;
+    this.fetcher = deps.fetcher ?? safeFetch;
+    this.cache = deps.cache ?? new TtlCache();
     this.hidden = deps.hidden ?? (() => false);
     this.now = deps.now ?? Date.now;
     this.accountCreatedAt = deps.accountCreatedAt ?? (() => undefined);
@@ -679,6 +691,34 @@ export class Social {
       muted: await handles(await this.store.outgoing('mutes', viewer)),
       blocked: await handles(await this.store.outgoing('blocks', viewer)),
       followers: (await this.store.incoming('follows', viewer)).length,
+    };
+  }
+
+  /** Room and follows stay private unless the owner opts in. Preview is owner-only. */
+  async spaceSections(viewer: string, accountId: string, preview = false): Promise<SpaceSections> {
+    const profile = await this.profiles.get(accountId);
+    if (!profile || (viewer !== accountId && this.hidden(accountId))) return { sources: [], people: [] };
+    await this.resolve(viewer, profile.handle);
+    if (preview && viewer !== accountId) throw new SocialError('Only your own Space can be previewed', 'forbidden');
+    const legacy = profile.sources ?? [];
+    const room = (preview || profile.showSources === true) && this.preferences
+      ? (await this.preferences.get(accountId)).columns.flatMap((c) => c.panels).map((p) => ({ ...p, title: p.title ?? p.id })) : [];
+    // Explicit recommendations were already published by their owner. Probe only
+    // newly projected room subscriptions, preserving existing recommendations offline.
+    const sources = preview || profile.showSources !== false
+      ? normalizeFeatured([...legacy, ...await publicSources(room, this.fetcher, this.cache)], 500) : [];
+    const people = [];
+    if (preview || profile.showPeople === true) {
+      for (const id of await this.store.outgoing('follows', accountId)) {
+        const person = await this.profiles.get(id);
+        if (!person || this.hidden(id) || await this.blockedEitherWay(accountId, id) || await this.blockedEitherWay(viewer, id)) continue;
+        people.push({ key: spaceKey('person', id), handle: person.handle,
+          ...(person.displayName ? { displayName: person.displayName } : {}), pinned: false });
+      }
+    }
+    return {
+      sources: curate(sources.map((s) => ({ ...s, key: sourceKey(s), pinned: false })), profile.sourceCuration, legacy.map(sourceKey), preview),
+      people: curate(people, profile.peopleCuration, [], preview),
     };
   }
 

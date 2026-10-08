@@ -4,6 +4,7 @@
  * clips) reaches the model fenced as untrusted: another user's note is exactly
  * where someone would try to plant instructions.
  */
+import { publicSpaceProfile } from '../public-profiles.ts';
 import { clean } from '../lib/text.ts';
 import { httpUrl } from '../profile.ts';
 import { clipText, type ClipData } from '../clips.ts';
@@ -184,10 +185,12 @@ export const SOCIAL_TOOLS: ToolDef[] = [
         const mine = profile.accountId === ctx.userId;
         const posts = await ctx.social.sharesOf(ctx.userId, profile.accountId, { limit: GRID_POSTS });
         const stats = await ctx.social.stats(ctx.userId, profile.accountId);
+        const sections = await ctx.social.spaceSections(ctx.userId, profile.accountId);
+        const sectionPreview = mine ? await ctx.social.spaceSections(ctx.userId, profile.accountId, true) : undefined;
         const details = await ctx.social.spaceDetails(ctx.userId, profile.accountId);
-        const { accountId: _id, travelers: _travelers, broughtAboard: _brought, ...pub } = profile;
+        const { accountId: _id, travelers: _travelers, broughtAboard: _brought, ...pub } = mine ? profile : publicSpaceProfile(profile);
         const link = spaceLink(ctx, profile.handle);
-        const space = { ...pub, ...details, ...(details.pinned ? { pinned: forGrid([details.pinned])[0]! } : {}), mine, followers: stats.followers, following: stats.following, posts: forGrid(posts), sources: profile.sources ?? [], ...(link ? { link } : {}) };
+        const space = { ...pub, ...details, ...(details.pinned ? { pinned: forGrid([details.pinned])[0]! } : {}), mine, followers: stats.followers, following: stats.following, posts: forGrid(posts), ...sections, ...(sectionPreview ? { sectionPreview } : {}), ...(link ? { link } : {}) };
         const title = profile.spaceTitle ?? `@${profile.handle}`;
         // What they feature that's in the user's room too: the user's own data, said only to them.
         const room = new Set(mine ? [] : (await ctx.store.get(ctx.userId)).columns.flatMap((c) => c.panels).map((p) => sourceSignal(p.source, p.config, p.title ?? p.id)?.key).filter((k) => k !== undefined));

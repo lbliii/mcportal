@@ -152,6 +152,14 @@ function icons(): Record<string, Icon> {
   };
   const bubble = 'M7 5h10a3 3 0 0 1 3 3v6.5a3 3 0 0 1-3 3h-6l-3.5 2.5v-2.5H7a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3z';
   return {
+    // Reading destinations: keep the doorway geometry, with familiar cues at small sizes.
+    room: { d: `${arch(12, 20, 12, 16)}M3.5 20h17`, dot: [15, 13, 1] },
+    recall: { d: 'M17 10a6.5 6.5 0 1 1-13 0a6.5 6.5 0 1 1 13 0M15.2 15.2L20.5 20.5M4 21h8' },
+    desk: { d: `M9 3h8a3 3 0 0 1 3 3v11${box(4, 7, 12, 14)}M8 12h4M8 16h4` },
+    compare: { d: `${arch(6.75, 20, 7.5, 16)}${arch(17.25, 20, 7.5, 16)}M5.25 12h3M5.25 16h3M15.75 12h3M15.75 16h3` },
+    catchup: { d: 'M9 19.4A8 8 0 1 1 20 12M12 7v5l3 2M12.5 19l2.5 2.5 5.5-6' },
+    changes: { d: `${box(4, 3, 16, 18)}M7.5 8h5M10 5.5v5M7.5 16h5M16 8h.5M16 16h.5` },
+    upcoming: { d: `${box(4, 5, 16, 15)}M8 3v4M16 3v4M4 10h16`, dot: [16, 15, 1.6] },
     columns: { d: arch(7.25, 19.5, 6.5, 15) + arch(16.75, 19.5, 6.5, 15) },
     shelves: { d: shelf(4.5) + shelf(13.5) },
     // The front page: the lead story's block over lines of type.

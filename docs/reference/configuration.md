@@ -134,3 +134,7 @@ MCPortal reads these when Railway sets them. You don't set them yourself.
 | `RAILWAY_PUBLIC_DOMAIN` | Default public URL, and an allowed host |
 | `RAILWAY_ENVIRONMENT` | Turns on `MCPORTAL_TRUST_PROXY` |
 | `RAILWAY_SERVICE_NAME` | Names the actor in admin-CLI audit entries when `USER` is unset |
+
+## Optional artist events
+
+`TICKETMASTER_API_KEY` enables verified artist lookup and dated city/country event checks on the server. The key never enters exports, tool results or logs. Public iCalendar reading watches need no key. [Coverage and limits](../explanation/reading-experiences.md#changes-and-upcoming).

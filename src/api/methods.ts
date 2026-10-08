@@ -17,7 +17,6 @@
 import { WATCH_SCOPE_SCHEMA } from '../tools/watches.ts';
 import { storeScope } from '../adapters/shopify.ts';
 import { SPACE_INPUT } from '../space-input.ts';
-import type { PublicProfileInput } from '../public-profiles.ts';
 import { clipInput } from '../portability.ts';
 import { buildClip, CLIP_LIMITS, newClipId, type ClipKind } from '../clips.ts';
 import { buildEdition } from '../editions.ts';
@@ -27,6 +26,7 @@ import { clean } from '../lib/text.ts';
 import { httpUrl, validateProfile, type Profile } from '../profile.ts';
 import { validateReadingUpdate, type ReadingUpdate } from '../reading.ts';
 import { tracksSeen } from '../seen.ts';
+import { SPACE_SETTINGS_SCHEMA, type PublicProfileInput } from '../public-profiles.ts';
 import { AUDIENCES, REBLOG_RULES } from '../social.ts';
 import type { Wanted } from '../people.ts';
 import { SERVER_INFO } from '../mcp.ts';
@@ -34,6 +34,12 @@ import { findTool } from '../tools/index.ts';
 import { need, type ToolContext } from '../tools/kit.ts';
 import { CLIP_KINDS } from '../types.ts';
 import { MIN_CLIENT_VERSION, type ApiMethod } from './calls.ts';
+import { LIBRARY_SCHEMA, searchLibrary, type LibraryQuery } from '../library.ts';
+import { COLLECTION_CHANGE_SCHEMA, type CollectionChange } from '../collections.ts';
+import { changeCollection } from '../collection-service.ts';
+import { CATCHUP_SCHEMA, catchup, type CatchupInput } from '../catchup.ts';
+import { watchAction, WATCH_SCHEMA, type WatchInput } from '../reading-watches.ts';
+import { validateExperiences, type ExperienceState } from '../experiences.ts';
 
 const NO_PARAMS = { type: 'object', additionalProperties: false, properties: {} };
 const id = { type: 'string', maxLength: 100 };
@@ -67,10 +73,16 @@ const portalsOf = (profile: Profile) => profile.columns.flatMap((c) => c.panels)
  * where a public profile would carry their id (the caller's own id stays, so tools
  * can tell "me" from "them").
  */
-function publicRef<P extends { accountId: string; handle: string }>(profile: P, ctx: ToolContext): P {
+async function publicRef<P extends { accountId: string; handle: string }>(profile: P, ctx: ToolContext, includeSources = true): Promise<P> {
   if (profile.accountId === ctx.userId) return profile;
   const copy = { ...profile, accountId: `@${profile.handle}` };
   if ('broughtAboard' in copy) delete copy.broughtAboard;
+  for (const key of ['showSources', 'showPeople', 'sourceCuration', 'peopleCuration']) delete (copy as Record<string, unknown>)[key];
+  if (!includeSources) (copy as Record<string, unknown>).sources = [];
+  else if ('sources' in profile) {
+    const sections = includeSources ? await ctx.social?.spaceSections(ctx.userId, profile.accountId) : undefined;
+    (copy as Record<string, unknown>).sources = sections?.sources ?? [];
+  }
   return copy;
 }
 
@@ -82,6 +94,14 @@ async function accountOf(ref: string, ctx: ToolContext): Promise<string> {
 }
 
 export const API_METHODS: Record<string, ApiMethod> = {
+  'catchup.action': params<CatchupInput>(CATCHUP_SCHEMA, (p, ctx) => catchup(p, ctx), 'write', 2),
+  'reading_watches.action': params<WatchInput>(WATCH_SCHEMA, (p, ctx) => watchAction(p, ctx), 'write'),
+  'experiences.get': params(NO_PARAMS, (_p, ctx) => need(ctx.experiences, 'Reading sessions are not available.').get(ctx.userId)),
+  'experiences.put': params<{ state: ExperienceState; ifMatch: number }>({ type: 'object', required: ['state', 'ifMatch'], additionalProperties: false, properties: { state: { type: 'object' }, ifMatch: { type: 'integer', minimum: 0 } } }, (p, ctx) => need(ctx.experiences, 'Reading sessions are not available.').replaceIf(ctx.userId, validateExperiences(p.state), p.ifMatch), 'write'),
+  'collections.list': params(NO_PARAMS, (_p, ctx) => need(ctx.collections, 'Collections are not available.').list(ctx.userId)),
+  'collections.get': params<{ id: string }>({ type: 'object', required: ['id'], additionalProperties: false, properties: { id } }, async (p, ctx) => (await need(ctx.collections, 'Collections are not available.').get(ctx.userId, p.id)) ?? null),
+  'collections.change': params<CollectionChange>(COLLECTION_CHANGE_SCHEMA, async (p, ctx) => (await changeCollection(p, ctx)) ?? null, 'write'),
+  'library.search': params<LibraryQuery>(LIBRARY_SCHEMA, (query, ctx) => searchLibrary(ctx.userId, query, ctx)),
   /** Who the token belongs to, and the versions, for link_status and update nudges. */
   me: params(NO_PARAMS, async (_p, ctx) => ({
     accountId: ctx.userId,
@@ -104,8 +124,15 @@ export const API_METHODS: Record<string, ApiMethod> = {
     { type: 'object', required: ['profile'], additionalProperties: false, properties: { profile: { type: 'object' }, ifMatch: { type: 'integer', minimum: 0 } } },
     async ({ profile, ifMatch }, ctx) => {
       const valid = validateProfile(profile);
-      if (ifMatch !== undefined) return { rev: await ctx.store.replaceIf(ctx.userId, valid, ifMatch) };
-      await ctx.store.put(ctx.userId, valid);
+      // An older linked client may omit a presentation field it cannot represent.
+      // Preserve it for matching portal IDs; explicit 'default' resets it.
+      const preserveViews = (before: Profile): Profile => {
+        const known = new Map(before.columns.flatMap(c => c.panels).map(p => [p.id, p.view]));
+        const keptEvents = new Map(before.saved.filter(s => s.event).map(s => [s.url, s.event!]));
+        return { ...valid, saved: valid.saved.map(s => !s.event && keptEvents.has(s.url) ? { ...s, event: keptEvents.get(s.url)! } : s), columns: valid.columns.map(c => ({ ...c, panels: c.panels.map(p => p.view === undefined && known.get(p.id) !== undefined ? { ...p, view: known.get(p.id)! } : p) })) };
+      };
+      if (ifMatch !== undefined) return { rev: await ctx.store.replaceIf(ctx.userId, preserveViews(await ctx.store.get(ctx.userId)), ifMatch) };
+      await ctx.store.update(ctx.userId, before => ({ profile: preserveViews(before), result: undefined }));
       return { rev: (await ctx.store.versioned(ctx.userId)).rev };
     }, 'write'),
 
@@ -205,12 +232,12 @@ export const API_METHODS: Record<string, ApiMethod> = {
   'profiles.byHandle': params<{ handle: string }>({ type: 'object', required: ['handle'], additionalProperties: false, properties: { handle } },
     async (p, ctx) => {
       const found = await profilesOf(ctx).byHandle(p.handle);
-      return found ? { ...found, profile: publicRef(found.profile, ctx) } : null;
+      return found ? { ...found, profile: await publicRef(found.profile, ctx) } : null;
     }),
   /** Featured sources must be portals in the room, as set_public_profile picks them. */
   'profiles.set': params<PublicProfileInput>(
     { type: 'object', additionalProperties: false, properties: {
-      handle, displayName: { type: 'string', maxLength: 50 }, bio: { type: 'string', maxLength: 160 }, spaceTitle: { type: 'string', maxLength: 60 }, ...SPACE_INPUT, listed: { type: 'boolean' }, reblogs: { type: 'string', enum: REBLOG_RULES },
+      ...SPACE_SETTINGS_SCHEMA, handle, displayName: { type: 'string', maxLength: 50 }, bio: { type: 'string', maxLength: 160 }, spaceTitle: { type: 'string', maxLength: 60 }, ...SPACE_INPUT, listed: { type: 'boolean' }, reblogs: { type: 'string', enum: REBLOG_RULES },
       sources: { type: 'array', maxItems: 12, items: { type: 'object', required: ['source', 'config'], additionalProperties: false, properties: { title: { type: 'string', maxLength: 80 }, source: { type: 'string', maxLength: 20 }, config: {} } } },
     } },
     async (input, ctx) => {
@@ -259,6 +286,9 @@ export const API_METHODS: Record<string, ApiMethod> = {
     async (p, ctx) => (await socialOf(ctx).get(ctx.userId, p.id)) ?? null),
   'social.feed': params<{ query?: { limit?: number; before?: string } }>({ type: 'object', additionalProperties: false, properties: { query: pageQuery } },
     (p, ctx) => socialOf(ctx).feed(ctx.userId, p.query)),
+  'social.spaceSections': params<{ accountId: string; preview?: boolean }>(
+    { type: 'object', required: ['accountId'], additionalProperties: false, properties: { accountId: id, preview: { type: 'boolean' } } },
+    async (p, ctx) => socialOf(ctx).spaceSections(ctx.userId, await accountOf(p.accountId, ctx), p.preview)),
   'social.sharesOf': params<{ accountId: string; query?: { limit?: number; before?: string } }>(
     { type: 'object', required: ['accountId'], additionalProperties: false, properties: { accountId: id, query: pageQuery } },
     async (p, ctx) => socialOf(ctx).sharesOf(ctx.userId, await accountOf(p.accountId, ctx), p.query)),
@@ -269,7 +299,7 @@ export const API_METHODS: Record<string, ApiMethod> = {
   'social.mute': params<{ handle: string; on: boolean }>({ type: 'object', required: ['handle', 'on'], additionalProperties: false, properties: { handle, on: { type: 'boolean' } } },
     async (p, ctx) => publicRef(await socialOf(ctx).mute(ctx.userId, p.handle, p.on), ctx), 'write'),
   'social.block': params<{ handle: string; on: boolean }>({ type: 'object', required: ['handle', 'on'], additionalProperties: false, properties: { handle, on: { type: 'boolean' } } },
-    async (p, ctx) => publicRef(await socialOf(ctx).block(ctx.userId, p.handle, p.on), ctx), 'write'),
+    async (p, ctx) => publicRef(await socialOf(ctx).block(ctx.userId, p.handle, p.on), ctx, false), 'write'),
   'social.uses': params(NO_PARAMS, (_p, ctx) => socialOf(ctx).uses(ctx.userId)),
   'social.connections': params(NO_PARAMS, (_p, ctx) => socialOf(ctx).connections(ctx.userId)),
   /** find_people's matching: what to look for comes from the caller's own room and words. */

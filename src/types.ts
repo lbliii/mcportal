@@ -9,7 +9,7 @@ import type { ErrorCode } from './lib/errors.ts';
  * whom to follow, kept in the profile, and 'lobby' posts shared with everyone by listed
  * people (docs/plans/finding-people.md).
  */
-export type SourceKind = 'hn' | 'rss' | 'github' | 'docs' | 'saved' | 'pinned' | 'clips' | 'following' | 'people' | 'lobby' | 'watches';
+export type SourceKind = 'hn' | 'rss' | 'github' | 'docs' | 'saved' | 'pinned' | 'clips' | 'following' | 'people' | 'lobby' | 'watches' | 'changes' | 'upcoming';
 
 export const CLIP_KINDS = ['quote', 'exchange', 'note', 'table', 'image', 'link'] as const;
 export type ClipKind = (typeof CLIP_KINDS)[number];
@@ -59,6 +59,10 @@ export interface Item {
   person?: { handle: string; following: boolean; cover?: import('./space-design.ts').Cover };
   /** Not yet seen by this user (src/seen.ts). */
   new?: true;
+  /** Structured GitHub release metadata, distinct from a search result or generic RSS. */
+  watch?: { id: string; findingId?: string };
+  event?: import('./watches-state.ts').WatchedEvent;
+  release?: { repo: string; version: string };
   offer?: { amount: string; currency: string; availability: 'in_stock' | 'sold_out' | 'unknown'; store: string; variant: string; variantsPartial: boolean; observedAt?: string; previousPrice?: string };
   finding?: { kind: 'new' | 'price_drop' | 'sale' | 'back'; noticedAt: string };
 }

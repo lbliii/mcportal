@@ -243,9 +243,11 @@
     readerGeneration++;
     if (stopReading) stopReading();
     articleUrl = null; clipId = null; docsArgs = null; spaceHandle = null; docsState = null;
+    pendingKeptLocator = null;
     root.classList.remove('article-view');
     $('reader').classList.remove('space', 'docs', 'toc-open');
     $('reader').hidden = true;
+    if (restoreExperience()) return;
     $('grid').hidden = false;
     if (!state.profile) { await loadRoom(); return; }
     $('roomName').textContent = state.profile.name;

@@ -2,6 +2,9 @@
 import { processLogger } from '../lib/log.ts';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { DocumentExperienceStore } from '../experiences.ts';
+import { DocumentCollectionStore } from '../collections.ts';
+import { memoryPersistence } from '../lib/document.ts';
 import { FileWatchStore } from '../watches.ts';
 import { validateProfile } from '../profile.ts';
 import type { Queryable } from './schema.ts';
@@ -11,6 +14,17 @@ import type { Queryable } from './schema.ts';
  * database. Never overwrites rows; files are left in place. Returns what it did.
  */
 export async function importFiles(db: Queryable, dataDir: string): Promise<{ skipped: boolean; profiles: number; auth: boolean }> {
+  // Additive new stores migrate even on databases whose older profile import already ran.
+  for (const [file, key, validate] of [
+    ['collections/data.json','collections',async (raw: string) => { const store = new DocumentCollectionStore(memoryPersistence(raw)); await store.list('__validate__'); }],
+    ['experiences/data.json','reading-experiences',async (raw: string) => { const store = new DocumentExperienceStore(memoryPersistence(raw)); await store.owners(); }],
+  ] as const) {
+    let raw: string;
+    try { raw = await readFile(path.join(dataDir,file),'utf8'); }
+    catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue; throw error; }
+    await validate(raw);
+    await db.query('INSERT INTO mcportal_kv (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING',[key,raw]);
+  }
   const done = await db.query(`SELECT 1 FROM mcportal_meta WHERE key = 'imported_files'`);
   if (done.rows.length) return { skipped: true, profiles: 0, auth: false };
   let names: string[] = [];
