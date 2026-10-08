@@ -162,6 +162,10 @@ export class LocalSession {
       link: this.link,
       ...(this.options.fetch ? { fetch: this.options.fetch } : {}),
       ...(this.options.now ? { now: this.options.now } : {}),
+      onCompatibility: (result) => {
+        if (result.status === 'update_available') this.notice = `MCPortal ${result.recommendedVersion} is available. Update through your host; this version can still sign in.`;
+        if (result.status === 'unavailable') this.notice = 'Could not check MCPortal compatibility. Sign-in will still try the server; check your connection if it fails.';
+      },
       onLinked: (_record, client) => this.mergeLocal(client),
       onSyncFailure: (message) => { this.notice = message; },
       ...(this.options.base.log ? { log: this.options.base.log } : {}),

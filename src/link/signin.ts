@@ -1,3 +1,5 @@
+import { checkCompatibility, type Compatibility } from './compatibility.ts';
+import { SERVER_INFO } from '../mcp.ts';
 /**
  * Signing a local MCPortal in to a hosted one: OAuth 2.1 authorization code with PKCE
  * and a loopback redirect (RFC 8252), against the hosted server's own OAuth endpoints.
@@ -45,6 +47,7 @@ export interface SignInOptions {
   onSyncFailure?: (message: string) => void;
   fetch?: typeof fetch;
   clientName?: string;
+  onCompatibility?: (result: Compatibility) => void;
   now?: () => number;
   log?: Logger;
   /** The browser has ten minutes by default. Shorter deadlines are useful to callers and tests. */
@@ -84,6 +87,11 @@ export async function startSignIn(options: SignInOptions): Promise<PendingSignIn
   const server = hostedOrigin(options.server);
   // Good news opens the door; anything else is a failure that says what to do next.
   const resultPage = (title: string, body: string, ok = false) => page(title, body, ok ? { siteUrl: server, door: 'open', kicker: 'It\'s alive!' } : { siteUrl: server, door: 'shut', kicker: 'Signal lost' });
+  const compatibility = await checkCompatibility(server, SERVER_INFO.version, fetcher);
+  options.onCompatibility?.(compatibility);
+  if (compatibility.status === 'update_required') {
+    throw new AppError('failed_precondition', `MCPortal ${SERVER_INFO.version} needs an update to ${compatibility.minClientVersion} or later before sign-in. Update MCPortal through your host, restart the connection, then sign in again.`, { details: { stage: 'discovery', reference, status: 426, minClientVersion: compatibility.minClientVersion } });
+  }
   const verifier = b64url(randomBytes(32));
   const challenge = b64url(createHash('sha256').update(verifier).digest());
   const state = b64url(randomBytes(24));
