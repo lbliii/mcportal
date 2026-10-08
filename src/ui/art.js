@@ -17,16 +17,7 @@
 /** @typedef {() => number} ArtRandom A seeded generator of numbers in [0, 1). */
 const portalArt = (() => {
   // paper, ink a, ink b, darkest ink, accent
-  const INKS = [
-    ['#F2E6CF', '#2A8C82', '#E0A526', '#1F2A36', '#C4452C'],   // atomic
-    ['#EFE3C8', '#E2692A', '#3FA7A0', '#1E2F4F', '#F2C230'],   // space age
-    ['#F4E4C1', '#2B5C8A', '#D2402F', '#1B2330', '#F2C230'],   // pulp
-    ['#EDE2C6', '#7A8B3A', '#C8622B', '#3E2C22', '#E9B949'],   // olive drab
-    ['#F3E1D3', '#5B3558', '#E27A73', '#2A1C2B', '#8CC6A8'],   // pink moon
-    ['#F0DDC2', '#B5482E', '#E3B070', '#3A2A3F', '#5FA8A0'],   // mars
-    ['#ECE6D6', '#1F4E8C', '#9AA3A6', '#17202E', '#D8432E'],   // mission
-    ['#E9E4D4', '#2F7F9A', '#EFB23C', '#243447', '#D9603B'],   // harbor
-  ];
+  const INKS = spaceInks.sets.map((set) => set.colors);
   const W = 160, H = 84;
 
   /** FNV-1a: a stable 32-bit hash of a key. @param {string} s */

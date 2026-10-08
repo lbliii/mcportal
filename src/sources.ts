@@ -1,3 +1,4 @@
+import { eventIsPast } from './watches-state.ts';
 import { docsInputUrl, docsUrl, loadDocs, parseGithubDocs, resolveDocs, type DocsConfig, type DocSite } from './adapters/docs.ts';
 import { fetchGithub, githubEndpoint, type GithubConfig } from './adapters/github.ts';
 import { fetchHn, hnEndpoint, type HnConfig } from './adapters/hn.ts';
@@ -14,12 +15,15 @@ import type { Article, Fetcher, Item, PortalResult, SourceKind } from './types.t
 
 /** Declared freshness per source, in seconds (Orrery-style freshness policy). */
 export const FRESHNESS: Record<SourceKind | 'reader', number> = {
+  watches: 86_400,
   saved: 0,
   pinned: 0,
   clips: 0,
   following: 0,
   changes: 0,
   upcoming: 0,
+  people: 0,
+  lobby: 0,
   hn: 120,
   github: 300,
   rss: 600,
@@ -41,7 +45,7 @@ function loadFailure(error: unknown, deps: SourceDeps, fields: LogFields): { err
   return { error: clean(userMessage(error, 'Unexpected error loading this source'), 200), errorCode: code };
 }
 
-const DEFAULT_TITLES: Record<SourceKind, string> = { hn: 'Hacker News', rss: 'Feed', github: 'GitHub', docs: 'Docs', saved: 'Saved', pinned: 'Pinned', clips: 'Clips', following: 'Following', changes: 'Changes', upcoming: 'Upcoming' };
+const DEFAULT_TITLES: Record<SourceKind, string> = { watches: 'Shop', hn: 'Hacker News', rss: 'Feed', github: 'GitHub', docs: 'Docs', saved: 'Saved', pinned: 'Pinned', clips: 'Clips', following: 'Following', people: 'People', lobby: 'Lobby', changes: 'Changes', upcoming: 'Upcoming' };
 
 /** Saved items come from the profile, not the network. */
 export function savedPortal(portal: PortalInput, saved: SavedItem[]): PortalResult {
@@ -49,7 +53,7 @@ export function savedPortal(portal: PortalInput, saved: SavedItem[]): PortalResu
   const items: Item[] = saved.slice(0, limit).map((s) => {
     let host = '';
     try { host = new URL(s.url).hostname.replace(/^www\./, ''); } catch { /* validated on save */ }
-    return { id: s.url, title: s.title, url: s.url, ...(s.note !== undefined ? { summary: s.note } : {}), meta: host ? [host] : [], publishedAt: s.savedAt, ...(s.event ? { event: s.event, summary: `${new Date(s.event.startsAt).toLocaleDateString('en', { timeZone: s.event.timezone })} · ${s.event.timezone}${Date.parse(s.event.startsAt) < Date.now() ? ' · Past event' : ''} · ${s.event.status}` } : {}) };
+    return { id: s.url, title: s.title, url: s.url, ...(s.note || s.description ? { summary: s.note || s.description } : {}), ...(s.image ? { image: s.image } : {}), meta: [...(host ? [host] : []), ...(s.event ? [new Date(s.event.startsAt).toLocaleDateString('en', { timeZone: s.event.timezone }), s.event.timezone, ...(eventIsPast(s.event) ? ['Past event'] : []), s.event.status] : [])], publishedAt: s.savedAt, ...(s.event ? { event: s.event } : {}) };
   });
   return {
     portalId: portal.id,
@@ -106,6 +110,15 @@ export function clipsPortal(portal: PortalInput, clips: ClipSummary[]): PortalRe
 
 /** Shares from people the user follows; the caller runs Social.feed and passes the result. */
 export function followingPortal(portal: PortalInput, shares: SharedItem[]): PortalResult {
+  return sharesPortal(portal, shares, 'following', 'shares from people you follow');
+}
+
+/** The Lobby: posts shared with everyone by listed people; the caller runs Social.lobby. Someone the user doesn't follow says so. */
+export function lobbyPortal(portal: PortalInput, shares: SharedItem[]): PortalResult {
+  return sharesPortal(portal, shares, 'lobby', 'posts shared with everyone by listed people');
+}
+
+function sharesPortal(portal: PortalInput, shares: SharedItem[], source: 'following' | 'lobby', endpoint: string): PortalResult {
   const items: Item[] = shares.map((s) => {
     const original = s.original && 'author' in s.original ? s.original : undefined;
     const reblog: NonNullable<Item['share']>['reblog'] = s.reblogOf ? {
@@ -114,22 +127,24 @@ export function followingPortal(portal: PortalInput, shares: SharedItem[]): Port
       ...(s.via ? { via: s.via } : {}),
     } : undefined;
     const kind = s.kind === 'clip' ? (original?.clip?.kind ?? s.clip?.kind ?? 'clip') : 'link';
+    const preview = s.reblogOf ? original : s;
     return {
       id: s.id,
       title: s.title,
       ...(s.url ? { url: s.url } : {}),
       ...(s.note ? { summary: clean(s.note, 280) } : {}),
-      meta: [`@${s.author.handle}`, ...(reblog ? [reblog.by ? `reblogged @${reblog.by}` : 'reblogged a removed post'] : []), kind],
+      ...(preview?.image ? { image: preview.image } : {}),
+      meta: [`@${s.author.handle}`, ...(reblog ? [reblog.by ? `reblogged @${reblog.by}` : 'reblogged a removed post'] : []), kind, ...(s.canFollow?.includes(s.author.handle) ? ['not followed'] : [])],
       publishedAt: s.createdAt,
-      share: { id: s.id, kind: s.kind, ...(reblog ? { reblog } : {}), ...(s.reblogCount ? { reblogs: s.reblogCount } : {}), ...(s.myReblog ? { mine: s.myReblog } : {}), canReblog: s.canReblog },
+      share: { ...(s.author.cover ? { cover: s.author.cover } : {}), ...(preview?.description ? { description: preview.description } : {}), id: s.id, kind: s.kind, ...(reblog ? { reblog } : {}), ...(s.reblogCount ? { reblogs: s.reblogCount } : {}), ...(s.myReblog ? { mine: s.myReblog } : {}), canReblog: s.canReblog },
     };
   });
   return {
     portalId: portal.id,
-    source: 'following',
-    title: portal.title ?? DEFAULT_TITLES.following,
+    source,
+    title: portal.title ?? DEFAULT_TITLES[source],
     items,
-    provenance: { source: 'following', endpoint: 'shares from people you follow', fetchedAt: new Date().toISOString(), cached: false, ttlSeconds: 0 },
+    provenance: { source, endpoint, fetchedAt: new Date().toISOString(), cached: false, ttlSeconds: 0 },
   };
 }
 
@@ -154,6 +169,29 @@ export function docsQuery(query: string): string | null {
   const docsy = /^(?:docs?|developers?|dev|learn|guides?|reference|api|manual|book|wiki)\./i.test(url.hostname)
     || /\/(?:docs?|documentation|reference|guides?|manual|api|book|learn)(?:\/|$)/i.test(url.pathname);
   return stripped !== q || docsy ? stripped : null;
+}
+
+/** A person the agent suggested, as the People portal shows them: resolved by the caller (who's still there, and whether the user follows them). */
+export interface SuggestedPerson { cover?: import('./space-design.ts').Cover | undefined; handle: string; why: string; at: string; displayName?: string | undefined; spaceTitle?: string | undefined; followers: number; following: boolean }
+
+/** The People portal: the agent's suggestions, kept in the profile. */
+export function peoplePortal(portal: PortalInput, people: SuggestedPerson[]): PortalResult {
+  const { limit } = normalizeSourceConfig('people', portal.config, portal.id);
+  const items: Item[] = people.slice(0, limit).map((p) => ({
+    id: `person:${p.handle}`,
+    title: p.displayName ? `${p.displayName} (@${p.handle})` : `@${p.handle}`,
+    summary: p.why,
+    meta: [...(p.spaceTitle ? [p.spaceTitle] : []), `${p.followers} follower${p.followers === 1 ? '' : 's'}`, ...(p.following ? ['following'] : [])],
+    publishedAt: p.at,
+    person: { handle: p.handle, following: p.following, ...(p.cover ? { cover: p.cover } : {}) },
+  }));
+  return {
+    portalId: portal.id,
+    source: 'people',
+    title: portal.title ?? DEFAULT_TITLES.people,
+    items,
+    provenance: { source: 'people', endpoint: "your agent's suggestions", fetchedAt: people[0]?.at ?? new Date().toISOString(), cached: false, ttlSeconds: 0 },
+  };
 }
 
 /** A docs portal candidate for find_source, already loaded (and cached for the test-load that follows). */
@@ -196,7 +234,7 @@ export function docsItems(site: DocSite, config: DocsConfig): Item[] {
 }
 
 export async function loadPortal(portal: PortalInput, deps: SourceDeps, force = false): Promise<PortalResult> {
-  if (portal.source === 'saved' || portal.source === 'pinned' || portal.source === 'clips' || portal.source === 'following' || portal.source === 'changes' || portal.source === 'upcoming') throw new AppError('invalid_argument', `${portal.source} portals are built from the profile, not fetched`);
+  if (portal.source === 'changes' || portal.source === 'upcoming' || portal.source === 'watches' || portal.source === 'saved' || portal.source === 'pinned' || portal.source === 'clips' || portal.source === 'following' || portal.source === 'people' || portal.source === 'lobby') throw new AppError('invalid_argument', `${portal.source} portals are built from the profile, not fetched`);
   const config = normalizeSourceConfig(portal.source, portal.config, portal.id);
   let endpoint = '';
   let title = portal.title ?? DEFAULT_TITLES[portal.source];
@@ -251,7 +289,8 @@ export async function loadPortal(portal: PortalInput, deps: SourceDeps, force = 
 }
 
 export async function loadArticle(url: string, deps: SourceDeps): Promise<Article> {
-  const result = await deps.cache.get(`reader:${url}`, FRESHNESS.reader, () => fetchArticle(url, deps.fetcher));
+  // Keep legacy text-only extractions out of the structured reader cache.
+  const result = await deps.cache.get(`reader:v2:${url}`, FRESHNESS.reader, () => fetchArticle(url, deps.fetcher));
   const { finalUrl, ...article } = result.value;
   return {
     url: finalUrl,
@@ -261,6 +300,7 @@ export async function loadArticle(url: string, deps: SourceDeps): Promise<Articl
 }
 
 export const SOURCE_DOCS = {
+  watches: { description: 'Private store follows, created with watch. Refresh checks supported public Shopify catalogues; no background monitoring.', config: { kind: 'store', limit: '1-30' } },
   hn: { description: 'Hacker News stories.', config: { feed: 'top | new | best | ask | show (default top)', limit: '1-30' } },
   github: {
     description: 'GitHub repositories (search) or a repo\'s releases.',
@@ -291,8 +331,16 @@ export const SOURCE_DOCS = {
     description: 'What people the user follows on MCPortal shared (links and clips, with their notes), newest first, minus anyone muted or blocked. Hosted only. Their notes are third-party text.',
     config: { limit: '1-30 (default 30)' },
   },
-  changes: { description: 'Private retained changes and availability findings from your page and repository watches. Watch manages subscriptions.', config: { limit: '1-30 (default 30)' } },
+  changes: { description: 'Private retained changes and availability findings from your page and repository watches. watch_reading manages subscriptions.', config: { limit: '1-30 (default 30)' } },
   upcoming: { description: 'Dated events from your confirmed artist and public-calendar watches, soonest first. Past saved events stay saved.', config: { limit: '1-30 (default 30)' } },
+  lobby: {
+    description: 'Posts shared with everyone on MCPortal by people who chose to be findable, newest first, at most 3 per person a day, minus anyone muted or blocked. Hosted only. Their notes are third-party text.',
+    config: { limit: '1-30 (default 30)' },
+  },
+  people: {
+    description: "People your agent suggested following, each with its reason (suggest_people), newest first. Suggestions last 30 days. Hosted only.",
+    config: { limit: '1-30 (default 30)' },
+  },
   pinned: {
     description: 'Items you fetched with another tool the user has connected (Jira, Slack, Confluence, a database, …). Created and refreshed only with pin_portal; MCPortal never fetches them.',
     config: { from: 'where they came from, e.g. "Jira"', recipe: 'how to fetch them again: tool name and arguments, in plain words', limit: '1-30 (default 30)' },

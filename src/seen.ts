@@ -1,6 +1,6 @@
 /**
  * What the user has seen in each portal, so "new" means new to them
- * (docs/plans/attention.md, phase 3). Kept apart from reading history: that holds 1,000
+ * (docs/explanation/reading.md, phase 3). Kept apart from reading history: that holds 1,000
  * records an account, and feed items would push real reading out within days.
  *
  * A portal's seen set is its items' ids, hashed (12 hex characters), at most
@@ -22,7 +22,7 @@ export const SEEN_PER_PORTAL = 500;
 export const SEEN_BATCH = { portals: 40, items: 100 };
 
 /** Your own portals (what you saved or clipped) have nothing new to tell you. */
-const UNTRACKED: ReadonlySet<SourceKind> = new Set(['saved', 'clips']);
+const UNTRACKED: ReadonlySet<SourceKind> = new Set(['saved', 'clips', 'people']);
 export const tracksSeen = (source: SourceKind) => !UNTRACKED.has(source);
 
 /** An item id as stored: short, and nothing the site wrote. */

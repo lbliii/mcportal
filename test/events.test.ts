@@ -1,3 +1,4 @@
+import { savedPortal } from '../src/sources.ts';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { artistEvents,findArtists,resolveArtist,parseCalendar } from '../src/adapters/events.ts';
@@ -65,4 +66,13 @@ test('calendar events without detail URLs remain distinct when bookmarked',()=>{
   const text=['BEGIN:VCALENDAR',...['one','two'].flatMap(id=>['BEGIN:VEVENT',`UID:${id}`,'DTSTART:20270704T193000Z',`SUMMARY:Show ${id}`,'END:VEVENT']),'END:VCALENDAR'].join('\r\n');
   const {events}=parseCalendar(text,'https://example.com/calendar.ics','UTC',Date.parse('2027-07-01'));
   assert.equal(events.length,2);assert.notEqual(events[0]!.url,events[1]!.url);assert.match(events[0]!.url,/#mcportal-event=one$/);
+});
+
+test('Saved events retain typed dates, updated status and personal notes when projected into the room', () => {
+  const savedEvent = { ...event, status: 'cancelled' as const };
+  const portal = savedPortal({ id: 'saved', source: 'saved', config: {} }, [{ url: savedEvent.url, title: savedEvent.title, savedAt: savedEvent.updatedAt, note: 'Go with a friend', event: savedEvent }]);
+  assert.deepEqual(portal.items[0]!.event, savedEvent);
+  assert.equal(portal.items[0]!.summary, 'Go with a friend');
+  assert.ok(portal.items[0]!.meta.includes('cancelled'));
+  assert.ok(portal.items[0]!.meta.includes(savedEvent.timezone));
 });

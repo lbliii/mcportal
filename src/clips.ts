@@ -1,6 +1,6 @@
 /**
  * Clips: typed snippets the user asked to keep from a conversation or an article
- * (docs/plans/clips.md). Kept out of the profile, since tables and images would
+ * (docs/explanation/reading.md). Kept out of the profile, since tables and images would
  * bloat the one document every layout edit rewrites.
  *
  * Everything in a clip is untrusted plain text or checked image bytes. Text keeps

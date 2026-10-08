@@ -1,5 +1,5 @@
 /**
- * Highlights (docs/plans/attention.md, phase 4): the agent picks what's worth the user's
+ * Highlights (docs/explanation/reading.md, phase 4): the agent picks what's worth the user's
  * time from what's new in their room. MCPortal never ranks or summarizes; it gives the
  * agent compact candidates and taste signals (list_new_items), and shows the agent's picks
  * with the sources' own titles and links (show_highlights). Refs name an item by portal and
@@ -92,7 +92,7 @@ export function candidates(portals: PortalResult[], seen: Map<string, Set<string
 export function candidateLine(c: Candidate, now = Date.now()): string {
   const age = c.item.publishedAt ? ageText(now - Date.parse(c.item.publishedAt)) : '';
   const excerpt = c.item.summary ? clean(c.item.summary, CANDIDATES.excerpt) : '';
-  return `[${c.ref}] ${c.portalTitle} · ${c.item.title}${age ? ` · ${age}` : ''}${c.item.meta.length ? ` · ${c.item.meta.slice(0, 2).join(', ')}` : ''}${excerpt ? `\n  ${excerpt}` : ''}`;
+  return `[${c.ref}] ${c.portalTitle} · ${c.item.title}${c.item.finding ? ' ['+c.item.finding.kind+']' : ''}${age ? ` · ${age}` : ''}${c.item.meta.length ? ` · ${c.item.meta.slice(0, 2).join(', ')}` : ''}${excerpt ? `\n  ${excerpt}` : ''}`;
 }
 
 function ageText(ms: number): string {

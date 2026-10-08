@@ -66,10 +66,10 @@ test('Space browser: preview before enabling, independent visibility, pin/order/
     await page.waitFor(`document.querySelector('.sources').textContent.includes('Alpha')`, 'source restored');
     await page.click('[aria-label="Move Beta up"]');
     await page.waitFor(`window.__space.sourceCuration.order[0] === 'source:Beta'`, 'source reordered');
-    assert.deepEqual(await page.eval(`Array.from(document.querySelectorAll('.sources .st > div:first-child')).map((n) => n.textContent)`), ['GammaPinned', 'Beta', 'Alpha']);
+    assert.deepEqual(await page.eval(`Array.from(document.querySelectorAll('.sources .st > b:first-child')).map((n) => n.textContent)`), ['GammaPinned', 'Beta', 'Alpha']);
     await page.click(peopleToggle);
     await page.click('.space-section-settings:has([aria-label="Show people I follow on my Space"]) .space-section-preview .btn');
-    await page.waitFor(`window.__space.showPeople === true && document.querySelector('.sources .link-btn')`, 'Fellow travelers');
+    await page.waitFor(`window.__space.showPeople === true && document.querySelector('.space-travelers .handle')`, 'Fellow travelers');
     await page.click(sourceToggle);
     await page.waitFor(`window.__space.showSources === false && !document.querySelector('.sources .st')`, 'sources disabled');
     assert.equal(await page.eval(`window.__space.showPeople`), true, 'hiding sources does not hide people');

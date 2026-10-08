@@ -8,22 +8,26 @@ import { publicSpaceProfile } from '../public-profiles.ts';
 import { clean } from '../lib/text.ts';
 import { httpUrl } from '../profile.ts';
 import { clipText, type ClipData } from '../clips.ts';
-import { AUDIENCES, REBLOG_RULES, type Reblogger, type SharedItem } from '../social.ts';
+import { AUDIENCES, REBLOG_RULES, type PersonMatch, type Reblogger, type SharedItem } from '../social.ts';
+import { hostOf, namedSignal, sourceSignal, termsOf, type Wanted } from '../people.ts';
 import { isAppError } from '../lib/errors.ts';
 import { ensurePortal } from '../layout.ts';
-import { HOSTED_ONLY, labOn, labsOf, socialActive, socialEntry, ok, toolError, untrusted, ROOM_URI, type CallToolResult, type ToolContext, type ToolDef } from './kit.ts';
+import { PEOPLE, type Profile } from '../profile.ts';
+import { peoplePortal, type SuggestedPerson } from '../sources.ts';
+import { HOSTED_ONLY, labsOf, socialActive, socialEntry, ok, toolError, untrusted, ROOM_URI, type CallToolResult, type ToolContext, type ToolDef } from './kit.ts';
 import type { ToolResults } from './results.ts';
 
 export function shareLine(s: SharedItem): string {
   const who = s.mine ? 'you' : `@${s.author.handle}`;
-  const to = s.audience === 'mcportal' ? 'everyone on MCPortal' : 'followers';
+  const to = s.audience === 'everyone' ? 'Public' : 'Followers only';
   const original = s.original && 'author' in s.original ? s.original : undefined;
+  const preview = s.reblogOf ? original : s;
   const what = s.reblogOf
     ? `reblogged ${original ? `@${original.author.handle}'s post` : s.original && 'removed' in s.original && s.original.removed === 'detached' ? 'a post its author removed from this reblog' : 'a post that was removed'}${s.via ? ` (via @${s.via})` : ''}`
     : `shared ${s.kind === 'clip' ? `a ${s.clip?.kind ?? 'clip'}` : 'a link'}`;
   const reblogs = [s.reblogCount ? `${s.reblogCount} reblog${s.reblogCount === 1 ? '' : 's'}` : '', s.reblogs && !s.reblogOf ? `reblogs: ${s.reblogs} only` : '', s.myReblog && !s.mine ? 'you reblogged it' : ''].filter(Boolean);
   return `- [${s.id}] ${who} ${what}: ${s.title}${s.url ? ` <${s.url}>` : ''} · to ${to} · ${s.createdAt.slice(0, 10)}${reblogs.map((r) => ` · ${r}`).join('')}${s.hiddenAt ? ' · hidden by an admin' : ''}`
-    + `${original?.note ? `\n  @${original.author.handle}'s note: ${clean(original.note, 300)}` : ''}${s.note ? `\n  note: ${clean(s.note, 300)}` : ''}`;
+    + `${preview?.description ? `\n  source description: ${clean(preview.description, 500)}` : ''}${original?.note ? `\n  @${original.author.handle}'s note: ${clean(original.note, 300)}` : ''}${s.note ? `\n  note: ${clean(s.note, 300)}` : ''}`;
 }
 
 /** "Reblogged by @a, @b and 3 more." */
@@ -40,6 +44,108 @@ function fail(error: unknown): CallToolResult {
 }
 
 const handleProp = { type: 'string', description: 'e.g. "@someone"' };
+
+/**
+ * What find_people looks for, from its arguments, else the user's room; and how the reasons
+ * name the sources ("of your sources", "of the sources you named", "of @ana's sources").
+ */
+async function wantedFrom(args: Record<string, unknown>, ctx: ToolContext): Promise<{ wanted: Wanted; basis: string; except?: string }> {
+  const wanted: Wanted = { sources: [], hosts: [], terms: typeof args.about === 'string' ? termsOf(args.about) : [] };
+  const named = Array.isArray(args.sources) ? args.sources.map(String).slice(0, 10) : [];
+  for (const raw of named) {
+    const { source, host } = namedSignal(raw);
+    if (source) wanted.sources.push(source);
+    if (host) wanted.hosts.push(host);
+  }
+  if (named.length) return { wanted, basis: 'of the sources you named' };
+  const like = typeof args.like === 'string' && args.like.trim() ? args.like : undefined;
+  if (like && ctx.social) {
+    const them = await ctx.social.resolve(ctx.userId, like);
+    for (const f of them.sources ?? []) { const s = sourceSignal(f.source, f.config, f.title); if (s) wanted.sources.push(s); }
+    for (const post of await ctx.social.sharesOf(ctx.userId, them.accountId, { limit: 20 })) { const h = post.url ? hostOf(post.url) : undefined; if (h && !wanted.hosts.includes(h)) wanted.hosts.push(h); }
+    return { wanted, basis: `of @${them.handle}'s sources`, except: them.handle };
+  }
+  if (!wanted.terms.length) {
+    for (const p of (await ctx.store.get(ctx.userId)).columns.flatMap((c) => c.panels)) {
+      const s = sourceSignal(p.source, p.config, p.title ?? p.id);
+      if (!s) continue;
+      wanted.sources.push(s);
+      if (s.site && !wanted.hosts.includes(s.site)) wanted.hosts.push(s.site);
+    }
+  }
+  return { wanted, basis: 'of your sources' };
+}
+
+/** A match's reasons as short clauses. Source titles are the other person's words: they stay inside the fence. */
+function reasonsOf(p: PersonMatch, basis: string): string[] {
+  const list = (xs: string[]) => (xs.length <= 3 ? xs.join(', ') : `${xs.slice(0, 3).join(', ')} and ${xs.length - 3} more`);
+  return [
+    p.sources.length ? `features ${p.sources.length === 1 ? 'one' : p.sources.length} ${basis}: ${list(p.sources)}` : '',
+    p.sites.length ? `features other feeds from ${list(p.sites)}` : '',
+    p.hosts.length ? `shared ${list(p.hosts.map((h) => `${h.count} post${h.count === 1 ? '' : 's'} from ${h.host}`))}` : '',
+    p.terms.space.length ? `their Space mentions ${list(p.terms.space)}` : '',
+    p.terms.posts.length ? `their posts mention ${list(p.terms.posts)}` : '',
+  ].filter(Boolean);
+}
+
+/**
+ * Listed people who feature some of these sources: a passing hint for add_portal and
+ * build_room ("@ana features 3 of these"). Handles only, never their titles; '' if none.
+ */
+export async function featuredBy(ctx: ToolContext, sources: Array<{ source: string; config: unknown; title?: string | undefined }>, what: string): Promise<string> {
+  if (!ctx.social) return '';
+  const signals = sources.map((s) => sourceSignal(s.source, s.config, s.title ?? s.source)).filter((s) => s !== undefined);
+  if (!signals.length) return '';
+  try {
+    const people = (await ctx.social.findPeople(ctx.userId, { sources: signals, hosts: [], terms: [] }, { limit: 3 })).filter((p) => p.sources.length);
+    if (!people.length) return '';
+    const named = people.map((p) => (signals.length > 1 ? `@${p.handle} (${p.sources.length})` : `@${p.handle}`)).join(', ');
+    return `On MCPortal, ${named} also feature${people.length === 1 ? 's' : ''} ${what}. If the user might like to follow people with their taste, offer to introduce them (find_people says why).`;
+  } catch {
+    return '';   // a hint, never a failure
+  }
+}
+
+/** Who find_people last returned to each user, for an hour: suggest_people keeps only those. */
+const FOUND_MS = 3600_000;
+const found = new Map<string, { handles: Set<string>; at: number }>();
+function rememberFound(userId: string, handles: string[]): void {
+  const now = Date.now();
+  for (const [k, v] of found) if (now - v.at > FOUND_MS) found.delete(k);
+  if (found.size >= 5000) found.delete(found.keys().next().value!);
+  const prior = found.get(userId);
+  // Several searches in one conversation all count: the agent may pick across them.
+  found.set(userId, { handles: new Set([...(prior && now - prior.at <= FOUND_MS ? prior.handles : []), ...handles]), at: now });
+}
+function foundFor(userId: string): Set<string> | undefined {
+  const entry = found.get(userId);
+  return entry && Date.now() - entry.at <= FOUND_MS ? entry.handles : undefined;
+}
+
+/**
+ * The People portal's suggestions as they stand: someone who unlisted, blocked the user, was
+ * suspended or deleted their profile drops out; following them is shown, not hidden.
+ */
+export async function suggestedPeople(profile: Profile, ctx: ToolContext): Promise<SuggestedPerson[]> {
+  if (!ctx.social) return [];
+  const social = ctx.social;
+  const out = await Promise.all((profile.people?.picks ?? []).map(async (pick): Promise<SuggestedPerson | undefined> => {
+    try {
+      const them = await social.resolve(ctx.userId, pick.handle);
+      if (!them.listed || them.handle !== pick.handle) return undefined;
+      const stats = await social.stats(ctx.userId, them.accountId);
+      return { ...pick, displayName: them.displayName, spaceTitle: them.spaceTitle, followers: stats.followers, following: stats.following, cover: them.cover };
+    } catch {
+      return undefined;
+    }
+  }));
+  return out.filter((p) => p !== undefined);
+}
+
+/** A Space's address: /@handle on the server that holds the account (docs/plans/finding-people.md). */
+export function spaceLink(ctx: ToolContext, handle: string): string | undefined {
+  try { return ctx.accountUrl ? new URL(`/@${handle}`, ctx.accountUrl).href : undefined; } catch { return undefined; }
+}
 
 const GRID_POSTS = 60;
 const GRID_IMAGES = 12;
@@ -79,15 +185,22 @@ export const SOCIAL_TOOLS: ToolDef[] = [
         const mine = profile.accountId === ctx.userId;
         const posts = await ctx.social.sharesOf(ctx.userId, profile.accountId, { limit: GRID_POSTS });
         const stats = await ctx.social.stats(ctx.userId, profile.accountId);
-        const { accountId: _id, ...pub } = mine ? profile : publicSpaceProfile(profile);
         const sections = await ctx.social.spaceSections(ctx.userId, profile.accountId);
         const sectionPreview = mine ? await ctx.social.spaceSections(ctx.userId, profile.accountId, true) : undefined;
-        const space = { ...pub, mine, followers: stats.followers, following: stats.following, posts: forGrid(posts), ...sections, ...(sectionPreview ? { sectionPreview } : {}) };
+        const details = await ctx.social.spaceDetails(ctx.userId, profile.accountId);
+        const { accountId: _id, travelers: _travelers, broughtAboard: _brought, ...pub } = mine ? profile : publicSpaceProfile(profile);
+        const link = spaceLink(ctx, profile.handle);
+        const space = { ...pub, ...details, ...(details.pinned ? { pinned: forGrid([details.pinned])[0]! } : {}), mine, followers: stats.followers, following: stats.following, posts: forGrid(posts), ...sections, ...(sectionPreview ? { sectionPreview } : {}), ...(link ? { link } : {}) };
         const title = profile.spaceTitle ?? `@${profile.handle}`;
+        // What they feature that's in the user's room too: the user's own data, said only to them.
+        const room = new Set(mine ? [] : (await ctx.store.get(ctx.userId)).columns.flatMap((c) => c.panels).map((p) => sourceSignal(p.source, p.config, p.title ?? p.id)?.key).filter((k) => k !== undefined));
+        const shared = space.sources.filter((s) => room.has(sourceSignal(s.source, s.config, s.title)?.key ?? '')).map((s) => s.title);
         const text = [
-          `Showing ${mine ? 'your space' : `@${profile.handle}'s space`} "${title}" in a card: ${posts.length} post(s)${mine ? '' : ' you can see'}, ${stats.followers} follower(s), ${space.sources.length} featured source(s).${!mine && !stats.following ? ' The user doesn\'t follow them yet.' : ''}`,
+          `Showing ${mine ? 'your space' : `@${profile.handle}'s space`} "${title}" in a card: ${posts.length} post(s)${mine ? '' : ' you can see'}, ${stats.followers} follower(s), ${space.sources.length} featured source(s).${!mine && !stats.following ? ' The user doesn\'t follow them yet.' : ''}`
+            + (link ? ` Link to share it (it also brings friends in): ${link}` : ''),
           untrusted(mine ? 'your space' : `@${profile.handle}'s space`, [
             profile.bio ? `bio: ${profile.bio}` : '',
+            shared.length ? `in the user's room too: ${shared.join(', ')}` : '',
             ...space.sources.map((s) => `source: ${s.title} (${s.source})`),
             ...posts.slice(0, 10).map(shareLine),
           ].filter(Boolean).join('\n')),
@@ -100,10 +213,10 @@ export const SOCIAL_TOOLS: ToolDef[] = [
   },
   {
     name: 'share',
-    title: 'Share with followers',
+    title: 'Share to your Space',
     access: 'write',
     available: socialActive,
-    description: "Share one of the user's saved links (savedUrl) or clips (clipId) with a note, to their followers or everyone on MCPortal. Only when they ask; if you write the note, share only after they approve its exact words.",
+    description: "Share a saved link (savedUrl), clip (clipId), or reblog a post (reblogOf). Only when asked; ask first if unread. An agent-written note needs approval of its exact words.",
     inputSchema: {
       type: 'object',
       additionalProperties: false,
@@ -111,14 +224,10 @@ export const SOCIAL_TOOLS: ToolDef[] = [
         savedUrl: { type: 'string', description: 'URL of a saved item' },
         clipId: { type: 'string' },
         note: { type: 'string', maxLength: 500 },
-        audience: { type: 'string', enum: AUDIENCES },
+        audience: { type: 'string', enum: AUDIENCES, description: 'everyone: Public; followers: Followers only. Default: saved choice or Public.' },
+        reblogOf: { type: 'string', description: 'post id' },
+        reblogs: { type: 'string', enum: REBLOG_RULES },
       },
-    },
-    // Reblogging (docs/plans/reblog.md) is a lab until it's had real use.
-    lab: {
-      name: 'reblog',
-      properties: { reblogOf: { type: 'string', description: 'post id' }, reblogs: { type: 'string', enum: REBLOG_RULES } },
-      description: "Share one of the user's saved links (savedUrl) or clips (clipId), or reblog a post (reblogOf), with a note, to their followers or everyone on MCPortal. Only when they ask; ask first if they haven't read it; if you write the note, share only after they approve its exact words.",
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     async handler(args, ctx) {
@@ -138,7 +247,7 @@ export const SOCIAL_TOOLS: ToolDef[] = [
           const url = httpUrl(args.savedUrl);
           const saved = url ? (await ctx.store.get(ctx.userId)).saved.find((s) => s.url === url) : undefined;
           if (!saved) return toolError('Share a saved item (savedUrl, save it first with save_item) or a clip (clipId).');
-          input = { kind: 'link', title: saved.title, url: saved.url, note: args.note, audience: args.audience, reblogs: args.reblogs };
+          input = { kind: 'link', title: saved.title, url: saved.url, description: saved.description, image: saved.image, note: args.note, audience: args.audience, reblogs: args.reblogs };
         }
         const shared = await ctx.social.share(ctx.userId, input);
         return ok(`Shared (id ${shared.id}).\n${untrusted('your share', shareLine(shared))}`, { share: shared } satisfies ToolResults['share']);
@@ -188,7 +297,7 @@ export const SOCIAL_TOOLS: ToolDef[] = [
     name: 'share_settings',
     title: 'Change who can reblog a post',
     access: 'write',
-    available: (reach) => socialActive(reach) && reach.labs.includes('reblog'),
+    available: socialActive,
     description: "Change who may reblog one of the user's posts, or remove it from someone's reblog of it (detach: the reblog's id; permanent). Only when they ask.",
     inputSchema: {
       type: 'object',
@@ -199,7 +308,6 @@ export const SOCIAL_TOOLS: ToolDef[] = [
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
     async handler(args, ctx) {
       if (!ctx.social) return toolError(HOSTED_ONLY.sharing, 'unavailable');
-      if (!labOn(ctx, 'reblog')) return toolError("Reblogging isn't on for this MCPortal yet.", 'unavailable');
       if (args.reblogs === undefined && args.detach === undefined) return toolError('Say who may reblog it (reblogs) or which reblog to remove it from (detach).');
       try {
         const share = await ctx.social.shareSettings(ctx.userId, String(args.id ?? ''), { reblogs: args.reblogs, detach: args.detach });
@@ -280,6 +388,113 @@ export const SOCIAL_TOOLS: ToolDef[] = [
       } catch (error) {
         return fail(error);
       }
+    },
+  },
+  {
+    name: 'find_people',
+    title: 'Find people to follow',
+    access: 'read',
+    cost: 2,
+    available: socialEntry,
+    description: "Find people on MCPortal who share the user's interests, by topics (about), sites (sources) or someone like them (like); with none, by their room. Pass topics, not the conversation. Introduce one or two with the reasons.",
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        about: { type: 'string', maxLength: 200 },
+        sources: { type: 'array', maxItems: 10, items: { type: 'string' }, description: 'sites, feeds or owner/repo' },
+        like: handleProp,
+      },
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+    async handler(args, ctx) {
+      if (!ctx.social) return toolError(HOSTED_ONLY.sharing, 'unavailable');
+      try {
+        const { wanted, basis, except } = await wantedFrom(args, ctx);
+        const people = await ctx.social.findPeople(ctx.userId, wanted, except ? { except } : {});
+        // Someone the user said "Not for me" to comes last, and says so.
+        const passed = new Set((await ctx.store.get(ctx.userId)).people?.passed.map((p) => p.handle) ?? []);
+        const found = people.map((p) => ({ ...p, reasons: reasonsOf(p, basis), ...(passed.has(p.handle) ? { passed: true as const } : {}) }))
+          .sort((a, b) => Number(Boolean(a.passed)) - Number(Boolean(b.passed)));
+        for (const p of found) if (p.passed) p.reasons.push('the user passed on them before (Not for me)');
+        rememberFound(ctx.userId, found.map((p) => p.handle));
+        if (!found.length) {
+          return ok(`Nobody listed on MCPortal matches yet. Only people who chose to be findable show up, and there aren't many so far. ${basis === 'of your sources' ? 'Try topics (about) or sites (sources).' : ''}`.trim(), { people: [] } satisfies ToolResults['find_people']);
+        }
+        const body = found.map((p) => [
+          `@${p.handle}${p.displayName ? ` (${p.displayName})` : ''}${p.spaceTitle ? `, "${p.spaceTitle}"` : ''} · ${p.followers} follower(s)`,
+          `  why: ${p.reasons.join('; ')}`,
+          p.bio ? `  bio: ${p.bio}` : '',
+          p.featured.length ? `  features: ${p.featured.join(', ')}` : '',
+          ...p.posts.map((post) => `  - ${post.title}${post.url ? ` <${post.url}>` : ''}${post.note ? ` — ${clean(post.note, 200)}` : ''}`),
+        ].filter(Boolean).join('\n')).join('\n');
+        return ok(`${found.length} listed ${found.length === 1 ? 'person matches' : 'people match'}, best first. Introduce one or two in your own words from what's below, then offer to follow (relationship) or open their Space (open_space); to keep picks in the room, suggest_people. Say only what they made public.\n${untrusted('people on MCPortal', body)}`,
+          { people: found } satisfies ToolResults['find_people']);
+      } catch (error) {
+        return fail(error);
+      }
+    },
+  },
+  {
+    name: 'suggest_people',
+    title: 'Suggest people to follow',
+    access: 'write',
+    available: socialEntry,
+    description: "Keep picks from find_people in the user's People portal, best first, each with a one-line reason: what they share, never guesses about who they are; by handle.",
+    inputSchema: {
+      type: 'object',
+      required: ['picks'],
+      additionalProperties: false,
+      properties: {
+        picks: { type: 'array', minItems: 1, maxItems: 8, items: { type: 'object', required: ['handle', 'why'], additionalProperties: false, properties: { handle: handleProp, why: { type: 'string', maxLength: PEOPLE.why } } } },
+      },
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    _meta: { ui: { resourceUri: ROOM_URI } },
+    async handler(args, ctx) {
+      if (!ctx.social) return toolError(HOSTED_ONLY.sharing, 'unavailable');
+      const recent = foundFor(ctx.userId);
+      if (!recent) return toolError('Call find_people first: suggest only people it just returned.', 'failed_precondition');
+      const picks = (Array.isArray(args.picks) ? args.picks : []).map((p: { handle?: unknown; why?: unknown }) => ({ handle: String(p.handle ?? '').trim().replace(/^@/, '').toLowerCase(), why: clean(p.why, PEOPLE.why) }));
+      const unknown = picks.filter((p) => !recent.has(p.handle)).map((p) => `@${clean(p.handle, 40)}`);
+      if (unknown.length) return toolError(`Not kept: ${unknown.join(', ')} ${unknown.length === 1 ? "wasn't" : "weren't"} in find_people's last results. Suggest only people it returned.`, 'invalid_argument');
+      if (picks.some((p) => !p.why)) return toolError('Each pick needs a reason (why).');
+      const at = new Date().toISOString();
+      const chosen = new Set(picks.map((p) => p.handle));
+      const { profile, added } = await ctx.store.update(ctx.userId, (before) => {
+        const old = before.people ?? { picks: [], passed: [] };
+        const people = {
+          picks: [...picks.map((p) => ({ ...p, at })), ...old.picks.filter((p) => !chosen.has(p.handle))].slice(0, PEOPLE.picks),
+          passed: old.passed.filter((p) => !chosen.has(p.handle)),
+        };
+        const placed = ensurePortal({ ...before, people }, 'people', 'People');
+        return { profile: placed.profile, result: placed };
+      });
+      const spec = profile.columns.flatMap((c) => c.panels).find((p) => p.source === 'people');
+      const portal = peoplePortal(spec ?? { id: 'people', source: 'people', config: {} }, await suggestedPeople(profile, ctx));
+      return ok(`Kept ${picks.length} suggestion(s) in the People portal${added ? ' (just added to the room)' : ''}, shown in a card. Each has Follow, their Space and Not for me.`,
+        { suggested: { portal }, profile, layoutChanged: added } satisfies ToolResults['suggest_people']);
+    },
+  },
+  {
+    name: 'pass_person',
+    title: 'Not for me',
+    access: 'write',
+    available: socialEntry,
+    description: "The room's Not for me on a suggested person: they leave the People portal, and find_people says the user passed on them for 90 days.",
+    inputSchema: { type: 'object', required: ['handle'], additionalProperties: false, properties: { handle: handleProp } },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    _meta: { ui: { resourceUri: ROOM_URI, visibility: ['app'] } },
+    async handler(args, ctx) {
+      const handle = String(args.handle ?? '').trim().replace(/^@/, '').toLowerCase();
+      if (!/^[a-z0-9_]{2,30}$/.test(handle)) return toolError('That isn\'t a handle.');
+      const profile = await ctx.store.update(ctx.userId, (before) => {
+        const old = before.people ?? { picks: [], passed: [] };
+        const people = { picks: old.picks.filter((p) => p.handle !== handle), passed: [{ handle, at: new Date().toISOString() }, ...old.passed.filter((p) => p.handle !== handle)] };
+        const next = { ...before, people };
+        return { profile: next, result: next };
+      });
+      return ok(`Passed on @${handle}.`, { profile } satisfies ToolResults['pass_person']);
     },
   },
   {

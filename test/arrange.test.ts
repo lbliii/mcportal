@@ -11,7 +11,7 @@ import { handleMessage } from '../src/mcp.ts';
 import { MemoryProfileStore } from '../src/store.ts';
 import { createFixtureFetcher } from '../src/lib/fixture-fetch.ts';
 import { TtlCache } from '../src/lib/cache.ts';
-import { defaultProfile, offeredLayouts, validateProfile, type Profile } from '../src/profile.ts';
+import { defaultProfile, diffProfiles, offeredLayouts, validateProfile, type Profile } from '../src/profile.ts';
 
 /** Three columns: HN | GitHub, a blog | a pinned list. */
 function room(): Profile {
@@ -33,6 +33,19 @@ const refused = (change: Arrangement, code: string, message: RegExp) =>
 test('arrange: "put GitHub on the left" moves only GitHub, to the top of column 1', () => {
   const p = arrange(room(), { move: [{ portal: 'GitHub', column: 1, position: 1 }] });
   assert.deepEqual(layout(p), [['gh', 'hn'], ['blog'], ['bugs']]);
+});
+
+test('diff: "moved" names what moved, not what shifted around it', () => {
+  // One column each; GitHub to the top of column 1 and the blog to the top of column 2. The first
+  // and second columns gain a portal above theirs, and column 4 becomes 3 as 3 closes up: not moves.
+  const five = validateProfile({ ...room(), columns: ['a', 'b', 'gh', 'c', 'blog'].map((id) => ({ width: 1, panels: [{ id, source: 'rss', title: id, config: { url: `https://example.com/${id}` } }] })), pins: {} });
+  const moved = arrange(five, { move: [{ portal: 'gh', column: 1, position: 1 }, { portal: 'blog', column: 2, position: 1 }] });
+  assert.deepEqual(layout(moved), [['gh', 'a'], ['blog', 'b'], ['c']]);
+  assert.deepEqual(diffProfiles(five, moved).moved, ['gh (column 3 → 1)', 'blog (column 5 → 2)']);
+  // Order unchanged, but GitHub leaves HN's column for the blog's: GitHub moved, the blog didn't.
+  const split = arrange(room(), { move: [{ portal: 'GitHub', column: 1, position: 2 }] });
+  assert.deepEqual(diffProfiles(room(), split).moved, ['gh (column 2 → 1)']);
+  assert.deepEqual(diffProfiles(room(), arrange(room(), { layout: 'river' })).moved, []);
 });
 
 test('arrange: "make GitHub wider" sets its column width, nothing else', () => {
@@ -94,17 +107,18 @@ test('arrange: a title that names two portals is refused with their ids', () => 
 test('layouts: river is always offered; front page still needs its lab, and existing rooms stay valid', async () => {
   assert.deepEqual(labsFrom(' FrontPage , nonsense'), ['frontpage']);
   assert.deepEqual(labsFrom(undefined), []);
-  assert.deepEqual(offeredLayouts([]), ['columns', 'shelves', 'river']);
-  assert.deepEqual(offeredLayouts(['frontpage']), ['columns', 'shelves', 'frontpage', 'river']);
-  assert.deepEqual(offeredLayouts(['river']), ['columns', 'shelves', 'river']);
-  assert.deepEqual(labsFrom('frontpage,river'), ['frontpage'], 'the old river flag is no longer needed');
+  assert.deepEqual(offeredLayouts([]), ['columns', 'shelves', 'river', 'catalogue', 'editorial', 'paperback']);
+  assert.deepEqual(offeredLayouts(['frontpage']), ['columns', 'shelves', 'frontpage', 'river', 'catalogue', 'editorial', 'paperback']);
+  assert.deepEqual(labsFrom('frontpage,river,reblog'), ['frontpage'], 'graduated labs are ignored');
   assert.equal(validateProfile({ ...defaultProfile(), layout: 'frontpage' }).layout, 'frontpage');
   assert.equal(validateProfile({ ...defaultProfile(), layout: 'river' }).layout, 'river');
   const before = { ...room(), saved: [{ url: 'https://example.com/saved', title: 'Saved', savedAt: '2026-01-01T00:00:00.000Z' }] };
   const ctx = { store: new MemoryProfileStore({ default: before }), fetcher: createFixtureFetcher(), cache: new TtlCache(), userId: 'default', labs: [] };
   const list = await handleMessage({ jsonrpc: '2.0', id: 1, method: 'tools/list' }, ctx) as { result: { tools: Array<{ name: string; inputSchema: { properties: { layout?: { enum: string[] } } } }> } };
   for (const name of ['arrange_room', 'build_room']) {
-    assert.ok(list.result.tools.find((t) => t.name === name)?.inputSchema.properties.layout?.enum.includes('river'), `${name} offers river without labs`);
+    for (const layout of ['river', 'catalogue', 'editorial', 'paperback']) {
+      assert.ok(list.result.tools.find((t) => t.name === name)?.inputSchema.properties.layout?.enum.includes(layout), `${name} offers ${layout} without labs`);
+    }
   }
   const refused = await handleMessage({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'arrange_room', arguments: { layout: 'frontpage' } } }, ctx) as { result: { structuredContent: { error?: { code: string } } } };
   assert.equal(refused.result.structuredContent.error?.code, 'invalid_argument');
@@ -117,4 +131,19 @@ test('layouts: river is always offered; front page still needs its lab, and exis
   assert.deepEqual(after.pins, before.pins);
   await handleMessage({ jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'build_room', arguments: { packs: ['gaming'], layout: 'river' } } }, ctx);
   assert.equal((await ctx.store.get('default')).layout, 'river', 'starter packs can build a river without labs');
+});
+
+test('layouts: all three design preferences persist without changing sources, pins or bookmarks', async () => {
+  const before = { ...room(), saved: [{ url: 'https://example.com/saved', title: 'Saved', savedAt: '2026-01-01T00:00:00.000Z' }] };
+  const ctx = { store: new MemoryProfileStore({ default: before }), fetcher: createFixtureFetcher(), cache: new TtlCache(), userId: 'default', labs: [] };
+  for (const layout of ['catalogue', 'editorial', 'paperback']) {
+    const result = await handleMessage({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'arrange_room', arguments: { layout } } }, ctx) as { result: { isError?: boolean } };
+    assert.ok(!result.result.isError);
+    const after = await ctx.store.get('default');
+    assert.equal(validateProfile(after).layout, layout);
+    assert.deepEqual(after.columns, before.columns);
+    assert.deepEqual(after.pins, before.pins);
+    assert.deepEqual(after.saved, before.saved);
+    assert.equal(after.openIn, before.openIn);
+  }
 });

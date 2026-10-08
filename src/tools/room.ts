@@ -10,19 +10,27 @@ import { ACTIVE_LABS } from '../labs.ts';
 import { MAX_PACKS, packSummaries, STARTER_PACKS } from '../packs.ts';
 import { SEEN_BATCH, tracksSeen, withNews } from '../seen.ts';
 import { describeDiff, describeLayout, diffProfiles, findPortal, normalizeSourceConfig, offeredLayouts, PORTAL_VIEWS, type Layout, type PortalInput, type Profile, type ProfileDiff } from '../profile.ts';
-import { clipsPortal, clipsQuery, followingPortal, loadPortal, pinnedPortal, savedPortal } from '../sources.ts';
+import { clipsPortal, clipsQuery, followingPortal, loadPortal, lobbyPortal, peoplePortal, pinnedPortal, savedPortal } from '../sources.ts';
 import { currentSavedEvents } from '../watches-state.ts';
 import { watchPortal } from '../watch-portals.ts';
+import type { Intros } from '../social.ts';
 import type { PortalResult } from '../types.ts';
-import { identityOf, labsOf, ok, toolError, toolFailure, untrusted, ROOM_URI, type CallToolResult, type ToolContext, type ToolDef } from './kit.ts';
+import { identityOf, labsOf, need, ok, toolError, toolFailure, untrusted, ROOM_URI, type CallToolResult, type ToolContext, type ToolDef } from './kit.ts';
+import { featuredBy, suggestedPeople } from './social.ts';
 import type { ToolResults } from './results.ts';
 
 /** Any portal's current items: profile-backed ones from the profile and stores, the rest fetched (cached unless `force`). */
 export async function portalFor(spec: PortalInput, profile: Profile, ctx: ToolContext, force = false): Promise<PortalResult> {
+  if (spec.source === 'watches') return need(ctx.watches, 'Store watches are unavailable on this server.').portal(ctx.userId, spec.id, spec.title ?? 'Shop', spec.config && typeof spec.config === 'object' ? Number((spec.config as { limit?: number }).limit) || 30 : 30, force);
   if (spec.source === 'changes' || spec.source === 'upcoming') return watchPortal(spec, ctx);
   if (spec.source === 'saved') return savedPortal(spec, currentSavedEvents(profile, profile.saved.some(s => s.event) ? (await ctx.experiences?.get(ctx.userId))?.state : undefined).saved);
   if (spec.source === 'pinned') return pinnedPortal(spec, profile.pins);
   if (spec.source === 'clips') return clipsPortal(spec, ctx.clips ? await ctx.clips.list(ctx.userId, clipsQuery(spec)) : []);
+  if (spec.source === 'people') return peoplePortal(spec, await suggestedPeople(profile, ctx));
+  if (spec.source === 'lobby') {
+    const { limit } = normalizeSourceConfig('lobby', spec.config, spec.id);
+    return lobbyPortal(spec, ctx.social ? await ctx.social.lobby(ctx.userId, { limit }) : []);
+  }
   if (spec.source === 'following') {
     const { limit } = normalizeSourceConfig('following', spec.config, spec.id);
     return followingPortal(spec, ctx.social ? await ctx.social.feed(ctx.userId, { limit }) : []);
@@ -32,7 +40,7 @@ export async function portalFor(spec: PortalInput, profile: Profile, ctx: ToolCo
 
 /** One item as a line of text for the model. */
 export function itemLine(item: PortalResult['items'][number]): string {
-  return `- ${item.title}${item.meta.length ? ` (${item.meta.join(', ')})` : ''}${item.url ? ` <${item.url}>` : ''}`;
+  return `- ${item.title}${item.finding ? ` [${item.finding.kind}${item.offer?.previousPrice ? `; previously ${item.offer.previousPrice} ${item.offer.currency}` : ''}; noticed ${item.finding.noticedAt}]` : ''}${item.meta.length ? ` (${item.meta.join(', ')})` : ''}${item.url ? ` <${item.url}>` : ''}`;
 }
 
 /** Layouts the tools accept: a lab's only while it's on. */
@@ -54,6 +62,7 @@ function summarizePortals(profile: Profile, portals: PortalResult[], notice?: st
       lines.push(`\n[${portal.portalId}] could not load: ${clean(portal.error, 200)}`);
       continue;
     }
+    if(portal.watches) lines.push(untrusted('your store watches', portal.watches.map(w=>`${w.id}: ${w.displayName} <${w.origin}>${w.collection?' collection='+w.collection:''}${w.salesOnly?' sales only':''}${w.paused?' paused':''}${w.partial?' partial catalogue':''}${w.error?' refresh failed: '+w.error:''}`).join('\n')));
     const fresh = portal.newCount ? `, ${portal.newCount} new` : '';
     if (portal.pin) {
       lines.push(`\n[${portal.portalId}] ${portal.items.length} items${fresh} pinned from ${portal.pin.from}, updated ${portal.provenance.fetchedAt}. To refresh: ${portal.pin.recipe}; then pin_portal with portalId ${portal.portalId}.`);
@@ -77,6 +86,49 @@ async function rearrange(change: Arrangement, ctx: ToolContext): Promise<CallToo
     return toolFailure(error, 'Nothing changed: ');
   }
   return ok(`Saved. Changes: ${describeDiff(saved.changes)}.\nLayout now: ${describeLayout(saved.profile)}`, { profile: saved.profile, changes: saved.changes } satisfies ToolResults['arrange_room']);
+}
+
+
+/** A link's identity for matching the same story: no fragment, tracking parameters, www or trailing slash (as the river's storyKey). */
+function linkKey(url: string): string {
+  try {
+    const u = new URL(url);
+    for (const k of [...u.searchParams.keys()]) if (/^(utm_.*|ref|fbclid|gclid)$/.test(k)) u.searchParams.delete(k);
+    return `${u.host.replace(/^www\./, '')}${u.pathname.replace(/\/+$/, '')}${u.search}`;
+  } catch {
+    return url;
+  }
+}
+
+/**
+ * "Also shared by" (docs/plans/finding-people.md): stories in the room that a listed person
+ * the user doesn't follow shared with everyone, one name per story, newest share first.
+ * Only public posts; never the user, people they follow, mute or block.
+ */
+async function alsoSharedIn(portals: PortalResult[], ctx: ToolContext): Promise<NonNullable<ToolResults['open_room']['alsoShared']>> {
+  if (!ctx.social) return [];
+  const inRoom = new Map<string, string>();
+  for (const portal of portals) if (portal.source !== 'following' && portal.source !== 'lobby') for (const item of portal.items) if (item.url) inRoom.set(linkKey(item.url), item.url);
+  if (!inRoom.size) return [];
+  try {
+    const out = new Map<string, NonNullable<ToolResults['open_room']['alsoShared']>[number]>();
+    for (const share of await ctx.social.lobby(ctx.userId, { limit: 100 }, { unfollowedOnly: true })) {
+      const url = share.url ? inRoom.get(linkKey(share.url)) : undefined;
+      if (url && !out.has(url)) out.set(url, { url, handle: share.author.handle, ...(share.author.cover ? { cover: share.author.cover } : {}) });
+    }
+    return [...out.values()];
+  } catch {
+    return [];   // a nicety, never a failure
+  }
+}
+
+/** What open_room tells the agent about Space links: whom to offer, who joined. Handles are [a-z0-9_] only. */
+function introLines(intros: Intros): string {
+  const names = (handles: string[]) => handles.map((h) => `@${h}`).join(', ');
+  return [
+    intros.offer.length ? `The user came in through ${names(intros.offer)}'s Space link: offer to follow them (relationship). The room shows a Follow button too.` : '',
+    intros.joined.length ? `${names(intros.joined)} joined MCPortal through the user's Space link; the room says so.` : '',
+  ].filter(Boolean).join('\n');
 }
 
 export const ROOM_TOOLS: ToolDef[] = [
@@ -115,15 +167,19 @@ export const ROOM_TOOLS: ToolDef[] = [
       const portals = await withNews(await Promise.all(specs.map((p) => portalFor(p, profile, ctx))), ctx.userId, ctx.seen);
       const edition = resolveEdition(await ctx.editions?.get(ctx.userId), portals);
       const lead = leadOf(edition, portals);
-      return ok(summarizePortals(profile, portals, notice, edition),
-        { profile, portals, notice, identity, ...(edition ? { edition } : {}), ...(lead ? { lead } : {}), ...(labsOf(ctx).length ? { labs: [...labsOf(ctx)] } : {}), generatedAt: new Date().toISOString() } satisfies ToolResults['open_room']);
+      // Space links (docs/plans/finding-people.md): said once, after setup, so a newcomer meets them in a built room.
+      const intros = ctx.social ? await ctx.social.takeIntros(ctx.userId).catch(() => undefined) : undefined;
+      const said = intros && (intros.offer.length || intros.joined.length) ? intros : undefined;
+      const alsoShared = await alsoSharedIn(portals, ctx);
+      return ok([summarizePortals(profile, portals, notice, edition), ...(said ? [introLines(said)] : [])].join('\n'),
+        { profile, portals, notice, identity, ...(edition ? { edition } : {}), ...(lead ? { lead } : {}), ...(said ? { intros: said } : {}), ...(alsoShared.length ? { alsoShared } : {}), ...(labsOf(ctx).length ? { labs: [...labsOf(ctx)] } : {}), generatedAt: new Date().toISOString() } satisfies ToolResults['open_room']);
     },
   },
   {
     name: 'build_room',
     title: 'Build the room from starter packs',
     access: 'write',
-    description: `Set up the user's room from up to ${MAX_PACKS} starter packs (ids from open_room's setup). Replaces the layout, keeping saved items: confirm first if they built the room themselves. An empty list keeps the sample room and finishes setup. Then call open_room.`,
+    description: `Set up the room from up to ${MAX_PACKS} packs (ids in open_room). Replaces its layout, keeps saved items: confirm if the user built it. An empty list keeps the room and finishes setup. Then open_room.`,
     inputSchema: {
       type: 'object',
       required: ['packs'],
@@ -154,14 +210,15 @@ export const ROOM_TOOLS: ToolDef[] = [
         return { profile: built, result: built };
       });
       const labels = ids.map((id) => STARTER_PACKS.find((p) => p.id === id)!.label);
-      return ok(`Built the room from ${labels.join(', ')}: ${sources.length} sources, ${layout} layout. Saved items kept (${profile.saved.length}).`, { profile } satisfies ToolResults['build_room']);
+      const hint = await featuredBy(ctx, sources, 'some of these sources');
+      return ok(`Built the room from ${labels.join(', ')}: ${sources.length} sources, ${layout} layout. Saved items kept (${profile.saved.length}).${hint ? `\n${hint}` : ''}`, { profile } satisfies ToolResults['build_room']);
     },
   },
   {
     name: 'arrange_room',
     title: 'Arrange the room',
     access: 'write',
-    description: "Change the room's layout: move portals (to a column, 1 = left; one past the last makes a new column), set column widths, retitle portals or change their settings, rename the room, or switch layout or how stories open. Name portals by id or title (open_room lists them); only what you name changes. Removing is remove_portal.",
+    description: "Arrange portals by id/title (open_room lists them): move to a column (1 = left; last + 1 creates one), set widths, titles, config, room name, layout or story opening. Only what you name changes. Remove with remove_portal.",
     inputSchema: {
       type: 'object',
       additionalProperties: false,
@@ -172,7 +229,7 @@ export const ROOM_TOOLS: ToolDef[] = [
         retitle: { type: 'array', items: { type: 'object', required: ['portal', 'title'], additionalProperties: false, properties: { portal: { type: 'string' }, title: { type: 'string' } } } },
         configure: { type: 'array', items: { type: 'object', required: ['portal', 'config'], additionalProperties: false, properties: { portal: { type: 'string' }, config: { type: 'object', description: 'Settings to change (list_sources)' } } } },
         name: { type: 'string' },
-        layout: { type: 'string', enum: OFFERED_LAYOUTS, description: `columns: side by side; shelves: sideways rows; river: one stream, newest first${OFFERED_LAYOUTS.includes('frontpage') ? '; frontpage: picks, then top items per portal' : ''}` },
+        layout: { type: 'string', enum: OFFERED_LAYOUTS, description: `columns: lanes; shelves: sideways cards; river: newest first; catalogue: compact rows; editorial: lead per source; paperback: covers${OFFERED_LAYOUTS.includes('frontpage') ? '; frontpage: agent picks' : ''}` },
         openIn: { type: 'string', enum: ['card', 'chat'], description: 'stories open in the room, or as their own card in the chat' },
       },
     },

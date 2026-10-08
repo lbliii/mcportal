@@ -37,7 +37,7 @@ export function columnOf(profile: Profile, portalId: string): number {
  * Put a Saved (or Clips, or Following) portal in the layout the first time it's needed,
  * so what the user saved visibly lands somewhere.
  */
-export function ensurePortal(profile: Profile, source: 'saved' | 'clips' | 'following', title: string): { profile: Profile; added: boolean } {
+export function ensurePortal(profile: Profile, source: 'saved' | 'clips' | 'following' | 'people', title: string): { profile: Profile; added: boolean } {
   if (profile.columns.some((c) => c.panels.some((p) => p.source === source))) return { profile, added: false };
   const portal: PortalSpec = { id: source, source, title, config: { limit: LIMITS.items } };
   while (findPortal(profile, portal.id)) portal.id += '-2';

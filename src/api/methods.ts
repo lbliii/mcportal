@@ -14,6 +14,9 @@
  * Left out on purpose: anything that deletes everything or imports (deleteAll,
  * import), moderation and admin, and account deletion. Those stay on their pages.
  */
+import { WATCH_SCOPE_SCHEMA } from '../tools/watches.ts';
+import { storeScope } from '../adapters/shopify.ts';
+import { SPACE_INPUT } from '../space-input.ts';
 import { clipInput } from '../portability.ts';
 import { buildClip, CLIP_LIMITS, newClipId, type ClipKind } from '../clips.ts';
 import { buildEdition } from '../editions.ts';
@@ -23,11 +26,12 @@ import { clean } from '../lib/text.ts';
 import { httpUrl, validateProfile, type Profile } from '../profile.ts';
 import { validateReadingUpdate, type ReadingUpdate } from '../reading.ts';
 import { tracksSeen } from '../seen.ts';
-import { publicSpaceProfile, SPACE_SETTINGS_SCHEMA, type PublicProfile, type PublicProfileInput } from '../public-profiles.ts';
+import { SPACE_SETTINGS_SCHEMA, type PublicProfileInput } from '../public-profiles.ts';
 import { AUDIENCES, REBLOG_RULES } from '../social.ts';
+import type { Wanted } from '../people.ts';
 import { SERVER_INFO } from '../mcp.ts';
 import { findTool } from '../tools/index.ts';
-import { labOn, need, type ToolContext } from '../tools/kit.ts';
+import { need, type ToolContext } from '../tools/kit.ts';
 import { CLIP_KINDS } from '../types.ts';
 import { MIN_CLIENT_VERSION, type ApiMethod } from './calls.ts';
 import { LIBRARY_SCHEMA, searchLibrary, type LibraryQuery } from '../library.ts';
@@ -60,11 +64,6 @@ const seenOf = (ctx: ToolContext) => need(ctx.seen, 'Seen tracking is not availa
 const handoffsOf = (ctx: ToolContext) => need(ctx.handoffs, 'Handoffs are not available on this server.');
 const editionsOf = (ctx: ToolContext) => need(ctx.editions, 'Editions are not available on this server.');
 const socialOf = (ctx: ToolContext) => need(ctx.social, 'Sharing is not available on this server.');
-/** The social layer for reblogging, which is a lab (MCPORTAL_LABS=reblog) until it's had real use. */
-const reblogging = (ctx: ToolContext) => {
-  if (!labOn(ctx, 'reblog')) throw new AppError('unavailable', "Reblogging isn't on for this MCPortal yet.");
-  return socialOf(ctx);
-};
 const profilesOf = (ctx: ToolContext) => need(ctx.publicProfiles, 'Public profiles are not available on this server.');
 
 const portalsOf = (profile: Profile) => profile.columns.flatMap((c) => c.panels);
@@ -74,10 +73,17 @@ const portalsOf = (profile: Profile) => profile.columns.flatMap((c) => c.panels)
  * where a public profile would carry their id (the caller's own id stays, so tools
  * can tell "me" from "them").
  */
-async function publicRef(profile: PublicProfile, ctx: ToolContext, includeSources = true): Promise<PublicProfile> {
+async function publicRef<P extends { accountId: string; handle: string }>(profile: P, ctx: ToolContext, includeSources = true): Promise<P> {
   if (profile.accountId === ctx.userId) return profile;
-  const sections = includeSources ? await ctx.social?.spaceSections(ctx.userId, profile.accountId) : undefined;
-  return { ...publicSpaceProfile(profile), sources: sections?.sources ?? [], accountId: `@${profile.handle}` };
+  const copy = { ...profile, accountId: `@${profile.handle}` };
+  if ('broughtAboard' in copy) delete copy.broughtAboard;
+  for (const key of ['showSources', 'showPeople', 'sourceCuration', 'peopleCuration']) delete (copy as Record<string, unknown>)[key];
+  if (!includeSources) (copy as Record<string, unknown>).sources = [];
+  else if ('sources' in profile) {
+    const sections = includeSources ? await ctx.social?.spaceSections(ctx.userId, profile.accountId) : undefined;
+    (copy as Record<string, unknown>).sources = sections?.sources ?? [];
+  }
+  return copy;
 }
 
 /** An "@handle" from publicRef back to the account, as the caller may see it; or the caller's own id. */
@@ -129,6 +135,20 @@ export const API_METHODS: Record<string, ApiMethod> = {
       await ctx.store.update(ctx.userId, before => ({ profile: preserveViews(before), result: undefined }));
       return { rev: (await ctx.store.versioned(ctx.userId)).rev };
     }, 'write'),
+
+  // ---- private store watches, always as the authenticated account
+  'watches.list': params(NO_PARAMS, (_p,ctx)=>need(ctx.watchStore,'Store watches unavailable.').list(ctx.userId)),
+  'watches.preview': params<{url:string;scope?:unknown}>({type:'object',required:['url'],additionalProperties:false,properties:{url:{type:'string',maxLength:2048},scope:WATCH_SCOPE_SCHEMA}},
+    (p,ctx)=>need(ctx.watches,'Store watches unavailable.').preview(ctx.userId,p.url,storeScope(p.scope)),'read',8),
+  'watches.confirm': params<{select:string}>({type:'object',required:['select'],additionalProperties:false,properties:{select:{type:'string',maxLength:100}}},
+    (p,ctx)=>need(ctx.watches,'Store watches unavailable.').confirm(ctx.userId,p.select),'write',1),
+  'watches.unwatch': params<{id:string;paused?:boolean}>(toolSchema('unwatch'),
+    (p,ctx)=>need(ctx.watches,'Store watches unavailable.').unwatch(ctx.userId,p.id,p.paused),'write',1),
+  'watches.portal': params<{portalId:string;force?:boolean}>({type:'object',required:['portalId'],additionalProperties:false,properties:{portalId:{type:'string',maxLength:80},force:{type:'boolean'}}},async(p,ctx)=>{
+    const spec=portalsOf(await ctx.store.get(ctx.userId)).find(s=>s.id===p.portalId&&s.source==='watches');
+    if(!spec)throw new AppError('not_found','No Shop portal with that id in your room.');
+    return need(ctx.watches,'Store watches unavailable.').portal(ctx.userId,spec.id,spec.title??'Shop',(spec.config as {limit:number}).limit,p.force);
+  },'read',8),
 
   // ---- clips
   /** Rebuilt from its content, exactly like a new clip, with an id this server picks. */
@@ -217,7 +237,7 @@ export const API_METHODS: Record<string, ApiMethod> = {
   /** Featured sources must be portals in the room, as set_public_profile picks them. */
   'profiles.set': params<PublicProfileInput>(
     { type: 'object', additionalProperties: false, properties: {
-      ...SPACE_SETTINGS_SCHEMA, handle, displayName: { type: 'string', maxLength: 50 }, bio: { type: 'string', maxLength: 160 }, spaceTitle: { type: 'string', maxLength: 60 }, accent: { type: 'string', maxLength: 20 }, reblogs: { type: 'string', enum: REBLOG_RULES },
+      ...SPACE_SETTINGS_SCHEMA, handle, displayName: { type: 'string', maxLength: 50 }, bio: { type: 'string', maxLength: 160 }, spaceTitle: { type: 'string', maxLength: 60 }, ...SPACE_INPUT, listed: { type: 'boolean' }, reblogs: { type: 'string', enum: REBLOG_RULES },
       sources: { type: 'array', maxItems: 12, items: { type: 'object', required: ['source', 'config'], additionalProperties: false, properties: { title: { type: 'string', maxLength: 80 }, source: { type: 'string', maxLength: 20 }, config: {} } } },
     } },
     async (input, ctx) => {
@@ -226,11 +246,13 @@ export const API_METHODS: Record<string, ApiMethod> = {
         const stray = input.sources.find((s) => !room.has(`${s.source}|${JSON.stringify(s.config)}`));
         if (stray) throw new AppError('invalid_argument', `Only portals in the room can be featured (${clean(stray.title ?? stray.source, 60)} isn't one).`);
       }
-      return profilesOf(ctx).set(ctx.userId, input);
+      return socialOf(ctx).setSpace(ctx.userId, input);
     }, 'write'),
   'profiles.remove': params(NO_PARAMS, async (_p, ctx) => (await profilesOf(ctx).remove(ctx.userId)) ?? null, 'write'),
+  'profiles.restoreAppearance': params<{ appearance: unknown }>({ type: 'object', required: ['appearance'], additionalProperties: false, properties: { appearance: { type: 'object' } } }, async (p, ctx) => profilesOf(ctx).restoreAppearance(ctx.userId, p.appearance), 'write'),
 
   // ---- social, always as the token's account
+  'social.spaceDetails': params<{ accountId: string }>({ type: 'object', required: ['accountId'], additionalProperties: false, properties: { accountId: { type: 'string' } } }, async (p, ctx) => socialOf(ctx).spaceDetails(ctx.userId, await accountOf(p.accountId, ctx))),
   'social.resolve': params<{ handle: string }>({ type: 'object', required: ['handle'], additionalProperties: false, properties: { handle } },
     async (p, ctx) => publicRef(await socialOf(ctx).resolve(ctx.userId, p.handle), ctx)),
   /** A clip or saved item the server looks up itself, as the share tool does; never content from the request. */
@@ -246,18 +268,18 @@ export const API_METHODS: Record<string, ApiMethod> = {
       const url = httpUrl(p.savedUrl);
       const saved = url ? (await ctx.store.get(ctx.userId)).saved.find((s) => s.url === url) : undefined;
       if (!saved) throw new AppError('invalid_argument', 'Share a saved item (savedUrl) or a clip (clipId).');
-      return social.share(ctx.userId, { kind: 'link', title: saved.title, url: saved.url, note: p.note, audience: p.audience, reblogs: p.reblogs });
+      return social.share(ctx.userId, { kind: 'link', title: saved.title, url: saved.url, description: saved.description, image: saved.image, note: p.note, audience: p.audience, reblogs: p.reblogs });
     }, 'write'),
-  /** A post the server looks up by id, as share does: nothing of the original comes from the request. While reblogging is a lab, only with the lab on. */
+  /** A post the server looks up by id, as share does: nothing of the original comes from the request. */
   'social.reblog': params<{ id: string; note?: string; audience?: string }>(
     { type: 'object', required: ['id'], additionalProperties: false, properties: { id, note: { type: 'string', maxLength: 500 }, audience: { type: 'string', enum: AUDIENCES } } },
-    (p, ctx) => reblogging(ctx).reblog(ctx.userId, p), 'write'),
+    (p, ctx) => socialOf(ctx).reblog(ctx.userId, p), 'write'),
   'social.shareSettings': params<{ id: string; reblogs?: string; detach?: string }>(
     { type: 'object', required: ['id'], additionalProperties: false, properties: { id, reblogs: { type: 'string', enum: REBLOG_RULES }, detach: id } },
-    (p, ctx) => reblogging(ctx).shareSettings(ctx.userId, p.id, { reblogs: p.reblogs, detach: p.detach }), 'write'),
+    (p, ctx) => socialOf(ctx).shareSettings(ctx.userId, p.id, { reblogs: p.reblogs, detach: p.detach }), 'write'),
   'social.reblogsOf': params<{ id: string; query?: { limit?: number; before?: string } }>(
     { type: 'object', required: ['id'], additionalProperties: false, properties: { id, query: pageQuery } },
-    (p, ctx) => reblogging(ctx).reblogsOf(ctx.userId, p.id, p.query)),
+    (p, ctx) => socialOf(ctx).reblogsOf(ctx.userId, p.id, p.query)),
   'social.unshare': params<{ id: string }>({ type: 'object', required: ['id'], additionalProperties: false, properties: { id } },
     (p, ctx) => socialOf(ctx).unshare(ctx.userId, p.id), 'write'),
   'social.get': params<{ id: string }>({ type: 'object', required: ['id'], additionalProperties: false, properties: { id } },
@@ -280,6 +302,23 @@ export const API_METHODS: Record<string, ApiMethod> = {
     async (p, ctx) => publicRef(await socialOf(ctx).block(ctx.userId, p.handle, p.on), ctx, false), 'write'),
   'social.uses': params(NO_PARAMS, (_p, ctx) => socialOf(ctx).uses(ctx.userId)),
   'social.connections': params(NO_PARAMS, (_p, ctx) => socialOf(ctx).connections(ctx.userId)),
+  /** find_people's matching: what to look for comes from the caller's own room and words. */
+  'social.findPeople': params<{ wanted: Wanted; options?: { limit?: number; except?: string } }>({
+    type: 'object', required: ['wanted'], additionalProperties: false, properties: {
+      wanted: { type: 'object', required: ['sources', 'hosts', 'terms'], additionalProperties: false, properties: {
+        sources: { type: 'array', maxItems: 80, items: { type: 'object', required: ['key', 'title'], additionalProperties: false, properties: { key: { type: 'string', maxLength: 600 }, site: { type: 'string', maxLength: 255 }, title: { type: 'string', maxLength: 200 } } } },
+        hosts: { type: 'array', maxItems: 80, items: { type: 'string', maxLength: 255 } },
+        terms: { type: 'array', maxItems: 12, items: { type: 'string', maxLength: 60 } },
+      } },
+      options: { type: 'object', additionalProperties: false, properties: { limit: { type: 'integer', minimum: 1, maximum: 12 }, except: { type: 'string', maxLength: 40 } } },
+    } },
+    (p, ctx) => socialOf(ctx).findPeople(ctx.userId, p.wanted, p.options)),
+  /** The Lobby, and with unfollowedOnly, the posts "also shared by" draws on. */
+  'social.lobby': params<{ query?: { limit?: number; before?: string }; options?: { unfollowedOnly?: boolean } }>({
+    type: 'object', additionalProperties: false, properties: { query: pageQuery, options: { type: 'object', additionalProperties: false, properties: { unfollowedOnly: { type: 'boolean' } } } } },
+    (p, ctx) => socialOf(ctx).lobby(ctx.userId, p.query, p.options)),
+  /** Space-link notes for open_room, each said once. */
+  'social.takeIntros': params(NO_PARAMS, (_p, ctx) => socialOf(ctx).takeIntros(ctx.userId), 'write'),
   'social.stats': params<{ accountId: string }>({ type: 'object', required: ['accountId'], additionalProperties: false, properties: { accountId: id } },
     async (p, ctx) => socialOf(ctx).stats(ctx.userId, await accountOf(p.accountId, ctx))),
   'social.report': params<{ target: { shareId?: string; handle?: string }; reason: string }>(

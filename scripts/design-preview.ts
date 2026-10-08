@@ -10,11 +10,19 @@ import {defaultProfile} from '../src/profile.ts';
 import {createFixtureFetcher} from '../src/lib/fixture-fetch.ts';
 import {TtlCache} from '../src/lib/cache.ts';
 import {MemoryEditionStore} from '../src/editions.ts';
-import {page} from '../src/page.ts';
+import {handshake,page} from '../src/page.ts';
+import {accountHome} from '../src/account.ts';
+import {WEB_BRAND_CSS,webHeader,webFooter} from '../src/web-brand.ts';
+import {PAGE_CSP} from '../src/lib/web.ts';
 import {serveSite,DEFAULT_SUPPORT_URL} from '../src/site.ts';
 const ctx={store:new MemoryProfileStore({room:{...defaultProfile(),onboarded:true},frontpage:{...defaultProfile(),onboarded:true,layout:'frontpage'},river:{...defaultProfile(),onboarded:true,layout:'river'}}),editions:new MemoryEditionStore(),fetcher:createFixtureFetcher(),cache:new TtlCache(),userId:'room'};
 const rpc=(name:string,args:Record<string,unknown>,userId:string)=>handleMessage({jsonrpc:'2.0',id:1,method:'tools/call',params:{name,arguments:args}},{...ctx,userId}).then((r)=>(r as {result:{structuredContent:any}}).result);
 const now='2026-09-30T12:00:00Z',url='https://example.com/guide';
+const unfinished=[
+ ['https://example.com/guide','Conversational portals',.35],
+ ['https://example.org/field-notes','Field notes from a small web',.72],
+ ['https://example.net/library','How the card catalogue learned to dream',0],
+].map(([url,title,progress])=>({url,title,progress,status:'opened',lastSeenAt:now,lastOpenedAt:now}));
 const blocks=[{type:'h',level:2,id:'room',text:'A room for your internet'},{type:'p',text:'Your agent brings reading, saved clips and shared ideas into one conversational space.'},{type:'callout',kind:'note',text:'Keep useful actions visible before hover.'},{type:'pre',text:'const theme = "adaptive";',lang:'javascript'}];
 const article={url,title:'Conversational portals',byline:'MCPortal fixtures',wordCount:230,blocks,provenance:{endpoint:url,fetchedAt:now,cached:false}};
 const clip={id:'c_fixture',title:'Ideas worth keeping',kind:'note',tags:['design'],createdAt:now,source:{kind:'conversation'},note:'A clipped thought from a conversation.',data:{kind:'note',blocks}};
@@ -23,9 +31,10 @@ const share={id:'s_fixture',title:clip.title,kind:'clip',clip,note:'Bring the we
 const reblog={...share,id:'s_reblog',note:'Passing this on: the second half is the good part.',author:{handle:'curator'},reblogOf:{root:share.id,via:'s_via'},via:'wanderer',original:{id:share.id,author:{handle:'reader'},title:share.title,kind:'clip',clip,note:share.note,createdAt:now},myReblog:undefined,canReblog:true};
 const mypost={...share,mine:true,canReblog:false,reblogs:'followers'};
 const rebloggers=[{handle:'curator',reblogId:'s_reblog',createdAt:now,note:'Passing this on.'},{handle:'wanderer',reblogId:'s_via',createdAt:now},{handle:'lurker',reblogId:'s_cut',createdAt:now,detached:true}];
-const space={handle:'reader',spaceTitle:'Dispatches from my room',displayName:'Reader',bio:'Small discoveries, collected and shared.',accent:'teal',mine:false,following:false,followers:3,posts:[share],sources:[{source:'rss',title:'Design transmissions',config:{url:'https://example.com/feed.xml'}}]};
+const space={handle:'reader',spaceTitle:'Dispatches from my room',displayName:'Reader',bio:'Small discoveries, collected and shared.',cover:{ink:'atomic',motif:'arches',seed:8},format:'paperback',travelers:[],stamps:[],volume:1,mine:false,following:false,followers:3,posts:[share],sources:[{source:'rss',title:'Design transmissions',config:{url:'https://example.com/feed.xml'}}]};
 const docs={docs:url,site:{title:'Portal handbook',sections:[{title:'Getting started',pages:[{title:'A room for your internet',url}]}]}};
 const result=(structuredContent:unknown)=>({content:[],structuredContent});
+const accountPreview=async()=>accountHome({login:'reader',csrf:'preview',handle:'reader',portals:14,saved:22,clips:1,grants:[{grantId:'g1',clientName:'Claude',lastUsedAt:Date.parse(now)},{grantId:'g2',clientName:'MCPortal on Mac',lastUsedAt:Date.parse(now)-2*86_400_000}]});
 async function fixture(view:string){
  // The front page as the agent leaves it: three picks with reasons, the lab on.
  if(view==='frontpage'){const items=(await rpc('list_new_items',{},'frontpage')).structuredContent.items;await rpc('show_highlights',{title:'Morning edition',intro:'Three worth your coffee.',picks:[items[1],items[4],items[2]].map((c:{ref:string},i:number)=>({ref:c.ref,why:['It answers the question you asked yesterday about agent tooling.','A release you have been waiting on.','Short, and close to what you saved last week.'][i]}))},'frontpage');const r=await rpc('open_room',{},'frontpage');r.structuredContent.labs=['frontpage'];return r;}
@@ -56,11 +65,16 @@ createServer(async(req,res)=>{try{
  if(u.pathname==='/rpc'){let text='';for await(const chunk of req){text+=chunk;if(text.length>100000)throw new Error('Large request');}const msg=JSON.parse(text);
   res.setHeader('content-type','application/json');
   const name=msg.params?.name;
-  const canned=name==='read_doc_page'?result({page:article,section:'Getting started',provenance:article.provenance}):name==='get_clip'?result({clip}):name==='get_share'?result({share}):name==='open_space'?result({space}):name==='search_docs'?result({hits:[{url,title:article.title}]}):null;
+  const canned=name==='list_reading'?result({reading:unfinished}):name==='read_doc_page'?result({page:article,section:'Getting started',provenance:article.provenance}):name==='get_clip'?result({clip}):name==='get_share'?result({share}):name==='open_space'?result({space}):name==='search_docs'?result({hits:[{url,title:article.title}]}):null;
   res.end(JSON.stringify(canned?{jsonrpc:'2.0',id:msg.id,result:canned}:await handleMessage(msg,ctx)));return;
  }
- if(u.pathname==='/auth'){res.end(page('Sign in','<h1>Welcome to MCPortal</h1><p class="muted">Your personal portal.</p><button class="primary">Continue with GitHub</button><button>Cancel</button>'));return;}
- if(u.pathname==='/admin'){res.end((await readFile(new URL('../src/ui/admin.html',import.meta.url),'utf8')).replace('/*MCPORTAL_DESIGN*/',(await import('../src/design/generated.ts')).DESIGN_CSS+(await import('../src/design/generated.ts')).PRIMITIVES_CSS));return;}
+ if(u.pathname==='/auth'){res.setHeader('content-security-policy',PAGE_CSP);res.end(page('Connect to MCPortal',`<h1>Connect to MCPortal?</h1>${handshake('MCPortal on Mac')}<p><strong>MCPortal on Mac</strong> wants to open and change your MCPortal room.</p><p class="muted">After you approve, you'll sign in with GitHub, then be sent back to <code>127.0.0.1:50108</code>. Only continue if you started this from that app.</p><form><button class="primary" type="button">Continue with GitHub</button><button type="button">Cancel</button></form><p class="muted">By continuing, you agree to MCPortal's <a href="/terms">terms</a> and confirm you're at least 13. See the <a href="/privacy">privacy policy</a> for what's kept.</p>`,{door:'open'}));return;}
+ if(u.pathname==='/callback-error'||u.pathname==='/callback-success'){res.setHeader('content-security-policy',PAGE_CSP);const ok=u.pathname==='/callback-success';res.end(page(ok?'This computer is signed in':'Sign-in not finished',ok?'<p>MCPortal on this computer now keeps your portal in your hosted account, as <b>reader</b>.</p><p>You can close this tab and go back to your app.</p>':"<p>GitHub signed you in as @reader. This MCPortal server is invite-only. Use your invited GitHub account or ask its owner for an invite. Reference: preview-only.</p><p>Start it again from MCPortal in your app using a fresh link on this computer.</p>",ok?{siteUrl:'http://127.0.0.1:8799',door:'open',kicker:"It's alive!"}:{siteUrl:'http://127.0.0.1:8799',door:'shut',kicker:'Signal lost'}));return;}
+ if(u.pathname==='/invite-preview'){res.setHeader('content-security-policy',PAGE_CSP);res.end(page("You're invited to MCPortal",'<p>@curator invited <b>@reader</b> to MCPortal.</p><ol><li>Add MCPortal to your agent.</li><li>Connect and sign in with the invited GitHub account.</li><li>Ask: “open my portal”.</li></ol>',{door:'open',kicker:'A door has opened!'}));return;}
+ if(u.pathname==='/import-preview'){res.setHeader('content-security-policy',PAGE_CSP);res.end(page('Import into MCPortal','<p>Pick your MCPortal export file. It only adds to your room: nothing is removed or moved.</p><form><label>Your MCPortal export<input type="file" accept=".json"></label><button class="primary" type="button">Import</button></form><p class="muted">This link works once, for 15 minutes.</p>',{door:'open',kicker:'Incoming transmission'}));return;}
+ if(u.pathname==='/account-preview'){res.setHeader('content-security-policy',PAGE_CSP);res.end(await accountPreview());return;}
+ if(['/privacy','/terms','/support','/security'].includes(u.pathname)){await serveSite(res,u.pathname,{publicUrl:'http://127.0.0.1:8799',supportUrl:DEFAULT_SUPPORT_URL,inviteOnly:false});return;}
+ if(u.pathname==='/admin'){res.end((await readFile(new URL('../src/ui/admin.html',import.meta.url),'utf8')).replace('/*MCPORTAL_DESIGN*/',(await import('../src/design/generated.ts')).DESIGN_CSS+(await import('../src/design/generated.ts')).PRIMITIVES_CSS+WEB_BRAND_CSS).replace('<!--MCPORTAL_WEB_HEADER-->',webHeader()).replace('<!--MCPORTAL_WEB_FOOTER-->',webFooter()));return;}
  if(u.pathname==='/site'){await serveSite(res,'/',{publicUrl:'http://127.0.0.1:8799',supportUrl:DEFAULT_SUPPORT_URL,inviteOnly:false});return;}
  if(u.pathname.startsWith('/site/')){const file=u.pathname.slice(6);if(!/^[\w.-]+$/.test(file))throw new Error('Invalid asset');res.setHeader('content-type',file.endsWith('.svg')?'image/svg+xml':file.endsWith('.ttf')?'font/ttf':'image/png');res.end(await readFile(new URL(`../src/site/${file}`,import.meta.url)));return;}
  res.end(`<!doctype html><html><head><meta name="viewport" content="width=device-width"><title>MCPortal design regression host</title><style>body{margin:0;font:14px system-ui;background:#000}header{padding:12px;background:#eee;color:#111}button,select{font:inherit;padding:6px;margin:4px}iframe{display:block;width:100%;height:900px;border:0;background:transparent}pre{margin:0;padding:12px;background:#eee;color:#111;white-space:pre-wrap}</style></head><body><header>
@@ -69,7 +83,7 @@ createServer(async(req,res)=>{try{
  <label>Display <select id="display"><option>inline</option><option>fullscreen</option></select></label>
  <label>Inputs <select id="inputs"><option>complete</option><option>theme-only</option><option>background-only</option><option>hostile</option><option>none</option></select></label>
  <button id="switch">Theme-only switch</button><button id="reset">Reset inputs</button><button id="run">Run browser checks</button>
- <a href="/site">Site</a> <a href="/auth">Auth</a> <a href="/admin">Admin</a></header><iframe title="MCPortal" src="/app"></iframe><pre id="report" aria-live="polite">Loading fixture…</pre><script>
+ <a href="/site">Site</a> <a href="/auth">Consent</a> <a href="/callback-error">Sign-in error</a> <a href="/callback-success">Sign-in success</a> <a href="/invite-preview">Invite</a> <a href="/import-preview">Import</a> <a href="/account-preview">Account</a> <a href="/admin">Admin</a></header><iframe title="MCPortal" src="/app"></iframe><pre id="report" aria-live="polite">Loading fixture…</pre><script>
  const frame=document.querySelector('iframe'), report=document.querySelector('#report'), fields=['view','mode','display','inputs'];let ready=false, current=null;
  const presets={light:{'--color-background-primary':'#FFFFFF','--color-text-primary':'#1B1B1A','--color-text-secondary':'#646460'},dark:{'--color-background-primary':'#161616','--color-text-primary':'#ECECEA','--color-text-secondary':'#A5A59F'}};
  function context(){const mode=document.querySelector('#mode').value,input=document.querySelector('#inputs').value;const display=document.querySelector('#display').value;return input==='none'?{}:{theme:mode,displayMode:display,availableDisplayModes:['inline','fullscreen'],styles:{variables:input==='complete'?presets[mode]:input==='background-only'?{'--color-background-primary':'#161616'}:input==='hostile'?{'--color-background-primary':'#888','--color-text-primary':'#888','--color-text-secondary':'transparent','--mp-surface-canvas':'transparent','--lane-h':'0px'}:{}}};}

@@ -100,8 +100,10 @@ const skipRole = (role: string) => (role.startsWith('std:') && !['std:term', 'st
 const FIRST = ['tutorial', 'intro', 'getting-started', 'quickstart', 'user', 'guide', 'howto', 'topics', 'library', 'reference', 'api'];
 
 /** A path segment as a title: "getting-started" → "Getting started". */
+/** Words a file or path name spells in lower case that read as capitals: "cli" is "CLI". */
+const ACRONYMS = new Set(['api', 'apis', 'cd', 'ci', 'cli', 'css', 'dns', 'faq', 'html', 'http', 'https', 'ide', 'json', 'jwt', 'llm', 'mcp', 'sdk', 'sql', 'ssh', 'tls', 'toml', 'ui', 'url', 'urls', 'yaml']);
 export const words = (segment: string) => {
-  const text = segment.replace(/[-_]+/g, ' ').trim();
+  const text = segment.replace(/[-_]+/g, ' ').trim().replace(/\b[a-z]+\b/g, (w) => (ACRONYMS.has(w) ? w.toUpperCase() : w));
   return text.charAt(0).toUpperCase() + text.slice(1);
 };
 

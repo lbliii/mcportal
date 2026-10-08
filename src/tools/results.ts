@@ -9,9 +9,9 @@ import type { DocHit, DocPage, DocPageRef, DocSection, DocsToc } from '../adapte
 import type { Clip, ClipSummary } from '../clips.ts';
 import type { FetchedSource, SourceCandidate } from '../discover.ts';
 import type { Profile, ProfileDiff, SourceSettings } from '../profile.ts';
-import type { PublicProfile } from '../public-profiles.ts';
+import type { FeaturedSource, PublicProfile } from '../public-profiles.ts';
+import type { SocialService, Intros, PersonMatch, Reblogger, SharedItem } from '../social.ts';
 import type { SpaceSections } from '../space.ts';
-import type { Reblogger, SharedItem } from '../social.ts';
 import type { Handoff } from '../handoffs.ts';
 import type { Candidate, HighlightPick, Lead, RoomEdition } from '../highlights.ts';
 import type { ReadingState } from '../reading.ts';
@@ -21,6 +21,8 @@ import type { LibraryResult } from '../library.ts';
 import type { Collection } from '../collections.ts';
 import type { CollectionData } from '../collection-service.ts';
 import type { CatchupSession } from '../experiences.ts';
+import type { WatchPreview } from '../store-watches.ts';
+import type { StoreScope } from '../adapters/shopify.ts';
 
 /** A starter pack as the welcome screen lists it. */
 export type PackSummary = { id: string; label: string; blurb: string; sources: string[] };
@@ -40,6 +42,10 @@ export type RoomResult = {
   lead?: Lead;
   /** Labs this server has on (src/labs.ts), so the room can offer them. */
   labs?: string[];
+  /** Space links, said once: people to offer a follow of, and newcomers who joined through the user's link. */
+  intros?: Intros;
+  /** Stories in the room that a listed person the user doesn't follow shared with everyone: one handle per story's link. */
+  alsoShared?: Array<{ url: string; handle: string; cover?: import('../space-design.ts').Cover }>;
 };
 
 /** After a save or unsave: the saved list, the room, and the Saved portal redrawn. */
@@ -65,10 +71,12 @@ export type DocsPageResult = {
 
 /** Someone's space: their public profile, their posts and the sources they recommend. */
 export type SpaceResult = {
-  space: Omit<PublicProfile, 'accountId' | 'sources'> & { mine: boolean; followers: number; following: boolean; posts: SharedItem[]; sectionPreview?: SpaceSections } & SpaceSections;
+  space: Omit<PublicProfile, 'accountId' | 'travelers'> & Awaited<ReturnType<SocialService['spaceDetails']>> & { mine: boolean; followers: number; following: boolean; posts: SharedItem[]; sources: FeaturedSource[]; link?: string; sectionPreview?: SpaceSections } & Partial<Pick<SpaceSections, 'people'>>;
 };
 
 export type ToolResults = {
+  watch: { preview?: WatchPreview; confirmed?: { id: string; displayName: string; origin: string; scope: StoreScope; paused: boolean }; profile?: Profile; portal?: PortalResult };
+  unwatch: { removed: boolean };
   search_library: { library: LibraryResult };
   open_collection: { collections: Collection[]; sources: Array<Pick<PortalResult, 'portalId' | 'title' | 'source'>>; desk?: CollectionData };
   update_collection: { collections: Collection[]; collection?: Collection };
@@ -99,13 +107,16 @@ export type ToolResults = {
   clip: { clip: ClipSummary; profile: Profile; layoutChanged: boolean; portals: PortalResult[] };
   open_space: SpaceResult;
   /** labs: the server's, so a card offers what the room would. */
+  find_people: { people: Array<PersonMatch & { reasons: string[]; passed?: true }> };
+  suggest_people: { suggested: { portal: PortalResult }; profile: Profile; layoutChanged: boolean };
+  pass_person: { profile: Profile };
   get_share: { share: SharedItem; rebloggers?: Reblogger[]; labs?: string[] };
   share: { share: SharedItem };
   share_settings: { share: SharedItem };
   unshare: { removed: boolean };
   relationship: { handle?: string; layoutChanged?: boolean; profile?: Profile };
   record_reading: { reading: ReadingState };
-  account_settings: { identity: Identity; url: string | null };
+  account_settings: { identity: Identity; url: string | null; shareAudience: SharedItem['audience'] };
   set_public_profile: { profile: PublicProfile };
   link_account: { url: string };
   unlink_account: { identity: Identity };

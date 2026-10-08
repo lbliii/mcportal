@@ -27,9 +27,9 @@ export const TOOL_CASES: ToolCase[] = [
   { prompt: 'Show my Topic Desks and reading trails', tool: 'open_collection' },
   { prompt: 'Create an empty Topic Desk called Agents that remember, to understand how work resumes', tool: 'update_collection', args: { action: 'create', title: 'Agents that remember' } },
   { prompt: 'Present my hn-top portal as cards without moving it or changing its feed', tool: 'arrange_room', args: { view: [{ portal: 'hn-top', view: 'cards' }] } },
-  { prompt: 'Watch this documentation page for text changes: https://example.com/docs/persistence.md', tool: 'watch', args: { action: 'add', kind: 'page', url: 'https://example.com/docs/persistence.md' } },
-  { prompt: 'Find the artist Phoenix so I can confirm which one to watch for shows in my city', tool: 'watch', args: { action: 'find_artist', query: 'Phoenix' } },
-  { prompt: 'Open my retained Changes and Upcoming findings', tool: 'watch', args: { action: 'list' } },
+  { prompt: 'Watch this documentation page for text changes: https://example.com/docs/persistence.md', tool: 'watch_reading', args: { action: 'add', kind: 'page', url: 'https://example.com/docs/persistence.md' } },
+  { prompt: 'Find the artist Phoenix so I can confirm which one to watch for shows in my city', tool: 'watch_reading', args: { action: 'find_artist', query: 'Phoenix' } },
+  { prompt: 'Open my retained Changes and Upcoming findings', tool: 'watch_reading', args: { action: 'list' } },
   // The room
   { prompt: 'open my portal', tool: 'open_room' },
   { prompt: "what's new across my sources this morning?", tool: 'open_room' },
@@ -99,6 +99,15 @@ export const TOOL_CASES: ToolCase[] = [
   { prompt: 'take my post s_7e8f9a0b1c2d out of the reblog s_5d6e7f8a9b0c', tool: 'share_settings', args: { id: 's_7e8f9a0b1c2d', detach: 's_5d6e7f8a9b0c' }, where: 'labs' },
   { prompt: 'from now on only my followers can reblog what I post', tool: 'set_public_profile', args: { reblogs: 'followers' }, where: 'labs' },
   { prompt: 'who reblogged my post s_7e8f9a0b1c2d?', tool: 'get_share', args: { id: 's_7e8f9a0b1c2d' }, where: 'labs' },
+
+  // Finding people (docs/plans/finding-people.md)
+  { prompt: 'who should I follow on MCPortal?', tool: 'find_people' },
+  { prompt: 'is anyone on MCPortal into modular synths?', tool: 'find_people', args: { about: 'synth' } },
+  { prompt: 'find people who read simonwillison.net', tool: 'find_people', args: { sources: ['simonwillison.net'] } },
+  { prompt: 'who else is like @ada?', tool: 'find_people', args: { like: 'ada' } },
+  { prompt: 'let people with similar sources find me', tool: 'set_public_profile', args: { listed: true } },
+  { prompt: 'find me a few people to follow and keep them in my room', tool: 'find_people' },
+  { prompt: 'add the Lobby to my room', tool: 'add_portal', args: { source: 'lobby' } },
 
   // Not for MCPortal
   { prompt: "what's 17 times 23?", tool: null },

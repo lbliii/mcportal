@@ -1,3 +1,8 @@
+import { FileCollectionStore } from '../src/collections.ts';
+import { FileExperienceStore } from '../src/experiences.ts';
+import { watchAction } from '../src/reading-watches.ts';
+import { TtlCache } from '../src/lib/cache.ts';
+import { createFixtureFetcher } from '../src/lib/fixture-fetch.ts';
 /**
  * Deleting an account leaves nothing that names it. Every kind of data is created for
  * one account (and a bystander) in file-backed stores, the account is deleted, and then
@@ -8,6 +13,7 @@ import { mkdtemp, readdir, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
+import { FileWatchStore, newStoreWatch } from '../src/watches.ts';
 import { deleteAccountData } from '../src/account.ts';
 import { runAdmin } from '../src/admin-cli.ts';
 import { Accounts, makeBootstrap } from '../src/accounts.ts';
@@ -33,6 +39,12 @@ async function filesUnder(dir: string): Promise<Array<{ file: string; text: stri
   return out;
 }
 
+async function seedReadingState(dir: string, userId: string) {
+  const collections = new FileCollectionStore(dir), experiences = new FileExperienceStore(dir);
+  await collections.change(userId, { action: 'create', title: `Desk for ${userId}`, entries: [{ ref: 'url:https://example.com/kept', title: 'Kept evidence' }] });
+  await watchAction({ action: 'add', kind: 'page', title: `Watch for ${userId}`, url: 'https://example.com/changes' }, { userId, store: new FileProfileStore(dir), experiences, fetcher: createFixtureFetcher(), cache: new TtlCache() });
+}
+
 test('deleting an account leaves nothing that names it', async () => {
   const dir = await mkdtemp(path.join(tmpdir(), 'mcportal-delete-'));
   const accounts = new Accounts(fileAuthPersistence(dir, 'accounts.json'), makeBootstrap(['admin'], [], true));
@@ -42,8 +54,8 @@ test('deleting an account leaves nothing that names it', async () => {
   const social = new Social({ store: socialStore, profiles: publicProfiles });
   const deps = {
     accounts, oauth: auth, publicProfiles, social,
-    store: new FileProfileStore(dir), reading: new FileReadingStore(dir), handoffs: new FileHandoffStore(dir),
-    seen: new FileSeenStore(dir), editions: new FileEditionStore(dir), clips: new FileClipStore(dir),
+    watchStore: new FileWatchStore(dir), store: new FileProfileStore(dir), reading: new FileReadingStore(dir), handoffs: new FileHandoffStore(dir),
+    seen: new FileSeenStore(dir), editions: new FileEditionStore(dir), clips: new FileClipStore(dir), collections: new FileCollectionStore(dir), experiences: new FileExperienceStore(dir),
   };
 
   // Two accounts: lawrence (to delete, who came in by invite) and friend (who stays). Sign-up is open.
@@ -58,6 +70,10 @@ test('deleting an account leaves nothing that names it', async () => {
   assert.ok(friendAdmitted.ok);
   const friend = friendAdmitted.account.id;
 
+  await deps.watchStore.import(me,[newStoreWatch({origin:'https://lawrence.example.com',name:'Lawrence shop',products:[],partial:false,pages:1},{})]);
+  await deps.watchStore.import(friend,[newStoreWatch({origin:'https://friend.example.com',name:'Friend shop',products:[],partial:false,pages:1},{})]);
+  await seedReadingState(dir, me);
+  await seedReadingState(dir, friend);
   // Everything lawrence can have.
   await deps.store.put(me, validateProfile({ ...defaultProfile(), name: "Lawrence's room", saved: [{ url: 'https://example.com/a', title: 'Saved' }] }));
   await writeFile(path.join(dir, `${safeFileId(me)}.corrupt-1700000000000.json`), '{"name": "Lawrence\'s broken room"');
@@ -87,6 +103,12 @@ test('deleting an account leaves nothing that names it', async () => {
   await deleteAccountData(me, deps);
 
   // Nothing names him: not his id (his GitHub id), login, name, computer, or anything he wrote.
+  assert.equal((await deps.watchStore.list(me)).length,0);
+  assert.equal((await deps.watchStore.list(friend)).length,1);
+  assert.deepEqual(await deps.collections.list(me), []);
+  assert.equal((await deps.experiences.get(me)).state.watches.length, 0);
+  assert.equal((await deps.collections.list(friend)).length, 1);
+  assert.equal((await deps.experiences.get(friend)).state.watches.length, 1);
   const traces = ['4242', 'lawrence', 'Lawrence', 'Lawrences-MacBook', 'spam from them'];
   const after = await filesUnder(dir);
   const found = after.flatMap((f) => traces.filter((t) => f.text.includes(t)).map((t) => `${f.file}: ${t}`));
@@ -121,6 +143,7 @@ test('admin delete: for someone who lost GitHub access, only with --confirm, and
     await new FileProfileStore(dir).put(admitted.account.id, validateProfile({ ...defaultProfile(), name: 'Mine' }));
     await new FileClipStore(dir).add(admitted.account.id, buildClip({ kind: 'quote', text: 'kept' }));
 
+    await seedReadingState(dir, admitted.account.id);
     const lines: string[] = [];
     const run = (...args: string[]) => runAdmin(args, dir, (l) => lines.push(l));
     assert.equal(await run('delete', '@lawrence'), 2, 'without --confirm it only says what it would do');

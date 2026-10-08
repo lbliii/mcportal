@@ -10,20 +10,22 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { Accounts, makeBootstrap } from '../src/accounts.ts';
 import { AuthStore } from '../src/auth/store.ts';
-import { buildClip, MemoryClipStore } from '../src/clips.ts';
-import { MemoryEditionStore } from '../src/editions.ts';
-import { MemoryHandoffStore } from '../src/handoffs.ts';
+import { buildClip, FileClipStore, MemoryClipStore } from '../src/clips.ts';
+import { FileEditionStore, MemoryEditionStore } from '../src/editions.ts';
+import { FileHandoffStore, MemoryHandoffStore } from '../src/handoffs.ts';
 import { TtlCache } from '../src/lib/cache.ts';
 import { memoryPersistence } from '../src/lib/document.ts';
 import { createFixtureFetcher } from '../src/lib/fixture-fetch.ts';
 import { StateClient, type LinkAuth } from '../src/link/client.ts';
+import { LinkFile, type LinkRecord } from '../src/link/link-file.ts';
+import { LocalSession } from '../src/link/session.ts';
 import { linkedStores } from '../src/link/stores.ts';
 import { handleMessage } from '../src/mcp.ts';
 import { PublicProfiles } from '../src/public-profiles.ts';
 import { FileReadingStore } from '../src/reading.ts';
 import { FileSeenStore } from '../src/seen.ts';
 import { DocumentSocialStore, Social } from '../src/social.ts';
-import { MemoryProfileStore } from '../src/store.ts';
+import { FileProfileStore, MemoryProfileStore } from '../src/store.ts';
 import type { ToolContext } from '../src/tools/kit.ts';
 import { startApp, type Running } from './helpers.ts';
 
@@ -35,7 +37,7 @@ async function hosted() {
   const store = new MemoryProfileStore();
   const clips = new MemoryClipStore();
   const publicProfiles = new PublicProfiles(memoryPersistence());
-  const social = new Social({ store: new DocumentSocialStore(), profiles: publicProfiles });
+  const social = new Social({ store: new DocumentSocialStore(), profiles: publicProfiles, preferences: store });
   const reading = new FileReadingStore(await mkdtemp(path.join(tmpdir(), 'mcportal-linked-')));
   const app = await startApp({ github: { clientId: 'gh-client', clientSecret: 'gh-secret' } }, createFixtureFetcher(), {
     store, clips, publicProfiles, social, authPersistence,
@@ -63,6 +65,24 @@ function device(app: Running, accountId: string, auth: LinkAuth, options: { now?
     return res!.result as { content: Array<{ text: string }>; structuredContent?: any; isError?: boolean };
   };
   return { ctx, call };
+}
+
+/** A local MCPortal (stdio's LocalSession) whose link.json says what `link` says. */
+async function linkedLocal(link: Partial<LinkRecord> & { server: string }, fetcher?: typeof fetch) {
+  const dataDir = await mkdtemp(path.join(tmpdir(), 'mcportal-linked-local-'));
+  const record: LinkRecord = { version: 1, accountId: 'github-42', login: 'lawrence', clientId: 'mcpc_test_device', accessToken: 'mcpat_old', refreshToken: 'mcprt_old', expiresAt: 0, linkedAt: new Date().toISOString(), ...link };
+  await new LinkFile(dataDir).write(record);
+  const local = { store: new FileProfileStore(dataDir), clips: new FileClipStore(dataDir), reading: new FileReadingStore(dataDir), seen: new FileSeenStore(dataDir), handoffs: new FileHandoffStore(dataDir), editions: new FileEditionStore(dataDir) };
+  const session = new LocalSession({ dataDir, localUser: 'default', local, base: { fetcher: createFixtureFetcher(), cache: new TtlCache() }, ...(fetcher ? { fetch: fetcher } : {}) });
+  const rpc = async (method: string, params: Record<string, unknown> = {}) => (await handleMessage({ jsonrpc: '2.0', id: 1, method, params }, await session.context()))!;
+  const call = async (name: string, args: Record<string, unknown> = {}) => (await rpc('tools/call', { name, arguments: args })).result as { content: Array<{ text: string }>; structuredContent?: any; isError?: boolean };
+  /** tools/list, timed. */
+  const list = async () => {
+    const started = Date.now();
+    const res = await rpc('tools/list');
+    return { ms: Date.now() - started, names: (res.result as { tools: Array<{ name: string }> }).tools.map((t) => t.name), error: res.error };
+  };
+  return { session, rpc, call, list };
 }
 
 const fixed = (token: string): LinkAuth => ({ token: async () => token, refresh: async () => undefined });
@@ -162,7 +182,7 @@ test('linked: sharing and following work from a local MCPortal, as the linked ac
     await mac.call('build_room', { packs: ['developer'] });
     await mac.call('save_item', { url: 'https://example.com/kept', title: 'Worth reading' });
     assert.equal((await mac.call('set_public_profile', { handle: 'lawrence' })).isError, undefined);
-    const shared = await mac.call('share', { savedUrl: 'https://example.com/kept', note: 'read this', audience: 'mcportal' });
+    const shared = await mac.call('share', { savedUrl: 'https://example.com/kept', note: 'read this', audience: 'everyone' });
     assert.equal(shared.structuredContent.share.title, 'Worth reading');
     const clip = await mac.call('clip', { kind: 'quote', content: 'quotable', title: 'A clip' });
     assert.equal((await mac.call('share', { clipId: clip.structuredContent.clip.id })).isError, undefined, 'a clip shares by its hosted id');
@@ -178,6 +198,13 @@ test('linked: sharing and following work from a local MCPortal, as the linked ac
     await mac.ctx.social!.shareSettings(lawrence.accountId, shared.structuredContent.share.id, { reblogs: 'nobody' });
     assert.deepEqual((await mac.ctx.social!.reblogsOf(lawrence.accountId, shared.structuredContent.share.id)).map((r) => r.handle), ['friend']);
     assert.equal((await mac.ctx.social!.get(lawrence.accountId, shared.structuredContent.share.id))?.reblogCount, 1);
+    // A choice made on one device is loaded and used by a new linked device.
+    await mac.call('share', { savedUrl: 'https://example.com/kept', audience: 'followers' });
+    const secondDevice = device(h.app, lawrence.accountId, fixed(lawrence.tokens.access_token));
+    assert.equal((await secondDevice.call('account_settings')).structuredContent.shareAudience, 'followers');
+    const remembered = await secondDevice.call('share', { clipId: clip.structuredContent.clip.id });
+    assert.equal(remembered.structuredContent.share.audience, 'followers');
+    assert.equal((await secondDevice.ctx.social!.get(lawrence.accountId, shared.structuredContent.share.id))?.audience, 'everyone', 'earlier posts are unchanged');
     // The stores refuse to act as anyone else, whatever a caller passes.
     await assert.rejects(mac.ctx.social!.feed(friend.accountId), /only as its linked account/);
     await assert.rejects(mac.ctx.store.get(friend.accountId), /only its linked account/);
@@ -297,11 +324,11 @@ test('hosted end to end: three accounts over /mcp share, follow, reblog, see it 
     assert.ok((await bob.rpc('tools/list')).tools.some((t: { name: string }) => t.name === 'share_settings'), 'the lab is on: its tools are listed');
 
     await alice.call('save_item', { url: 'https://example.com/found', title: 'A find' });
-    const post = (await alice.call('share', { savedUrl: 'https://example.com/found', note: 'Look at this.', audience: 'mcportal' })).structuredContent.share;
+    const post = (await alice.call('share', { savedUrl: 'https://example.com/found', note: 'Look at this.', audience: 'everyone' })).structuredContent.share;
     await bob.call('relationship', { handle: 'alice', action: 'follow' });
     const seenByBob = (await bob.call('open_room')).structuredContent.portals.find((p: any) => p.source === 'following').items[0];
     assert.equal(seenByBob.share.canReblog, true);
-    const reblog = await bob.call('share', { reblogOf: seenByBob.share.id, note: 'Agreed.', audience: 'mcportal' });
+    const reblog = await bob.call('share', { reblogOf: seenByBob.share.id, note: 'Agreed.', audience: 'everyone' });
     assert.ok(!reblog.isError, reblog.content[0]!.text);
 
     await carol.call('relationship', { handle: 'bob', action: 'follow' });
@@ -348,4 +375,57 @@ test('linked: catch-up, watch subscriptions and findings are hosted, survive ano
     const room=await office.call('open_room');assert.ok(room.structuredContent.portals.some((p:any)=>p.source==='changes'&&p.items.length===1));
     await mac.call('watch_reading',{action:'delete',id});assert.deepEqual((await office.call('watch_reading',{action:'list'})).structuredContent.watches.inbox,[]);
   } finally {await h.app.close();}
+});
+
+test('linked, hosted side down: initialize and tools/list answer at once; calls say they can\'t reach it', async () => {
+  // Nothing listens on port 9, so the token refresh fails to connect (as with DNS blocked).
+  const down = await linkedLocal({ server: 'http://127.0.0.1:9' });
+  assert.ok((await down.rpc('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 't', version: '0' } })).result);
+  const listed = await down.list();
+  assert.equal(listed.error, undefined);
+  assert.ok(listed.ms < 2_000, `tools/list took ${listed.ms} ms`);
+  for (const name of ['open_room', 'unlink_account', 'list_shares']) assert.ok(listed.names.includes(name), `${name} is listed`);
+  const room = await down.call('open_room');
+  assert.equal(room.isError, true);
+  assert.equal(room.structuredContent.error.code, 'upstream_unreachable');
+  assert.match(room.content[0]!.text, /Can't reach your hosted MCPortal/);
+
+  // A server that never answers: the listing waits a moment, not the host's whole timeout.
+  const hung = await linkedLocal({ server: 'http://127.0.0.1:9' }, () => new Promise<Response>(() => {}));
+  const slow = await hung.list();
+  assert.equal(slow.error, undefined);
+  assert.ok(slow.ms < 5_000, `tools/list took ${slow.ms} ms`);
+  assert.ok(slow.names.includes('unlink_account'));
+});
+
+test('linked, sign-in gone: a refused refresh or a moved host means sign in again, and unlink_account still works', async () => {
+  const h = await hosted();
+  try {
+    // The hosted server refuses the refresh token (spent, revoked).
+    const refused = await linkedLocal({ server: h.app.base });
+    const listed = await refused.list();
+    assert.ok(listed.names.includes('unlink_account'));
+    const failed = await refused.call('search_clips');
+    assert.equal(failed.isError, true);
+    assert.equal(failed.structuredContent.error.code, 'unauthenticated');
+    assert.match(failed.content[0]!.text, /Sign in again.*link_account/);
+    const out = await refused.call('unlink_account');
+    assert.equal(out.isError, undefined, out.content[0]!.text);
+    assert.match(out.content[0]!.text, /already ended/);
+    assert.equal((await refused.session.context()).link?.linked, false, 'back in ghost mode, so link_account is offered');
+  } finally {
+    await h.app.close();
+  }
+
+  // link.json names a host that no longer serves MCPortal (421 Misdirected Request, or a redirect elsewhere).
+  for (const status of [421, 301]) {
+    const answer: typeof fetch = async () => new Response('', { status, headers: status === 301 ? { location: 'https://elsewhere.example/' } : {} });
+    for (const expiresAt of [0, Date.now() + 3_600_000]) {   // refreshing, and calling with a live token
+      const moved = await linkedLocal({ server: 'https://old-host.example', expiresAt }, answer);
+      assert.ok((await moved.list()).names.includes('unlink_account'));
+      const failed = await moved.call('open_room');
+      assert.equal(failed.structuredContent.error.code, 'unauthenticated', `${status}, expiresAt ${expiresAt}`);
+      assert.match(failed.content[0]!.text, /has moved.*Sign in again/);
+    }
+  }
 });

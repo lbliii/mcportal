@@ -223,7 +223,7 @@ test('browser: river is visible without labs and the toolbar saves the choice', 
   await openRoom();
   try {
     assert.equal(await page.eval(`document.querySelector('[data-layout="river"]').hidden`), false);
-    await page.click('[data-layout="river"]');
+    await chooseLayout('river');
     await page.waitFor(`document.querySelector('#grid.river .river-feed article')`, 'the river to draw');
     assert.equal(await page.eval(`document.querySelector('[data-layout="river"]').getAttribute('aria-pressed')`), 'true');
     assert.equal((await profiles.get('default')).layout, 'river');
@@ -232,6 +232,123 @@ test('browser: river is visible without labs and the toolbar saves the choice', 
     assert.deepEqual(page.problems, []);
   } finally {
     await profiles.put('default', room());
+  }
+});
+
+/** Choose through the same named, keyboard-accessible popover as a person using the room. */
+async function chooseLayout(layout: string): Promise<void> {
+  await page.waitFor(`!document.getElementById('btnLayout').disabled`, 'layout settings to finish saving');
+  await page.click('#btnLayout');
+  await page.click(`[data-layout="${layout}"]`);
+  await page.waitFor(`!document.getElementById('btnLayout').disabled`, 'the layout preference to save');
+}
+
+test('browser: all three designs reopen, adapt to narrow themes, and keep the reader and save controls', { skip }, async () => {
+  await openRoom();
+  try {
+    for (const layout of ['catalogue', 'editorial', 'paperback']) {
+      await chooseLayout(layout);
+      await page.waitFor(`document.querySelector('#grid.${layout} .designed')`, `${layout} to draw`);
+      assert.equal((await profiles.get('default')).layout, layout);
+      assert.equal(await page.eval(`document.activeElement.id`), 'btnLayout');
+      assert.equal(await page.eval(`document.querySelector('#layoutMenu').matches(':popover-open')`), false);
+      await page.goto(`${app.base}/preview`);
+      await page.waitFor(`document.querySelector('#grid.${layout} .designed') && !document.querySelector('.skeleton')`, `${layout} to reopen`);
+      assert.deepEqual(await page.eval(`[...document.querySelectorAll('[data-portal]')].map(n => n.dataset.portal)`), ['hn-top', 'gh-mcp', 'simonw', 'saved', 'docs']);
+      for (const width of [320, 754, 1280]) for (const theme of ['light', 'dark']) {
+        await page.send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
+        await page.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: theme }] });
+        await page.waitFor(`document.documentElement.dataset.theme === '${theme}'`, 'the room theme to change');
+        assert.equal(await page.eval(`document.documentElement.scrollWidth <= innerWidth`), true, `${layout} fits ${width}px in ${theme}`);
+        assert.equal(await page.eval(`Boolean(document.querySelector('#grid button button, #grid button a'))`), false, 'actions stay outside the opening button');
+      }
+      await page.click('[data-portal="saved"] .item-main');
+      await page.waitFor(`!document.getElementById('reader').hidden && document.querySelector('#reader h1')?.textContent.includes('PS5')`, 'the article to open');
+      await page.click('#reader [aria-label="Back to your room"]');
+      await page.waitFor(`!document.getElementById('grid').hidden`, 'the chosen layout to return');
+      assert.equal(await page.eval(`document.querySelector('[data-portal="saved"] [data-save-url]').getAttribute('aria-pressed')`), 'true');
+      assert.deepEqual(page.problems, []);
+    }
+  } finally {
+    await page.send('Emulation.setEmulatedMedia', { features: [] });
+    await page.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+    await profiles.put('default', room());
+  }
+});
+
+test('browser: the original layouts retain opening, saving and reachable controls on narrow screens', { skip }, async () => {
+  await openRoom();
+  try {
+    for (const layout of ['columns', 'shelves', 'river']) {
+      await chooseLayout(layout);
+      await page.waitFor(`document.querySelector('#grid.${layout}') && !document.querySelector('.skeleton')`, `${layout} to draw`);
+      assert.equal((await profiles.get('default')).layout, layout);
+      for (const width of [320, 754, 1280]) for (const theme of ['light', 'dark']) {
+        await page.send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
+        await page.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: theme }] });
+        await page.waitFor(`document.documentElement.dataset.theme === '${theme}'`, 'the theme to change');
+        assert.equal(await page.eval(`document.documentElement.scrollWidth <= innerWidth`), true, `${layout} fits ${width}px in ${theme}`);
+        assert.equal(await page.eval(`Boolean(document.querySelector('#grid button button, #grid button a'))`), false);
+        if (layout === 'shelves') {
+          assert.equal(await page.eval(`[...document.querySelectorAll('.card')].every(card => {
+            const box = card.getBoundingClientRect();
+            const cover = card.querySelector('.thumb').getBoundingClientRect();
+            return Math.abs(cover.top - box.top - 1) < 1 && [...card.querySelectorAll('.item-meta button')].every(button => {
+              const rect = button.getBoundingClientRect();
+              return rect.left >= box.left && rect.right <= box.right && rect.bottom <= box.bottom;
+            });
+          })`), true, 'cover strips align and actions fit inside every card');
+          await page.waitFor(`document.querySelector('[data-portal="saved"] [aria-label="Scroll Saved left"]').disabled`, 'the left edge to disable its arrow');
+          assert.equal(await page.eval(`document.querySelector('[data-portal="saved"] [aria-label="Scroll Saved right"]').disabled`), true, 'a single saved card has no empty scrolling action');
+          assert.ok(await page.eval(`Boolean(document.querySelector('[data-portal="saved"] [aria-label="Share to your space"]'))`), 'saved stories keep their share action');
+        }
+      }
+      const main = layout === 'shelves' ? '.card-main' : '.item-main';
+      const saved = layout === 'river' ? `article:has([data-save-url="${ARTICLE}"])` : '[data-portal="saved"]';
+      await page.click(`${saved} ${main}`);
+      await page.waitFor(`!document.getElementById('reader').hidden && document.querySelector('#reader h1')?.textContent.includes('PS5')`, 'the article to open');
+      await page.click('#reader [aria-label="Back to your room"]');
+      await page.waitFor(`!document.getElementById('grid').hidden`, 'the chosen layout to return');
+      await page.waitFor(`document.querySelector('.continue-reading')?.getAttribute('aria-busy') === 'false'`, 'reading history to settle before measuring the save button');
+      await page.click(`${saved} [data-save-url="${ARTICLE}"]`);
+      await page.waitFor(`!document.querySelector('#grid [data-save-url="${ARTICLE}"][aria-pressed="true"]')`, 'the save to be removed').catch(async (error) => {
+        const observed = await page.eval(`JSON.stringify({readerHidden:document.getElementById('reader').hidden,toast:document.getElementById('toast').textContent,buttons:[...document.querySelectorAll('[data-save-url="${ARTICLE}"]')].map(b=>({pressed:b.getAttribute('aria-pressed'),box:b.getBoundingClientRect()}))})`);
+        throw new Error(`${layout}: ${error.message}; ${observed}`);
+      });
+      assert.equal((await profiles.get('default')).saved.some(item => item.url === ARTICLE), false);
+      await tool('save_item', { url: ARTICLE, title: 'Hijacking the PS5' });
+      await page.goto(`${app.base}/preview`);
+      await page.waitFor(`document.querySelector('#grid.${layout} [data-save-url="${ARTICLE}"]') && !document.querySelector('.skeleton')`, 'the chosen layout to reopen');
+      assert.deepEqual(page.problems, []);
+    }
+  } finally {
+    await page.send('Emulation.setEmulatedMedia', { features: [] });
+    await page.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+    await profiles.put('default', room());
+  }
+});
+
+test('browser: a rejected layout preference restores the previous room and keeps the chooser usable', { skip }, async () => {
+  const { identifier } = await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `
+    const originalFetch = window.fetch;
+    window.fetch = (input, options) => {
+      const call = options?.body && typeof options.body === 'string' ? JSON.parse(options.body) : null;
+      if (call?.params?.name === 'arrange_room') return Promise.resolve(Response.json({ jsonrpc: '2.0', id: call.id, result: { isError: true, content: [{ type: 'text', text: 'Fixture save refused' }] } }));
+      return originalFetch(input, options);
+    };` });
+  try {
+    await openRoom();
+    await chooseLayout('paperback');
+    assert.equal(await page.eval(`document.querySelector('#grid').classList.contains('paperback')`), false);
+    assert.equal(await page.eval(`document.getElementById('btnLayout').textContent`), 'Layout: Columns');
+    assert.equal((await profiles.get('default')).layout, 'columns');
+    assert.match(await page.eval<string>(`document.getElementById('toast').textContent`), /Couldn't save: Fixture save refused/);
+    assert.equal(await page.eval(`document.activeElement.id`), 'btnLayout');
+    await page.click('#btnLayout');
+    assert.equal(await page.eval(`document.querySelector('[data-layout="paperback"]').disabled`), false);
+    assert.deepEqual(page.problems, []);
+  } finally {
+    await page.send('Page.removeScriptToEvaluateOnNewDocument', { identifier });
   }
 });
 
@@ -340,6 +457,35 @@ test('browser: docs anchors stay below the reader controls and contents do not o
   }
 });
 
+test('browser: narrow docs keep heading navigation and Contents brings search into view without leaving the reader', { skip }, async () => {
+  try {
+    await openRoom();
+    await page.click('[data-portal="docs"] .item-main');
+    await page.waitFor(`document.querySelector('.docs-toc a[data-url="${DOCS}/deploy.md"]')`, 'docs contents');
+    await page.eval(`document.querySelector('.docs-toc a[data-url="${DOCS}/deploy.md"]').click()`);
+    await page.waitFor(`document.querySelectorAll('.docs-page .body h2').length === 45`, 'long docs page');
+    assert.equal(await page.eval(`document.querySelector('.docs-toc a.current').getAttribute('aria-current')`), 'page');
+    for (const width of [900, 360]) {
+      await page.send('Emulation.setDeviceMetricsOverride', { width, height: 850, deviceScaleFactor: 1, mobile: false });
+      await page.click('.docs-outline summary');
+      await page.click('.docs-outline a:last-child');
+      await page.waitFor(`document.activeElement.textContent === 'Step 45'`, 'the outline destination to receive focus');
+      assert.ok(await page.eval<boolean>(`document.querySelector('.body h2:last-of-type').getBoundingClientRect().top >= document.querySelector('.reader-top').getBoundingClientRect().bottom - 1`));
+    }
+    await page.click('.docs-toggle');
+    assert.equal(await page.eval(`document.querySelector('.docs-toggle').getAttribute('aria-expanded')`), 'true');
+    assert.equal(await page.eval(`document.activeElement.className`), 'docs-search');
+    assert.ok(await page.eval<boolean>(`(() => { const r = document.activeElement.getBoundingClientRect(); return r.top >= 0 && r.bottom < innerHeight; })()`));
+    await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape' });
+    assert.equal(await page.eval(`document.getElementById('reader').hidden`), false);
+    assert.equal(await page.eval(`document.querySelector('.docs-toggle').getAttribute('aria-expanded')`), 'false');
+    assert.equal(await page.eval(`document.activeElement.className`), 'btn docs-toggle');
+    assert.deepEqual(page.problems, []);
+  } finally {
+    await page.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+  }
+});
+
 test('browser: the reader records opening and position, resumes there, and marks read only when asked', { skip }, async () => {
   await readings.deleteAll('default');
   const openArticle = async () => {
@@ -374,7 +520,7 @@ test('browser: the reader records opening and position, resumes there, and marks
   const read = await readingWhen((r) => r.status === 'read');
   assert.equal(read.status, 'read');
   assert.ok(read.readAt);
-  assert.deepEqual((await tool('list_reading', {})).reading.map((r: any) => r.url), [], 'finished reading is not "in the middle of"');
+  assert.equal((await tool('list_reading', {})).reading.some((r: any) => r.url === ARTICLE), false, 'the finished article is not "in the middle of"');
   assert.deepEqual(page.problems, []);
 });
 
@@ -407,6 +553,8 @@ test('browser: Continue reading survives a fresh view, opens docs at its saved p
   await openRoom();
   await page.waitFor(`document.querySelector('.continue-item')`, 'recent unfinished reading');
   assert.match(await page.eval<string>(`document.querySelector('.continue-reading').textContent`), /Deploy.*35%/s);
+  assert.equal(await page.eval<string>(`document.querySelector('.continue-source').textContent`), 'docs.example.com');
+  assert.equal(await page.eval<string>(`document.querySelector('.continue-progress > span').style.width`), '35%');
   assert.doesNotMatch(await page.eval<string>(`document.querySelector('.continue-reading').textContent`), /First steps|PS5/);
   await page.click('.continue-item');
   await page.waitFor(`document.querySelector('.docs-page .mark-read:not([disabled])') && document.getElementById('toast').textContent.includes('where you left off')`, 'the docs page to resume');
@@ -457,17 +605,20 @@ test('browser: docs hash navigation takes precedence over the saved position and
   await tool('record_reading', { url, title: 'Deploy', status: 'opened', anchor: { block: 70 }, progress: 0.9 });
   await openRoom();
   await page.click('[data-portal="docs"] .item-main');
-  await page.waitFor(`document.querySelector('.docs-page .mark-read:not([disabled])')`, 'the initial docs page');
+  await page.waitFor(`!document.getElementById('reader').hidden && document.querySelector('.docs-page h1')?.textContent === 'Install' && document.querySelector('.docs-page .mark-read:not([disabled])')`, 'the initial docs page');
   await page.eval(`document.querySelector('.docs-page .body a').click()`);
-  await page.waitFor(`document.querySelector('.docs-page h1')?.textContent === 'Deploy' && !document.querySelector('.docs-page .mark-read').disabled`, 'Deploy page');
+  await page.waitFor(`!document.getElementById('reader').hidden && document.querySelector('.docs-page h1')?.textContent === 'Deploy' && !document.querySelector('.docs-page .mark-read').disabled`, 'Deploy page');
   assert.ok(await page.eval<number>(`document.getElementById('reader').scrollTop || window.scrollY`) < 500, 'the explicit first heading takes precedence over saved block 70');
   assert.equal((await tool('get_reading', { url })).reading.anchor.block, 70, 'jumping back does not discard the furthest saved passage');
   await page.eval(`document.querySelector('#reader [aria-label="Back to your room"]').click()`);
+  // Back refreshes the unfinished-reading strip. Wait for its new height before
+  // measuring another real pointer click; retained hidden docs are not readiness.
+  await page.waitFor(`document.getElementById('reader').hidden && !document.getElementById('grid').hidden && document.querySelector('.continue-reading')?.getAttribute('aria-busy') === 'false'`, 'the room and refreshed reading strip after Back');
   await tool('record_reading', { url, status: 'opened', anchor: { block: 0 }, progress: 0 });
   await page.click('[data-portal="docs"] .item-main');
-  await page.waitFor(`document.querySelector('.docs-page .mark-read:not([disabled])')`, 'docs ready');
+  await page.waitFor(`!document.getElementById('reader').hidden && document.querySelector('.docs-page h1')?.textContent === 'Install' && document.querySelector('.docs-page .mark-read:not([disabled])')`, 'docs ready');
   await page.eval(`document.querySelector('.docs-toc a[data-url="${url}"]').click()`);
-  await page.waitFor(`document.querySelector('.docs-page h1')?.textContent === 'Deploy' && !document.querySelector('.docs-page .mark-read').disabled`, 'Deploy ready');
+  await page.waitFor(`!document.getElementById('reader').hidden && document.querySelector('.docs-page h1')?.textContent === 'Deploy' && !document.querySelector('.docs-page .mark-read').disabled`, 'Deploy ready');
   assert.equal((await tool('get_reading', { url })).reading.progress, 0, 'the navigation fixture starts at the beginning');
   await page.eval(`document.getElementById('reader').style.maxHeight = '220px'; document.getElementById('reader').scrollTop = 800`);
   await page.waitFor(`Number(document.querySelector('.docs-page .body').dataset.furthest) > 0`, 'the docs position').catch(async (error) => {
@@ -735,7 +886,7 @@ test("browser: in the river, follows' shares and reblogs join their stories with
       const name = body && body.params && body.params.name;
       if (url === '/mcp' && (name === 'share' || name === 'unshare')) {
         window.__calls.push({ name, args: body.params.arguments });
-        return answer(name === 'share' ? { content: [], structuredContent: { share: { id: 's_mine' } } } : { content: [], structuredContent: { removed: true } });
+        return answer(name === 'share' ? { content: [], structuredContent: { share: { id: 's_mine', audience: body.params.arguments.audience } } } : { content: [], structuredContent: { removed: true } });
       }
       const res = await real(url, init);
       if (name !== 'open_room') return res;
@@ -745,12 +896,14 @@ test("browser: in the river, follows' shares and reblogs join their stories with
       if (hn) {
         const now = new Date().toISOString();
         const share = (id, extra) => ({ id, kind: 'link', canReblog: true, ...extra });
+        const plain = room.portals.find((p) => p.portalId === 'gh-mcp')?.items[0];
+        if (plain) { plain.summary = 'Feed source context'; plain.image = { url: 'https://img.example.com/cover.png', kind: 'thumb' }; }
         room.identity = { mode: 'hosted', handle: 'reader' };
-        if (!location.search.includes('nolab')) room.labs = ['reblog'];   // ?nolab: the reblog lab off
+
         room.profile.columns.push({ width: 1, panels: [{ id: 'following', source: 'following', title: 'Following', config: {} }] });
         room.portals.push({ portalId: 'following', source: 'following', title: 'Following', provenance: { source: 'following', endpoint: 'shares from people you follow', fetchedAt: now, cached: false, ttlSeconds: 0 }, items: [
           { id: 's_ana', title: hn.items[0].title, url: hn.items[0].url, summary: 'Read the comments.', meta: ['@ana', 'link'], publishedAt: now, share: share('s_ana') },
-          { id: 's_ben', title: 'A post by cy', url: 'https://example.com/cy', summary: 'Ben agrees.', meta: ['@ben', 'reblogged @cy', 'link'], publishedAt: now, share: share('s_ben', { reblog: { root: 's_cy', by: 'cy', note: "Cy's own words." }, reblogs: 3 }) },
+          { id: 's_ben', title: 'A post by cy', url: 'https://example.com/cy', summary: 'Ben agrees.', meta: ['@ben', 'reblogged @cy', 'link'], publishedAt: now, share: share('s_ben', { description: 'Source context for cy', reblog: { root: 's_cy', by: 'cy', note: "Cy's own words." }, reblogs: 3 }) },
           { id: 's_dee', title: 'A post by cy', url: 'https://example.com/cy', meta: ['@dee', 'reblogged @cy', 'link'], publishedAt: now, share: share('s_dee', { reblog: { root: 's_cy', by: 'cy', note: "Cy's own words." }, reblogs: 3 }) },
           { id: 's_eve', title: 'Gone now', url: 'https://example.com/gone', summary: 'Still worth it.', meta: ['@eve', 'reblogged a removed post', 'link'], publishedAt: now, share: share('s_eve', { reblog: { root: 's_x', removed: 'removed' } }) },
           { id: 's_fay', title: 'Just for fay', url: 'https://example.com/fay', meta: ['@fay', 'link'], publishedAt: now, share: share('s_fay', { canReblog: false }) },
@@ -760,7 +913,10 @@ test("browser: in the river, follows' shares and reblogs join their stories with
     };
   })();` });
   await profiles.put('default', validateProfile({ ...room(), layout: 'river' }));
-  const hnTitle = (await tool('open_room', {})).portals.find((p: any) => p.portalId === 'hn-top').items[0].title;
+  const initial = await tool('open_room', {});
+  const hnTitle = initial.portals.find((p: any) => p.portalId === 'hn-top').items[0].title;
+  const existing = initial.portals.find((p: any) => p.portalId === 'gh-mcp').items[0];
+  await profiles.put('default', validateProfile({ ...initial.profile, saved: [...initial.profile.saved, { url: existing.url, title: 'My chosen bookmark title' }] }));
   /** The story with this title. */
   const find = (title: string) => `[...document.querySelectorAll('.river-feed > article')].find((n) => n.querySelector('.item-title').textContent.endsWith(${JSON.stringify(title)}))`;
   const read = (title: string) => page.eval<{ context: string | null; trail: string[]; removed: string | null; from: string; reblog: { label: string; disabled: boolean } | null } | null>(`(() => {
@@ -769,7 +925,7 @@ test("browser: in the river, follows' shares and reblogs join their stories with
     return node ? { context: node.querySelector('.story-context')?.textContent ?? null, trail: [...node.querySelectorAll('.story-note')].map((n) => n.textContent), removed: node.querySelector('.story-removed')?.textContent ?? null,
       from: node.querySelector('.item-from').textContent, reblog: b ? { label: b.getAttribute('aria-label'), disabled: b.disabled } : null } : null;
   })()`);
-  const menu = () => page.eval<string[]>(`[...document.querySelectorAll('.reblog-menu [role="menuitem"]')].map((n) => n.textContent)`);
+  const menu = () => page.eval<string[]>(`[...document.querySelectorAll('.reblog-menu > [role="menuitem"], .reblog-submit-row > [role="menuitem"]')].map((n) => n.textContent)`);
   try {
     page.problems.length = 0;
     await page.goto(`${app.base}/preview`);
@@ -782,12 +938,15 @@ test("browser: in the river, follows' shares and reblogs join their stories with
     assert.equal(cy?.context, '@ben and @dee reblogged @cy', 'two reblogs of one post are one card');
     assert.deepEqual(cy?.trail, ["@cyCy's own words.", '@benBen agrees.'], "the original's note, then a reblog's: two voices");
     assert.equal(cy?.reblog?.label, 'Reblog (3 reblogs)', 'the count pools on the original');
+    assert.equal(await page.eval(`${find('A post by cy')}.querySelector('.item-summary').textContent`), 'Source context for cy');
     assert.equal((await read('Gone now'))?.removed, 'The original post was removed.');
     assert.deepEqual((await read('Just for fay'))?.reblog, { label: "You can't reblog this post", disabled: true });
 
     // The menu: Reblog and Reblog with a note, plus a nudge to read it first.
     await page.eval(`${find('A post by cy')}.querySelector('.mi.reblog').click()`);
     assert.deepEqual(await menu(), ['Reblog', 'Reblog with a note']);
+    assert.equal(await page.eval(`document.querySelector('.reblog-menu input:checked').value`), 'everyone', 'quick reblog defaults to Public');
+    assert.match(await page.eval<string>(`document.querySelector('.reblog-menu .audience-help').textContent`), /Visible on your Space/);
     assert.equal(await page.eval(`document.activeElement.textContent`), 'Reblog', 'focus moves into the menu');
     await page.waitFor(`document.querySelector('.reblog-nudge')`, 'the read-it-first nudge');
     assert.match(await page.eval<string>(`document.querySelector('.reblog-nudge').textContent`), /You haven't read this yet\. Read it first\?/);
@@ -798,7 +957,7 @@ test("browser: in the river, follows' shares and reblogs join their stories with
     await page.eval(`[...document.querySelectorAll('.reblog-menu [role="menuitem"]')].find((n) => n.textContent === 'Reblog').click()`);
     await page.waitFor(`${find('A post by cy')}.querySelector('.mi.reblog').classList.contains('on')`, 'the reblog to land');
     assert.equal((await read('A post by cy'))?.reblog?.label, 'Undo reblog (4 reblogs)');
-    assert.deepEqual(await page.eval(`window.__calls.at(-1)`), { name: 'share', args: { reblogOf: 's_ben' } }, "it reblogs the post behind the story; the server finds cy's original");
+    assert.deepEqual(await page.eval(`window.__calls.at(-1)`), { name: 'share', args: { reblogOf: 's_ben', audience: 'everyone' } }, "it reblogs the post behind the story with its visible audience");
     assert.match(await page.eval<string>(`document.getElementById('toast').textContent`), /Sent through the portal!/);
     await page.eval(`${find('A post by cy')}.querySelector('.mi.reblog').click()`);
     assert.deepEqual(await menu(), ['Undo reblog']);
@@ -810,18 +969,190 @@ test("browser: in the river, follows' shares and reblogs join their stories with
     // A story no one has posted: reblogging with a note saves it first, then opens the composer.
     const plain = await page.eval<string>(`[...document.querySelectorAll('.river-feed > article')].find((n) => n.dataset.story.startsWith('gh-mcp')).querySelector('.item-title').textContent`);
     await page.eval(`[...document.querySelectorAll('.river-feed > article')].find((n) => n.dataset.story.startsWith('gh-mcp')).querySelector('.mi.reblog').click()`);
+    await page.eval(`document.querySelector('.reblog-menu input[value="followers"]').click()`);
+    assert.equal(await page.eval(`document.querySelector('.reblog-menu input:checked').value`), 'followers');
     await page.eval(`[...document.querySelectorAll('.reblog-menu [role="menuitem"]')].find((n) => n.textContent === 'Reblog with a note').click()`);
     await page.waitFor(`!document.getElementById('reader').hidden && document.querySelector('#reader .composer')`, 'the composer');
     assert.match(await page.eval<string>(`document.querySelector('#reader .composer').textContent`), new RegExp(`Reblog “${plain.replace(/^New/, '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}” to your space`));
-    assert.ok((await tool('open_room', {})).profile.saved.length > 1, 'saved first');
-    // The reblog lab off: no reblog buttons; stories keep phase 3's share button.
-    await page.goto(`${app.base}/preview?nolab`);
-    await page.waitFor(`document.querySelector('#grid.river .river-feed article') && !document.querySelector('.skeleton')`, 'the river, reblog lab off');
-    assert.equal(await page.eval(`document.querySelectorAll('.mi.reblog').length`), 0);
-    assert.ok(await page.eval<number>(`document.querySelectorAll('.story [aria-label="Share to your space"]').length`) > 0);
+    const saved = (await tool('open_room', {})).profile.saved;
+    assert.ok(saved.length > 1, 'saved first');
+    const preview = saved.find((s: any) => s.description === 'Feed source context');
+    assert.ok(preview, 'the feed description survives reblogging');
+    assert.deepEqual(preview.image, { url: 'https://img.example.com/cover.png', kind: 'thumb' });
+    assert.equal(preview.title, 'My chosen bookmark title', 'adding the preview preserves a chosen bookmark title');
+    assert.equal(preview.note, undefined, 'source descriptions are not personal notes');
+    assert.equal(await page.eval(`document.querySelector('.composer input:checked').value`), 'followers', 'the menu choice carries into the note composer');
+    assert.match(await page.eval<string>(`document.querySelector('.composer .audience-help').textContent`), /Hidden from your public Space/);
+    await page.click('.composer .row > button');
+    await page.waitFor(`document.querySelector('.composer [role="status"]')`, 'the followers reblog');
+    assert.equal(await page.eval(`window.__calls.at(-1).args.audience`), 'followers');
+    assert.match(await page.eval<string>(`document.querySelector('.composer').textContent`), /Reblogged · Followers only/);
+    await page.click('#reader .reader-top button');
+    await page.eval(`${find('A post by cy')}.querySelector('.mi.reblog').click()`);
+    assert.equal(await page.eval(`document.querySelector('.reblog-menu input:checked').value`), 'followers', 'future quick reblogs remember the choice');
+    await page.eval(`[...document.querySelectorAll('.reblog-menu [role="menuitem"]')].find((n) => n.textContent === 'Reblog').click()`);
+    await page.waitFor(`${find('A post by cy')}.querySelector('.mi.reblog').classList.contains('on')`, 'the followers quick reblog');
+    assert.equal(await page.eval(`window.__calls.at(-1).args.audience`), 'followers');
+    // No labs at all: the river is offered, and in columns every feed row has a reblog button too.
+    assert.equal(await page.eval(`document.querySelector('[data-layout="river"]').hidden`), false);
+    await page.eval(`document.querySelector('[data-layout="columns"]').click()`);
+    await page.waitFor(`!document.querySelector('#grid.river') && document.querySelector('#grid .item .mi.reblog')`, 'reblog in columns');
+    assert.ok(await page.eval<number>(`[...document.querySelectorAll('#grid .item')].filter((n) => n.querySelector('.mi.reblog')).length`) > 5);
     assert.deepEqual(page.problems, []);
   } finally {
     await page.send('Page.removeScriptToEvaluateOnNewDocument', { identifier });
+    await profiles.put('default', room());
+  }
+});
+
+test('browser: every handle is a door: @names open their space and come back to where you were; a share offers to follow its author', { skip }, async () => {
+  // As in the river test, the page gets a Following portal on the way in, and the social
+  // tools are answered in the page.
+  const { identifier } = await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => {
+    const real = window.fetch;
+    window.__calls = [];
+    const answer = (result) => new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result }), { status: 200, headers: { 'content-type': 'application/json' } });
+    const now = new Date().toISOString();
+    window.fetch = async (url, init) => {
+      const body = init && typeof init.body === 'string' ? JSON.parse(init.body) : null;
+      const name = body && body.params && body.params.name;
+      const args = body && body.params && body.params.arguments;
+      if (url === '/mcp' && ['open_space', 'get_share', 'relationship'].includes(name)) {
+        window.__calls.push({ name, args });
+        if (name === 'open_space') return answer({ content: [], structuredContent: { space: { handle: args.handle, displayName: args.handle.toUpperCase(), mine: false, followers: 2, following: false,
+          posts: Array.from({ length: 8 }, (_, i) => ({ id: 's_preview_' + i, kind: 'link', title: 'Preview story ' + i, description: 'Source preview ' + i, image: { url: 'https://img.example.com/space-' + i + '.png', kind: 'thumb' }, note: 'Personal note ' + i, audience: 'everyone', createdAt: now, author: { handle: args.handle }, mine: false, reblogCount: 0, canReblog: true })),
+          sources: [], createdAt: now, updatedAt: now } } });
+        if (name === 'relationship') return answer({ content: [], structuredContent: { handle: args.handle, layoutChanged: false } });
+        if (args.id === 's_ben') return answer({ content: [], structuredContent: { share: { id: 's_ben', kind: 'link', title: 'A post by cy', url: 'https://example.com/cy', audience: 'everyone', createdAt: now,
+          author: { handle: 'ben' }, mine: false, reblogCount: 1, canReblog: true, reblogOf: { root: 's_cy' }, original: { id: 's_cy', author: { handle: 'cy' }, note: "Cy's own words." }, canFollow: ['cy'] } } });
+        return answer({ content: [], structuredContent: { share: { id: 's_fay', kind: 'clip', title: 'Just for fay', clip: { kind: 'quote', data: { kind: 'quote', text: 'Cats are liquid.' } }, note: 'Worth a look.', audience: 'everyone', createdAt: now,
+          author: { handle: 'fay' }, mine: false, reblogCount: 0, canReblog: true, canFollow: ['fay'] } } });
+      }
+      const res = await real(url, init);
+      if (name !== 'open_room') return res;
+      const json = await res.json();
+      const room = json.result && json.result.structuredContent;
+      if (room && room.portals) {
+        room.identity = { mode: 'hosted', handle: 'reader' };
+        room.profile.columns.push({ width: 1, panels: [{ id: 'following', source: 'following', title: 'Following', config: {} }] });
+        room.portals.push({ portalId: 'following', source: 'following', title: 'Following', provenance: { source: 'following', endpoint: 'shares from people you follow', fetchedAt: now, cached: false, ttlSeconds: 0 }, items: [
+          { id: 's_ben', title: 'A post by cy', url: 'https://example.com/cy', meta: ['@ben', 'reblogged @cy', 'link'], publishedAt: now, share: { id: 's_ben', kind: 'link', canReblog: true, reblog: { root: 's_cy', by: 'cy', note: "Cy's own words." } } },
+          { id: 's_fay', title: 'Just for fay', meta: ['@fay', 'quote'], publishedAt: now, share: { id: 's_fay', kind: 'clip', canReblog: true } },
+        ] });
+      }
+      return new Response(JSON.stringify(json), { status: res.status, headers: { 'content-type': 'application/json' } });
+    };
+  })();` });
+  await profiles.put('default', validateProfile({ ...room(), layout: 'river' }));
+  const find = (title: string) => `[...document.querySelectorAll('.river-feed > article')].find((n) => n.querySelector('.item-title').textContent.endsWith(${JSON.stringify(title)}))`;
+  const spaceOpen = (handle: string) => page.waitFor(`!document.getElementById('reader').hidden && document.querySelector('#reader .space-head h1')?.textContent === ${JSON.stringify(handle.toUpperCase())}`, `@${handle}'s space`);
+  try {
+    page.problems.length = 0;
+    await page.goto(`${app.base}/preview`);
+    await page.waitFor(`document.querySelector('#grid.river .river-feed article') && !document.querySelector('.skeleton')`, 'the river');
+    assert.deepEqual(await page.eval(`[...${find('A post by cy')}.querySelectorAll('.story-context .handle, .story-note .handle')].map((n) => n.textContent)`), ['@ben', '@cy', '@cy'],
+      'the context row and the trail name people as buttons');
+
+    // From the river: the original's author, then back to the river.
+    await page.eval(`${find('A post by cy')}.querySelector('.story-context .handle:last-child').click()`);
+    await spaceOpen('cy');
+    assert.deepEqual(await page.eval(`window.__calls.at(-1)`), { name: 'open_space', args: { handle: 'cy' } });
+    await page.waitFor(`document.querySelector('#reader .space-link-image')?.naturalWidth > 0`, 'the first Space preview image');
+    assert.equal(await page.eval(`document.querySelector('#reader .space-description').textContent`), 'Source preview 0');
+    assert.equal(await page.eval(`document.querySelector('#reader .post .pn').textContent`), 'Personal note 0');
+    await page.eval(`document.querySelector('#reader [data-post-id="s_preview_7"]').scrollIntoView()`);
+    await page.waitFor(`document.querySelector('#reader [data-post-id="s_preview_7"] .space-link-image')?.naturalWidth > 0`, 'Space previews beyond the first image batch');
+    await page.eval(`document.querySelector('#reader .reader-top button').click()`);
+    await page.waitFor(`document.getElementById('reader').hidden && !document.getElementById('grid').hidden`, 'back to the river');
+
+    // A shared clip opens as a share: its author is a door, and Follow is right there.
+    await page.eval(`${find('Just for fay')}.querySelector('.item-main').click()`);
+    await page.waitFor(`document.querySelector('#reader .share-actions .btn.follow')`, 'the share with Follow');
+    assert.equal(await page.eval(`document.querySelector('#reader .byline').textContent.split(' · ')[0]`), '@fay shared a quote');
+    await page.eval(`document.querySelector('#reader .share-actions .btn.follow').click()`);
+    await page.waitFor(`document.querySelector('#reader .btn.follow').getAttribute('aria-pressed') === 'true'`, 'the follow');
+    assert.deepEqual(await page.eval(`window.__calls.at(-1)`), { name: 'relationship', args: { handle: 'fay', action: 'follow' } });
+    assert.equal(await page.eval(`document.querySelector('#reader .btn.follow').textContent`), 'Following @fay');
+
+    // From the share to the space and back to the very same share, as it was.
+    await page.eval(`document.querySelector('#reader .byline .handle').click()`);
+    await spaceOpen('fay');
+    await page.eval(`document.querySelector('#reader .reader-top button').click()`);
+    await page.waitFor(`document.querySelector('#reader h1')?.textContent === 'Just for fay'`, 'back to the share');
+    assert.equal(await page.eval(`document.querySelector('#reader .btn.follow').textContent`), 'Following @fay', 'the share comes back as you left it');
+    assert.equal(await page.eval(`document.getElementById('reader').classList.contains('space')`), false);
+
+    // A shared link opens in the reader, which still says who passed it on, with Follow for the original's author.
+    await page.eval(`document.querySelector('#reader .reader-top button').click()`);
+    await page.waitFor(`document.getElementById('reader').hidden`, 'back to the river');
+    await page.eval(`${find('A post by cy')}.querySelector('.item-main').click()`);
+    await page.waitFor(`document.querySelector('#reader .shared-by .btn.follow')`, 'the reader with who shared it');
+    assert.equal(await page.eval(`document.querySelector('#reader .shared-by .byline').textContent`), "@ben reblogged @cy's link");
+    assert.deepEqual(await page.eval(`[...document.querySelectorAll('#reader .shared-by .story-note')].map((n) => n.textContent)`), ["@cyCy's own words."]);
+    assert.equal(await page.eval(`document.querySelector('#reader .shared-by .btn.follow').textContent`), 'Follow @cy');
+    assert.deepEqual(await page.eval(`window.__calls.at(-1)`), { name: 'get_share', args: { id: 's_ben' } });
+
+    // A Following portal's rows name their people as buttons too.
+    await page.eval(`document.querySelector('#reader .reader-top button').click()`);
+    await page.eval(`document.querySelector('[data-layout="columns"]').click()`);
+    await page.waitFor(`!document.querySelector('#grid.river') && document.querySelector('#grid .item .item-meta .handle')`, 'handles in Following rows');
+    assert.deepEqual(await page.eval(`[...document.querySelectorAll('#grid .item .item-meta .handle')].map((n) => n.textContent)`), ['@ben', '@cy', '@fay']);
+    assert.deepEqual(page.problems, []);
+  } finally {
+    await page.send('Page.removeScriptToEvaluateOnNewDocument', { identifier });
+    await profiles.put('default', room());
+  }
+});
+
+test('browser: a standalone clip loads the saved audience before sharing, retries failures, and wraps on narrow screens', { skip }, async () => {
+  await profiles.put('default', validateProfile({ ...room(), shareAudience: 'followers' }));
+  const host = await attachHost();
+  const { identifier } = await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => {
+    const real = window.fetch;
+    window.__shares = [];
+    let failPreference = true;
+    window.fetch = async (url, init) => {
+      const body = init && typeof init.body === 'string' ? JSON.parse(init.body) : null;
+      const name = body?.params?.name;
+      let result;
+      if (url === '/mcp' && name === 'account_settings' && failPreference) {
+        failPreference = false;
+        result = { isError: true, content: [{ type: 'text', text: 'Preference temporarily unavailable' }] };
+      } else if (url === '/mcp' && name === 'share') {
+        window.__shares.push(body.params.arguments);
+        result = { content: [], structuredContent: { share: { id: 's_clip', audience: body.params.arguments.audience } } };
+      }
+      return result ? new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result }), { status: 200, headers: { 'content-type': 'application/json' } }) : real(url, init);
+    };
+  })();` });
+  try {
+    page.problems.length = 0;
+    await page.send('Emulation.setDeviceMetricsOverride', { width: 360, height: 900, deviceScaleFactor: 1, mobile: false });
+    await page.goto(`${app.base}/preview`);
+    await page.eval(`window.postMessage({ jsonrpc: '2.0', method: 'ui/notifications/tool-result', params: { structuredContent: { clip: {
+      id: 'c_test', title: 'A standalone clip', kind: 'quote', tags: [], source: { kind: 'conversation' }, createdAt: new Date().toISOString(), data: { kind: 'quote', text: 'Keep this thought.' }
+    } } } }, '*')`);
+    await page.waitFor(`document.querySelector('#reader h1')?.textContent === 'A standalone clip'`, 'the standalone clip card');
+    await page.eval(`[...document.querySelectorAll('#reader button')].find((b) => b.textContent.includes('Share to your space')).click()`);
+    await page.waitFor(`document.querySelector('.audience-help button')`, 'the preference retry');
+    assert.equal(await page.eval(`document.querySelector('.composer .row > button').disabled`), true, 'failure blocks submission rather than guessing Public');
+    assert.equal(await page.eval(`window.__shares.length`), 0);
+    await page.click('.audience-help button');
+    await page.waitFor(`document.querySelector('.composer input:checked')?.value === 'followers' && !document.querySelector('.composer .row > button').disabled`, 'the saved audience after retry');
+    assert.match(await page.eval<string>(`document.querySelector('.audience-help').textContent`), /Hidden from your public Space/);
+    await page.eval(`document.documentElement.style.fontSize = '200%'`);
+    assert.equal(await page.eval(`(() => { const box = document.querySelector('.composer').getBoundingClientRect(); return [...document.querySelectorAll('.composer .row button, .composer label')].every((n) => { const r = n.getBoundingClientRect(); return r.left >= box.left && r.right <= box.right; }); })()`), true, 'controls fit at 360px with enlarged text');
+    await page.click('.composer input[value="everyone"]');
+    assert.match(await page.eval<string>(`document.querySelector('.audience-help').textContent`), /Visible on your Space/);
+    await page.click('.composer .row > button');
+    await page.waitFor(`document.querySelector('.composer [role="status"]')`, 'the public clip share');
+    assert.deepEqual(await page.eval(`window.__shares`), [{ clipId: 'c_test', note: '', audience: 'everyone' }]);
+    assert.match(await page.eval<string>(`document.querySelector('.composer').textContent`), /Shared · Public/);
+    assert.deepEqual(page.problems, []);
+  } finally {
+    await page.send('Page.removeScriptToEvaluateOnNewDocument', { identifier });
+    await page.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: host });
+    await page.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
     await profiles.put('default', room());
   }
 });
@@ -845,7 +1176,7 @@ test('browser: a portal opens to fill the room; the reader returns to it, and Es
     // The reader opens over the portal and comes back to it.
     await page.click('.level .item-main');
     await page.waitFor(`!document.getElementById('reader').hidden && document.querySelector('#reader h1')`, 'the reader');
-    await page.click('#reader .reader-top .ib');
+    await page.click('#reader .reader-top [aria-label="Back to your room"]');
     await page.waitFor(`document.getElementById('reader').hidden && document.querySelector('.level')`, 'back at the portal');
     assert.equal(await page.eval(`document.querySelectorAll('.level li').length`), 15, 'still showing what it showed');
     await escape();
@@ -1038,4 +1369,210 @@ test('browser: reading navigation uses labelled custom icons and fits all destin
   assert.equal(await page.eval(`document.querySelector('#btnCompare').getAttribute('aria-label')`),'Compare (2)');
   assert.equal(await page.eval(`document.querySelector('#btnCompare').dataset.count`),'2');
   assert.equal(await page.eval(`Boolean(document.querySelector('#btnCompare svg path'))`),true);
+});
+
+test('browser: Space links: the room offers a follow of whoever brought you, says who joined through yours, and your space copies its link', { skip }, async () => {
+  const { identifier } = await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => {
+    const real = window.fetch;
+    window.__calls = [];
+    window.__intros = { offer: ['ana'], joined: ['ben'] };
+    const answer = (result) => new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result }), { status: 200, headers: { 'content-type': 'application/json' } });
+    const now = new Date().toISOString();
+    window.fetch = async (url, init) => {
+      const body = init && typeof init.body === 'string' ? JSON.parse(init.body) : null;
+      const name = body && body.params && body.params.name;
+      const args = body && body.params && body.params.arguments;
+      if (url === '/mcp' && (name === 'relationship' || name === 'open_space' || name === 'set_public_profile')) {
+        window.__calls.push({ name, args });
+        if (name === 'relationship') return answer({ content: [], structuredContent: { handle: args.handle, layoutChanged: false } });
+        if (name === 'set_public_profile') return answer({ content: [], structuredContent: { profile: { handle: 'reader', ...(args.listed ? { listed: true } : {}), createdAt: now, updatedAt: now } } });
+        return answer({ content: [], structuredContent: { space: { handle: 'reader', mine: true, followers: 0, following: false, posts: [], sources: [], link: 'https://mcportal.example/@reader', createdAt: now, updatedAt: now } } });
+      }
+      const res = await real(url, init);
+      if (name !== 'open_room') return res;
+      const json = await res.json();
+      const room = json.result && json.result.structuredContent;
+      if (room && room.portals) {
+        room.identity = { mode: 'hosted', handle: 'reader' };
+        if (window.__intros) { room.intros = window.__intros; window.__intros = undefined; }   // said once
+      }
+      return new Response(JSON.stringify(json), { status: res.status, headers: { 'content-type': 'application/json' } });
+    };
+  })();` });
+  try {
+    page.problems.length = 0;
+    await page.goto(`${app.base}/preview`);
+    await page.waitFor(`document.querySelector('#intros') && !document.querySelector('.skeleton')`, 'the intro strip');
+    assert.deepEqual(await page.eval(`[...document.querySelectorAll('#intros .intro')].map((n) => n.textContent)`),
+      ["You came in through @ana's Space link.Follow @anaNot now", '@ben joined MCPortal through your Space link.']);
+    await page.eval(`document.querySelector('#intros .btn.follow').click()`);
+    await page.waitFor(`document.querySelector('#intros .btn.follow').getAttribute('aria-pressed') === 'true'`, 'the follow');
+    assert.deepEqual(await page.eval(`window.__calls.at(-1)`), { name: 'relationship', args: { handle: 'ana', action: 'follow' } });
+    await page.eval(`document.querySelector('#intros .link-btn').click()`);
+    assert.equal(await page.eval(`document.querySelectorAll('#intros .intro').length`), 1, 'Not now puts that one away');
+
+    // Opening something hides the strip; the room brings it back.
+    await page.eval(`document.querySelector('#intros .handle').click()`);
+    await page.waitFor(`!document.getElementById('reader').hidden && document.querySelector('#reader .space-head')`, 'a space');
+    assert.equal(await page.eval(`getComputedStyle(document.getElementById('intros')).display`), 'none');
+    assert.ok(await page.eval(`document.querySelector('#reader .space-printshop').textContent.includes('Copy link to your space')`), 'your own space offers its link');
+    // Your space says whether you're findable, and switches it.
+    await page.eval(`[...document.querySelectorAll('#reader .space-printshop .btn')].find((b) => b.textContent === 'Unlisted: list me').click()`);
+    await page.waitFor(`[...document.querySelectorAll('#reader .space-printshop .btn')].some((b) => b.textContent.startsWith('Listed:'))`, 'listed');
+    assert.deepEqual(await page.eval(`window.__calls.at(-1)`), { name: 'set_public_profile', args: { listed: true } });
+    await page.eval(`[...document.querySelectorAll('#reader .space-printshop .btn')].find((b) => b.textContent.includes('Copy link')).click()`);
+    await page.waitFor(`/mcportal\\.example\\/@reader|Copied your Space link/.test(document.getElementById('toast').textContent)`, 'the link copied or shown');
+    await page.eval(`document.querySelector('#reader .reader-top button').click()`);
+    await page.waitFor(`document.getElementById('reader').hidden`, 'back to the room');
+    assert.notEqual(await page.eval(`getComputedStyle(document.getElementById('intros')).display`), 'none');
+    assert.deepEqual(page.problems, []);
+  } finally {
+    await page.send('Page.removeScriptToEvaluateOnNewDocument', { identifier });
+  }
+});
+
+test('browser: the People portal: suggested people with the agent\'s reason, Follow, Not for me, and their Space on click; never in the river', { skip }, async () => {
+  const { identifier } = await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => {
+    const real = window.fetch;
+    window.__calls = [];
+    const answer = (result) => new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result }), { status: 200, headers: { 'content-type': 'application/json' } });
+    const now = new Date().toISOString();
+    window.fetch = async (url, init) => {
+      const body = init && typeof init.body === 'string' ? JSON.parse(init.body) : null;
+      const name = body && body.params && body.params.name;
+      const args = body && body.params && body.params.arguments;
+      if (url === '/mcp' && ['relationship', 'pass_person', 'open_space'].includes(name)) {
+        window.__calls.push({ name, args });
+        if (name === 'relationship') return answer({ content: [], structuredContent: { handle: args.handle, layoutChanged: false } });
+        if (name === 'pass_person') return answer({ content: [], structuredContent: { profile: {} } });
+        return answer({ content: [], structuredContent: { space: { handle: args.handle, displayName: args.handle.toUpperCase(), mine: false, followers: 3, following: false, posts: [], sources: [], createdAt: now, updatedAt: now } } });
+      }
+      const res = await real(url, init);
+      if (name !== 'open_room') return res;
+      const json = await res.json();
+      const room = json.result && json.result.structuredContent;
+      if (room && room.portals) {
+        room.identity = { mode: 'hosted', handle: 'reader' };
+        room.profile.columns.push({ width: 1, panels: [{ id: 'people', source: 'people', title: 'People', config: {} }] });
+        room.portals.push({ portalId: 'people', source: 'people', title: 'People', provenance: { source: 'people', endpoint: "your agent's suggestions", fetchedAt: now, cached: false, ttlSeconds: 0 }, items: [
+          { id: 'person:ana', title: '@ana', summary: 'Posts mostly about cat behavior research.', meta: ['Cat Physics Quarterly', '3 followers'], publishedAt: now, person: { handle: 'ana', following: false } },
+          { id: 'person:ben', title: 'Ben (@ben)', summary: 'Plays World of Warcraft: raid guides and lore.', meta: ['12 followers'], publishedAt: now, person: { handle: 'ben', following: false } },
+        ] });
+      }
+      return new Response(JSON.stringify(json), { status: res.status, headers: { 'content-type': 'application/json' } });
+    };
+  })();` });
+  const people = `[...document.querySelectorAll('#grid .item')].filter((n) => n.querySelector('.person-act'))`;
+  try {
+    page.problems.length = 0;
+    await page.goto(`${app.base}/preview`);
+    await page.waitFor(`${people}.length === 2 && !document.querySelector('.skeleton')`, 'the People portal');
+    assert.deepEqual(await page.eval(`${people}.map((n) => [n.querySelector('.item-title').textContent, n.querySelector('.item-summary').textContent, [...n.querySelectorAll('.person-act')].map((b) => b.textContent)])`), [
+      ['@ana', 'Posts mostly about cat behavior research.', ['Follow', 'Not for me']],
+      ['Ben (@ben)', 'Plays World of Warcraft: raid guides and lore.', ['Follow', 'Not for me']]]);
+    assert.equal(await page.eval(`${people}.some((n) => n.querySelector('.mi.save, .mi.reblog'))`), false, 'nothing to save or reblog');
+
+    await page.eval(`${people}[0].querySelector('.person-act.follow').click()`);
+    await page.waitFor(`${people}[0].querySelector('.person-act.follow').textContent === 'Following'`, 'the follow');
+    assert.deepEqual(await page.eval(`window.__calls.at(-1)`), { name: 'relationship', args: { handle: 'ana', action: 'follow' } });
+
+    await page.eval(`[...${people}[1].querySelectorAll('.person-act')].find((b) => b.textContent === 'Not for me').click()`);
+    await page.waitFor(`${people}.length === 1`, 'ben passed on');
+    assert.deepEqual(await page.eval(`window.__calls.at(-1)`), { name: 'pass_person', args: { handle: 'ben' } });
+
+    await page.eval(`${people}[0].querySelector('.item-main').click()`);
+    await page.waitFor(`!document.getElementById('reader').hidden && document.querySelector('#reader .space-head h1')?.textContent === 'ANA'`, "ana's space");
+    await page.eval(`document.querySelector('#reader .reader-top button').click()`);
+    await page.waitFor(`document.getElementById('reader').hidden`, 'back to the room');
+
+    await page.eval(`document.querySelector('[data-layout="river"]').click()`);
+    await page.waitFor(`document.querySelector('#grid.river .river-feed article')`, 'the river');
+    assert.equal(await page.eval(`document.querySelectorAll('#grid.river .person-act').length`), 0, 'people stay out of the river');
+    assert.deepEqual(page.problems, []);
+  } finally {
+    await page.send('Page.removeScriptToEvaluateOnNewDocument', { identifier });
+    await profiles.put('default', room());
+  }
+});
+
+test('browser: the Lobby in the river: a stranger\'s post says "not followed", and a story someone you don\'t follow also shared says so, once', { skip }, async () => {
+  const { identifier } = await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => {
+    const real = window.fetch;
+    window.fetch = async (url, init) => {
+      const body = init && typeof init.body === 'string' ? JSON.parse(init.body) : null;
+      const name = body && body.params && body.params.name;
+      const res = await real(url, init);
+      if (name !== 'open_room') return res;
+      const json = await res.json();
+      const room = json.result && json.result.structuredContent;
+      const hn = room && room.portals && room.portals.find((p) => p.portalId === 'hn-top');
+      if (hn) {
+        const now = new Date().toISOString();
+        room.identity = { mode: 'hosted', handle: 'reader' };
+        room.profile.columns.push({ width: 1, panels: [{ id: 'lobby', source: 'lobby', title: 'Lobby', config: {} }] });
+        room.portals.push({ portalId: 'lobby', source: 'lobby', title: 'Lobby', provenance: { source: 'lobby', endpoint: 'posts shared with everyone by listed people', fetchedAt: now, cached: false, ttlSeconds: 0 }, items: [
+          { id: 's_zoe', title: hn.items[0].title, url: hn.items[0].url, summary: 'Worth the read.', meta: ['@zoe', 'link', 'not followed'], publishedAt: now, share: { id: 's_zoe', kind: 'link', canReblog: true } },
+        ] });
+        room.alsoShared = hn.items.filter((i) => i.url).map((i) => ({ url: i.url, handle: 'yan' }));   // every HN story, the first one included
+      }
+      return new Response(JSON.stringify(json), { status: res.status, headers: { 'content-type': 'application/json' } });
+    };
+  })();` });
+  await profiles.put('default', validateProfile({ ...room(), layout: 'river' }));
+  const titles = (await tool('open_room', {})).portals.find((p: any) => p.portalId === 'hn-top').items.slice(0, 1).map((i: any) => i.title);
+  const context = (title: string) => page.eval<string | null>(`[...document.querySelectorAll('.river-feed > article')].find((n) => n.querySelector('.item-title').textContent.endsWith(${JSON.stringify(title)}))?.querySelector('.story-context')?.textContent ?? null`);
+  try {
+    page.problems.length = 0;
+    await page.goto(`${app.base}/preview`);
+    await page.waitFor(`document.querySelector('#grid.river .river-feed article') && !document.querySelector('.skeleton')`, 'the river');
+    assert.equal(await context(titles[0]), '@zoe shared · not followed', "the Lobby's share joins HN's story; its sharer wins over also-shared");
+    const contexts = await page.eval<string[]>(`[...document.querySelectorAll('.river-feed > article .story-context')].map((n) => n.textContent)`);
+    assert.ok(contexts.includes('also shared by @yan'), `another HN story names who else shared it (${contexts.join(' | ')})`);
+    assert.equal(contexts.filter((c) => c.includes('@zoe')).length, 1, 'one name per story: zoe, not yan, on the first');
+    assert.deepEqual([...new Set(await page.eval<string[]>(`[...document.querySelectorAll('.river-feed .story-context .handle')].map((b) => b.textContent)`))].sort(), ['@yan', '@zoe'], 'both are doors');
+    assert.deepEqual(page.problems, []);
+  } finally {
+    await page.send('Page.removeScriptToEvaluateOnNewDocument', { identifier });
+    await profiles.put('default', room());
+  }
+});
+
+test('browser: docs find searches current content and reading comfort follows page navigation with reset and Escape', { skip }, async () => {
+  const host = await attachHost();
+  try {
+    await page.send('Emulation.setDeviceMetricsOverride', { width: 360, height: 600, deviceScaleFactor: 1, mobile: false });
+    await openRoom();
+    await page.click('[data-portal="docs"] .item-main');
+    await page.waitFor(`document.querySelector('#reader .body')`, 'the docs viewer');
+    await page.eval(`[...document.querySelectorAll('.docs-toc a')].find(n => n.textContent === 'Deploy').click()`);
+    await page.waitFor(`document.querySelectorAll('#reader .body h2').length === 45`, 'the long docs page');
+    await page.click('.reader-find-toggle');
+    await page.eval(`(() => { const input = document.querySelector('.reader-find-input'); input.value = 'Step 45'; input.dispatchEvent(new Event('input')); })()`);
+    assert.equal(await page.eval(`document.querySelector('.reader-find-count').textContent`), '1 of 2');
+    assert.ok(await page.eval<boolean>(`document.querySelector('.reader-find-hit.current').getBoundingClientRect().top >= document.querySelector('.reader-top').getBoundingClientRect().bottom`));
+    assert.equal(await page.eval(`document.querySelector('.docs-search').value`), '', 'page find leaves the docs index search alone');
+    await page.click('[aria-label="Next match"]');
+    await page.click('.reader-comfort-toggle');
+    assert.equal(await page.eval(`document.querySelectorAll('.reader-find-hit').length`), 0);
+    await page.waitFor(`(() => { const r = document.querySelector('.reader-top').getBoundingClientRect(); return r.top >= document.querySelector('.bar').getBoundingClientRect().bottom - 1 && document.querySelector('#readerComfort').hidden === false; })()`, 'reader controls to remain reachable after reflow in a short host frame');
+    const before = await page.eval<number>(`parseFloat(getComputedStyle(document.querySelector('.body')).fontSize)`);
+    await page.eval(`(() => { const s = document.querySelector('[aria-label="Reading text size"]'); s.value = 'larger'; s.dispatchEvent(new Event('change')); const m = document.querySelector('[aria-label="Reading line width"]'); m.value = 'focused'; m.dispatchEvent(new Event('change')); })()`);
+    await page.waitFor(`parseFloat(getComputedStyle(document.querySelector('.body')).fontSize) > ${before}`, 'larger reading type');
+    assert.equal(await page.eval(`document.querySelector('.body').style.getPropertyValue('--mp-reader-measure')`), '60ch');
+    assert.ok(await page.eval<boolean>(`document.documentElement.scrollWidth <= innerWidth`));
+    await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape' });
+    assert.equal(await page.eval(`document.getElementById('reader').hidden`), false);
+    assert.equal(await page.eval(`document.activeElement.className`), 'btn reader-comfort-toggle');
+    await page.eval(`[...document.querySelectorAll('.docs-toc a')].find(n => n.textContent === 'Install').click()`);
+    await page.waitFor(`document.querySelector('.docs-page h1')?.textContent === 'Install'`, 'the next docs page');
+    assert.ok(await page.eval<boolean>(`parseFloat(getComputedStyle(document.querySelector('.body')).fontSize) > ${before}`), 'reading settings follow navigation in the same open view');
+    await page.click('.reader-comfort-toggle');
+    await page.eval(`[...document.querySelectorAll('#readerComfort button')].find(n => n.textContent === 'Reset').click()`);
+    assert.equal(await page.eval(`parseFloat(getComputedStyle(document.querySelector('.body')).fontSize)`), before);
+    assert.equal(await page.eval(`document.querySelector('[aria-label="Reading line width"]').value`), 'comfortable');
+    assert.deepEqual(page.problems, []);
+  } finally {
+    await page.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: host });
+    await page.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+  }
 });

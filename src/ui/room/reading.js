@@ -7,7 +7,7 @@
   // missed; positions are only sent once the stored one is known (so they never overwrite
   // it blind), and after the open is recorded (so the two writes can't cross). Only the
   // "Mark as read" button marks it read; progress never implies read. The model reads
-  // this back with list_reading and never records reading itself (docs/reading-state.md).
+  // this back with list_reading and never records reading itself (docs/explanation/reading.md).
   const POSITION_EVERY = 15000;
   const MEASURE_AFTER = 250;
   /** Saves the open article's position, if it moved, and stops watching it. @type {(() => void) | null} */
@@ -29,12 +29,24 @@
       await readingWrites.catch(() => {});
       const { reading } = (await callTool('list_reading', { unfinished: true, limit: 4 })).structuredContent;
       if (generation !== continueGeneration) return;
-      strip.replaceChildren(el('h2', null, 'Continue reading'),
-        el('ul', null, reading.filter((r) => isHttpUrl(r.url)).map((r) => el('li', null,
-          el('button', { class: 'continue-item', type: 'button', onclick: () => continueReading(r) },
-            el('span', null, r.title || r.url),
-            el('small', null, `${Math.round((r.progress ?? 0) * 100)}% · opened ${ago(r.lastOpenedAt)}`))))));
-      strip.hidden = !reading.length;
+      const items = reading.filter((r) => isHttpUrl(r.url));
+      strip.replaceChildren(el('div', { class: 'continue-head' },
+        el('h2', null, 'Continue reading'), el('span', { class: 'continue-count' }, `${items.length} unfinished`)),
+        el('ul', null, items.map((r) => {
+          const progress = Math.max(0, Math.min(100, Math.round((r.progress ?? 0) * 100)));
+          const source = new URL(r.url).hostname.replace(/^www\./, '');
+          const title = r.title || r.url;
+          return el('li', null,
+            el('button', { class: 'continue-item', type: 'button', title, onclick: () => continueReading(r) },
+              el('span', { class: 'continue-source' }, source),
+              el('span', { class: 'continue-title' }, title),
+              el('span', { class: 'continue-meta' },
+                el('span', { class: 'continue-percent' }, `${progress}% read`),
+                el('span', null, `Opened ${ago(r.lastOpenedAt)}`)),
+              el('span', { class: 'continue-progress', 'aria-hidden': 'true' },
+                el('span', { style: `width:${progress}%` }))));
+        })));
+      strip.hidden = !items.length;
     } catch { if (generation === continueGeneration) strip.hidden = true; }   // older servers may not have reading history
     finally { if (generation === continueGeneration) strip.setAttribute('aria-busy', 'false'); }
   }
@@ -81,7 +93,7 @@
     const body = reader.querySelector('.body');
     if (!(body instanceof HTMLElement)) return;
     if (applyKeptLocator(body)) resume = false;
-    const blocks = () => [...body.children];
+    const blocks = () => logicalBlocks(body);
     let read = false;
     let ready = false;   // the stored position is known: saves may go out
     /** @type {Promise<unknown>} */
@@ -95,7 +107,7 @@
     // Where the user is: the first block on screen, and how much has been on screen.
     const position = () => {
       const box = reader.getBoundingClientRect();
-      const top = Math.max(0, box.top), bottom = Math.min(window.innerHeight, box.bottom);
+      const top = readerVisibleTop(reader), bottom = Math.min(window.innerHeight, box.bottom);
       const list = blocks();
       const first = Math.max(0, list.findIndex((b) => b.getBoundingClientRect().bottom > top + 1));
       let last = -1;
@@ -107,7 +119,7 @@
       const key = `${furthest.block}:${furthest.progress}`;
       if (!ready || read || key === saved) return;
       saved = key; lastSave = Date.now();
-      const update = { url, status: 'opened', progress: furthest.progress, anchor: { block: furthest.block } };
+      const update = { url, status: 'opened', progress: furthest.progress, anchor: { block: furthest.block, heading: headingAnchorAt(body, furthest.block) } };
       recorded = recorded.then(() => callTool('record_reading', update)).catch(() => {});
       readingWrites = recorded;
     };
@@ -160,9 +172,8 @@
       const { reading } = (await callTool('get_reading', { url })).structuredContent;
       if (stopReading !== stop) return;
       const anchor = reading && reading.status !== 'read' ? reading.anchor : null;
-      const heading = anchor?.heading && [...body.querySelectorAll('[data-anchor]')].find((node) => node.getAttribute('data-anchor') === anchor.heading || node.textContent === anchor.heading);
-      const block = anchor?.block ?? (heading ? blocks().findIndex((node) => node === heading || node.contains(heading)) : 0);
-      const target = blocks()[Math.max(0, block)];
+      const block = resolveBlock(body, anchor);
+      const target = blocks()[block];
       if (reading && reading.status !== 'read') {
         furthest = { block: Math.max(0, Math.min(block, blocks().length - 1)), progress: reading.progress ?? 0 };
         saved = `${furthest.block}:${furthest.progress}`;

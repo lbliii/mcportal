@@ -1,5 +1,5 @@
 /**
- * What's new since your last visit (docs/plans/attention.md, phase 3): open_room marks
+ * What's new since your last visit (docs/explanation/reading.md, phase 3): open_room marks
  * items the user hasn't seen, a portal's first showing is its baseline, and mark_seen
  * (the room) records what was on screen.
  */

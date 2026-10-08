@@ -1,0 +1,7 @@
+# Sphinx inventory version 2
+# Project: Rocket
+# Version: 1
+# The remainder of this file is compressed using zlib.
+latest/index std:doc -1 latest/index.html Overview
+latest/get-started std:doc -1 latest/get-started.html Getting started
+latest/reference/heartbeat std:doc -1 latest/reference/heartbeat.html Heartbeat

@@ -82,9 +82,9 @@ export interface UiProblem {
  * The most JSDoc casts (`/** @type {X} *\/ (expr)`) the UI may hold. Each is a place the
  * types take our word for it, so this only goes down: lower it when you remove some.
  */
-export const MAX_UI_CASTS = 50;
+export const MAX_UI_CASTS = 48;
 
-const UI_SCRIPT_FILES = ['room.html', 'admin.html', 'art.js', 'design/theme.js', 'design/palettes.js', 'brand/icons.js'];
+const UI_SCRIPT_FILES = ['room.html', 'admin.html', 'art.js', 'space-inks.js', 'space-format.js', 'design/theme.js', 'design/palettes.js', 'brand/icons.js'];
 
 /** Every JSDoc cast in the UI's scripts. */
 export async function uiCasts(): Promise<UiProblem[]> {

@@ -24,7 +24,7 @@ import { safeEqual, secretToken, sha256Url } from '../lib/ids.ts';
 import { processLogger } from '../lib/log.ts';
 import { RateLimiter } from '../lib/rate-limit.ts';
 import { cookies, escapeHtml, readBody, redirect, sendHtml, sendJson } from '../lib/web.ts';
-import { page } from '../page.ts';
+import { handshake, page } from '../page.ts';
 import { clean } from '../lib/text.ts';
 import type { Fetcher } from '../types.ts';
 import { Accounts, makeBootstrap, memoryPersistence } from '../accounts.ts';
@@ -101,7 +101,28 @@ export function isAllowedRedirectUri(value: string): boolean {
     if (url.hash || url.username || url.password) return false;
     if (url.protocol === 'https:') return true;
     // Native / CLI clients use loopback redirects (RFC 8252).
-    return url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+    return url.protocol === 'http:' && LOOPBACK_HOSTS.includes(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
+const LOOPBACK_HOSTS = ['localhost', '127.0.0.1', '[::1]'];
+
+/**
+ * Does a request-time redirect_uri match a registered one? Exact match, except that a
+ * loopback redirect may use any port (RFC 8252 §7.3): native clients such as Codex
+ * register `http://127.0.0.1/callback` and listen on whatever port the OS hands them.
+ */
+export function redirectUriMatches(registered: string, requested: string): boolean {
+  if (registered === requested) return true;
+  try {
+    const a = new URL(registered);
+    const b = new URL(requested);
+    if (a.protocol !== 'http:' || b.protocol !== 'http:' || !LOOPBACK_HOSTS.includes(a.hostname)) return false;
+    a.port = '';
+    b.port = '';
+    return a.href === b.href && !b.username && !b.password && !b.hash;
   } catch {
     return false;
   }
@@ -307,7 +328,7 @@ export class OAuthServer {
       const e = error instanceof OAuthError ? error : new OAuthError('server_error', 'Unexpected error', 500);
       if (!(error instanceof OAuthError)) processLogger().error('oauth.crashed', { route, error: errorStack(error) });
       if (route === '/oauth/authorize' || route === '/oauth/callback') {
-        sendHtml(res, e.status, page('Sign-in problem', `<h1>Sign-in problem</h1><p>${escapeHtml(e.message)}</p>`));
+        sendHtml(res, e.status, page('Sign-in problem', `<h1>Sign-in problem</h1><p>${escapeHtml(e.message)}</p>`, { door: 'shut', kicker: 'Signal lost' }));
       } else {
         sendJson(res, e.status, { error: e.error, error_description: e.message }, route === '/oauth/token' || route === '/oauth/register' ? CORS : {});
       }
@@ -359,7 +380,7 @@ export class OAuthServer {
     const q = url.searchParams;
     const client = await this.resolveClient(q.get('client_id') ?? '');
     const redirectUri = q.get('redirect_uri') ?? (client.redirectUris.length === 1 ? client.redirectUris[0]! : '');
-    if (!client.redirectUris.includes(redirectUri)) throw new OAuthError('invalid_request', 'redirect_uri is not registered for this client');
+    if (!client.redirectUris.some((registered) => redirectUriMatches(registered, redirectUri))) throw new OAuthError('invalid_request', 'redirect_uri is not registered for this client');
     if (q.get('response_type') !== 'code') throw new OAuthError('unsupported_response_type', 'Only response_type=code is supported');
     const challenge = q.get('code_challenge') ?? '';
     if (q.get('code_challenge_method') !== 'S256' || !/^[A-Za-z0-9_-]{43}$/.test(challenge)) {
@@ -385,6 +406,7 @@ export class OAuthServer {
       page(
         'Connect to MCPortal',
         `<h1>Connect to MCPortal?</h1>
+${handshake(client.clientName)}
 <p><strong>${escapeHtml(client.clientName)}</strong> wants to open and change your MCPortal room.</p>
 <p class="muted">After you approve, you'll sign in with GitHub, then be sent back to <code>${escapeHtml(redirectHost)}</code>. Only continue if you started this from that app.</p>
 <form method="post" action="/oauth/authorize">
@@ -393,6 +415,7 @@ export class OAuthServer {
 <button name="decision" value="deny" type="submit">Cancel</button>
 </form>
 <p class="muted">By continuing, you agree to MCPortal's <a href="/terms">terms</a> and confirm you're at least 13. See the <a href="/privacy">privacy policy</a> for what's kept.</p>`,
+        { door: 'open' },
       ),
       { 'set-cookie': cookie },
     );
@@ -440,7 +463,7 @@ export class OAuthServer {
    */
   beginPageSignIn(req: IncomingMessage, res: ServerResponse, done: PageSignInHandler): void {
     if (!this.config.github) return sendHtml(res, 404, page('Not available', '<p>GitHub sign-in is not configured.</p>'));
-    if (!this.limits.authorize.take(this.clientIp(req))) return sendHtml(res, 429, page('Slow down', '<p>Too many sign-in attempts. Try again in a few minutes.</p>'));
+    if (!this.limits.authorize.take(this.clientIp(req))) return sendHtml(res, 429, page('Slow down', '<p>Too many sign-in attempts. Try again in a few minutes.</p>', { door: 'shut', kicker: 'Ion storm' }));
     const now = this.now();
     for (const [k, v] of this.pageSignIns) if (v.expiresAt <= now) this.pageSignIns.delete(k);
     const ghState = `pg_${secretToken(24)}`;
@@ -459,7 +482,7 @@ export class OAuthServer {
     const browser = cookies(req)[this.pageCookieName] ?? '';
     const clear = { 'set-cookie': `${this.pageCookieName}=; Path=/oauth/callback; HttpOnly; SameSite=Lax; Max-Age=0${this.secure ? '; Secure' : ''}` };
     if (!pending || pending.expiresAt <= this.now() || !browser || !safeEqual(sha256Url(browser), pending.browser)) {
-      return sendHtml(res, 400, page('Sign-in expired', '<p>This sign-in link expired or was started in another browser. Start again.</p>'), clear);
+      return sendHtml(res, 400, page('Sign-in expired', '<p>This sign-in link expired or was started in another browser. Start again.</p>', { door: 'shut', kicker: 'This door has closed' }), clear);
     }
     const ghCode = url.searchParams.get('code');
     const who = ghCode ? await this.githubIdentity(ghCode) : { error: 'GitHub sign-in was cancelled' };

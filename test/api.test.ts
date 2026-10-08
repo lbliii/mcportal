@@ -37,7 +37,7 @@ const room = (extra: Partial<Profile> = {}) => validateProfile({
 async function hosted() {
   const store = new MemoryProfileStore({ alice: room(), bob: room() });
   const profiles = new PublicProfiles(memoryPersistence());
-  const social = new Social({ store: new DocumentSocialStore(), profiles });
+  const social = new Social({ store: new DocumentSocialStore(), profiles, preferences: store });
   await profiles.set('alice', { handle: 'alice' });
   await profiles.set('bob', { handle: 'bob' });
   const shared = { store, clips: new MemoryClipStore(), reading: new FileReadingStore(await mkdtemp(path.join(tmpdir(), 'mcportal-api-'))), seen: new FileSeenStore(null), handoffs: new MemoryHandoffStore(), editions: new MemoryEditionStore(), publicProfiles: profiles, social, fetcher: createFixtureFetcher(), cache: new TtlCache() };
@@ -174,8 +174,13 @@ test('api social: shares name a clip or saved item the server looks up; always a
   const h = await hosted();
   const alice = h.ctx('alice'), bob = h.ctx('bob');
   assert.equal(await code(call(alice, 'social.share', { savedUrl: 'https://example.com/not-saved' })), 'invalid_argument');
-  const link = await call(alice, 'social.share', { savedUrl: 'https://example.com/kept', note: 'worth it', audience: 'mcportal' });
+  const before = await h.store.get('alice');
+  await h.store.put('alice', validateProfile({ ...before, saved: before.saved.map((s) => ({ ...s, description: 'Source context', image: { url: 'https://example.com/cover.png', kind: 'thumb' } })) }));
+  const link = await call(alice, 'social.share', { savedUrl: 'https://example.com/kept', note: 'worth it', audience: 'everyone' });
   assert.equal(link.title, 'Kept link', 'the title comes from the saved item, not the request');
+  assert.equal(link.description, 'Source context');
+  assert.deepEqual(link.image, { url: 'https://example.com/cover.png', kind: 'thumb' });
+  assert.equal(await code(call(alice, 'social.share', { savedUrl: 'https://example.com/kept', description: 'Forged' })), 'invalid_argument', 'previews come only from the saved item');
   assert.equal(await code(call(alice, 'social.share', { clipId: 'cnope' })), 'not_found');
   assert.equal(await code(call(alice, 'social.share', { savedUrl: 'https://example.com/kept', title: 'Forged' })), 'invalid_argument', 'no content from the request');
   await call(bob, 'social.follow', { handle: '@alice' });

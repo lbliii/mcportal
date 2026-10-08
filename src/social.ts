@@ -1,18 +1,17 @@
 /**
  * Sharing and follows (identity plan, phase 4). Native to MCPortal: shares are
- * seen by signed-in users in their Following portal or on a profile, never
- * published to the open web.
+ * seen in Following or on a profile. Public Space projections use the everyone audience.
  *
  *   share   a saved link or a clip with a note. The content is copied at share
  *           time, so the share doesn't change if the clip does. Audience:
- *           'followers' (default) or 'mcportal' (anyone signed in).
+ *           'followers' or 'everyone' (public, the default without a preference).
  *   follow  open for anyone with a public profile.
  *   mute    their shares disappear from your Following portal.
  *   block   they can't follow you or see your shares, and you don't see theirs;
  *           blocking removes follows both ways.
  *   report  a share or a profile, for admins to look at. Admins can hide a share.
  *   reblog  pass someone's post on to your followers, with an optional note
- *           (docs/plans/reblog.md). A reblog references the original, never copies
+ *           (docs/explanation/social.md). A reblog references the original, never copies
  *           its note or clip, so the original's author keeps control: deleting it,
  *           hiding it, or detaching it from one reblog leaves a tombstone there.
  *           Reblogging a reblog reblogs the original, crediting the one you saw (via).
@@ -24,21 +23,26 @@
  * The store interface and the in-process store live in social-store.ts and are
  * re-exported from here.
  */
+import { commonness, match, type Candidate, type Match, type Wanted } from './people.ts';
 import { randomBytes } from 'node:crypto';
 import { ClipError, cleanText, type Clip } from './clips.ts';
 import { AppError, type AppErrorOptions, type ErrorCode } from './lib/errors.ts';
 import { clean } from './lib/text.ts';
-import type { PublicProfile, PublicProfiles } from './public-profiles.ts';
+import { normalizeFeatured, type PublicProfile, type PublicProfiles } from './public-profiles.ts';
 import { TtlCache } from './lib/cache.ts';
 import { safeFetch } from './lib/safe-fetch.ts';
 import { curate, publicSources, sourceKey, spaceKey, type SpaceSections } from './space.ts';
 import type { Fetcher } from './types.ts';
 import type { ProfileStore } from './store.ts';
+import { normalizeLinkPreview } from './profile.ts';
+import type { LinkPreview } from './types.ts';
+import type { Cover, SpaceStamp } from './space-design.ts';
+import type { PublicProfileInput } from './public-profiles.ts';
 import { limitOf, type SocialStore } from './social-store.ts';
 
 export { DocumentSocialStore, type SocialStore } from './social-store.ts';
 
-export const AUDIENCES = ['followers', 'mcportal'] as const;
+export const AUDIENCES = ['followers', 'everyone'] as const;
 export type Audience = (typeof AUDIENCES)[number];
 /** Who may reblog a post: anyone signed in, people who follow its author, or nobody. */
 export const REBLOG_RULES = ['anyone', 'followers', 'nobody'] as const;
@@ -47,9 +51,12 @@ export type ReblogRule = (typeof REBLOG_RULES)[number];
 /** How long a resolved report is kept. */
 export const REPORT_DAYS = 180;
 
+/** The Lobby shows at most this many posts per person per day, so one prolific person can't fill it. */
+export const LOBBY_PER_DAY = 3;
+
 export const SOCIAL_LIMITS = { note: 500, sharesPerUser: 1000, follows: 2000, reason: 500, openReportsPerUser: 50 } as const;
 
-export interface Share {
+export interface Share extends LinkPreview {
   id: string;
   accountId: string;
   kind: 'link' | 'clip';
@@ -83,9 +90,33 @@ export interface Report {
   resolution?: string;
 }
 
-export type Relation = 'follows' | 'mutes' | 'blocks';
+/**
+ * Who follows, mutes and blocks whom, plus two one-time notes from Space links
+ * (docs/plans/finding-people.md): 'intros', a came in through b's link (offer a follow);
+ * 'joins', someone new (b) joined through a's link (tell a once).
+ */
+export type Relation = 'follows' | 'mutes' | 'blocks' | 'intros' | 'joins';
+
+/** A listed person who matches what find_people looked for: what they made public, and why they match. */
+export interface PersonMatch extends Match {
+  handle: string;
+  displayName?: string;
+  spaceTitle?: string;
+  bio?: string;
+  cover?: Cover;
+  followers: number;
+  /** Titles of the sources they feature. */
+  featured: string[];
+  /** Their latest posts shared with everyone: evidence for the agent. */
+  posts: Array<{ title: string; url?: string; note?: string }>;
+}
+
+/** What open_room passes on from Space links, once: people to offer a follow of, and newcomers who came in through yours. */
+export interface Intros { offer: string[]; joined: string[]; covers?: Record<string, Cover> }
 
 export interface PageQuery {
+  /** Internal tie breaker when a page ends among simultaneous posts. */
+  beforeId?: string | undefined;
   limit?: number | undefined;
   before?: string | undefined;
 }
@@ -104,14 +135,14 @@ const newId = (prefix: string) => `${prefix}${randomBytes(6).toString('hex')}`;
 // ---- the rules ----------------------------------------------------------------
 
 /** An author as others see them: by handle, never by account id. */
-export interface Author { handle: string; displayName?: string }
+export interface Author { handle: string; displayName?: string; cover?: Cover }
 
 /**
- * The original of a reblog as the viewer may see it, drawn live: its author, note and clip.
+ * The original of a reblog as the viewer may see it, drawn live: its author, link preview, note and clip.
  * Or why it's gone: deleted, hidden or private ('removed'), or detached by its author.
  */
 export type Original =
-  | { id: string; author: Author; title: string; url?: string; note?: string; clip?: Clip; kind: 'link' | 'clip'; createdAt: string }
+  | (LinkPreview & { id: string; author: Author; title: string; url?: string; note?: string; clip?: Clip; kind: 'link' | 'clip'; createdAt: string })
   | { removed: 'removed' | 'detached' };
 
 /** A share as another user sees it: the author by handle, never by account id. */
@@ -128,10 +159,12 @@ export interface SharedItem extends Omit<Share, 'accountId'> {
   myReblog?: string;
   /** Whether the viewer may reblog it now. */
   canReblog: boolean;
+  /** One share only (get): the people on it the viewer could follow (its author, the original's, via), by handle. */
+  canFollow?: string[];
 }
 
 /** Someone who reblogged a post, as the viewer may see them. */
-export interface Reblogger { handle: string; reblogId: string; createdAt: string; note?: string; detached?: true }
+export interface Reblogger { cover?: Cover; handle: string; reblogId: string; createdAt: string; note?: string; detached?: true }
 
 export interface SocialDeps {
   fetcher?: Fetcher;
@@ -143,6 +176,7 @@ export interface SocialDeps {
   /** Accounts that can't be seen (suspended). */
   hidden?: (accountId: string) => boolean;
   now?: () => number;
+  accountCreatedAt?: (accountId: string) => number | undefined;
 }
 
 /**
@@ -153,7 +187,7 @@ export interface SocialDeps {
  */
 export type SocialService = Pick<Social,
   'resolve' | 'share' | 'unshare' | 'get' | 'feed' | 'sharesOf' | 'follow' | 'unfollow' | 'mute' | 'block' | 'uses' | 'connections' | 'stats' | 'report'
-  | 'reblog' | 'shareSettings' | 'reblogsOf' | 'spaceSections'>;
+  | 'spaceSections' | 'setSpace' | 'spaceDetails' | 'reblog' | 'shareSettings' | 'reblogsOf' | 'takeIntros' | 'findPeople' | 'lobby'>;
 
 export class Social {
   private store: SocialStore;
@@ -163,6 +197,7 @@ export class Social {
   private cache: TtlCache;
   private hidden: (accountId: string) => boolean;
   private now: () => number;
+  private accountCreatedAt: (accountId: string) => number | undefined;
 
   constructor(deps: SocialDeps) {
     this.store = deps.store;
@@ -172,6 +207,7 @@ export class Social {
     this.cache = deps.cache ?? new TtlCache();
     this.hidden = deps.hidden ?? (() => false);
     this.now = deps.now ?? Date.now;
+    this.accountCreatedAt = deps.accountCreatedAt ?? (() => undefined);
   }
 
   private at(): string {
@@ -185,7 +221,8 @@ export class Social {
     if (found.profile.accountId !== viewer && (await this.blockedEitherWay(viewer, found.profile.accountId))) {
       throw new SocialError(`No MCPortal profile for @${found.profile.handle}`, 'not_found');   // a block hides both ways, silently
     }
-    return found.profile;
+    const { broughtAboard: _brought, ...profile } = found.profile;
+    return profile;
   }
 
   private async blockedEitherWay(a: string, b: string): Promise<boolean> {
@@ -194,6 +231,10 @@ export class Social {
 
   /** The one visibility rule for shares. */
   async canSee(viewer: string, share: Share): Promise<boolean> {
+    if (!viewer) {
+      const profile = await this.profiles.get(share.accountId);
+      return Boolean(profile && !profile.private && !share.hiddenAt && !this.hidden(share.accountId) && share.audience === 'everyone');
+    }
     if (share.accountId === viewer) return true;
     if (share.hiddenAt || this.hidden(share.accountId)) return false;
     if (!(await this.profiles.get(share.accountId))) return false;   // gone private: shares go with the profile
@@ -203,13 +244,13 @@ export class Social {
       const root = await this.store.getShare(share.reblogOf.root);
       if (root && root.accountId !== viewer && (await this.blockedEitherWay(viewer, root.accountId))) return false;
     }
-    if (share.audience === 'mcportal') return true;
+    if (share.audience === 'everyone') return true;
     return (await this.store.outgoing('follows', viewer)).includes(share.accountId);
   }
 
   private async authorOf(accountId: string): Promise<Author | undefined> {
     const profile = await this.profiles.get(accountId);
-    return profile ? { handle: profile.handle, ...(profile.displayName ? { displayName: profile.displayName } : {}) } : undefined;
+    return profile ? { handle: profile.handle, ...(profile.displayName ? { displayName: profile.displayName } : {}), ...(profile.cover ? { cover: profile.cover } : {}) } : undefined;
   }
 
   /**
@@ -234,6 +275,7 @@ export class Social {
     const author = await this.authorOf(root.accountId);
     if (!author) return { removed: 'removed' };
     return { id: root.id, author, title: root.title, kind: root.kind, createdAt: root.createdAt,
+      ...normalizeLinkPreview(root),
       ...(root.url ? { url: root.url } : {}), ...(root.note ? { note: root.note } : {}), ...(root.clip ? { clip: root.clip } : {}) };
   }
 
@@ -252,7 +294,7 @@ export class Social {
         author: (await this.authorOf(accountId)) ?? { handle: 'you' },
         mine: accountId === viewer,
         reblogCount: counts.get(rootIdOf(s)) ?? 0,
-        canReblog: Boolean(root) && !s.detachedAt && !mine.has(rootIdOf(s)) && !(await this.refusal(viewer, root!)),
+        canReblog: Boolean(viewer) && Boolean(root) && !s.detachedAt && !mine.has(rootIdOf(s)) && !(await this.refusal(viewer, root!)),
       };
       const myReblog = mine.get(rootIdOf(s));
       if (myReblog) item.myReblog = myReblog;
@@ -271,7 +313,9 @@ export class Social {
   private async post(author: string, input: { note?: unknown; audience?: unknown }, fields: Omit<Share, 'id' | 'accountId' | 'note' | 'audience' | 'createdAt'>): Promise<SharedItem> {
     if (!(await this.profiles.get(author))) throw new SocialError('Sharing needs a public profile, so people know who shared it. Create one with set_public_profile first', 'failed_precondition');
     if ((await this.store.countShares(author)) >= SOCIAL_LIMITS.sharesPerUser) throw new SocialError(`You have ${SOCIAL_LIMITS.sharesPerUser} posts, the most MCPortal keeps. Remove some with unshare`, 'limit_exceeded');
-    const audience: Audience = input.audience === 'mcportal' ? 'mcportal' : 'followers';
+    if (input.audience !== undefined && !(AUDIENCES as readonly unknown[]).includes(input.audience)) throw new SocialError(`audience must be one of ${AUDIENCES.join(', ')}`);
+    const audience: Audience = input.audience === 'everyone' || input.audience === 'followers'
+      ? input.audience : (await this.preferences?.get(author))?.shareAudience ?? 'everyone';
     let note: string;
     try {
       note = cleanText(input.note, SOCIAL_LIMITS.note, 'note');
@@ -280,11 +324,16 @@ export class Social {
       throw new SocialError(error.message.replace(/\.$/, ''), error.code);
     }
     const share: Share = { id: newId('s'), accountId: author, ...fields, ...(note ? { note } : {}), audience, createdAt: this.at() };
+    // Save an explicit selection before posting, so a preference write failure can't
+    // make a successfully published post look like a failed share. Never infer from old posts.
+    if (input.audience !== undefined) await this.preferences?.update(author, (profile) => ({
+      ...(profile.shareAudience !== audience ? { profile: { ...profile, shareAudience: audience } } : {}), result: undefined,
+    }));
     await this.store.addShare(share);
     return (await this.present(author, [share]))[0]!;
   }
 
-  async share(author: string, input: { kind: 'link' | 'clip'; title: string; url?: string | undefined; clip?: Clip | undefined; note?: unknown; audience?: unknown; reblogs?: unknown }): Promise<SharedItem> {
+  async share(author: string, input: { kind: 'link' | 'clip'; title: string; url?: string | undefined; clip?: Clip | undefined; description?: string | undefined; image?: LinkPreview['image'] | undefined; note?: unknown; audience?: unknown; reblogs?: unknown }): Promise<SharedItem> {
     // Who may reblog it: what the post says, else the author's default (absent: anyone).
     const reblogs = (REBLOG_RULES as readonly unknown[]).includes(input.reblogs) ? input.reblogs as ReblogRule : (await this.profiles.get(author))?.reblogs;
     return this.post(author, input, {
@@ -292,6 +341,7 @@ export class Social {
       title: clean(input.title, 200) || 'Untitled',
       ...(input.url ? { url: input.url } : {}),
       ...(input.clip ? { clip: input.clip } : {}),
+      ...(input.kind === 'link' ? normalizeLinkPreview(input) : {}),
       ...(reblogs && reblogs !== 'anyone' ? { reblogs } : {}),
     });
   }
@@ -355,19 +405,37 @@ export class Social {
       if (isAuthor ? this.hidden(r.accountId) || (await this.blockedEitherWay(viewer, r.accountId)) : r.detachedAt || !visible) continue;
       const who = await this.authorOf(r.accountId);
       if (!who) continue;
-      out.push({ handle: who.handle, reblogId: r.id, createdAt: r.createdAt, ...(r.note && visible ? { note: r.note } : {}), ...(r.detachedAt ? { detached: true as const } : {}) });
+      out.push({ ...who, reblogId: r.id, createdAt: r.createdAt, ...(r.note && visible ? { note: r.note } : {}), ...(r.detachedAt ? { detached: true as const } : {}) });
     }
     return out;
   }
 
   async unshare(author: string, id: string): Promise<boolean> {
-    return this.store.deleteShare(author, id);
+    const removed = await this.store.deleteShare(author, id);
+    if (removed && (await this.profiles.get(author))?.pinnedShareId === id) await this.profiles.set(author, { pinnedShareId: '' });
+    return removed;
   }
 
   /** One share, if the viewer may see it. */
   async get(viewer: string, id: string): Promise<SharedItem | undefined> {
     const share = await this.store.getShare(id);
-    return share && (await this.canSee(viewer, share)) ? (await this.present(viewer, [share]))[0] : undefined;
+    if (!share || !(await this.canSee(viewer, share))) return undefined;
+    const item = (await this.present(viewer, [share]))[0]!;
+    const canFollow = viewer ? await this.followable(viewer, share, item) : [];
+    if (canFollow.length) item.canFollow = canFollow;
+    return item;
+  }
+
+  /** Who on a post the viewer doesn't follow yet: its author, the original's author, then whoever it came via. Only people the viewer can see. */
+  private async followable(viewer: string, share: Share, item: SharedItem): Promise<string[]> {
+    const following = new Set(await this.store.outgoing('follows', viewer));
+    // present() names an author without a profile 'you'; nobody can follow that.
+    const people: Array<[string | undefined, string | undefined]> = [[share.accountId, (await this.authorOf(share.accountId))?.handle]];
+    if (share.reblogOf && item.original && 'author' in item.original) people.push([(await this.store.getShare(share.reblogOf.root))?.accountId, item.original.author.handle]);
+    if (share.reblogOf?.via && item.via) people.push([(await this.store.getShare(share.reblogOf.via))?.accountId, item.via]);
+    const out: string[] = [];
+    for (const [id, handle] of people) if (id && handle && id !== viewer && !following.has(id) && !out.includes(handle)) out.push(handle);
+    return out;
   }
 
   /** The Following portal: shares from people the viewer follows, minus muted and blocked. */
@@ -393,12 +461,105 @@ export class Social {
     return this.present(viewer, visible);
   }
 
+  /**
+   * The Lobby (docs/plans/finding-people.md): posts shared with everyone by listed people,
+   * newest first, at most LOBBY_PER_DAY a person a day, minus anyone the viewer mutes or
+   * blocks (or who blocks them) and reblogs of muted people's posts. A post by someone the
+   * viewer doesn't follow carries canFollow. `unfollowedOnly` leaves out the viewer and the
+   * people they follow ("also shared by" in the river).
+   */
+  async lobby(viewer: string, query: PageQuery = {}, options: { unfollowedOnly?: boolean } = {}): Promise<SharedItem[]> {
+    const limit = limitOf(query);
+    const [follows, mutes, blocks, blockedBy] = await Promise.all([
+      this.store.outgoing('follows', viewer), this.store.outgoing('mutes', viewer), this.store.outgoing('blocks', viewer), this.store.incoming('blocks', viewer)]);
+    const following = new Set(follows);
+    const muted = new Set(mutes);
+    const skip = new Set([...mutes, ...blocks, ...blockedBy]);
+    const authors = (await this.profiles.listed())
+      .filter((p) => !skip.has(p.accountId) && !this.hidden(p.accountId) && !(options.unfollowedOnly && (p.accountId === viewer || following.has(p.accountId))))
+      .map((p) => p.accountId);
+    if (!authors.length) return [];
+    const perDay = new Map<string, number>();
+    const visible: Share[] = [];
+    let before = query.before;
+    for (let round = 0; round < 5 && visible.length < limit; round++) {
+      const page = await this.store.sharesBy(authors, { limit: 100, before });
+      for (const s of page) {
+        if (visible.length >= limit || s.audience !== 'everyone' || !(await this.canSee(viewer, s))) continue;
+        if (s.reblogOf && muted.size && muted.has((await this.store.getShare(s.reblogOf.root))?.accountId ?? '')) continue;
+        const day = `${s.accountId} ${s.createdAt.slice(0, 10)}`;
+        const posted = perDay.get(day) ?? 0;
+        if (posted >= LOBBY_PER_DAY) continue;
+        perDay.set(day, posted + 1);
+        visible.push(s);
+      }
+      if (page.length < 100) break;
+      before = page[page.length - 1]!.createdAt;
+    }
+    const items = await this.present(viewer, visible);
+    items.forEach((item, i) => {
+      const author = visible[i]!.accountId;
+      if (author !== viewer && !following.has(author)) item.canFollow = [item.author.handle];
+    });
+    return items;
+  }
+
   /** One person's shares that the viewer may see (all of them, for yourself). */
   async sharesOf(viewer: string, accountId: string, query: PageQuery = {}): Promise<SharedItem[]> {
-    const page = await this.store.sharesBy([accountId], { ...query, limit: limitOf(query) * 2, includeHidden: accountId === viewer });
     const visible: Share[] = [];
-    for (const s of page) if (visible.length < limitOf(query) && (await this.canSee(viewer, s))) visible.push(s);
+    let cursor = query;
+    for (let round = 0; round < 10 && visible.length < limitOf(query); round++) {
+      const page = await this.store.sharesBy([accountId], { ...cursor, limit: 100, includeHidden: accountId === viewer });
+      for (const s of page) if (visible.length < limitOf(query) && (await this.canSee(viewer, s))) visible.push(s);
+      if (page.length < 100) break;
+      const last = page.at(-1)!;
+      cursor = { ...query, before: last.createdAt, beforeId: last.id };
+    }
     return this.present(viewer, visible);
+  }
+
+  /** Validate authored choices against their ownership and current discoverability. */
+  async setSpace(owner: string, input: PublicProfileInput): Promise<Awaited<ReturnType<PublicProfiles['set']>>> {
+    if (input.pinnedShareId) {
+      const post = await this.store.getShare(input.pinnedShareId);
+      if (!post || post.accountId !== owner) throw new SocialError('Only a post of your own can be pinned', 'not_found');
+    }
+    if (input.travelers) for (const handle of input.travelers) {
+      const p = await this.resolve(owner, handle);
+      if (!p.listed || p.accountId === owner) throw new SocialError('Fellow travelers must be other listed people');
+    }
+    return this.profiles.set(owner, input);
+  }
+
+  /** Live, consent-aware travelers and earned stamps; follows never seed this list. */
+  async spaceDetails(viewer: string, owner: string): Promise<{ travelers: Author[]; stamps: SpaceStamp[]; volume: number; pinned?: SharedItem }> {
+    const p = await this.profiles.get(owner);
+    const travelers: Author[] = [];
+    for (const handle of p?.travelers ?? []) {
+      try {
+        const them = await this.resolve(owner, handle);
+        if (!them.listed || this.hidden(them.accountId) || (viewer && await this.blockedEitherWay(viewer, them.accountId))) continue;
+        travelers.push({ handle: them.handle, ...(them.displayName ? { displayName: them.displayName } : {}), ...(them.cover ? { cover: them.cover } : {}) });
+      } catch (e) { if (!(e instanceof SocialError && e.code === 'not_found')) throw e; }
+    }
+    const volume = Math.max(1, 1 + Math.floor((this.now() - Date.parse(p?.createdAt ?? this.at())) / (365.2425 * 86400_000)));
+    const stamps: SpaceStamp[] = [];
+    const born = this.accountCreatedAt(owner);
+    if (born !== undefined && born < Date.parse('2026-10-07T04:00:00Z')) stamps.push({ name: 'charter', label: 'Charter traveler' });
+    const brought = p?.broughtAboard ?? 0;
+    const milestone = [10, 3, 1].find((n) => brought >= n);
+    if (milestone) stamps.push({ name: 'brought', label: `Brought ${milestone} aboard` });
+    const posts: Share[] = [];
+    for (let round = 0; round < 10; round++) {
+      const last = posts.at(-1);
+      const page = await this.store.sharesBy([owner], { limit: 100, includeHidden: true, ...(last ? { before: last.createdAt, beforeId: last.id } : {}) });
+      posts.push(...page); if (page.length < 100) break;
+    }
+    const weeks = new Set(posts.map((s) => Math.floor((Date.parse(s.createdAt) + 3 * 86400_000) / (7 * 86400_000))));
+    if (weeks.size >= 10) stamps.push({ name: 'signal', label: 'Signal keeper' });
+    if (volume > 1) stamps.push({ name: 'volume', label: `Vol. ${volume}` });
+    const pinned = p?.pinnedShareId ? await this.get(viewer, p.pinnedShareId) : undefined;
+    return { travelers, stamps: stamps.filter((s) => !p?.hiddenStamps?.includes(s.name)), volume, ...(pinned ? { pinned } : {}) };
   }
 
   async follow(viewer: string, handle: string): Promise<PublicProfile> {
@@ -422,7 +583,85 @@ export class Social {
     return target;
   }
 
-  /** Blocking also removes follows both ways. Unblocking doesn't restore them. */
+  /**
+   * Someone opened `handle`'s Space link and signed in: remember to offer them a follow the
+   * next time they open their room, and when the link brought a brand-new account, tell
+   * `handle` once. Nothing to remember for your own link or someone you already follow.
+   */
+  async introduce(viewer: string, handle: string, newAccount: boolean): Promise<'self' | 'following' | 'offered'> {
+    const target = await this.resolve(viewer, handle);
+    if (this.hidden(target.accountId)) throw new SocialError(`No MCPortal profile for @${target.handle}`, 'not_found');
+    if (target.accountId === viewer) return 'self';
+    if (newAccount && await this.store.relate('joins', target.accountId, viewer)) await this.profiles.recordJoin(target.accountId);
+    if ((await this.store.outgoing('follows', viewer)).includes(target.accountId)) return 'following';
+    await this.store.relate('intros', viewer, target.accountId);
+    return 'offered';
+  }
+
+  /**
+   * The Space-link notes waiting for the viewer, taken (each is said once): handles to offer
+   * a follow of, and newcomers who joined through their link. A newcomer without a handle
+   * yet stays waiting: there's no one to name until they claim one.
+   */
+  async takeIntros(viewer: string): Promise<Intros> {
+    const out: Intros = { offer: [], joined: [] };
+    const following = new Set(await this.store.outgoing('follows', viewer));
+    for (const id of await this.store.outgoing('intros', viewer)) {
+      await this.store.unrelate('intros', viewer, id);
+      const profile = await this.profiles.get(id);
+      if (profile && !this.hidden(id) && !following.has(id) && !(await this.blockedEitherWay(viewer, id))) out.offer.push(profile.handle);
+    }
+    for (const id of await this.store.outgoing('joins', viewer)) {
+      const profile = await this.profiles.get(id);
+      if (!profile) continue;
+      await this.store.unrelate('joins', viewer, id);
+      if (!this.hidden(id) && !(await this.blockedEitherWay(viewer, id))) out.joined.push(profile.handle);
+    }
+    for (const handle of [...out.offer, ...out.joined]) {
+      const profile = await this.profiles.byHandle(handle);
+      if (profile?.profile.cover) (out.covers ??= {})[handle] = profile.profile.cover;
+    }
+    return out;
+  }
+
+  /**
+   * Listed people who match `wanted` (docs/plans/finding-people.md), best first. Never the
+   * viewer, anyone they follow, mute or block (or who blocks them), anyone suspended, or
+   * anyone unlisted; `except` leaves one more out by handle. Only what people chose to make
+   * public is read: their profile, featured sources, and posts shared with everyone.
+   */
+  async findPeople(viewer: string, wanted: Wanted, options: { limit?: number; except?: string } = {}): Promise<PersonMatch[]> {
+    const limit = Math.min(12, Math.max(1, options.limit ?? 12));
+    const listed = await this.profiles.listed();
+    const [follows, mutes, blocks, blockedBy] = await Promise.all([
+      this.store.outgoing('follows', viewer), this.store.outgoing('mutes', viewer), this.store.outgoing('blocks', viewer), this.store.incoming('blocks', viewer)]);
+    const skip = new Set([viewer, ...follows, ...mutes, ...blocks, ...blockedBy]);
+    const people = listed.filter((p) => !skip.has(p.accountId) && p.handle !== options.except && !this.hidden(p.accountId));
+    const common = commonness(listed.map((p) => ({ featured: p.sources ?? [] })));
+    const postsOf = async (accountId: string) => (await this.store.sharesBy([accountId], { limit: 20 }))
+      .filter((s) => s.audience === 'everyone' && !s.hiddenAt)
+      .map((s) => ({ title: s.title, ...(s.url ? { url: s.url } : {}), ...(s.note ? { note: s.note } : {}) }));
+    // Posts only count when the search looks at sites or words; otherwise they're read for the winners alone.
+    const needPosts = wanted.hosts.length > 0 || wanted.terms.length > 0;
+    const scored = await Promise.all(people.map(async (p) => {
+      const posts = needPosts ? await postsOf(p.accountId) : [];
+      const candidate: Candidate = { handle: p.handle, ...(p.cover ? { cover: p.cover } : {}), displayName: p.displayName, spaceTitle: p.spaceTitle, bio: p.bio, featured: p.sources ?? [], posts };
+      return { p, posts, m: match(candidate, wanted, common) };
+    }));
+    const best = scored.filter((s) => s.m.score > 0).sort((a, b) => b.m.score - a.m.score || a.p.handle.localeCompare(b.p.handle)).slice(0, limit);
+    return Promise.all(best.map(async ({ p, posts, m }) => ({
+      ...m,
+      handle: p.handle, ...(p.cover ? { cover: p.cover } : {}),
+      ...(p.displayName ? { displayName: p.displayName } : {}),
+      ...(p.spaceTitle ? { spaceTitle: p.spaceTitle } : {}),
+      ...(p.bio ? { bio: p.bio } : {}),
+      followers: (await this.store.incoming('follows', p.accountId)).length,
+      featured: (p.sources ?? []).map((s) => s.title),
+      posts: (needPosts ? posts : await postsOf(p.accountId)).slice(0, 5),
+    })));
+  }
+
+  /** Blocking also removes follows (and Space-link notes) both ways. Unblocking doesn't restore them. */
   async block(viewer: string, handle: string, on: boolean): Promise<PublicProfile> {
     const found = await this.profiles.byHandle(handle);
     if (!found) throw new SocialError(`No MCPortal profile for @${clean(handle, 40).replace(/^@/, '')}`, 'not_found');
@@ -430,8 +669,10 @@ export class Social {
     if (target.accountId === viewer) throw new SocialError("You can't block yourself");
     if (on) {
       await this.store.relate('blocks', viewer, target.accountId);
-      await this.store.unrelate('follows', viewer, target.accountId);
-      await this.store.unrelate('follows', target.accountId, viewer);
+      for (const relation of ['follows', 'intros', 'joins'] as const) {
+        await this.store.unrelate(relation, viewer, target.accountId);
+        await this.store.unrelate(relation, target.accountId, viewer);
+      }
     } else await this.store.unrelate('blocks', viewer, target.accountId);
     return target;
   }
@@ -462,8 +703,10 @@ export class Social {
     const legacy = profile.sources ?? [];
     const room = (preview || profile.showSources === true) && this.preferences
       ? (await this.preferences.get(accountId)).columns.flatMap((c) => c.panels).map((p) => ({ ...p, title: p.title ?? p.id })) : [];
-    const raw = preview || profile.showSources !== false ? [...legacy, ...room] : [];
-    const sources = await publicSources(raw, this.fetcher, this.cache);
+    // Explicit recommendations were already published by their owner. Probe only
+    // newly projected room subscriptions, preserving existing recommendations offline.
+    const sources = preview || profile.showSources !== false
+      ? normalizeFeatured([...legacy, ...await publicSources(room, this.fetcher, this.cache)], 500) : [];
     const people = [];
     if (preview || profile.showPeople === true) {
       for (const id of await this.store.outgoing('follows', accountId)) {

@@ -9,6 +9,7 @@
   /*include:design/tokens.css*/
   /*include:room/room.css*/
   /*include:room/experiences.css*/
+  /*include:space.css*/
   /*include:design/primitives.css*/
 </style>
 </head>
@@ -19,21 +20,30 @@
   <div class="room-name" id="roomName"></div>
   <div class="spacer"></div>
   <span class="status" id="status">Warming up the portal…</span>
-  <span class="sep room-only"></span>
-  <div class="seg room-only" role="group" aria-label="Layout">
-    <button class="ib" data-layout="columns" data-icon="columns" aria-pressed="true" title="Columns: scroll sideways, then down each column" aria-label="Columns layout"></button>
-    <button class="ib" data-layout="shelves" data-icon="shelves" aria-pressed="false" title="Shelves: one sideways row per source" aria-label="Shelves layout"></button>
-    <button class="ib" data-layout="frontpage" data-icon="frontpage" aria-pressed="false" title="Front page: your agent's picks, then each source's top stories" aria-label="Front page layout" hidden></button>
-    <button class="ib" data-layout="river" data-icon="river" aria-pressed="false" title="River: every source in one stream, newest first" aria-label="River layout"></button>
+  <div class="room-actions room-only" role="group" aria-label="Room controls">
+  <button class="btn layout-choice room-only" id="btnLayout" popovertarget="layoutMenu" aria-expanded="false" aria-label="Choose room layout">Layout: Columns</button>
+  <div class="layout-menu room-only" id="layoutMenu" popover role="group" aria-label="Room layout">
+    <p>Choose your layout</p>
+    <button data-layout="catalogue" aria-pressed="false"><span class="layout-symbol" data-icon="river" aria-hidden="true"></span><b>Catalogue</b><span>Compact rows for scanning</span></button>
+    <button data-layout="editorial" aria-pressed="false"><span class="layout-symbol" data-icon="frontpage" aria-hidden="true"></span><b>Editorial</b><span>A lead story, then smaller features</span></button>
+    <button data-layout="paperback" aria-pressed="false"><span class="layout-symbol" data-icon="shelves" aria-hidden="true"></span><b>Paperback</b><span>A shelf of illustrated covers</span></button>
+    <hr>
+    <button data-layout="columns" aria-pressed="true"><span class="layout-symbol" data-icon="columns" aria-hidden="true"></span><b>Columns</b><span>Side-by-side portals</span></button>
+    <button data-layout="shelves" aria-pressed="false"><span class="layout-symbol" data-icon="shelves" aria-hidden="true"></span><b>Shelves</b><span>Sideways rows of cards</span></button>
+    <button data-layout="river" aria-pressed="false"><span class="layout-symbol" data-icon="river" aria-hidden="true"></span><b>River</b><span>One stream, newest first</span></button>
+    <button data-layout="frontpage" aria-pressed="false" hidden><span class="layout-symbol" data-icon="frontpage" aria-hidden="true"></span><b>Front page</b><span>Your agent’s picks, then top stories</span></button>
   </div>
   <button class="ib room-only" id="btnAdd" data-icon="plus" aria-pressed="false" title="Add a source: any site, feed, subreddit, YouTube channel or repo" aria-label="Add a source"></button>
   <button class="ib room-only" id="btnOpenIn" data-icon="chat" aria-pressed="false" title="Open stories as their own card in the conversation" aria-label="Open stories in chat" hidden></button>
   <button class="ib room-only" id="btnSources" data-icon="sources" aria-pressed="false" title="Show where each portal's data came from" aria-label="Show sources"></button>
   <button class="ib room-only" id="btnRefresh" data-icon="refresh" title="Refresh all portals" aria-label="Refresh all portals"></button>
+  </div>
+  <div class="global-actions" role="group" aria-label="Display and account">
   <button class="ib" id="btnExpand" data-icon="expand" title="Fullscreen: step all the way through" aria-label="Fullscreen"></button>
   <div class="who-wrap room-only">
     <button class="who" id="btnWho" aria-haspopup="dialog" aria-controls="whoMenu" hidden></button>
     <div class="who-menu" id="whoMenu" role="dialog" aria-label="Your account" hidden></div>
+  </div>
   </div>
 </header>
 <nav class="experience-nav" aria-label="Reading experiences">
@@ -46,6 +56,8 @@
   <button type="button" id="btnUpcoming" aria-label="Upcoming" title="Upcoming"><span class="experience-nav-icon" data-icon="upcoming" aria-hidden="true"></span><span class="experience-nav-label">Upcoming</span></button>
 </nav>
 <section id="addSheet" class="add-sheet room-only" hidden>
+  <div class="add-row" role="group" aria-label="Source type"><button id="addFeed" class="btn" type="button" aria-pressed="true">Feed or site</button><button id="addStore" class="btn" type="button" aria-pressed="false">Shopify store</button></div>
+  <div id="storeScope" class="add-row" hidden><label>Collection handle (optional) <input id="storeCollection" type="text" maxlength="80" placeholder="new-arrivals"></label><label><input id="storeSales" type="checkbox"> Sales only</label></div>
   <form class="add-row" id="addForm">
     <input id="addInput" type="text" autocomplete="off" spellcheck="false" placeholder="theverge.com, r/LocalLLaMA, youtube.com/@channel, owner/repo…" aria-label="Site, feed, subreddit, channel or repo">
     <button class="btn" type="submit">Scan</button>
@@ -80,7 +92,9 @@
   const $$ = (selector, /** @type {ParentNode} */ from = document) => /** @type {NodeListOf<HTMLElement>} */ (from.querySelectorAll(selector));
   /** The first element matching a selector, or null. @param {string} selector */
   const $first = (selector, /** @type {ParentNode} */ from = document) => /** @type {HTMLElement | null} */ (from.querySelector(selector));
+  /*include:space-inks.js*/
   /*include:art.js*/
+  /*include:space-format.js*/
 
   // MCPortal icon set: 24px grid, 1.75px round strokes, 3px house corners, drawn in currentColor.
   // The icon set and its stroke come from scripts/brand.ts, so they match the Line mark.
@@ -125,6 +139,7 @@
   /*include:room/levels.js*/
   /*include:room/seen.js*/
   /*include:room/reader.js*/
+  /*include:room/reader-tools.js*/
   /*include:room/reading.js*/
   /*include:room/passage.js*/
   /*include:room/handoff.js*/
@@ -133,6 +148,7 @@
   /*include:room/social.js*/
   /*include:room/reblog.js*/
   /*include:room/add.js*/
+  /*include:room/shop.js*/
   /*include:room/toolbar.js*/
   /*include:room/boot.js*/
 })();

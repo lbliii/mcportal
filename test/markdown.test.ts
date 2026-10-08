@@ -149,7 +149,8 @@ test('reader: a Sphinx page keeps its structure: main zone, signatures, callouts
   ]);
   const [h1, source, body, seeAlso, warning, sig, , pre, h2, table, last] = a.blocks as [ArticleBlock, ...ArticleBlock[]];
   assert.equal(h1.text, 'os.path — Common pathname manipulations', 'the ¶ permalink is gone');
-  assert.deepEqual(source!.spans, [{ text: 'Source code: ' }, { text: 'Lib/posixpath.py', href: 'https://github.com/python/cpython/tree/3.14/Lib/posixpath.py' }]);
+  assert.equal(source!.spans!.map((s) => s.text).join(''), 'Source code: Lib/posixpath.py');
+  assert.deepEqual(source!.spans!.filter((s) => s.href), [{ text: 'Lib/posixpath.py', href: 'https://github.com/python/cpython/tree/3.14/Lib/posixpath.py' }]);
   assert.deepEqual(body!.spans!.at(-2), { text: 'open()', href: 'https://docs.python.org/3/library/functions.html#open', code: true });
   assert.equal(seeAlso!.text, 'The pathlib module offers high-level path objects.');
   assert.equal(warning!.text, 'First paragraph.\n\nSecond paragraph.', 'one admonition, one callout');

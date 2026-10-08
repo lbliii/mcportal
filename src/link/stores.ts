@@ -19,6 +19,8 @@ import type { ReadingState, ReadingStore, ReadingUpdate } from '../reading.ts';
 import type { SeenStore } from '../seen.ts';
 import type { SocialService } from '../social.ts';
 import type { ProfileChange, ProfileStore, Versioned } from '../store.ts';
+import type { Watches } from '../store-watches.ts';
+import type { StoreWatch, WatchDocument, WatchStore } from '../watches.ts';
 import type { StateClient } from './client.ts';
 
 /** How long a read of the room is reused before asking whether it changed (which is free when it hasn't). */
@@ -328,6 +330,7 @@ export function remoteProfiles(client: StateClient, accountId: string): ProfileD
     async get(id) { mine(id); return (await client.call<Awaited<ReturnType<ProfileDirectory['get']>> | null>('profiles.mine')) ?? undefined; },
     async byHandle(handle) { return (await client.call<Awaited<ReturnType<ProfileDirectory['byHandle']>> | null>('profiles.byHandle', { handle })) ?? undefined; },
     async set(id, input) { mine(id); return client.call('profiles.set', dropUndefined({ ...input })); },
+    async restoreAppearance(id, appearance) { mine(id); return client.call('profiles.restoreAppearance', { appearance }); },
     async remove(id) { mine(id); return (await client.call<Awaited<ReturnType<ProfileDirectory['remove']>> | null>('profiles.remove')) ?? undefined; },
   };
 }
@@ -337,6 +340,8 @@ export function remoteSocial(client: StateClient, accountId: string): SocialServ
   const as = (viewer: string) => { if (viewer !== accountId) throw new Error('A linked MCPortal acts only as its linked account.'); };
   return {
     async spaceSections(viewer, owner, preview = false) { as(viewer); return client.call('social.spaceSections', { accountId: owner, preview }); },
+    async setSpace(owner, input) { as(owner); return client.call('profiles.set', dropUndefined({ ...input })); },
+    async spaceDetails(viewer, owner) { as(viewer); return client.call('social.spaceDetails', { accountId: owner }); },
     async resolve(viewer, handle) { as(viewer); return client.call('social.resolve', { handle }); },
     async share(author, input) {
       as(author);
@@ -358,12 +363,32 @@ export function remoteSocial(client: StateClient, accountId: string): SocialServ
     async sharesOf(viewer, owner, query = {}) { as(viewer); return client.call('social.sharesOf', { accountId: owner, query: dropUndefined({ ...query }) }); },
     async follow(viewer, handle) { as(viewer); return client.call('social.follow', { handle }); },
     async unfollow(viewer, handle) { as(viewer); return client.call('social.unfollow', { handle }); },
+    async takeIntros(viewer) { as(viewer); return client.call('social.takeIntros', {}); },
+    async lobby(viewer, query = {}, options = {}) { as(viewer); return client.call('social.lobby', { query: dropUndefined({ ...query }), options: dropUndefined({ ...options }) }); },
+    async findPeople(viewer, wanted, options = {}) { as(viewer); return client.call('social.findPeople', { wanted, options: dropUndefined({ ...options }) }); },
     async mute(viewer, handle, on) { as(viewer); return client.call('social.mute', { handle, on }); },
     async block(viewer, handle, on) { as(viewer); return client.call('social.block', { handle, on }); },
     async uses(id) { as(id); return client.call('social.uses'); },
     async connections(viewer) { as(viewer); return client.call('social.connections'); },
     async stats(viewer, owner) { as(viewer); return client.call('social.stats', { accountId: owner }); },
     async report(reporter, target, reason) { as(reporter); return client.call('social.report', { target: dropUndefined({ ...target }), reason: typeof reason === 'string' ? reason : '' }); },
+  };
+}
+
+/** Watches always resolve on the hosted account; offline writes never fall back to files. */
+export class RemoteWatchStore extends Linked implements WatchStore {
+  async list(userId:string):Promise<StoreWatch[]> {this.mine(userId);return this.client.call('watches.list');}
+  async update<T>(userId:string,_change:(state:WatchDocument)=>{state?:WatchDocument;result:T}):Promise<T> {this.mine(userId);throw onAccountPage('Editing raw watch data');}
+  async import(userId:string,_records:unknown[]):Promise<number> {this.mine(userId);throw onAccountPage('Importing store watches');}
+  async deleteAll(userId:string):Promise<void> {this.mine(userId);throw onAccountPage('Deleting all store watches');}
+}
+export function remoteWatches(client:StateClient,accountId:string):Watches {
+  const mine=(id:string)=>{if(id!==accountId)throw new Error('A linked MCPortal serves only its linked account.');};
+  return {
+    async preview(userId,url,scope){mine(userId);return client.call('watches.preview',{url,scope});},
+    async confirm(userId,select){mine(userId);return client.call('watches.confirm',{select});},
+    async unwatch(userId,id,paused){mine(userId);return client.call('watches.unwatch',dropUndefined({id,paused}));},
+    async portal(userId,portalId,_title,_limit,force=false){mine(userId);return client.call('watches.portal',{portalId,force});},
   };
 }
 
@@ -411,6 +436,8 @@ export function linkedStores(client: StateClient, accountId: string, options: { 
       },
     },
     store: new RemoteProfileStore(client, accountId, options.now),
+    watchStore: new RemoteWatchStore(client, accountId),
+    watches: remoteWatches(client, accountId),
     clips: new RemoteClipStore(client, accountId),
     reading: new RemoteReadingStore(client, accountId),
     seen: new RemoteSeenStore(client, accountId),

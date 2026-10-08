@@ -1,22 +1,47 @@
 # Contributing
 
-MCPortal runs from a checkout with no build step. Node **22.18+** runs the `.ts` files directly.
+Thanks for helping with MCPortal. Bug reports, ideas and pull requests are all welcome.
+
+- **Issues** are the place for bugs, questions and proposals. Search first; add to an existing one if it fits.
+- **Small fixes** (typos, clear bugs, a failing source) can go straight to a pull request.
+- **Larger changes** (a new tool, a change to the tool interface, storage or auth) should start as an issue, so we can agree on the shape before you write the code.
+- **Security problems** go privately, not in an issue. See [SECURITY.md](SECURITY.md).
+
+By contributing, you agree that your work is licensed under the project's [AGPL-3.0 license](LICENSE).
+
+## Set up
+
+You need Node **22.18+** (or any Node 24). Node runs the `.ts` files directly; there's no build step.
 
 ```bash
-git clone git@github.com:lbliii/mcportal.git ~/Developer/mcportal
-cd ~/Developer/mcportal
-npm test            # offline test suite
-npm run demo        # canned data, no network
-npm start           # live data
+git clone https://github.com/lbliii/mcportal.git
+cd mcportal
+npm install
+npm run check
 ```
 
-Open the room at **http://127.0.0.1:8787/preview**. Use `127.0.0.1`, not `localhost`: the dev server binds IPv4 only, and some browsers resolve `localhost` to `::1` first.
+`npm run check` type-checks the server and the UI, checks the generated design files, and runs every test. It's the gate for every pull request: there's no hosted CI. To run it before each push:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+Other commands you'll use:
+
+```bash
+npm test          # the offline test suite
+npm run demo      # the room with canned data and no network
+npm start         # the room with live data
+npm run smoke     # a live check against Hacker News, GitHub and an RSS feed (needs network)
+```
+
+`npm start` and `npm run demo` serve the room at **http://127.0.0.1:8787/preview**. Use `127.0.0.1`, not `localhost`: the server binds IPv4 only, and some browsers try `::1` first.
 
 ## Develop against Claude desktop
 
-This is the fastest way to see the room render inline in a Claude chat. It doesn't need a deployment, sign-in, or permission to add custom connectors: Claude desktop launches the server from your checkout over stdio and lists it under Connectors.
+This shows the room rendering inline in a real chat, with no deployment or sign-in. Claude desktop launches the server from your checkout over stdio.
 
-1. Find your Node path with `which node`. Claude desktop doesn't use your shell's `PATH`, so it needs the absolute path.
+1. Find the absolute path to Node with `which node`. Claude desktop doesn't use your shell's `PATH`.
 2. Add `mcportal` to `mcpServers` in `~/Library/Application Support/Claude/claude_desktop_config.json` (on Windows, `%APPDATA%\Claude\claude_desktop_config.json`):
 
    ```json
@@ -24,24 +49,21 @@ This is the fastest way to see the room render inline in a Claude chat. It doesn
      "mcpServers": {
        "mcportal": {
          "command": "/opt/homebrew/bin/node",
-         "args": ["/Users/<you>/Developer/mcportal/bin/mcportal-dev.mjs"]
+         "args": ["/path/to/mcportal/bin/mcportal-dev.mjs"]
        }
      }
    }
    ```
 
-3. Quit and reopen Claude desktop.
-4. In a new chat, ask **"open my room"**.
+3. Quit and reopen Claude desktop, start a new chat and ask "open my room".
 
-Your profile lives in `~/.mcportal/default.json`.
+`bin/mcportal-dev.mjs` holds Claude's connection open and restarts the real server behind it whenever a `.ts` file under `src/` changes, so:
 
-`mcportal-dev.mjs` keeps Claude's connection open and runs the real server behind it. When a `.ts` file under `src/` changes, it restarts the server and replays the connection handshake, so Claude doesn't notice. What that means for your edits:
+- **Server code** is live on the next tool call.
+- **Room UI** is read fresh each time a card opens. Ask for the room again to see a change; a card already in the chat is frozen.
+- **Tool names, descriptions and schemas** may be cached per chat. Start a new chat, or restart Claude if a change doesn't show.
 
-- **Server code** (`src/**/*.ts`): live on the next tool call. No Claude restart needed.
-- **Room UI** (`src/ui/room.html`, with its styles and script split into fragments under `src/ui/room/*`, inlined by `roomHtml()` in `src/mcp.ts`; new fragments must be added to `UI_INCLUDES`): read fresh each time a card opens. Ask Claude to open the room again to see changes. A card that's already in the chat is frozen, because it's sandboxed and can't reload itself.
-- **Tool names, descriptions or schemas**: Claude may cache the tool list per session. Start a new chat, or restart Claude if a change doesn't show.
-
-Reload messages go to stderr, which shows up in Claude desktop's MCP logs. To run without hot reload, use `bin/mcportal.mjs` with `--stdio`.
+Reload messages go to stderr, which appears in Claude desktop's MCP logs. Your profile lives in `~/.mcportal/default.json`. To try a new user's first run without touching it, set `MCPORTAL_DATA_DIR` to a scratch directory in the `env` of that config entry.
 
 To check the stdio server without Claude:
 
@@ -51,60 +73,43 @@ echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":
 
 ## Develop against Claude Code
 
-Install the repo as a local plugin, which includes the `/portal` command and skill:
+Install your checkout as a local plugin, which adds the `/portal` command and skill:
 
-```
-/plugin marketplace add ~/Developer/mcportal
+```text
+/plugin marketplace add /path/to/mcportal
 /plugin install mcportal@mcportal
 ```
 
-## How the server code fits together
+## Conventions that matter
 
-- **Tools** live in `src/tools/`, one module per area. Each `ToolDef` declares its `access` (`read`, `write` or `fetch`, for the access gate) and its budget `cost`; `test/foundations.test.ts` checks every tool does, and that `readOnlyHint` agrees. Arguments are checked against `inputSchema` before the handler runs, so keep the schema exactly as strict as the handler: if the handler trims or normalizes something, the schema shouldn't refuse it.
-- **Errors**: throw an `AppError` (`src/lib/errors.ts`) or one of its subclasses with a code from `ERROR_CODES` for anything expected. Branch on `error.code`, never on message text. In a handler, `toolFailure(error, 'Not added: ')` turns an expected error into a tool error and rethrows bugs. Anything that isn't an `AppError` is treated as a bug: logged with its stack, shown to the user only as a reference.
-- **Logs**: use the `Logger` you're given (`ctx.log` in tools, `deps.log` elsewhere), with an event name and flat fields: `log.warn('source.failed', { source, code })`. Never log tokens, profile contents, third-party text or raw user ids (`userRef()` hashes one).
-- **The room UI** (`src/ui/room.html`, `src/ui/room/*.js`, `src/ui/admin.html`) is plain JavaScript checked as strictly as the server: `npm run typecheck` runs `scripts/check-ui.ts`, which type-checks the assembled page with JSDoc types and points errors at the fragment files. Type every function with JSDoc; use `$('id')` (typed per id in `src/ui/ui.d.ts`; add new ids there), `$$`/`$first` for selectors, and `errorText(error)` in catch blocks. A JSDoc cast needs a comment saying why it holds.
-- **What tools return to the UI** is one contract, `src/tools/results.ts`: handlers check their `structuredContent` with `satisfies ToolResults['tool']`, and the UI's `callTool()` is typed by it. A tool the UI starts calling gets an entry there.
-- **Browser tests** (`test/ui-browser.test.ts`) drive the real room in headless Chrome against fixture data and fail on any page error. They skip without Chrome (`CHROME_PATH` points at one). A new view or flow gets a test there.
-- **Linked mode** (`src/link/`): a local MCPortal signed in to a hosted one runs the same tools against remote stores that call the hosted state API (`/api/v1/call`, `src/api/`). A store method the tools start using needs a state API method and a remote version; `test/linked.test.ts` runs the real tools against an in-process hosted app, and `test/link-signin.test.ts` covers signing in and out with a fake GitHub. To try signing in by hand, use a scratch `MCPORTAL_DATA_DIR` so your own `~/.mcportal/link.json` isn't touched, and `MCPORTAL_HOSTED_URL` for a hosted MCPortal other than the public one.
-- **Layout changes** go through `src/layout.ts` (`withLayout`, `addPortalTo`, `ensurePortal`), which never move or drop the user's other portals or saved items.
+The [architecture explanation](docs/explanation/architecture.md) covers how the pieces fit. These are the rules reviewers check:
 
-## Versions and the tool interface
+- **Tools** live in `src/tools/`, one module per area. Each declares its `access` (`read`, `write` or `fetch`) and its budget `cost`. Keep `inputSchema` exactly as strict as the handler: if the handler trims or normalizes a value, the schema shouldn't refuse it.
+- **Results the UI reads** are one typed contract in `src/tools/results.ts`. A handler checks its `structuredContent` with `satisfies ToolResults['tool']`.
+- **Errors**: throw an `AppError` (`src/lib/errors.ts`) with a code from `ERROR_CODES` for anything expected, and branch on `error.code`, never on message text. Anything else is treated as a bug.
+- **Logs**: use the logger you're given (`ctx.log` in tools) with an event name and flat fields. Never log tokens, profile contents, third-party text or raw user ids; `userRef()` hashes an id.
+- **Layout changes** go through `src/layout.ts`, which never moves or drops the user's other portals or saved items.
+- **The room UI** is plain JavaScript type-checked through JSDoc. Type every function, and add new element ids to `src/ui/ui.d.ts`. A new view or flow gets a test in `test/ui-browser.test.ts`, which drives the real room in headless Chrome (set `CHROME_PATH` if it can't find one).
+- **Linked mode**: a store method the tools start using needs a state API method in `src/api/` and a remote version in `src/link/`. `test/linked.test.ts` runs the real tools against an in-process hosted server.
+- **Avoid new runtime dependencies.** Locally MCPortal has none; the hosted server adds only `pg`. Raise a new one in an issue first.
+- **The tool interface is a public contract.** Read the [compatibility policy](docs/how-to/release.md#compatibility) before renaming or changing a tool.
+- **The fetch and OAuth boundaries** stay consistent with the [security model](docs/explanation/security.md).
+- **Screenshots** on the landing page and in the README come from `node scripts/screenshots.ts`: each is a chat turn with the real room in an MCP Apps frame, captured by headless Chrome. It fetches feeds and docs live, so retake them when the UI changes visibly, and check that each agent reply still matches the page it shows. `--serve` lets you look before capturing.
 
-Hosts cache tool lists and agents learn tool names, so the tool interface (names, arguments, results in `src/tools/results.ts`) is versioned with the package: a change that breaks it (a renamed or removed tool or argument, a stricter schema, a different result shape) raises the minor version while we're below 1.0 and gets a line under "For hosts and agents" in the changelog. `package.json` holds the version; `npm test` checks that the lockfile, `src/mcp.ts`, the plugin, `server.json` and `manifest.json` agree, and `node scripts/distribution.ts` regenerates the last two. Don't change the version by hand: the release script does it.
+## Before you open a pull request
 
-Once MCPortal is listed in a directory, tool names are a public contract:
-- **A renamed tool keeps its old name for one release,** as an alias that isn't listed and says where the tool moved. A removed tool says what replaces it for one release.
-- **`MIN_CLIENT_VERSION`** (`src/api/calls.ts`, the oldest local MCPortal the hosted state API accepts) only rises in a release whose notes say so, never in passing.
-- **Renaming a listed tool or the connector** also needs an edit to the directory listing, which is reviewed again.
-
-## Cutting a release
-
-Plugin users only get a release when the version changes, so changes reach them in releases, not merges. From an up-to-date `main` with nothing uncommitted:
-
-```bash
-npm run release -- prepare minor
-```
-
-`prepare` takes a version (`0.6.0`) or `patch`, `minor` or `major`. It sets the version everywhere it's stated, moves the changelog's "Unreleased" section under it, runs `npm run check`, and opens a `release/v<version>` PR whose description is the release notes. Add `--dry-run` to see the version and notes without changing anything.
-
-After the release PR is merged, from the merged `main`:
-
-```bash
-npm run release -- publish
-```
-
-That tags the merge commit `v<version>` and creates the GitHub release with that version's notes. Then deploy the hosted service from the same commit; `/health` reports the new version.
-
-## Before opening a PR
-
-- `npm run check` passes: typecheck (server and UI), design outputs, and every test. There's no hosted CI yet, so this is the gate. To run it before every push: `git config core.hooksPath .githooks`.
-- If you touched storage (`src/db.ts` and `src/db/`, `src/store.ts`, `src/auth/store.ts`), run the Postgres tests too. They're skipped unless `TEST_DATABASE_URL` is set, and each run uses its own schema:
+- `npm run check` passes.
+- If you touched storage (`src/db.ts`, `src/db/`, `src/store.ts`, `src/auth/store.ts`), run the Postgres tests. They skip unless `TEST_DATABASE_URL` is set, and each run uses its own schema. A throwaway local cluster works:
 
   ```bash
-  TEST_DATABASE_URL=postgres://localhost:5432/postgres node --test test/db.test.ts
+  initdb -D /tmp/mcportal-pg -U postgres -A trust
+  pg_ctl -D /tmp/mcportal-pg -o "-p 55432" start
+  TEST_DATABASE_URL=postgres://postgres@localhost:55432/postgres \
+    node --test test/db.test.ts test/store-contract.test.ts test/privacy-db.test.ts
+  pg_ctl -D /tmp/mcportal-pg stop
   ```
-- `npm run smoke` passes if you touched an adapter or `safe-fetch` (needs network).
-- If you touched the brand (`scripts/brand.ts`), run `npm run brand` and commit what it writes. Brand files are generated, not edited; see [brand/README.md](brand/README.md).
-- If you touched design tokens or shared controls, run `npm run design`, commit its outputs, and run `npm run design:check`. Use the [design-system guide](docs/design-system.md) for theme contracts and the fixture browser workflow.
-- Changes to the fetch or OAuth boundaries stay consistent with the security model in the [README](README.md#security-model).
+
+- If you touched an adapter or `src/lib/safe-fetch.ts`, run `npm run smoke`.
+- If you touched the brand (`scripts/brand.ts`), run `npm run brand` and commit what it writes. Brand files are generated; see [brand/README.md](brand/README.md).
+- If you touched design tokens or shared controls, run `npm run design` and commit its outputs. See the [design system reference](docs/reference/design-system.md).
+- If your change is visible to users or agents, add a line under "Unreleased" in [CHANGELOG.md](CHANGELOG.md). Don't change the version; releases do that ([Cut a release](docs/how-to/release.md)).

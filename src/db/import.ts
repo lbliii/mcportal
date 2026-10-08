@@ -5,6 +5,7 @@ import path from 'node:path';
 import { DocumentExperienceStore } from '../experiences.ts';
 import { DocumentCollectionStore } from '../collections.ts';
 import { memoryPersistence } from '../lib/document.ts';
+import { FileWatchStore } from '../watches.ts';
 import { validateProfile } from '../profile.ts';
 import type { Queryable } from './schema.ts';
 
@@ -60,4 +61,20 @@ export async function importFiles(db: Queryable, dataDir: string): Promise<{ ski
   }
   await db.query(`INSERT INTO mcportal_meta (key, value) VALUES ('imported_files', $1) ON CONFLICT (key) DO NOTHING`, [new Date().toISOString()]);
   return { skipped: false, profiles, auth };
+}
+
+/** Store follows have a separate import marker so existing databases can adopt them too. */
+export async function importWatchFiles(db:Queryable,dataDir:string):Promise<number> {
+  if((await db.query("SELECT 1 FROM mcportal_meta WHERE key='imported_watch_files'")).rows.length)return 0;
+  const files=new FileWatchStore(dataDir);
+  const {rows}=await db.query<{user_id:string}>('SELECT user_id FROM mcportal_profiles');
+  let count=0;
+  for(const {user_id} of rows){
+    const watches=await files.list(user_id);
+    if(!watches.length)continue;
+    const inserted=await db.query('INSERT INTO mcportal_watches(user_id,data) VALUES($1,$2) ON CONFLICT DO NOTHING',[user_id,JSON.stringify({version:1,watches})]);
+    if(inserted.rowCount)count+=watches.length;
+  }
+  await db.query("INSERT INTO mcportal_meta(key,value) VALUES('imported_watch_files',$1) ON CONFLICT DO NOTHING",[new Date().toISOString()]);
+  return count;
 }

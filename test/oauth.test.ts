@@ -24,6 +24,9 @@ function fakeUpstreams(users: Record<string, { id: number; login: string }>): { 
     if (url === 'https://client.example/meta.json') {
       return reply(200, { client_id: 'https://client.example/meta.json', client_name: 'Example CIMD Client', redirect_uris: ['https://client.example/cb'] });
     }
+    if (url === 'https://chatgpt.com/oauth/codex/client.json') {
+      return reply(200, { client_id: url, client_name: 'Codex', application_type: 'native', redirect_uris: ['http://127.0.0.1/callback', 'http://localhost/callback'] });
+    }
     return fixtures(url, options);
   };
   return { fetcher, calls };
@@ -299,6 +302,25 @@ test('client ID metadata documents work without registration', async () => {
   }
 });
 
+test('loopback redirects match on any port, as native clients like Codex need (RFC 8252 7.3)', async () => {
+  const app = await startOAuth();
+  try {
+    const { challenge } = pkce();
+    const base = { response_type: 'code', client_id: 'https://chatgpt.com/oauth/codex/client.json', code_challenge: challenge, code_challenge_method: 'S256' };
+    const status = async (redirect_uri: string) => (await raw(app.port, { path: `/oauth/authorize?${new URLSearchParams({ ...base, redirect_uri })}` })).status;
+    assert.equal(await status('http://127.0.0.1:54321/callback'), 200);
+    assert.equal(await status('http://localhost:61000/callback'), 200);
+    assert.equal(await status('http://127.0.0.1:54321/elsewhere'), 400, 'path still has to match');
+    assert.equal(await status('http://localhost.evil.example:54321/callback'), 400);
+    assert.equal(await status('https://127.0.0.1:54321/callback'), 400, 'scheme still has to match');
+    const clientId = await register(app, ['https://client.example/cb']);
+    const https = await raw(app.port, { path: `/oauth/authorize?${new URLSearchParams({ ...base, client_id: clientId, redirect_uri: 'https://client.example:8443/cb' })}` });
+    assert.equal(https.status, 400, 'non-loopback ports stay exact');
+  } finally {
+    await app.close();
+  }
+});
+
 test('invite-only: admins and invited logins get in and get accounts; others are refused; suspension cuts off at once', async () => {
   const { Accounts, makeBootstrap, memoryPersistence } = await import('../src/accounts.ts');
   const users = { 'gh-code-lawrence': { id: 42, login: 'Lawrence' }, 'gh-code-mallory': { id: 666, login: 'mallory' }, 'gh-code-eve': { id: 7, login: 'eve' } };
@@ -480,8 +502,9 @@ test('account page: download everything, one-time links, and delete the account 
     assert.equal((await raw(app.port, { path: '/download/not-a-real-token-at-all' })).status, 410);
 
     const home = await raw(app.port, { path: '/account', headers: { cookie: session } });
-    assert.match(home.body, /Signed in as <b>@Lawrence<\/b>\. Public profile: <b>@lawrence<\/b>/);
-    assert.match(home.body, /1 clip\(s\)/);
+    assert.match(home.body, /Signed in as<\/p><h1>@Lawrence<\/h1>/);
+    assert.match(home.body, /Your public profile is <b>@lawrence<\/b>/);
+    assert.match(home.body, /<b>1<\/b> <span>clip<\/span>/);
     assert.doesNotMatch(String(home.headers['content-security-policy']), /script-src/);
     const csrf = home.body.match(/name="csrf" value="([^"]+)"/)![1]!;
     const bookmarks = await raw(app.port, { path: '/account/export/bookmarks', headers: { cookie: session } });
@@ -658,7 +681,7 @@ test('admin moderation: reports show on the admin page; hide, unhide and dismiss
   const social = new Social({ store: new DocumentSocialStore(), profiles: publicProfiles });
   await publicProfiles.set('github-7', { handle: 'spammer' });
   await publicProfiles.set('github-8', { handle: 'reader' });
-  const share = await social.share('github-7', { kind: 'link', title: 'Buy now', url: 'https://spam.example/', note: 'cheap', audience: 'mcportal' });
+  const share = await social.share('github-7', { kind: 'link', title: 'Buy now', url: 'https://spam.example/', note: 'cheap', audience: 'everyone' });
   const report = await social.report('github-8', { shareId: share.id }, 'spam');
   const app = await startApp({ github: { clientId: 'gh-client', clientSecret: 'gh-secret' } }, fakeUpstreams(users).fetcher, { accounts, publicProfiles, social });
   const cookieOf = (res: { headers: Record<string, string | string[] | undefined> }, name: string) =>
@@ -688,6 +711,66 @@ test('admin moderation: reports show on the admin page; hide, unhide and dismiss
     assert.equal(shown.audit[0].action, 'share.unhidden');
     assert.equal((await social.get('github-8', share.id))?.title, 'Buy now');
     assert.equal((await post('/admin/api/report', { id: 'nope', action: 'dismiss' })).status, 404);
+  } finally {
+    await app.close();
+  }
+});
+
+test('space links: /@handle shows only the handle until you sign in there; signing in admits a newcomer and remembers the intro', async () => {
+  const { Accounts, accountIdFor, makeBootstrap, memoryPersistence } = await import('../src/accounts.ts');
+  const { PublicProfiles } = await import('../src/public-profiles.ts');
+  const { DocumentSocialStore, Social } = await import('../src/social.ts');
+  const users = { 'gh-code-newbie': { id: 7, login: 'Newbie' }, 'gh-code-ana': { id: 99, login: 'ana' } };
+  const accounts = new Accounts(memoryPersistence(), makeBootstrap([], [], true));
+  const publicProfiles = new PublicProfiles(memoryPersistence());
+  const social = new Social({ store: new DocumentSocialStore(), profiles: publicProfiles });
+  const ana = await accounts.admit({ githubId: 99, login: 'ana' });
+  assert.ok(ana.ok);
+  await publicProfiles.set(ana.account.id, { handle: 'ana', bio: 'A bio only for people signed in', public: false });
+  const app = await startApp({ github: { clientId: 'gh-client', clientSecret: 'gh-secret' } }, fakeUpstreams(users).fetcher, { accounts, publicProfiles, social });
+  const cookieOf = (res: { headers: Record<string, string | string[] | undefined> }, name: string) =>
+    ([] as string[]).concat(res.headers['set-cookie'] ?? []).map((c) => c.split(';')[0]!).find((c) => c.startsWith(`${name}=`) && c.length > name.length + 1);
+  const signInThrough = async (path: string, code: string) => {
+    const start = await raw(app.port, { path });
+    assert.equal(start.status, 302);
+    const gh = new URL(String(start.headers.location));
+    assert.equal(gh.host, 'github.com');
+    return raw(app.port, { path: `/oauth/callback?code=${code}&state=${gh.searchParams.get('state')}`, headers: { cookie: cookieOf(start, 'mcportal_page')! } });
+  };
+  try {
+    const nobody = await raw(app.port, { path: '/@nobody_here' });
+    assert.equal(nobody.status, 404);
+    assert.match(nobody.body, /Nobody here by that name/);
+
+    const visitor = await raw(app.port, { path: '/@ANA' });
+    assert.equal(visitor.status, 200, 'handles are case-insensitive');
+    assert.equal(visitor.headers['x-robots-tag'], 'noindex, nofollow');
+    assert.match(visitor.body, /@ana is on MCPortal/);
+    assert.match(visitor.body, /href="\/@ana\/signin"/);
+    assert.doesNotMatch(visitor.body, /A bio only/, 'nothing but the handle before sign-in');
+
+    // A newcomer signs in on the page: admitted (open sign-up), back to the page, intro remembered.
+    const newbie = accountIdFor(7);
+    assert.equal(await accounts.forIdentity({ githubId: 7, login: 'Newbie' }), undefined);
+    const done = await signInThrough('/@ana/signin', 'gh-code-newbie');
+    assert.equal(done.status, 302);
+    assert.equal(done.headers.location, '/@ana');
+    const session = cookieOf(done, 'mcportal_account')!;
+    assert.ok((await accounts.forIdentity({ githubId: 7, login: 'Newbie' }))?.id === newbie, 'the account exists now');
+    assert.match((await raw(app.port, { path: '/@ana', headers: { cookie: session } })).body, /offers to follow @ana/);
+    assert.match((await raw(app.port, { path: '/account', headers: { cookie: session } })).body, /Signed-in apps and devices/, 'the same sign-in serves the account page');
+    assert.deepEqual(await social.takeIntros(newbie), { offer: ['ana'], joined: [], covers: { ana: (await publicProfiles.get(ana.account.id))!.cover! } });
+    await publicProfiles.set(newbie, { handle: 'newbie' });
+    assert.deepEqual((await social.takeIntros(ana.account.id)).joined, ['newbie'], 'ana hears that someone joined through her link');
+
+    // Your own link, signed in.
+    const own = await signInThrough('/@ana/signin', 'gh-code-ana');
+    assert.match((await raw(app.port, { path: '/@ana', headers: { cookie: cookieOf(own, 'mcportal_account')! } })).body, /This is your Space link/);
+    assert.deepEqual(await social.takeIntros(ana.account.id), { offer: [], joined: [] }, 'an existing account brings nobody new');
+
+    // Suspended: nobody there.
+    await accounts.setStatus(ana.account.id, 'suspended', 'admin');
+    assert.equal((await raw(app.port, { path: '/@ana' })).status, 404);
   } finally {
     await app.close();
   }

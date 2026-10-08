@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Space covers: three directions (mockup)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="../../src/ui/space-inks.js"></script>
+<script src="../../src/ui/art.js"></script>
+<style>
+  @font-face { font-family: "MCPortal Jost"; src: url("../../brand/fonts/Jost-Bold.ttf"); font-weight: 700; }
+  @font-face { font-family: "MCPortal Jost"; src: url("../../brand/fonts/Jost-Medium.ttf"); font-weight: 500; }
+  :root { --head: "MCPortal Jost", Jost, Futura, sans-serif; --ui: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: var(--ui); background: #E7E2D6; color: #1F2A36; }
+  button { font: inherit; }
+
+  /* ---------------- the mockup's own chrome (not part of the product) */
+  .chrome { position: sticky; top: 0; z-index: 10; display: flex; flex-wrap: wrap; gap: 14px 22px; align-items: center; padding: 10px 20px; background: #1F2A36; color: #F2E6CF; font-size: 12.5px; }
+  .chrome h1 { margin: 0 8px 0 0; font: 700 14px var(--head); letter-spacing: .08em; text-transform: uppercase; }
+  .chrome label { opacity: .75; margin-right: 6px; }
+  .chrome .group { display: flex; align-items: center; gap: 5px; }
+  .sw { width: 22px; height: 22px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0; position: relative; overflow: hidden; }
+  .sw[aria-pressed="true"] { border-color: #F2E6CF; outline: 2px solid #E0A526; }
+  .sw i { position: absolute; inset: 0 50% 0 0; }
+  .chip { border: 1px solid #F2E6CF55; background: none; color: #F2E6CF; border-radius: 999px; padding: 3px 10px; cursor: pointer; }
+  .chip[aria-pressed="true"] { background: #F2E6CF; color: #1F2A36; }
+  .intro { max-width: 1180px; margin: 22px auto 6px; padding: 0 20px; font-size: 14px; line-height: 1.5; color: #3b4652; }
+  .direction { max-width: 1180px; margin: 26px auto 46px; padding: 0 20px; }
+  .dir-head { display: flex; align-items: baseline; gap: 12px; border-bottom: 2px solid #1F2A36; padding-bottom: 6px; margin-bottom: 14px; }
+  .dir-head h2 { margin: 0; white-space: nowrap; font: 700 20px var(--head); letter-spacing: .04em; }
+  .dir-head p { margin: 0; color: #4b5663; font-size: 13.5px; }
+  .dir-body { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 22px; align-items: start; }
+  .aside h3 { margin: 0 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: #4b5663; }
+  .aside .note { font-size: 12.5px; line-height: 1.5; color: #3b4652; margin: 10px 0 0; }
+  @media (max-width: 980px) { .dir-body { grid-template-columns: 1fr; } }
+
+  /* ---------------- art */
+  .art { display: block; width: 100%; height: 100%; --mp-art-paper: var(--mp-art-ink-p); --mp-art-ink: var(--mp-art-ink-c); }
+  .art .ap { fill: var(--mp-art-paper); } .art .aa { fill: var(--mp-art-ink-a); } .art .ab { fill: var(--mp-art-ink-b); } .art .ac { fill: var(--mp-art-ink); } .art .ax { fill: var(--mp-art-ink-x); }
+  .art .sb { stroke: var(--mp-art-ink-b); } .art .sc { stroke: var(--mp-art-ink); }
+
+  /* ---------------- shared Space pieces, all coloured by the chosen ink set */
+  .space { --p: #F2E6CF; --a: #2A8C82; --b: #E0A526; --c: #1F2A36; --x: #C4452C; background: var(--p); color: var(--c); border-radius: 14px; overflow: hidden; box-shadow: 0 1px 0 #0001, 0 10px 30px #1F2A3622; position: relative; }
+  .halftone { background-image: radial-gradient(circle, color-mix(in srgb, var(--c) 22%, transparent) 0.7px, transparent 0.9px); background-size: 4px 4px; }
+  .press { text-shadow: 1.6px -1.1px 0 var(--x); }   /* the keyline off register */
+  .btn { border: 1.5px solid var(--c); background: none; color: var(--c); border-radius: 8px; padding: 6px 14px; font-weight: 600; font-size: 13px; cursor: pointer; }
+  .btn.primary { background: var(--c); color: var(--p); }
+  .muted { color: color-mix(in srgb, var(--c) 70%, var(--p)); }
+  .label { font: 700 10.5px var(--head); letter-spacing: .14em; text-transform: uppercase; color: color-mix(in srgb, var(--c) 72%, var(--p)); }
+  .handle { font-weight: 600; color: var(--c); text-decoration: underline; text-decoration-color: var(--a); text-underline-offset: 3px; }
+  .stamp { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px 3px 6px; border: 1.5px dashed var(--a); border-radius: 999px; font: 700 10.5px var(--head); letter-spacing: .08em; text-transform: uppercase; color: var(--c); transform: rotate(-2deg); }
+  .stamp:nth-child(2n) { transform: rotate(1.5deg); border-color: var(--x); }
+  .stamp b { width: 14px; height: 14px; border-radius: 50%; background: var(--b); display: inline-block; box-shadow: inset 0 0 0 3px var(--p), inset 0 0 0 4px var(--c); }
+  .colophon { display: flex; align-items: center; gap: 10px; padding: 12px 22px; border-top: 1px solid color-mix(in srgb, var(--c) 25%, transparent); font: 500 11px var(--head); letter-spacing: .1em; text-transform: uppercase; color: color-mix(in srgb, var(--c) 70%, var(--p)); }
+  .colophon img { width: 20px; height: 20px; }
+  .colophon .url { margin-left: auto; text-transform: none; letter-spacing: .02em; }
+
+  .post { display: grid; grid-template-columns: 96px 1fr; gap: 12px; padding: 12px 0; border-top: 1px solid color-mix(in srgb, var(--c) 18%, transparent); }
+  .post .thumb { aspect-ratio: 160/84; border-radius: 6px; overflow: hidden; }
+  .post .t { font-weight: 650; font-size: 14.5px; line-height: 1.3; }
+  .post .n { margin: 4px 0 0; font-size: 13px; line-height: 1.45; }
+  .post .m { margin-top: 4px; font-size: 11.5px; }
+  .post .rb { font-size: 11.5px; margin-bottom: 2px; }
+  .post.quote { grid-template-columns: 1fr; }
+  .post.quote blockquote { margin: 0; padding: 4px 0 4px 12px; border-left: 3px solid var(--b); font: 500 16px/1.4 var(--head); }
+
+  .sources { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+  .src { display: flex; align-items: center; gap: 8px; padding: 6px 8px 6px 6px; border: 1px solid color-mix(in srgb, var(--c) 20%, transparent); border-radius: 10px; background: color-mix(in srgb, var(--p) 70%, white); font-size: 12.5px; }
+  .src .badge { width: 34px; height: 34px; flex: none; border-radius: 9px; overflow: hidden; }
+  .src small { display: block; font-size: 11px; }
+  .src .add { margin-left: auto; font-size: 11px; padding: 2px 8px; border-width: 1px; }
+  .travelers { display: flex; flex-wrap: wrap; gap: 10px; }
+  .trav { display: flex; align-items: center; gap: 7px; font-size: 12.5px; }
+  .trav .face { width: 30px; height: 30px; border-radius: 50%; overflow: hidden; box-shadow: 0 0 0 2px var(--p), 0 0 0 3.5px var(--c); }
+
+  /* ---------------- owner affordances: shown only in the owner view */
+  .owner-only { display: none !important; }
+  body.owner .owner-only { display: revert !important; }
+  body.owner .visitor-only { display: none !important; }
+  .edit { position: relative; }
+  body.owner .edit { outline: 1.5px dashed color-mix(in srgb, var(--a) 70%, transparent); outline-offset: 3px; border-radius: 3px; }
+  body.owner .edit::after { content: "✎"; position: absolute; right: -18px; top: -6px; font-size: 12px; color: var(--a); text-shadow: none; }
+  .printshop { margin: 0; padding: 12px 22px; background: var(--c); color: var(--p); font-size: 12.5px; display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+  .printshop strong { font: 700 12px var(--head); letter-spacing: .12em; text-transform: uppercase; }
+  .printshop .ask { margin-left: auto; font-style: italic; opacity: .85; }
+  .printshop button { border: 1px solid color-mix(in srgb, var(--p) 45%, transparent); background: none; color: var(--p); border-radius: 999px; padding: 3px 10px; cursor: pointer; font-size: 12px; }
+  .owner-stats { font-size: 12px; padding: 8px 12px; border-radius: 8px; background: color-mix(in srgb, var(--b) 22%, var(--p)); }
+
+  /* ================ A: the paperback cover */
+  .A .cover { position: relative; aspect-ratio: 160/62; overflow: hidden; }
+  .A .cover .art { position: absolute; inset: 0; }
+  .A .cover .fade { position: absolute; inset: auto 0 0 0; height: 46%; background: linear-gradient(transparent, var(--p)); }
+  .A .mast { padding: 0 26px 18px; margin-top: -54px; position: relative; }
+  .A .mast h1 { margin: 0; font: 700 44px/1 var(--head); letter-spacing: .02em; }
+  .A .freq { margin: 8px 0 4px; font: 500 14px var(--head); letter-spacing: .06em; }
+  .A .who { font-size: 13px; }
+  .A .bio { margin: 10px 0 12px; max-width: 560px; font-size: 14.5px; line-height: 1.5; }
+  .A .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-size: 12.5px; }
+  .A .body { display: grid; grid-template-columns: 1fr 230px; gap: 26px; padding: 4px 26px 22px; }
+  .A .pinned { border: 2px solid var(--c); border-radius: 12px; padding: 14px; margin-bottom: 8px; box-shadow: 4px 4px 0 var(--b); background: color-mix(in srgb, var(--p) 60%, white); }
+  .A .pinned .post { border: 0; padding: 0; grid-template-columns: 150px 1fr; }
+  .A .side > * + * { margin-top: 18px; }
+  .A .side .sources { grid-template-columns: 1fr; }
+  @media (max-width: 760px) { .A .body { grid-template-columns: 1fr; } }
+
+  /* ================ B: the pulp magazine */
+  .B .masthead { padding: 16px 24px 10px; border-bottom: 3px double var(--c); display: grid; grid-template-columns: auto 1fr auto; align-items: end; gap: 14px; }
+  .B .masthead .issue { font: 700 11px var(--head); letter-spacing: .14em; text-transform: uppercase; line-height: 1.5; }
+  .B .masthead h1 { margin: 0; text-align: center; font: 700 52px/0.95 var(--head); letter-spacing: .06em; text-transform: uppercase; }
+  .B .masthead .price { text-align: right; font: 700 11px var(--head); letter-spacing: .14em; text-transform: uppercase; }
+  .B .strap { display: flex; justify-content: space-between; padding: 6px 24px; background: var(--c); color: var(--p); font: 500 12px var(--head); letter-spacing: .12em; text-transform: uppercase; }
+  .B .front { display: grid; grid-template-columns: 1.35fr 1fr; gap: 22px; padding: 18px 24px; }
+  .B .illo { align-self: start; border: 2px solid var(--c); padding: 6px; background: var(--p); transform: rotate(-.6deg); box-shadow: 5px 5px 0 var(--a); }
+  .B .illo .frame { aspect-ratio: 160/100; overflow: hidden; }
+  .B .illo .cap { font: 500 11px var(--head); letter-spacing: .08em; text-transform: uppercase; padding: 6px 2px 0; display: flex; justify-content: space-between; }
+  .B .cover-lines h2 { margin: 0 0 4px; font: 700 26px/1.05 var(--head); }
+  .B .cover-lines .kicker { font: 700 11px var(--head); letter-spacing: .14em; text-transform: uppercase; color: var(--x); }
+  .B .cover-lines p { margin: 6px 0 12px; font-size: 13.5px; line-height: 1.5; }
+  .B .toc { list-style: none; margin: 0; padding: 0; counter-reset: toc; }
+  .B .toc li { display: grid; grid-template-columns: 28px 1fr auto; gap: 8px; align-items: baseline; padding: 7px 0; border-top: 1px dotted color-mix(in srgb, var(--c) 40%, transparent); font-size: 13.5px; }
+  .B .toc li::before { counter-increment: toc; content: counter(toc, decimal-leading-zero); font: 700 13px var(--head); color: var(--a); }
+  .B .toc small { font-size: 11.5px; }
+  .B .lower { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; padding: 4px 24px 20px; }
+  @media (max-width: 760px) { .B .front, .B .lower { grid-template-columns: 1fr; } .B .masthead h1 { font-size: 36px; } }
+
+  /* ================ C: the mission patch (built for the chat card) */
+  .C { max-width: 620px; }
+  .C .band { display: grid; grid-template-columns: 150px 1fr; gap: 18px; padding: 20px 22px 16px; align-items: center; }
+  .C .patch { width: 150px; height: 150px; border-radius: 50%; overflow: hidden; position: relative; box-shadow: 0 0 0 4px var(--p), 0 0 0 7px var(--c), 0 0 0 9px var(--b); }
+  .C .patch .art { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .C .patch svg.ringtext { position: absolute; inset: 0; }
+  .C h1 { margin: 0; font: 700 30px/1.05 var(--head); }
+  .C .call { font: 700 12px var(--head); letter-spacing: .16em; text-transform: uppercase; margin-top: 4px; }
+  .C .freq { margin: 8px 0 10px; font-size: 13.5px; line-height: 1.45; }
+  .C .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 12.5px; }
+  .C .stamps { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 22px 12px; }
+  .C .tabs { display: flex; gap: 2px; padding: 0 22px; border-bottom: 2px solid var(--c); }
+  .C .tabs span { padding: 6px 12px; font: 700 11px var(--head); letter-spacing: .12em; text-transform: uppercase; border-radius: 8px 8px 0 0; }
+  .C .tabs span.on { background: var(--c); color: var(--p); }
+  .C .feed { padding: 4px 22px 14px; }
+
+  /* ---------------- link unfurl (Slack/Discord/iMessage preview) */
+  .unfurl { border-left: 4px solid #c9ccd1; padding: 4px 0 4px 12px; font-family: -apple-system, system-ui, sans-serif; background: #fff; border-radius: 4px; }
+  .unfurl .site { font-size: 12px; color: #616061; font-weight: 600; }
+  .unfurl .ttl { font-size: 14px; color: #1264a3; font-weight: 700; margin: 2px 0; }
+  .unfurl .desc { font-size: 13px; color: #1d1c1d; margin-bottom: 8px; }
+  .og { aspect-ratio: 1200/630; border-radius: 8px; overflow: hidden; position: relative; background: var(--p); }
+  .og .art { position: absolute; inset: 0; }
+  .og .plate { position: absolute; left: 6%; bottom: 9%; right: 6%; display: flex; align-items: end; gap: 10px; }
+  .og .plate .t { font: 700 26px/1 var(--head); color: var(--c); background: var(--p); padding: 6px 10px 5px; box-shadow: 3px 3px 0 var(--c); }
+  .og .plate .h { font: 700 11px var(--head); letter-spacing: .12em; color: var(--p); background: var(--c); padding: 4px 8px; text-transform: uppercase; }
+  .og .imprint { position: absolute; top: 7%; right: 5%; font: 700 9px var(--head); letter-spacing: .16em; color: var(--c); background: var(--p); padding: 3px 6px; text-transform: uppercase; }
+  .og.patch-og { display: grid; grid-template-columns: 42% 1fr; align-items: center; }
+  .og.patch-og .art { position: static; }
+  .og.patch-og .disc { margin: 0 auto; width: 74%; aspect-ratio: 1; border-radius: 50%; overflow: hidden; box-shadow: 0 0 0 4px var(--p), 0 0 0 7px var(--c); }
+  .og.patch-og .words { padding-right: 8%; }
+  .og.patch-og .words div:first-child { font: 700 22px/1.05 var(--head); color: var(--c); }
+  .og.patch-og .words div + div { margin-top: 6px; font: 700 10px var(--head); letter-spacing: .14em; text-transform: uppercase; color: var(--x); }
+  .og.mag-og .mtitle { position: absolute; top: 0; left: 0; right: 0; text-align: center; font: 700 30px var(--head); letter-spacing: .06em; text-transform: uppercase; color: var(--c); background: var(--p); padding: 8px 0 4px; border-bottom: 3px double var(--c); }
+  .og.mag-og .art { top: 52px; }
+</style>
+</head>
+<body>
+<div class="chrome">
+  <h1>Space covers · mockup</h1>
+  <div class="group"><label>Ink</label><span id="inks"></span></div>
+  <div class="group"><label>Motif</label><span id="motifs"></span></div>
+  <div class="group"><button class="chip" id="reroll" type="button">↻ Re-roll composition</button></div>
+  <div class="group"><label>View as</label><button class="chip" data-view="visitor" aria-pressed="true">Visitor</button><button class="chip" data-view="owner" aria-pressed="false">Owner</button></div>
+</div>
+
+<p class="intro">One sample Space (<b>@ana</b>), drawn three ways. The cover art comes from the real <code>src/ui/art.js</code> engine, so these are covers a Space would actually get. Before the owner picks anything, the ink, motif and composition are all seeded from the handle. Change the ink or motif, or re-roll the composition, and all three directions update. <b>View as Owner</b> shows the edit marks, the print-shop bar and the owner-only stats. On the right of each direction is how a pasted Space link would look in Slack.</p>
+
+<section class="direction">
+  <div class="dir-head"><h2>A · Paperback</h2><p>A cover band across the top, the title set over it, a pinned "Now transmitting" post, and sources and people in a side column. Closest to the landing page.</p></div>
+  <div class="dir-body"><div id="A"></div><div class="aside"><h3>Link preview</h3><div id="A-og"></div><p class="note">The preview is the same cover with a title plate on it, like a paperback spine label. It shows only what a visitor would see anyway: the handle, the Space title and art made from them.</p></div></div>
+</section>
+
+<section class="direction">
+  <div class="dir-head"><h2>B · Pulp magazine</h2><p>The Space as a pulp magazine. The title is the masthead and the post count becomes "No. 42". The newest post is the cover story and the rest are "In this issue". The loudest of the three, with the most personality.</p></div>
+  <div class="dir-body"><div id="B"></div><div class="aside"><h3>Link preview</h3><div id="B-og"></div><p class="note">The masthead does the branding. "Vol. II" counts the Space's years, which gives long-time users a quiet bit of status.</p></div></div>
+</section>
+
+<section class="direction">
+  <div class="dir-head"><h2>C · Mission patch</h2><p>Compact and built for the chat card: a round patch with the cover art, the handle as a call sign, stamps, and tabs for posts, sources and travelers. The art could also serve as each person's avatar across MCPortal.</p></div>
+  <div class="dir-body"><div id="C"></div><div class="aside"><h3>Link preview</h3><div id="C-og"></div><p class="note">The patch doubles as an avatar, so the same mark appears beside @ana in the river, the Lobby and the People portal. Your art becomes your face across MCPortal.</p></div></div>
+</section>
+
+<script>
+const INKS = [
+  ['atomic', '#F2E6CF', '#2A8C82', '#E0A526', '#1F2A36', '#C4452C'],
+  ['space age', '#EFE3C8', '#E2692A', '#3FA7A0', '#1E2F4F', '#F2C230'],
+  ['pulp', '#F4E4C1', '#2B5C8A', '#D2402F', '#1B2330', '#F2C230'],
+  ['olive drab', '#EDE2C6', '#7A8B3A', '#C8622B', '#3E2C22', '#E9B949'],
+  ['pink moon', '#F3E1D3', '#5B3558', '#E27A73', '#2A1C2B', '#8CC6A8'],
+  ['mars', '#F0DDC2', '#B5482E', '#E3B070', '#3A2A3F', '#5FA8A0'],
+  ['mission', '#ECE6D6', '#1F4E8C', '#9AA3A6', '#17202E', '#D8432E'],
+  ['harbor', '#E9E4D4', '#2F7F9A', '#EFB23C', '#243447', '#D9603B'],
+];
+const MOTIFS = ['arches', 'orbits', 'portal', 'gravity', 'doorway'];
+const hash = (s) => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
+
+const space = {
+  handle: 'ana', name: 'Ana Ruiz', title: 'The Night Shift',
+  freq: ['synths', 'urbanism', 'old NASA photos', 'cats'],
+  bio: 'I read the internet after midnight and keep the good bits. Transit maps, modular synths, and whatever the Voyager team is up to.',
+  followers: 128, posts: 42, since: 2025,
+  stamps: ['Charter traveler', 'Brought 3 aboard', 'Signal keeper'],
+  pinned: { title: 'Every subway map is a lie (and that’s fine)', host: 'citylab.com', note: 'The best explainer of why diagrams beat geography. I think about this every time I ride the L.', reblogs: 9 },
+  feed: [
+    { title: 'The Voyager 1 thruster fix, explained', host: 'nasa.gov', note: 'They fixed a 47-year-old spacecraft from 15 billion miles away. I want to be that calm.', ago: '2h' },
+    { kind: 'quote', text: 'A city is a machine for making accidental meetings.', by: 'from a clip of “The Death and Life…”', ago: '1d' },
+    { title: 'Patch notes: Make Noise 0-Coast firmware 2.0', host: 'makenoisemusic.com', reblog: 'theo', ago: '2d' },
+    { title: 'Cats choose the warmest seat on the train, a field study', host: 'reddit.com/r/cats', note: 'Peer reviewed by me, at 1am.', ago: '4d' },
+  ],
+  sources: [['CityLab', 'citylab.com'], ['Hacker News', 'Hacker News'], ['Make Noise', 'makenoisemusic.com'], ['NASA JPL', 'jpl.nasa.gov'], ['r/transit', 'reddit.com']],
+  travelers: ['theo', 'mira', 'kojo', 'sam_r'],
+};
+
+// Seeded from the handle until the owner chooses: ink, motif and composition.
+const seed = hash(space.handle);
+const state = { ink: seed % 8, motif: Math.floor(seed / 8) % 5, roll: 0 };
+const styleOf = () => state.ink + state.motif * 8;
+const cover = (key = 'cover') => portalArt.draw(styleOf(), `${space.handle}/${key}/${state.roll}`);
+const other = (k) => portalArt.draw(portalArt.styles([k])[0], k);   // someone else's art, by their own key
+const h = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+function vars() {
+  const [, p, a, b, c, x] = INKS[state.ink];
+  return `--p:${p};--a:${a};--b:${b};--c:${c};--x:${x}`;
+}
+const printshop = () => `<div class="printshop owner-only"><strong>Print shop</strong>
+  <button>Ink: ${INKS[state.ink][0]}</button><button>Motif: ${MOTIFS[state.motif]}</button><button>↻ Re-roll</button><button>Pin a post</button><button>Stamps</button>
+  <span class="ask">or ask your agent: “dress my Space like a 70s Moebius comic”</span></div>`;
+const followRow = () => `<button class="btn primary visitor-only">Follow</button><button class="btn owner-only">Copy Space link</button>`;
+const ownerStats = () => `<div class="owner-stats owner-only">This week: <b>3 people</b> passed your posts on (@theo, @mira, @kojo). <span class="muted">Only you see this.</span></div>`;
+const colophon = () => `<div class="colophon"><img src="../../brand/mark.svg" alt=""> An MCPortal paperback <span class="url">mcportal.lol/@${space.handle}</span></div>`;
+
+function postHtml(p, i) {
+  if (p.kind === 'quote') return `<div class="post quote"><div><blockquote>${h(p.text)}</blockquote><div class="m muted">${h(p.by)} · ${p.ago}</div></div></div>`;
+  return `<div class="post"><div class="thumb">${other(`${p.host}/${i}`)}</div><div>
+    ${p.reblog ? `<div class="rb muted">⟳ reblogged <span class="handle">@${p.reblog}</span></div>` : ''}
+    <div class="t">${h(p.title)}</div>${p.note ? `<p class="n">${h(p.note)}</p>` : ''}<div class="m muted">${h(p.host)} · ${p.ago}</div></div></div>`;
+}
+const sourcesHtml = () => `<div class="sources">${space.sources.map(([t, s]) => `<div class="src"><div class="badge">${other(s)}</div><div>${h(t)}<small class="muted">${h(s)}</small></div><button class="btn add visitor-only">Add</button></div>`).join('')}</div>`;
+const travelersHtml = () => `<div class="travelers">${space.travelers.map((t) => `<div class="trav"><div class="face">${other(`@${t}`)}</div><span class="handle">@${t}</span></div>`).join('')}</div>`;
+const stampsHtml = () => space.stamps.map((s) => `<span class="stamp"><b></b>${s}</span>`).join('');
+
+function drawA() {
+  const p = space.pinned;
+  return `<div class="space A" style="${vars()}">${printshop()}
+    <div class="cover">${cover()}<div class="fade"></div></div>
+    <div class="mast">
+      <h1 class="press"><span class="edit">${space.title}</span></h1>
+      <div class="freq"><span class="edit">Transmitting on: ${space.freq.join(' · ')}</span></div>
+      <div class="who muted">@${space.handle} · ${space.name} · since ${space.since}</div>
+      <p class="bio"><span class="edit">${h(space.bio)}</span></p>
+      <div class="row">${followRow()}<span class="muted">${space.followers} followers · ${space.posts} posts</span></div>
+    </div>
+    <div class="body">
+      <div>
+        <div class="label" style="margin-bottom:8px">★ Now transmitting</div>
+        <div class="pinned"><div class="post"><div class="thumb">${other('citylab/pinned')}</div><div><div class="t">${h(p.title)}</div><p class="n">${h(p.note)}</p><div class="m muted">${p.host} · ${p.reblogs} reblogs</div></div></div></div>
+        ${ownerStats()}
+        <div class="label" style="margin:16px 0 0">Recent transmissions</div>
+        ${space.feed.map(postHtml).join('')}
+      </div>
+      <div class="side">
+        <div><div class="label" style="margin-bottom:8px">Stamps</div><div style="display:flex;flex-wrap:wrap;gap:6px">${stampsHtml()}</div></div>
+        <div><div class="label" style="margin-bottom:8px">Sources I read</div>${sourcesHtml()}</div>
+        <div><div class="label" style="margin-bottom:8px">Fellow travelers</div>${travelersHtml()}</div>
+      </div>
+    </div>${colophon()}</div>`;
+}
+
+function drawB() {
+  const lead = space.feed[0];
+  return `<div class="space B" style="${vars()}">${printshop()}
+    <div class="masthead halftone">
+      <div class="issue">Vol. II<br>No. ${space.posts}</div>
+      <h1 class="press"><span class="edit">${space.title}</span></h1>
+      <div class="price">@${space.handle}<br>Free · Weekly-ish</div>
+    </div>
+    <div class="strap"><span class="edit">${space.freq.join(' ✦ ')}</span><span>${space.followers} readers</span></div>
+    <div class="front">
+      <div class="illo"><div class="frame">${cover()}</div><div class="cap"><span>Cover: ${MOTIFS[state.motif]} in ${INKS[state.ink][0]}</span><span>by @${space.handle}</span></div></div>
+      <div class="cover-lines">
+        <div class="kicker">Cover story</div>
+        <h2>${h(lead.title)}</h2>
+        <p>${h(lead.note)}</p>
+        <div style="display:flex;gap:8px;margin-bottom:14px">${followRow()}</div>
+        <div class="label" style="margin-bottom:4px">In this issue</div>
+        <ol class="toc">${[space.pinned, ...space.feed.slice(1)].map((p) => `<li><span>${h(p.title || `“${p.text}”`)}${p.reblog ? ` <small class="muted">via @${p.reblog}</small>` : ''}</span><small class="muted">${p.host || 'clip'}</small></li>`).join('')}</ol>
+        ${ownerStats()}
+      </div>
+    </div>
+    <div class="lower">
+      <div><div class="label" style="margin-bottom:8px">The editor recommends: sources</div>${sourcesHtml()}</div>
+      <div><div class="label" style="margin-bottom:8px">Contributors &amp; fellow travelers</div>${travelersHtml()}
+        <div class="label" style="margin:16px 0 8px">Stamps</div><div style="display:flex;flex-wrap:wrap;gap:6px">${stampsHtml()}</div>
+        <p class="muted" style="font-size:13px;line-height:1.5;margin-top:14px"><span class="edit">${h(space.bio)}</span></p></div>
+    </div>${colophon()}</div>`;
+}
+
+function drawC() {
+  return `<div class="space C" style="${vars()}">${printshop()}
+    <div class="band halftone">
+      <div class="patch">${cover('patch')}<svg class="ringtext" viewBox="0 0 150 150"><defs><path id="rp" d="M75 75 m-61 0 a61 61 0 1 1 122 0 a61 61 0 1 1 -122 0"/></defs>
+        <circle cx="75" cy="75" r="68" fill="none" stroke="var(--c)" stroke-width="15"/>
+        <text font-family="MCPortal Jost" font-weight="700" font-size="9.5" letter-spacing="2.6" fill="var(--p)"><textPath href="#rp" startOffset="2%">✦ ${space.title.toUpperCase()} ✦ @${space.handle.toUpperCase()} ✦ SINCE ${space.since}</textPath></text></svg></div>
+      <div>
+        <h1 class="press"><span class="edit">${space.title}</span></h1>
+        <div class="call">Call sign @${space.handle} · ${space.name}</div>
+        <div class="freq"><span class="edit">Transmitting on ${space.freq.join(', ')}.</span> <span class="muted">${h(space.bio)}</span></div>
+        <div class="row">${followRow()}<span class="muted">${space.followers} followers · ${space.posts} posts</span></div>
+      </div>
+    </div>
+    <div class="stamps">${stampsHtml()}</div>
+    <div class="tabs"><span class="on">Transmissions</span><span>Sources (${space.sources.length})</span><span>Travelers (${space.travelers.length})</span></div>
+    <div class="feed">${ownerStats() ? `<div style="margin-top:10px">${ownerStats()}</div>` : ''}
+      <div class="post"><div class="thumb">${other('citylab/pinned')}</div><div><div class="rb muted">★ pinned</div><div class="t">${h(space.pinned.title)}</div><p class="n">${h(space.pinned.note)}</p></div></div>
+      ${space.feed.slice(0, 3).map(postHtml).join('')}</div>${colophon()}</div>`;
+}
+
+const unfurl = (inner) => `<div class="unfurl"><div class="site">MCPortal</div><div class="ttl">${space.title} · @${space.handle}</div><div class="desc">A Space on MCPortal. Your liminal webspace.</div>${inner}</div>`;
+function drawOgs() {
+  const style = vars();
+  document.getElementById('A-og').innerHTML = unfurl(`<div class="og" style="${style}">${cover('og')}<div class="imprint">MCPortal</div><div class="plate"><span class="t">${space.title}</span><span class="h">@${space.handle}</span></div></div>`);
+  document.getElementById('B-og').innerHTML = unfurl(`<div class="og mag-og" style="${style}">${cover('og')}<div class="mtitle">${space.title}</div><div class="plate"><span class="h">Vol. II · No. ${space.posts} · @${space.handle}</span></div></div>`);
+  document.getElementById('C-og').innerHTML = unfurl(`<div class="og patch-og" style="${style}"><div class="disc">${cover('patch')}</div><div class="words"><div>${space.title}</div><div>@${space.handle} · MCPortal</div></div></div>`);
+}
+
+function render() {
+  document.getElementById('A').innerHTML = drawA();
+  document.getElementById('B').innerHTML = drawB();
+  document.getElementById('C').innerHTML = drawC();
+  drawOgs();
+  document.querySelectorAll('#inks .sw').forEach((b, i) => b.setAttribute('aria-pressed', String(i === state.ink)));
+  document.querySelectorAll('#motifs .chip').forEach((b, i) => b.setAttribute('aria-pressed', String(i === state.motif)));
+}
+
+document.getElementById('inks').innerHTML = INKS.map(([name, p, a, b]) => `<button class="sw" title="${name}" aria-label="${name}" style="background:${b}"><i style="background:${a}"></i></button>`).join('');
+document.getElementById('motifs').innerHTML = MOTIFS.map((m) => `<button class="chip">${m}</button>`).join('');
+document.querySelectorAll('#inks .sw').forEach((b, i) => b.onclick = () => { state.ink = i; render(); });
+document.querySelectorAll('#motifs .chip').forEach((b, i) => b.onclick = () => { state.motif = i; render(); });
+document.getElementById('reroll').onclick = () => { state.roll++; render(); };
+document.querySelectorAll('[data-view]').forEach((b) => b.onclick = () => {
+  document.body.classList.toggle('owner', b.dataset.view === 'owner');
+  document.querySelectorAll('[data-view]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+});
+render();
+</script>
+</body>
+</html>

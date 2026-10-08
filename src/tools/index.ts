@@ -20,11 +20,13 @@ import { COLLECTION_TOOLS } from './collections.ts';
 import { COMPARISON_TOOLS } from './comparison.ts';
 import { READING_WATCH_TOOLS } from './reading-watches.ts';
 import { CATCHUP_TOOLS } from './catchup.ts';
+import { WATCH_TOOLS } from './watches.ts';
 
 export const TOOLS: readonly ToolDef[] = [
   ...ROOM_TOOLS,
   ...HIGHLIGHT_TOOLS,
   ...SOURCE_TOOLS,
+  ...WATCH_TOOLS,
   ...READER_TOOLS,
   ...SAVED_TOOLS,
   ...DOCS_TOOLS,

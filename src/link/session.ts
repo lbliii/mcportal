@@ -1,3 +1,5 @@
+import type { WatchStore } from '../watches.ts';
+import type { Watches } from '../store-watches.ts';
 /**
  * A local MCPortal, linked or not. Each request asks for its ToolContext here, which
  * is the local files when there's no link.json, or the hosted account's state (remote
@@ -30,7 +32,7 @@ import { signInFailure, type SignInFailure } from './signin-errors.ts';
 import { linkedStores } from './stores.ts';
 
 /** The hosted MCPortal a local one signs in to (MCPORTAL_HOSTED_URL to use another). */
-export const DEFAULT_HOSTED_URL = 'https://mcportal-production.up.railway.app';
+export const DEFAULT_HOSTED_URL = 'https://mcportal.lol';
 
 /** What tools see of the link (ctx.link): whether this MCPortal is signed in, and the two actions. */
 export interface LinkControl {
@@ -54,6 +56,8 @@ export interface LocalStores {
   collections?: CollectionStore;
   experiences?: ExperienceStore;
   reading: ReadingStore;
+  watchStore?: WatchStore;
+  watches?: Watches;
   seen: SeenStore;
   handoffs: HandoffStore;
   editions: EditionStore;
@@ -179,7 +183,7 @@ export class LocalSession {
     const clips = (await local.clips.usage(localUser)).count;
     const collections = await local.collections?.list(localUser) ?? [];
     const experiences = (await local.experiences?.get(localUser))?.state;
-    if (!profile.onboarded && !profile.saved.length && !clips && !collections.length && !experiences?.catchup && !experiences?.watches.length) return undefined;
+    if (!profile.onboarded && !profile.saved.length && !clips && !collections.length && !experiences?.catchup && !experiences?.watches.length && !(await local.watchStore?.list(localUser))?.length) return undefined;
     const file = await buildExport('mcportal', localUser, local);
     const { summary } = await client.upload(file.body.toString('utf8'));
     const note = `This computer's portal was added to your account. ${summary.replace(/^Imported: /, '')}`;

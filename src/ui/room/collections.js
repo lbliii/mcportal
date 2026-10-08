@@ -172,7 +172,8 @@
       try { await hostRequest('ui/message', { role: 'user', content: [{ type: 'text', text: request }] }, 10000); toast('Sent to your agent'); return; }
       catch { /* The request stays available below. */ }
     }
-    const panel = el('div', { class: 'agent-request', role: 'status' }, el('p', null, 'Tell your agent in the chat:'), el('p', null, request), copyButton(request));
+    const text = el('p', null, request);
+    const panel = el('div', { class: 'agent-request', role: 'status' }, el('p', null, 'Tell your agent in the chat:'), text, copyButton(request, text, 'Copy request'));
     $('experiences').prepend(panel); panel.scrollIntoView({ block: 'nearest' });
   }
   /** @param {string} id */

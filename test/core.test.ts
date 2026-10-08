@@ -84,11 +84,10 @@ test('tools/list links open_room to the UI and hides app-only tools from the mod
   const names = async (c: ToolContext) => ((await rpc(c, 'tools/list')).result as any).tools.map((t: any) => t.name) as string[];
   const local = await names(ctx());
   assert.ok(!local.includes('share') && !local.includes('open_space') && !local.includes('set_public_profile'), 'no sharing or profiles locally');
-  assert.equal(local.length, tools.length - 11);
+  assert.equal(local.length, tools.length - 15);
   const fresh = await names(ctx(social(false)));
-  assert.deepEqual(tools.map((t) => t.name).filter((n) => !fresh.includes(n)).sort(), ['get_public_profile', 'get_share', 'list_connections', 'list_shares', 'remove_public_profile', 'share', 'unshare']);
-  assert.deepEqual(tools.map((t) => t.name), ['open_room', 'build_room', 'arrange_room', 'remove_portal', 'refresh_portal', 'mark_seen', 'list_new_items', 'show_highlights', 'read_source', 'find_source', 'add_portal', 'list_sources', 'import_opml', 'read_article', 'get_thumbnails', 'save_item', 'remove_saved', 'pin_portal', 'open_docs', 'read_doc_page', 'search_docs', 'open_handoff', 'create_handoff', 'clip', 'search_clips', 'get_clip', 'update_clip', 'delete_clip', 'get_public_profile', 'set_public_profile', 'remove_public_profile', 'export_data', 'import_portal', 'account_settings', 'open_space', 'share', 'unshare', 'get_share', 'list_shares', 'relationship', 'list_connections', 'report', 'record_reading', 'get_reading', 'list_reading', 'search_library', 'open_collection', 'update_collection', 'catch_up', 'watch_reading', 'show_comparison']);
-  assert.ok((await names({ ...ctx(social(true)), labs: ['reblog'] })).includes('share_settings'), "a lab's tools are listed while it's on");
+  assert.deepEqual(tools.map((t) => t.name).filter((n) => !fresh.includes(n)).sort(), ['get_public_profile', 'get_share', 'list_connections', 'list_shares', 'remove_public_profile', 'share', 'share_settings', 'unshare']);
+  assert.deepEqual(tools.map((t) => t.name), ['open_room', 'build_room', 'arrange_room', 'remove_portal', 'refresh_portal', 'mark_seen', 'list_new_items', 'show_highlights', 'read_source', 'find_source', 'add_portal', 'list_sources', 'import_opml', 'watch', 'unwatch', 'read_article', 'get_thumbnails', 'save_item', 'remove_saved', 'pin_portal', 'open_docs', 'read_doc_page', 'search_docs', 'open_handoff', 'create_handoff', 'clip', 'search_clips', 'get_clip', 'update_clip', 'delete_clip', 'get_public_profile', 'set_public_profile', 'remove_public_profile', 'export_data', 'import_portal', 'account_settings', 'open_space', 'share', 'unshare', 'get_share', 'share_settings', 'list_shares', 'relationship', 'find_people', 'suggest_people', 'pass_person', 'list_connections', 'report', 'record_reading', 'get_reading', 'list_reading', 'search_library', 'open_collection', 'update_collection', 'catch_up', 'watch_reading', 'show_comparison']);
   assert.equal(tools.find((t) => t.name === 'open_room')._meta.ui.resourceUri, ROOM_URI);
   assert.deepEqual(tools.find((t) => t.name === 'refresh_portal')._meta.ui.visibility, ['app']);
   assert.equal(tools.find((t) => t.name === 'read_article')._meta.ui.resourceUri, ROOM_URI, 'reader renders as its own card');
@@ -102,7 +101,7 @@ test('resources/read serves the self-contained room app', async () => {
   assert.match(content.text, /<title>MCPortal<\/title>/);
   assert.ok(!/<script[^>]+src=/.test(content.text), 'no external scripts');
   assert.ok(!content.text.includes('__MCPORTAL_DEV__='), 'dev bootstrap only in /preview');
-  assert.ok(!/innerHTML/.test(content.text), 'UI never renders remote data as HTML');
+  assert.deepEqual([...content.text.matchAll(/innerHTML\s*=([^;]+);/g)].map((m) => m[1]!.trim()), ['spaceFormat.render(space)', 'spaceFormat.avatar(cover)'], 'only the escaped shared Space renderer and constant art may produce markup');
   assert.ok(!/[\u2028\u2029]/.test(content.text), 'no raw line separators in scripts');
   for (const [, script] of content.text.matchAll(/<script>([\s\S]*?)<\/script>/g)) new vm.Script(script); // throws on a syntax error
   const missing = await rpc(ctx(), 'resources/read', { uri: 'ui://nope' });
@@ -127,8 +126,8 @@ test('room fragments: every src/ui/room file is included, in order, and no inclu
     assert.ok(html.includes(text), `${name} appears in the assembled page`);
   }
   // The script fragments share one closure; their order is evaluation order.
-  const order = [...page.matchAll(/\/\*include:(room\/[\w.]+\.js)\*\//g)].map((m) => m[1]);
-  assert.deepEqual(order, ['bridge', 'dom', 'experiences', 'recall', 'collections', 'compare', 'catchup', 'watches', 'room', 'items', 'layouts', 'views', 'river', 'levels', 'seen', 'reader', 'reading', 'passage', 'handoff', 'highlights', 'docs', 'social', 'reblog', 'add', 'toolbar', 'boot'].map((n) => `room/${n}.js`));
+  const order = [...page.matchAll(/\/\*include:(room\/[\w.-]+\.js)\*\//g)].map((m) => m[1]);
+  assert.deepEqual(order, ['bridge', 'dom', 'experiences', 'recall', 'collections', 'compare', 'catchup', 'watches', 'room', 'items', 'layouts', 'views', 'river', 'levels', 'seen', 'reader', 'reader-tools', 'reading', 'passage', 'handoff', 'highlights', 'docs', 'social', 'reblog', 'add', 'shop', 'toolbar', 'boot'].map((n) => `room/${n}.js`));
 });
 
 // ---------------------------------------------------------------- tools
@@ -176,7 +175,7 @@ test('arrange_room moves portals and reports the diff; remove_portal removes onl
   // "Put GitHub on the left"
   const saved = await call(c, 'arrange_room', { move: [{ portal: 'gh-mcp', column: 1, position: 1 }] });
   assert.equal(saved.isError, undefined);
-  assert.match(saved.content[0]!.text, /moved: .*gh-mcp \(column 2 → 1\)/);
+  assert.match(saved.content[0]!.text, /moved: gh-mcp \(column 2 → 1\)\./, 'only what was asked to move, not portals that shifted around it');
   assert.equal((await call(c, 'open_room')).structuredContent.portals[0].portalId, 'gh-mcp');
   assert.deepEqual(saved.structuredContent.profile.columns.map((col: any) => col.panels.map((p: any) => p.id)), [['gh-mcp', 'hn-top'], ['simonw']], 'the emptied column is dropped; nothing else changes');
 
@@ -237,6 +236,28 @@ test('saving: save_item adds a Saved portal once, dedupes, fences titles; layout
   const removed = await call(c, 'remove_saved', { url: 'https://example.com/a' });
   assert.deepEqual(removed.structuredContent.saved.map((s: any) => s.url), ['https://example.com/b']);
   assert.equal((await call(c, 'save_item', { url: 'javascript:alert(1)' })).isError, true);
+});
+
+test('saving: source previews survive note edits and profile round-trips; unsafe pictures and avatars are omitted', async () => {
+  const c = ctx();
+  const image = { url: 'https://example.com/cover.png', kind: 'thumb' };
+  const saved = await call(c, 'save_item', { url: 'https://example.com/story', title: 'A story', description: 'From the publisher', imageUrl: image.url });
+  assert.equal(saved.structuredContent.saved[0].description, 'From the publisher');
+  assert.deepEqual(saved.structuredContent.portal.items[0].image, image);
+  assert.equal(saved.structuredContent.portal.items[0].summary, 'From the publisher');
+  const edited = await call(c, 'save_item', { url: 'https://example.com/story', note: 'My own note' });
+  const bookmark = validateProfile(edited.structuredContent.profile).saved[0]!;
+  assert.equal(bookmark.description, 'From the publisher');
+  assert.equal(bookmark.note, 'My own note');
+  assert.deepEqual(bookmark.image, image);
+  const malformed = validateProfile({ ...defaultProfile(), saved: [
+    { url: 'https://example.com/unsafe', description: 'x'.repeat(600), image: { url: 'javascript:alert(1)', kind: 'thumb' } },
+    { url: 'https://example.com/avatar', image: { url: image.url, kind: 'avatar' } },
+    { url: 'https://example.com/old', title: 'An old bookmark' },
+  ] }).saved;
+  assert.equal(malformed[0]!.description!.length, 500);
+  assert.ok(malformed.every((item) => !item.image));
+  assert.equal(malformed[2]!.description, undefined);
 });
 
 test('pinning: pin_portal adds a portal from another tool, refreshes it by id, and layout edits keep its items', async () => {
@@ -422,7 +443,7 @@ test('get_thumbnails: oversized WordPress uploads go through Photon; timeouts ar
 test('fallback art: distinct styles per source, varied placement per item, inlined into the app', async () => {
   const src = await readFile(new URL('../src/ui/art.js', import.meta.url), 'utf8');
   type Art = { styles(keys: string[]): number[]; draw(style: number, item: string): string; motifOf(style: number): string; inkOf(style: number): number; leadOf(style: number): string };
-  const art = vm.runInNewContext(`${src}; portalArt`) as Art;
+  const art = vm.runInNewContext(`${await readFile(new URL('../src/ui/space-inks.js', import.meta.url), 'utf8')}\n${src}; portalArt`) as Art;
   const noIds = (svg: string) => svg.replace(/pa\d+/g, 'pa');
 
   // Styles: stable, distinct, fresh ink sets first, and adding a portal never restyles earlier ones.

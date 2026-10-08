@@ -4,7 +4,7 @@ import type { PageQuery, Relation, Report, Share, SocialStore } from '../social.
 import { DELETED_ID, DELETED_RESOLUTION, limitOf } from '../social-store.ts';
 import type { Queryable } from './schema.ts';
 
-const RELATION_TABLES: Record<Relation, string> = { follows: 'mcportal_follows', mutes: 'mcportal_mutes', blocks: 'mcportal_blocks' };
+const RELATION_TABLES: Record<Relation, string> = { follows: 'mcportal_follows', mutes: 'mcportal_mutes', blocks: 'mcportal_blocks', intros: 'mcportal_intros', joins: 'mcportal_joins' };
 
 /** Shares, relations and reports in tables. Rules live in Social, not here. */
 export class PgSocialStore implements SocialStore {
@@ -52,11 +52,13 @@ export class PgSocialStore implements SocialStore {
     if (!query.includeHidden) where.push('hidden_at IS NULL');
     if (query.before && !Number.isNaN(Date.parse(query.before))) {
       values.push(query.before);
-      where.push(`created_at < $${values.length}`);
+      const dateParam = values.length;
+      if (query.beforeId) { values.push(query.beforeId); where.push(`(created_at, id) < ($${dateParam}::timestamptz, $${values.length}::text)`); }
+      else where.push(`created_at < $${dateParam}`);
     }
     values.push(limitOf(query));
     const { rows } = await this.db.query<{ data: Share; hidden_at: Date | null }>(
-      `SELECT data, hidden_at FROM mcportal_shares WHERE ${where.join(' AND ')} ORDER BY created_at DESC LIMIT $${values.length}`, values);
+      `SELECT data, hidden_at FROM mcportal_shares WHERE ${where.join(' AND ')} ORDER BY created_at DESC, id DESC LIMIT $${values.length}`, values);
     return rows.map((r) => this.row(r));
   }
 

@@ -8,6 +8,8 @@
  *     alone can't stop it because an attacker controls both headers);
  *   - never lets a malformed request crash the process.
  */
+import { StoreWatches } from './store-watches.ts';
+import { FileWatchStore, type WatchStore } from './watches.ts';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { OAuthServer } from './auth/oauth.ts';
 import { AuthStore, fileAuthPersistence, type AuthPersistence } from './auth/store.ts';
@@ -26,7 +28,8 @@ import { errorCode, errorMessage, errorStack, isAppError } from './lib/errors.ts
 import { safeEqual } from './lib/ids.ts';
 import { createLogger, requestId, type Logger } from './lib/log.ts';
 import { ToolMetrics } from './lib/metrics.ts';
-import { readBody } from './lib/web.ts';
+import { readBody, sendHtml } from './lib/web.ts';
+import { page } from './page.ts';
 import { handleMessage, RPC, rpcError, SERVER_INFO, roomHtml, type JsonRpcResponse } from './mcp.ts';
 import { API_EXPORT_PATH, API_IMPORT_PATH, API_PATH, CLIENT_HEADER, handleCalls, MIN_CLIENT_VERSION, versionAtLeast } from './api/calls.ts';
 import { API_METHODS } from './api/methods.ts';
@@ -78,6 +81,7 @@ export interface AppConfig {
 export interface AppDeps {
   store: ProfileStore;
   reading?: ReadingStore | undefined;
+  watchStore?: WatchStore | undefined;
   handoffs?: HandoffStore | undefined;
   seen?: SeenStore | undefined;
   editions?: EditionStore | undefined;
@@ -233,6 +237,8 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
   const admin = oauth ? new AdminPanel(accounts, oauth, config.publicUrl, deps.now, { social: oauth && deps.publicProfiles ? deps.social : undefined, profiles: deps.publicProfiles, budget, metrics }) : undefined;
   const health = healthCheck(deps, log);
   const site: SiteConfig = { supportUrl: DEFAULT_SUPPORT_URL, ...config.site, publicUrl: config.publicUrl, inviteOnly: Boolean(oauth) && !accounts.openSignup };
+  const watchStore = deps.watchStore ?? new FileWatchStore(config.dataDir);
+  const watches = new StoreWatches(watchStore, deps, deps.now, deps.store);
   const reading = deps.reading ?? new FileReadingStore(config.dataDir);
   const handoffs = deps.handoffs ?? new FileHandoffStore(config.dataDir);
   const seen = deps.seen ?? new FileSeenStore(config.dataDir);
@@ -243,18 +249,18 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
   const publicProfiles = oauth ? deps.publicProfiles : undefined;
   const social = oauth && publicProfiles ? deps.social : undefined;
   // The account page needs GitHub sign-in; without it, exports are written to the data directory.
-  const account = oauth ? new AccountPage({ accounts, oauth, store: deps.store, reading, handoffs, seen, editions, clips, collections, experiences, publicProfiles, social, publicUrl: config.publicUrl, log, now: deps.now }) : undefined;
+  const account = oauth ? new AccountPage({ accounts, oauth, store: deps.store, watchStore, reading, handoffs, seen, editions, clips, collections, experiences, publicProfiles, social, images: { fetcher: deps.fetcher, cache: deps.cache }, publicUrl: config.publicUrl, log, now: deps.now, trustProxy: config.trustProxy }) : undefined;
   // Retention on a schedule: what's kept only for a while goes even on a quiet server.
   const stopHousekeeping = startHousekeeping(retentionTasks({ handoffs, editions, experiences, social, accounts, oauth }), log);
   const context = (userId: string, reqLog: Logger): ToolContext => ({
     log: reqLog,
-    store: deps.store, reading, handoffs, seen, editions, clips, collections, experiences, publicProfiles, social, fetcher: deps.fetcher, cache: deps.cache, userId, budget, metrics, actor: accounts.actor(userId),
+    store: deps.store, watchStore, reading, handoffs, seen, editions, clips, collections, experiences, publicProfiles, social, fetcher: deps.fetcher, cache: deps.cache, userId, watches, budget, metrics, actor: accounts.actor(userId),
     labs: deps.labs,
     accountUrl: account?.url,
     uploadLink: account ? () => account.uploadLink(userId) : undefined,
     localFiles: !account && config.allowUnauthenticated && isLoopbackHost(config.host),
     deliver: async (format) => {
-      if (!account) return deliverToFile(format, userId, { store: deps.store, reading, clips, collections, experiences }, config.dataDir);
+      if (!account) return deliverToFile(format, userId, { store: deps.store, watchStore, reading, clips, collections, experiences }, config.dataDir);
       // Built when the link is opened, so it's current and the big ones aren't built twice.
       const summary = { mcportal: 'everything', bookmarks: 'saved items', clips: 'clips as Markdown', opml: 'sources as OPML' }[format];
       return { kind: 'link', where: account.downloadLink(userId, format), summary };
@@ -320,7 +326,7 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
       if (url.pathname === API_EXPORT_PATH) {
         const format = url.searchParams.get('format') ?? 'mcportal';
         if (!EXPORT_FORMATS.includes(format as ExportFormat)) return json(400, { error: 'bad_request', error_description: `format must be one of ${EXPORT_FORMATS.join(', ')}` });
-        const file = await buildExport(format as ExportFormat, userId, { store: deps.store, reading, clips, collections, experiences, publicProfile: await publicProfiles?.get(userId), social });
+        const file = await buildExport(format as ExportFormat, userId, { store: deps.store, watchStore, reading, clips, collections, experiences, publicProfile: await publicProfiles?.get(userId), social });
         return send(res, 200, file.body, file.contentType, { ...server, 'content-disposition': `attachment; filename="${file.filename}"`, 'x-mcportal-summary': file.summary });
       }
       let text: string;
@@ -331,7 +337,7 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
         return json(tooLarge ? 413 : 400, { error: tooLarge ? 'too_large' : 'bad_request', error_description: tooLarge ? 'Over 60 MB' : 'Unreadable body' }, tooLarge ? { connection: 'close' } : {});
       }
       try {
-        const result = await importExport(parseExport(text), userId, { store: deps.store, reading, clips, collections, experiences });
+        const result = await importExport(parseExport(text), userId, { store: deps.store, watchStore, reading, clips, collections, experiences, publicProfiles: deps.publicProfiles });
         return json(200, { result, summary: describeImport(result) });
       } catch (error) {
         if (!isAppError(error) || error.code === 'internal') throw error;
@@ -372,13 +378,13 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
     if (admin && (await admin.handle(req, res, url))) return;
     if (account && (await account.handle(req, res, url))) return;
 
-    if (req.method === 'GET' && (await serveSite(res, url.pathname, site))) return;
+    if (req.method === 'GET' && (await serveSite(res, url.pathname, site, req.headers.range))) return;
 
     if (url.pathname === '/preview' && req.method === 'GET') {
       // The page itself holds no secrets. With a static token, the page asks for it
       // (kept in sessionStorage), so it never lands in a URL, history or logs.
       if (!config.allowUnauthenticated && !config.staticToken) {
-        return send(res, 404, 'The preview is available locally or with MCPORTAL_TOKEN set.', 'text/plain; charset=utf-8');
+        return sendHtml(res, 404, page('Preview unavailable', '<p>The preview is available locally or with MCPORTAL_TOKEN set.</p><p><a href="/">Go to MCPortal</a></p>'));
       }
       const html = await roomHtml({ dev: true, needsToken: !config.allowUnauthenticated });
       return send(res, 200, html, 'text/html; charset=utf-8', {
@@ -389,7 +395,12 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
     }
 
     if (url.pathname === API_PATH || url.pathname === API_EXPORT_PATH || url.pathname === API_IMPORT_PATH) return stateApi(req, res, url, reqLog);
-    if (url.pathname !== '/mcp') return sendError(res, 404, 'not_found', 'Not found');
+    if (url.pathname !== '/mcp') {
+      if (req.method === 'GET' && !url.pathname.startsWith('/api/') && req.headers.accept?.includes('text/html')) {
+        return sendHtml(res, 404, page('Page not found', '<p>This doorway does not lead to a page.</p><p><a class="button primary" href="/">Go to MCPortal</a></p>', { door: 'shut', kicker: 'Lost in the ether' }));
+      }
+      return sendError(res, 404, 'not_found', 'Not found');
+    }
     const userId = await authenticate(req);
     if (!userId) return unauthorized(res);
     if (req.method !== 'POST') {

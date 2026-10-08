@@ -22,6 +22,14 @@ declare global {
 
   /** Every element of room.html that the script looks up by id, with its element type. */
   interface RoomElements {
+    docsContents: HTMLElement;
+    readerFind: HTMLDivElement;
+    readerComfort: HTMLDivElement;
+    addFeed: HTMLButtonElement;
+    addStore: HTMLButtonElement;
+    storeCollection: HTMLInputElement;
+    storeSales: HTMLInputElement;
+    storeScope: HTMLDivElement;
     addForm: HTMLFormElement;
     addHint: HTMLDivElement;
     addInput: HTMLInputElement;
@@ -31,6 +39,7 @@ declare global {
     btnAdd: HTMLButtonElement;
     btnExpand: HTMLButtonElement;
     btnImportOpml: HTMLButtonElement;
+    btnLayout: HTMLButtonElement;
     btnOpenIn: HTMLButtonElement;
     btnRefresh: HTMLButtonElement;
     btnSources: HTMLButtonElement;
@@ -46,6 +55,7 @@ declare global {
     comparisonInterpretation: HTMLElement;
     whoMenu: HTMLDivElement;
     grid: HTMLElement;
+    layoutMenu: HTMLDivElement;
     mainBar: HTMLElement;
     opmlFile: HTMLInputElement;
     reader: HTMLElement;
@@ -121,7 +131,7 @@ declare global {
    * URLs, each portal's fallback art style, the agent's edition and the room's lead
    * (open_room), and the labs on.
    */
-  type RoomState = { profile: Profile | null; identity: Identity | null; portals: Map<string, PortalResult>; saved: Set<string>; art: Map<string, number>; edition?: RoomEdition | undefined; lead?: Lead | undefined; labs: string[] };
+  type RoomState = { profile: Profile | null; identity: Identity | null; portals: Map<string, PortalResult>; saved: Set<string>; art: Map<string, number>; edition?: RoomEdition | undefined; lead?: Lead | undefined; labs: string[]; alsoShared: Map<string, NonNullable<ToolResults['open_room']['alsoShared']>[number]> };
 
   // ---- Admin page data (src/admin.ts: /admin/api/state and the POST actions).
   // admin.ts builds reports and usage as `unknown`, so their shapes are spelled out here

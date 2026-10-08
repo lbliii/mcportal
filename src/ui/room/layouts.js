@@ -1,4 +1,4 @@
-  // room/layouts.js: the room's layouts, one renderer each (docs/plans/room-layouts.md)
+  // room/layouts.js: the room's layouts, one renderer each (docs/explanation/social.md)
   // ------------------------------------------------------------ layouts
   // A layout draws the same room (the profile's ordered columns of portals) its own way.
   // Adding one never changes another: each says what class the grid gets, how the whole
@@ -15,13 +15,16 @@
   const ROOM_LAYOUTS = {
     /** Side-by-side columns of stacked portals; each portal lists its items. */
     columns: {
-      gridClass: null,
+      gridClass: 'columns',
       draw: (profile) => profile.columns.map((col) => el('div', { class: 'col', style: `--mp-column-weight:${col.width}` }, col.panels.map((spec) => renderPortal(spec.id)))),
       portal: (portalId) => {
         const portal = state.portals.get(portalId);
         const wrap = el('section', { class: 'portal', 'data-portal': portalId });
         if (!portal) return standBy(wrap);
-        wrap.append(el('div', { class: 'portal-head' }, ...portalLabel(portal), el('span', { class: 'tools' }, refreshButton(portal))));
+        wrap.append(el('div', { class: 'portal-head' },
+          el('span', { class: 'portal-plate', 'aria-hidden': 'true' }, thumbBox({ id: portalId, title: portal.title, meta: [] }, portal)),
+          el('div', { class: 'portal-heading' }, ...portalLabel(portal)),
+          el('span', { class: 'tools' }, refreshButton(portal))));
         const visible = displayMode === 'fullscreen' ? portal.items : portal.items.slice(0, INLINE_ITEMS);
         const items = portalItems(portal, () => el('ul', { class: 'items' }, visible.map((item) => el('li', null, watchNew(renderItem(item, portal, 'row'), item, portal)))));
         if (items) wrap.append(items);
@@ -43,16 +46,19 @@
         const color = portalColor(portal);
         const row = el('div', { class: 'shelf-row' });
         const page = (/** @type {number} */ dir) => row.scrollBy({ left: dir * Math.max(200, row.clientWidth - 60), behavior: scrollBehavior() });
+        const previous = iconButton('left', `Scroll ${portal.title} left`, () => page(-1));
+        const next = iconButton('right', `Scroll ${portal.title} right`, () => page(1));
+        const update = () => {
+          previous.disabled = row.scrollLeft <= 1;
+          next.disabled = row.scrollLeft >= row.scrollWidth - row.clientWidth - 1;
+        };
+        row.addEventListener('scroll', update, { passive: true });
+        requestAnimationFrame(update);
         wrap.append(el('div', { class: 'shelf-head' }, ...portalLabel(portal),
-          el('span', { class: 'tools' },
-            iconButton('left', `Scroll ${portal.title} left`, () => page(-1)),
-            iconButton('right', `Scroll ${portal.title} right`, () => page(1)),
-            refreshButton(portal))));
+          el('span', { class: 'tools' }, previous, next, refreshButton(portal))));
         const items = portalItems(portal, () => {
-          // A picture row only when most items have pictures; otherwise it's mostly empty boxes.
-          const withThumbs = portal.items.filter((i) => i.image && i.image.kind === 'thumb').length;
-          const media = withThumbs >= 2 && withThumbs * 2 >= portal.items.length;
-          row.append(...portal.items.map((item) => watchNew(renderItem(item, portal, 'tile', { color, media }), item, portal)));
+          // The source's existing cover art fills in for stories without a photograph.
+          row.append(...portal.items.map((item) => watchNew(renderItem(item, portal, 'tile', { color, media: true }), item, portal)));
           return row;
         });
         if (items) wrap.append(items);
@@ -118,7 +124,49 @@
       portal: (portalId) => ROOM_LAYOUTS.columns.portal(portalId),
       redraw: () => redrawRiver(),
     },
+    catalogue: {
+      gridClass: 'catalogue',
+      draw: (profile) => drawDesignedRoom(profile),
+      portal: (portalId) => designedPortal(portalId, 'catalogue'),
+    },
+    editorial: {
+      gridClass: 'editorial',
+      draw: (profile) => drawDesignedRoom(profile),
+      portal: (portalId) => designedPortal(portalId, 'editorial'),
+    },
+    paperback: {
+      gridClass: 'paperback',
+      draw: (profile) => drawDesignedRoom(profile),
+      portal: (portalId) => designedPortal(portalId, 'paperback'),
+    },
   };
+
+  /** Source sections keep the user's portal order and their refresh, reader and save controls. @param {Profile} profile */
+  function drawDesignedRoom(profile) {
+    return [el('header', { class: 'collection-head' },
+      el('div', { class: 'fp-kicker' }, new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })),
+      el('h1', null, profile.name)),
+    ...profile.columns.flatMap((col) => col.panels).map((spec) => renderPortal(spec.id))];
+  }
+
+  /** @param {string} portalId @param {'catalogue' | 'editorial' | 'paperback'} form */
+  function designedPortal(portalId, form) {
+    const portal = state.portals.get(portalId);
+    const wrap = el('section', { class: 'collection', 'data-portal': portalId });
+    if (!portal) return standBy(wrap);
+    wrap.append(el('div', { class: 'collection-source' }, ...portalLabel(portal), el('span', { class: 'tools' }, refreshButton(portal))));
+    const visible = displayMode === 'fullscreen' ? portal.items : portal.items.slice(0, 6);
+    const items = portalItems(portal, () => el('ul', { class: 'collection-items' }, visible.map((item, index) => {
+      const node = renderItem(item, portal, form, { color: portalColor(portal) });
+      if (form === 'editorial' && index === 0) node.classList.add('feature');
+      return el('li', null, watchNew(node, item, portal));
+    })));
+    if (items) wrap.append(items);
+    if (!portal.error && visible.length < portal.items.length) wrap.append(el('button', { class: 'link-btn portal-more', type: 'button', onclick: () => openPortal(portalId) }, `${portal.items.length - visible.length} more in ${portal.title}`));
+    wrap.append(portalFoot(portal, true));
+    primePictures(wrap);
+    return wrap;
+  }
 
   // ------------------------------------------------------------ front page parts
   /** Items each portal block shows first, and how many more each "more" adds. */
@@ -188,7 +236,7 @@
   }
 
   /** @type {Array<Profile['layout']>} */
-  const LAYOUT_NAMES = ['columns', 'shelves', 'frontpage', 'river'];
+  const LAYOUT_NAMES = ['columns', 'shelves', 'frontpage', 'river', 'catalogue', 'editorial', 'paperback'];
   /** Layouts that are labs: offered while the server has the lab on, and kept for whoever chose one. */
   const LAB_LAYOUTS = ['frontpage'];
   /** A layout by name (a toolbar button's), if there is one. @param {string | undefined} name */
@@ -209,6 +257,9 @@
     drawLaneControls();
     if (layout === ROOM_LAYOUTS.frontpage) frontEnd();
     for (const b of $$('[data-layout]')) b.setAttribute('aria-pressed', String(b.dataset.layout === p.layout));
+    const label = $first(`[data-layout="${p.layout}"] b`)?.textContent ?? 'Columns';
+    $('btnLayout').textContent = `Layout: ${label}`;
+    $('btnLayout').setAttribute('aria-label', `Choose room layout. Current layout: ${label}`);
     // A lab's layout is offered while the server has the lab on, and kept for whoever chose it.
     for (const lab of LAB_LAYOUTS) $first(`[data-layout="${lab}"]`)?.toggleAttribute('hidden', !(state.labs.includes(lab) || p.layout === lab));
     $('btnOpenIn').setAttribute('aria-pressed', String(p.openIn === 'chat'));
@@ -251,9 +302,15 @@
   /** @type {ResizeObserver | null} */
   let laneObserver = null;
 
+  // One observer for the room: replacing a shelf cannot leave detached rows observed.
+  new ResizeObserver(() => {
+    for (const row of $$('.shelf-row', $('grid'))) row.dispatchEvent(new Event('scroll'));
+  }).observe($('grid'));
+
   /** One portal, as the current layout draws it. @param {string} portalId */
   function renderPortal(portalId) {
     const portal = state.portals.get(portalId);
+    if (portal?.source === 'watches') return renderShopPortal(portal);
     const custom = portal && portalViewItems(portal, portal.items);
     if (portal && custom) {
       const wrap = el('section', { class: 'portal portal-custom-view', 'data-portal': portalId }, el('div', { class: 'portal-head' }, ...portalLabel(portal), el('span', { class: 'tools' }, refreshButton(portal))), portalItems(portal, () => custom), portalFoot(portal, true));
@@ -300,7 +357,7 @@
    */
   function portalItems(portal, items) {
     if (portal.error) return el('div', { class: 'error' }, `Signal lost in the ion storm (${portal.error}). Try refreshing this portal.`);
-    if (!portal.items.length) return el('div', { class: 'empty' }, 'All quiet on this frequency… for now. New posts will show up here.');
+    if (!portal.items.length) return el('div', { class: 'empty' }, portal.source === 'people' ? 'Ask your agent who you might like to follow.' : 'All quiet on this frequency… for now. New posts will show up here.');
     return items();
   }
 

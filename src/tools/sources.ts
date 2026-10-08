@@ -12,6 +12,7 @@ import { describeLayout, findPortal, LIMITS, sourceSettings, SOURCES, type Sourc
 import { findDocs, loadPortal, SOURCE_DOCS } from '../sources.ts';
 import type { Item, PortalResult, SourceKind } from '../types.ts';
 import { ok, toolError, toolFailure, untrusted, type ToolDef } from './kit.ts';
+import { featuredBy } from './social.ts';
 import type { ToolResults } from './results.ts';
 import { itemLine, portalFor } from './room.ts';
 
@@ -22,8 +23,8 @@ function sourceLabel(c: SourceSettings<FetchedSource>): string {
   return 'hn';
 }
 
-/** Sources MCPortal fetches (or, for saved, reads) itself. Pinned portals only come from pin_portal. */
-const ADDABLE: SourceKind[] = SOURCES.filter((s) => s !== 'pinned');
+/** Sources MCPortal fetches (or, for saved, reads) itself. Pinned portals only come from pin_portal, People from suggest_people. */
+const ADDABLE: SourceKind[] = SOURCES.filter((s) => s !== 'pinned' && s !== 'people' && s !== 'watches');
 
 export const SOURCE_TOOLS: ToolDef[] = [
   {
@@ -132,7 +133,8 @@ export const SOURCE_TOOLS: ToolDef[] = [
       if ('error' in added) return toolError(`Not added: ${added.error}`, added.code);
       const placed = findPortal(added.profile, added.portalId)!;
       const portal = await portalFor(placed, added.profile, ctx);
-      return ok(`Added "${portal.title}" (id ${added.portalId}) in column ${columnOf(added.profile, added.portalId)}.\nLayout now: ${describeLayout(added.profile)}`,
+      const hint = await featuredBy(ctx, [{ source, config, title: portal.title }], 'it');
+      return ok(`Added "${portal.title}" (id ${added.portalId}) in column ${columnOf(added.profile, added.portalId)}.\nLayout now: ${describeLayout(added.profile)}${hint ? `\n${hint}` : ''}`,
         { profile: added.profile, portal, portalId: added.portalId } satisfies ToolResults['add_portal']);
     },
   },

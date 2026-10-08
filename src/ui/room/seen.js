@@ -1,5 +1,5 @@
   // room/seen.js: what the user has had on screen, so "new" means new to them
-  // ------------------------------------------------------------ seen (docs/plans/attention.md, phase 3)
+  // ------------------------------------------------------------ seen (docs/explanation/reading.md, phase 3)
   // open_room marks items new to this user (src/seen.ts). An item that stays at least half
   // on screen for SEEN_AFTER ms, or that the user opens, is sent back with mark_seen, in
   // batches at most every SEEN_FLUSH ms and when the page is hidden. Its "new" mark stays

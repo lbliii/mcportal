@@ -7,9 +7,11 @@
  */
 import { readFile, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
+import { SPACE_INPUT } from '../space-input.ts';
+import type { PublicProfileInput } from '../public-profiles.ts';
 import { clean } from '../lib/text.ts';
 import { describeImport, EXPORT_FORMATS, importExport, parseExport, type ExportFormat } from '../portability.ts';
-import { ACCENTS, MAX_FEATURED, SPACE_SETTINGS_SCHEMA, publicSpaceProfile, suggestHandle, type PublicProfile } from '../public-profiles.ts';
+import { SPACE_SETTINGS_SCHEMA, publicSpaceProfile, MAX_FEATURED, suggestHandle, type PublicProfile } from '../public-profiles.ts';
 import type { ToolResults } from './results.ts';
 import { describeIdentity, HOSTED_ONLY, identityOf, socialActive, socialEntry, ok, toolError, toolFailure, untrusted, type ToolDef } from './kit.ts';
 
@@ -19,8 +21,13 @@ function describeProfile(p: PublicProfile): string {
     p.displayName ? `name: ${p.displayName}` : '',
     p.bio ? `bio: ${p.bio}` : '',
     p.spaceTitle ? `space: ${p.spaceTitle}` : '',
+    `format: ${p.format ?? 'paperback'}; ink: ${p.cover?.ink ?? 'atomic'}; motif: ${p.cover?.motif ?? 'arches'}` ,
+    p.frequency?.length ? `transmitting on: ${p.frequency.join(', ')}` : '',
+    p.travelers?.length ? `fellow travelers: ${p.travelers.join(', ')}` : '',
+    p.private ? 'Space: members only' : 'Space: public on the web',
     p.sources?.length ? `featured sources: ${p.sources.map((s) => s.title).join(', ')}` : '',
     p.reblogs ? `new posts can be reblogged by: ${p.reblogs === 'nobody' ? 'nobody' : 'followers only'}` : '',
+    p.listed ? 'listed: people with similar sources can find them (find_people)' : 'unlisted: found only by handle or Space link',
   ].filter(Boolean).join('\n');
 }
 
@@ -42,14 +49,14 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
         const found = await ctx.publicProfiles.byHandle(args.handle);
         if (!found) return toolError(`No MCPortal profile for @${clean(args.handle, 40).replace(/^@/, '')}.`, 'not_found');
         const sections = await ctx.social?.spaceSections(ctx.userId, found.profile.accountId);
-        const { accountId: _id, ...profile } = publicSpaceProfile({ ...found.profile, sources: sections?.sources ?? [] });
+        const { accountId: _id, broughtAboard: _brought, ...profile } = publicSpaceProfile({ ...found.profile, sources: sections?.sources ?? [] });
         const moved = found.movedFrom ? `@${found.movedFrom} is now @${profile.handle}.\n` : '';
         const stats = ctx.social && found.profile.accountId !== ctx.userId ? await ctx.social.stats(ctx.userId, found.profile.accountId) : undefined;
         const counts = stats ? `\n${stats.followers} follower(s), ${stats.shares} share(s) you can see.${stats.following ? ' You follow them.' : ''}` : '';
         return ok(`${moved}${untrusted(`@${profile.handle}`, describeProfile({ ...profile, accountId: _id }))}${counts}`, { profile, ...(stats ? { stats } : {}), ...(found.movedFrom ? { movedFrom: found.movedFrom } : {}) });
       }
       const mine = await ctx.publicProfiles.get(ctx.userId);
-      if (mine) return ok(`Your public profile (visible to signed-in MCPortal users):\n${describeProfile(mine)}`, { profile: mine });
+      if (mine) return ok(`Your public profile (public on the web unless made members-only):\n${describeProfile(mine)}`, { profile: mine });
       const suggested = suggestHandle(ctx.actor?.login);
       return ok(`You have no public profile; everything in your room is private. ${suggested ? `If you want one, @${suggested} is the suggested handle (from your GitHub login).` : 'Pick a handle to create one.'}`, { profile: null, suggested: suggested ?? null });
     },
@@ -59,7 +66,7 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
     title: 'Set your public profile and space',
     access: 'write',
     available: socialEntry,
-    description: "Change profile/Space only on request. Preview subscriptions and follows with open_space before opting in via showSources/showPeople. sourceCuration/peopleCuration pin, order or hide preview keys. featuredPortalIds keeps explicit recommendations. Old handles redirect for 30 days.",
+    description: "Create or change the user's public profile and Space, only when they ask: handle, name, bio, Space title, ink, motif, format, topics, own pinned post, listed fellow travelers, stamps, public visibility, featured portals ('Sources I read') and who may reblog their posts by default. Public by default: only their Space and everyone posts reach the web. Ask approval for exact bio and topic wording. Nothing else in their room becomes public. An old handle keeps pointing to them for 30 days.",
     inputSchema: {
       type: 'object',
       additionalProperties: false,
@@ -69,16 +76,13 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
         displayName: { type: 'string', maxLength: 50 },
         bio: { type: 'string', maxLength: 160 },
         spaceTitle: { type: 'string', maxLength: 60 },
-        accent: { type: 'string', enum: [...ACCENTS, ''] },
+        ...SPACE_INPUT,
         featuredPortalIds: { type: 'array', maxItems: MAX_FEATURED, items: { type: 'string' }, description: 'Ids (from open_room) of feed, Hacker News or GitHub portals to recommend; [] clears' },
+        reblogs: { type: 'string', enum: ['anyone', 'followers', 'nobody'] },
+        listed: { type: 'boolean', description: 'findable via find_people' },
       },
     },
-    lab: {
-      name: 'reblog',
-      properties: { reblogs: { type: 'string', enum: ['anyone', 'followers', 'nobody'] } },
-      description: "Change profile/Space only on request, including default reblog permissions. Preview subscriptions/follows with open_space before opting in via showSources/showPeople; curate preview keys with sourceCuration/peopleCuration. Old handles redirect for 30 days.",
-    },
-    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     async handler(args, ctx) {
       if (!ctx.publicProfiles) return toolError(HOSTED_ONLY.profiles, 'unavailable');
       try {
@@ -90,18 +94,19 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
           if (unknown.length) return toolError(`Not saved: no portal with id ${unknown.map((u) => clean(u, 40)).join(', ')} (see open_room).`, 'not_found');
           sources = ids.map((id) => portals.find((p) => p.id === id)!).map((p) => ({ title: p.title ?? p.id, source: p.source, config: p.config }));
         }
-        const { profile, created, released } = await ctx.publicProfiles.set(ctx.userId, {
+        const { profile, created, released } = await (ctx.social?.setSpace.bind(ctx.social) ?? ctx.publicProfiles.set.bind(ctx.publicProfiles))(ctx.userId, {
           handle: typeof args.handle === 'string' ? args.handle : undefined,
           displayName: typeof args.displayName === 'string' ? args.displayName : undefined,
           bio: typeof args.bio === 'string' ? args.bio : undefined,
           spaceTitle: typeof args.spaceTitle === 'string' ? args.spaceTitle : undefined,
-          accent: typeof args.accent === 'string' ? args.accent : undefined,
+          ...Object.fromEntries(Object.keys(SPACE_INPUT).filter((k) => args[k] !== undefined).map((k) => [k, args[k]])) as PublicProfileInput,
           sources,
           showSources: typeof args.showSources === 'boolean' ? args.showSources : undefined,
           showPeople: typeof args.showPeople === 'boolean' ? args.showPeople : undefined,
           sourceCuration: args.sourceCuration as PublicProfile['sourceCuration'],
           peopleCuration: args.peopleCuration as PublicProfile['peopleCuration'],
           reblogs: typeof args.reblogs === 'string' ? args.reblogs : undefined,
+          listed: typeof args.listed === 'boolean' ? args.listed : undefined,
         });
         const skipped = sources ? sources.length - (profile.sources?.length ?? 0) : 0;
         const head = created ? `Created your public profile as @${profile.handle}. ${UNLOCKS}` : released ? `Changed your handle from @${released} to @${profile.handle}. @${released} points to you for 30 days.` : 'Updated your public profile.';
@@ -192,11 +197,12 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
     async handler(_args, ctx) {
       const identity = await identityOf(ctx);
+      const shareAudience = (await ctx.store.get(ctx.userId)).shareAudience ?? 'everyone';
       if (!ctx.accountUrl) {
         const signIn = ctx.link ? ' To keep this portal in a hosted account (the same portal on every device, plus sharing), link_account signs in.' : '';
-        return ok(`${describeIdentity(identity)} To remove everything, delete that folder.${signIn}`, { identity, url: null } satisfies ToolResults['account_settings']);
+        return ok(`${describeIdentity(identity)} To remove everything, delete that folder.${signIn}`, { identity, url: null, shareAudience } satisfies ToolResults['account_settings']);
       }
-      return ok(`${describeIdentity(identity)} The account page is ${ctx.accountUrl}: the user signs in with GitHub there to download everything or delete their account.`, { identity, url: ctx.accountUrl } satisfies ToolResults['account_settings']);
+      return ok(`${describeIdentity(identity)} The account page is ${ctx.accountUrl}: the user signs in with GitHub there to download everything or delete their account.`, { identity, url: ctx.accountUrl, shareAudience } satisfies ToolResults['account_settings']);
     },
   },
   {

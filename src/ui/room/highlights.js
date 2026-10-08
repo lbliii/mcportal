@@ -1,5 +1,5 @@
   // room/highlights.js: the agent's picks from what's new, as a card (show_highlights)
-  // ------------------------------------------------------------ highlights (docs/plans/attention.md, phase 4)
+  // ------------------------------------------------------------ highlights (docs/explanation/reading.md, phase 4)
   // Each pick is the source's own item (title, link, summary, actions, as in the room) with
   // the agent's reason set apart. The reason and the intro are the agent's words, shown as
   // text. "Not for me" marks the item seen, so it won't come up as new again.
