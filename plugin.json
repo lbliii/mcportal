@@ -1,0 +1,12 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "mcportal-local",
+  "version": "0.11.0",
+  "description": "MCPortal: a personal, agent-composed workspace delivered as an MCP server with an MCP Apps UI.",
+  "author": {
+    "name": "Lawrence Lane"
+  },
+  "homepage": "https://mcportal.lol",
+  "repository": "https://github.com/lbliii/mcportal",
+  "license": "AGPL-3.0-only"
+}

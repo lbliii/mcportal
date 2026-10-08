@@ -10,6 +10,7 @@
  */
 import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
+import { pluginMetadata, pluginMcp } from './plugin-package.ts';
 import { surface } from './footprint.ts';
 
 const ROOT = new URL('../', import.meta.url);
@@ -62,7 +63,8 @@ export async function distributionFiles(): Promise<Record<string, string>> {
     compatibility: { platforms: ['darwin', 'win32', 'linux'], runtimes: { node: pkg.engines.node } },
   };
 
-  return { 'server.json': json(server), 'manifest.json': json(manifest) };
+  return { 'server.json': json(server), 'manifest.json': json(manifest),
+    'plugin.json': json(await pluginMetadata('local')), 'mcp.json': json(pluginMcp('local')) };
 }
 
 /** Files whose committed contents differ from what would be generated. */

@@ -137,7 +137,7 @@ async function prepare(spec: string | undefined, dryRun: boolean): Promise<void>
   const notes = changelogSection(changes.get('CHANGELOG.md')!, version);
 
   console.log(`Release v${version} (${current} before), dated ${date}.`);
-  console.log(`Changes: ${[...changes.keys(), 'server.json', 'manifest.json'].join(', ')}.`);
+  console.log(`Changes: ${[...changes.keys(), ...Object.keys(await distributionFiles())].join(', ')}.`);
   if (dryRun) {
     console.log(`\nRelease notes (${notes.split('\n').length} lines):\n\n${notes.split('\n').slice(0, 12).join('\n')}\n…\n\nDry run: nothing written.`);
     return;
@@ -150,7 +150,7 @@ async function prepare(spec: string | undefined, dryRun: boolean): Promise<void>
   for (const [file, text] of Object.entries(await distributionFiles())) await writeFile(at(file), text);
   execFileSync('npm', ['run', 'check', '--silent'], { cwd: ROOT, stdio: 'inherit' });
 
-  git('add', '--', ...changes.keys(), 'server.json', 'manifest.json');
+  git('add', '--', ...changes.keys(), ...Object.keys(await distributionFiles()));
   git('commit', '--quiet', '-m', `Release v${version}`);
   git('push', '--quiet', '-u', 'origin', branch);
   const bodyFile = path.join(await mkdtemp(path.join(tmpdir(), 'mcportal-release-')), 'body.md');
