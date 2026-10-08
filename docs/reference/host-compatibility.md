@@ -30,6 +30,8 @@ Hosts that omit the newer message and context fields get the inline reader.
 
 A host that renders no MCP Apps view still gets every tool's text result.
 
+The [October 8 M1 evidence report](../../reports/m1-core-content-loop.md) records current automated coverage and the attempted Codex check. No host acquired formal certification in that run: a connected public reader call succeeded, but the native host UI could not be inspected. Daily maintainer use above is historical context, not certification of the M1 integration.
+
 ## Navigation
 
 Reader and docs cards have an **Open your room** control. Opening a reader from the room keeps the room as it was: lane, column or shelf position, scroll and keyboard focus. From a standalone card, the control loads the room. Escape does the same.
@@ -66,6 +68,16 @@ Automated tests cover capability routing and returning to the room. They can't c
 6. Without `serverTools` or `updateModelContext`, the fallbacks appear at once.
 7. Both sign-in buttons open the browser or show a link. A denied or expired sign-in shows a cause, reference and retry; success redraws the room; a failed first import shows its warning.
 8. Docs search, internal links, parent docs and empty indexes keep navigation working.
+9. A selected passage or keyboard passage choice exposes its source and exact scope. Context-only hosts share context without a message; message-only hosts offer Copy for passages. Denials remain recoverable.
+10. Send a passage to a new conversation, reopen it under the same account, and verify position and exact quotation. Another account must not open the code. A missing live source must retain the handoff passage and offer Retry.
+11. Tear down and reopen the view, then check durable clips and reading history independently of the old iframe. Temporary handoffs expire after seven days; use clips for durable evidence.
+12. Record text-only tool results separately from rendered UI, with the tested host version, server revision, display modes, consent decisions and remaining gaps.
+
+### M1 display decision
+
+Start inline for a focused source result, with user-requested expansion for longer reading and docs navigation. Fullscreen is offered only when advertised, and the result of a display-mode request determines the actual mode. Keep controls outside the article's scrolling viewport so the source, passage and return actions remain reachable. These are implementation decisions checked in fixtures; they do not certify an individual host.
+
+This follows the [MCP Apps display-mode and container contract](https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx#display-modes) and [OpenAI's presentation guidance](https://developers.openai.com/plugins/build/chatgpt-ui#choose-a-presentation), consulted October 8, 2026. The latter recommends inline for focused results and fullscreen for detailed browsing; its presence does not establish ChatGPT compatibility. Host-specific sizing and permission behavior still require the checklist above.
 
 ## References
 

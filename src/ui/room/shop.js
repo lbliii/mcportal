@@ -1,6 +1,7 @@
   // A store follow is previewed before confirmation; catalogue content stays inert.
   /** @param {boolean} store */
   function addMode(store) {
+    invalidateSources();
     $('addStore').setAttribute('aria-pressed', String(store));
     $('addFeed').setAttribute('aria-pressed', String(!store));
     $('storeScope').hidden = !store;
@@ -11,18 +12,22 @@
     $('addResults').replaceChildren();
   }
   function followStore() { addMode(true); toggleAdd(true); }
+  for (const input of [$('storeCollection'), $('storeSales')]) input.addEventListener('input', invalidateSources);
   $('addStore').addEventListener('click', followStore);
   $('addFeed').addEventListener('click', () => addMode(false));
 
   /** @param {string} url */
   async function previewStore(url) {
+    const generation = beginSourcePreview();
     $('addHint').textContent = 'Checking the public catalogue…';
     $('addResults').replaceChildren();
     try {
       const scope = { ...($('storeCollection').value.trim() ? { collection: $('storeCollection').value.trim() } : {}), salesOnly: $('storeSales').checked };
       const result = await callTool('watch', { kind: 'store', url, scope });
+      if (generation !== sourceGeneration) return;
       if (result.structuredContent.preview) renderStorePreview(result.structuredContent.preview);
-    } catch(error) { $('addHint').textContent = errorText(error); }
+    } catch(error) { if (generation === sourceGeneration) $('addHint').textContent = errorText(error); }
+    finally { if (generation === sourceGeneration) $('addResults').setAttribute('aria-busy', 'false'); }
   }
   /** @param {NonNullable<ToolResults['watch']['preview']>} preview */
   function renderStorePreview(preview) {

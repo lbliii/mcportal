@@ -2,6 +2,7 @@
   // ------------------------------------------------------------ boot
   async function boot() {
     if (DEV) {
+      root.classList.add('standalone');
       $('btnExpand').hidden = true;
       await loadRoom();
       return;

@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Core content loop
+- Integrate reader wave 2 with full-height reading, separate controls, bounded image retries and improved article extraction while preserving Recall, reading tabs, page find and reading preferences.
+- Add a keyboard passage chooser, useful reader destination focus and stable Recall preview focus. Documentation search explains its coverage and GitHub pages show their actual version.
+- Keep retained handoff passages available when their source cannot load, with a live-page retry.
+- Ignore obsolete source previews and keep detailed OPML import reports. Concurrent imports and retries preserve completed subscriptions; remaining feeds and failures are named.
+- Record two rounds of explicitly simulated developer/researcher proxy tasks and logical later-day retrieval, plus a bounded accessibility audit. These are not human usability or adoption evidence.
+
+### For hosts and agents
+- `import_opml` adds `added`, `alreadyPresent` and `deferred` result fields. A valid import with no working feeds returns its detailed outcome and leaves a new room unconfigured.
+- `open_handoff` may return `{ unavailable: true, handoff }` when the live source fails; its text still includes the fenced retained passage. No live article content is implied.
+- Ship the new successful handoff variant in the next minor release under the compatibility policy; callers must handle unavailable live content before reading article/docs fields.
+
 ### Installation and upgrades
 - Package hosted and local MCPortal as Agent Plugins 1.0, with native Claude overlays and persistent plugin storage. Validate packaged startup and provide an explicit migration that retains existing rooms and account links.
 - Check hosted compatibility before local browser sign-in, with required-update and optional-update actions.

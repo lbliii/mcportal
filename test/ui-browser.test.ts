@@ -164,7 +164,7 @@ test('browser: Recall opens retained pages and returns with query, filters and f
   await page.waitFor(`document.querySelector('#recallCount').textContent.includes('1 match for')`, 'the filtered result');
   await page.click('.recall-hit .link-btn');
   await page.waitFor(`!document.querySelector('#reader').hidden && document.querySelector('#reader .body')`, 'the recalled page');
-  await page.click('#reader .reader-top button');
+  await page.click('#readerControls .reader-top button');
   await page.waitFor(`!document.querySelector('#experiences').hidden`, 'return to Recall');
   assert.equal(await page.eval(`document.querySelector('[aria-label="Search your library"]').value`), 'Hijacking');
   assert.equal(await page.eval(`document.querySelector('[aria-label="Filter by kind"]').value`), 'saved');
@@ -200,7 +200,7 @@ test('browser: selected Recall material creates a desk, supports a trail and com
     assert.equal(await page.eval(`document.querySelector('#comparisonSource1').classList.contains('compact-active')`), true);
     await page.click('#comparisonSource1 .experience-row button');
     await page.waitFor(`!document.querySelector('#reader').hidden && document.querySelector('#reader .body')`, 'the compared source in the reader');
-    await page.click('#reader .reader-top button');
+    await page.click('#readerControls .reader-top button');
     await page.waitFor(`!document.querySelector('#experiences').hidden`, 'comparison continuity');
     assert.equal(await page.eval(`document.querySelector('#comparisonSource1').classList.contains('compact-active')`), true);
   } finally { await page.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false }); }
@@ -264,7 +264,7 @@ test('browser: all three designs reopen, adapt to narrow themes, and keep the re
       }
       await page.click('[data-portal="saved"] .item-main');
       await page.waitFor(`!document.getElementById('reader').hidden && document.querySelector('#reader h1')?.textContent.includes('PS5')`, 'the article to open');
-      await page.click('#reader [aria-label="Back to your room"]');
+      await page.click('#readerControls [aria-label="Back to your room"]');
       await page.waitFor(`!document.getElementById('grid').hidden`, 'the chosen layout to return');
       assert.equal(await page.eval(`document.querySelector('[data-portal="saved"] [data-save-url]').getAttribute('aria-pressed')`), 'true');
       assert.deepEqual(page.problems, []);
@@ -307,7 +307,7 @@ test('browser: the original layouts retain opening, saving and reachable control
       const saved = layout === 'river' ? `article:has([data-save-url="${ARTICLE}"])` : '[data-portal="saved"]';
       await page.click(`${saved} ${main}`);
       await page.waitFor(`!document.getElementById('reader').hidden && document.querySelector('#reader h1')?.textContent.includes('PS5')`, 'the article to open');
-      await page.click('#reader [aria-label="Back to your room"]');
+      await page.click('#readerControls [aria-label="Back to your room"]');
       await page.waitFor(`!document.getElementById('grid').hidden`, 'the chosen layout to return');
       await page.waitFor(`document.querySelector('.continue-reading')?.getAttribute('aria-busy') === 'false'`, 'reading history to settle before measuring the save button');
       await page.click(`${saved} [data-save-url="${ARTICLE}"]`);
@@ -359,7 +359,8 @@ test('browser: an item opens in the reader, and home returns to the room', { ski
   assert.match(title, /PS5/);
   const paragraphs = await page.waitFor<number>(`document.querySelectorAll('#reader .body p').length`, 'the article body');
   assert.ok(paragraphs >= 3, `the article's text is shown (${paragraphs} paragraphs)`);
-  await page.click('#reader [aria-label="Back to your room"]');
+  assert.ok(await page.eval(`(() => { const r = document.querySelector('#reader').getBoundingClientRect(), t = document.querySelector('.reader-top').getBoundingClientRect(), b = document.querySelector('.bar').getBoundingClientRect(); return Math.abs(r.bottom - innerHeight) < 1 && t.width === b.width && t.top === Math.max(b.bottom, document.querySelector('.experience-nav').getBoundingClientRect().bottom) && r.top === t.bottom; })()`), 'preview reader fills the viewport below the two full-width action rows');
+  await page.click('#readerControls [aria-label="Back to your room"]');
   await page.waitFor(`!document.getElementById('grid').hidden`, 'the room to come back');
   assert.deepEqual(page.problems, []);
 });
@@ -389,10 +390,10 @@ test('browser: reader and source controls stack below the main toolbar while scr
     const row = document.querySelector(${JSON.stringify(selector)}), r = row?.getBoundingClientRect();
     if (!r) return false;
     const full = document.documentElement.classList.contains('fullscreen');
-    const edge = ${JSON.stringify(selector)} === '.level-head' || full ? document.getElementById('mainBar').getBoundingClientRect().bottom : document.getElementById('reader').getBoundingClientRect().top;
-    const buttons = [...row.querySelectorAll('button')].filter((b) => b.getClientRects().length);
+    const edge = ${JSON.stringify(selector)} === '.level-head' ? document.getElementById('mainBar').getBoundingClientRect().bottom : Math.max(document.getElementById('mainBar').getBoundingClientRect().bottom, document.querySelector('.experience-nav').getBoundingClientRect().bottom);
+    const buttons = [...row.querySelectorAll('button')].filter((b) => b.checkVisibility());
     const reachable = buttons.every((b) => { const r = b.getBoundingClientRect(); return b.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)); });
-    return Math.abs(r.top - edge) < 2 && reachable && getComputedStyle(row).backgroundColor !== 'rgba(0, 0, 0, 0)';
+    return Math.abs(r.top - edge) < 2 && reachable;
   })()`, `${selector} to remain visible below its toolbar`).catch(async (error) => {
     const geometry = await page.eval(`JSON.stringify({ row: document.querySelector(${JSON.stringify(selector)})?.getBoundingClientRect(), bar: document.getElementById('mainBar').getBoundingClientRect(), reader: document.getElementById('reader').getBoundingClientRect(), scroll: document.getElementById('reader').scrollTop, full: document.documentElement.classList.contains('fullscreen') })`);
     throw new Error(`${error.message}; ${geometry}`);
@@ -413,10 +414,10 @@ test('browser: reader and source controls stack below the main toolbar while scr
       await stack('.level-head');
       await page.click('.level .item-main');
       await page.waitFor(`document.querySelectorAll('#reader .body p').length === 80`, 'the long article');
-      await page.eval(mode === 'inline' ? `document.getElementById('reader').scrollTop = 500` : `window.scrollTo(0, 500)`);
+      await page.eval(`document.getElementById('reader').scrollTop = 500`);
       await stack('.reader-top');
       // The controls remain useful at the scrolled position, rather than just looking sticky.
-      await page.click('#reader .reader-top [aria-label="Back to your room"]');
+      await page.click('#readerControls .reader-top [aria-label="Back to your room"]');
       await page.waitFor(`document.getElementById('reader').hidden && document.querySelector('.level')`, 'back at the source');
       await page.eval(`window.scrollTo(0, 500)`);
       await stack('.level-head');
@@ -503,7 +504,7 @@ test('browser: the reader records opening and position, resumes there, and marks
   const scrolled = await page.eval<number>(`(() => { const r = document.getElementById('reader'); const blocks = document.querySelector('#reader .body').children; const target = blocks[Math.floor(blocks.length / 3)]; r.scrollTop += target.getBoundingClientRect().top - r.getBoundingClientRect().top; return r.scrollTop; })()`);
   assert.ok(scrolled > 0, 'the article is long enough to scroll');
   await page.waitFor(`Number(document.querySelector('#reader .body')?.dataset.furthest) > 0`, 'the reader to note how far it got');
-  await page.click('#reader [aria-label="Back to your room"]');
+  await page.click('#readerControls [aria-label="Back to your room"]');
   await page.waitFor(`!document.getElementById('grid').hidden`, 'the room to come back');
   const left = await readingWhen((r) => r.anchor?.block > 0);
   assert.ok(left?.anchor?.block > 0, 'its position was saved');
@@ -532,7 +533,7 @@ test('browser: viewing all blocks keeps reading unfinished and can still advance
   await page.waitFor(`document.querySelector('#reader .mark-read:not([disabled])')`, 'ready reading');
   await page.eval(`(() => { const reader = document.getElementById('reader'); reader.scrollTop = (reader.scrollHeight - reader.clientHeight) / 2; })()`);
   await page.waitFor(`Number(document.querySelector('#reader .body').dataset.furthest) > 0`, 'the anchor to advance despite full progress');
-  await page.eval(`document.querySelector('#reader [aria-label="Back to your room"]').click()`);
+  await page.eval(`document.querySelector('#readerControls [aria-label="Back to your room"]').click()`);
   const left = await readingWhen((reading) => reading.anchor?.block > 0);
   assert.equal(left.progress, 1);
   assert.equal(left.status, 'opened', 'only explicit completion marks the page read');
@@ -562,7 +563,7 @@ test('browser: Continue reading survives a fresh view, opens docs at its saved p
   assert.ok(await page.eval<number>(`document.getElementById('reader').scrollTop || window.scrollY`) > 0);
   await page.eval(`document.getElementById('reader').scrollTop += 500`);
   await page.waitFor(`Number(document.querySelector('.docs-page .body').dataset.furthest) > 20`, 'new docs reading progress');
-  await page.eval(`document.querySelector('#reader [aria-label="Back to your room"]').click()`);
+  await page.eval(`document.querySelector('#readerControls [aria-label="Back to your room"]').click()`);
   const left = await readingWhen((r) => r.anchor?.block > 20, url);
   assert.equal(left.status, 'opened', 'scrolling is not completion');
   await openRoom();
@@ -571,7 +572,7 @@ test('browser: Continue reading survives a fresh view, opens docs at its saved p
   await page.waitFor(`document.querySelector('.docs-page .mark-read:not([disabled])')`, 'reading to be ready');
   await page.eval(`document.querySelector('.docs-page .mark-read').click()`);
   await readingWhen((r) => r.status === 'read', url);
-  await page.eval(`document.querySelector('#reader [aria-label="Back to your room"]').click()`);
+  await page.eval(`document.querySelector('#readerControls [aria-label="Back to your room"]').click()`);
   await page.waitFor(`document.querySelector('.continue-reading').hidden`, 'finished reading to leave the strip');
   assert.deepEqual(page.problems, []);
   await profiles.put('default', room());
@@ -610,7 +611,7 @@ test('browser: docs hash navigation takes precedence over the saved position and
   await page.waitFor(`!document.getElementById('reader').hidden && document.querySelector('.docs-page h1')?.textContent === 'Deploy' && !document.querySelector('.docs-page .mark-read').disabled`, 'Deploy page');
   assert.ok(await page.eval<number>(`document.getElementById('reader').scrollTop || window.scrollY`) < 500, 'the explicit first heading takes precedence over saved block 70');
   assert.equal((await tool('get_reading', { url })).reading.anchor.block, 70, 'jumping back does not discard the furthest saved passage');
-  await page.eval(`document.querySelector('#reader [aria-label="Back to your room"]').click()`);
+  await page.eval(`document.querySelector('#readerControls [aria-label="Back to your room"]').click()`);
   // Back refreshes the unfinished-reading strip. Wait for its new height before
   // measuring another real pointer click; retained hidden docs are not readiness.
   await page.waitFor(`document.getElementById('reader').hidden && !document.getElementById('grid').hidden && document.querySelector('.continue-reading')?.getAttribute('aria-busy') === 'false'`, 'the room and refreshed reading strip after Back');
@@ -710,6 +711,7 @@ test('browser: a docs portal opens the docs viewer with its contents and a page'
   await page.waitFor(`document.querySelector('.docs-toc') && document.querySelectorAll('.docs-toc a').length >= 3`, 'the docs contents');
   const heading = await page.waitFor<string>(`document.querySelector('.docs-page h1, .docs-page h2')?.textContent`, 'a docs page');
   assert.match(heading, /Install|Getting started/);
+  assert.ok(await page.eval(`(() => { const r = document.querySelector('#reader').getBoundingClientRect(), t = document.querySelector('.reader-top').getBoundingClientRect(), b = document.querySelector('.bar').getBoundingClientRect(); return !document.querySelector('#reader .reader-top') && t.width === b.width && Math.abs(r.bottom - innerHeight) < 1 && document.querySelector('.docs-page h1').getBoundingClientRect().top >= t.bottom; })()`), 'docs share the full-width external action row and available viewport height');
   // Selecting text on a docs page offers the passage bar (no host here, so Clip and Copy).
   await page.waitFor(`document.querySelector('.docs-page [data-passage-url] p')`, 'the page text');
   await page.eval(`(() => { const p = document.querySelector('.docs-page [data-passage-url] p'); const r = document.createRange(); r.selectNodeContents(p); getSelection().removeAllRanges(); getSelection().addRange(r); })()`);
@@ -987,7 +989,7 @@ test("browser: in the river, follows' shares and reblogs join their stories with
     await page.waitFor(`document.querySelector('.composer [role="status"]')`, 'the followers reblog');
     assert.equal(await page.eval(`window.__calls.at(-1).args.audience`), 'followers');
     assert.match(await page.eval<string>(`document.querySelector('.composer').textContent`), /Reblogged · Followers only/);
-    await page.click('#reader .reader-top button');
+    await page.click('#readerControls .reader-top button');
     await page.eval(`${find('A post by cy')}.querySelector('.mi.reblog').click()`);
     assert.equal(await page.eval(`document.querySelector('.reblog-menu input:checked').value`), 'followers', 'future quick reblogs remember the choice');
     await page.eval(`[...document.querySelectorAll('.reblog-menu [role="menuitem"]')].find((n) => n.textContent === 'Reblog').click()`);
@@ -1062,7 +1064,7 @@ test('browser: every handle is a door: @names open their space and come back to 
     assert.equal(await page.eval(`document.querySelector('#reader .post .pn').textContent`), 'Personal note 0');
     await page.eval(`document.querySelector('#reader [data-post-id="s_preview_7"]').scrollIntoView()`);
     await page.waitFor(`document.querySelector('#reader [data-post-id="s_preview_7"] .space-link-image')?.naturalWidth > 0`, 'Space previews beyond the first image batch');
-    await page.eval(`document.querySelector('#reader .reader-top button').click()`);
+    await page.eval(`document.querySelector('#readerControls .reader-top button').click()`);
     await page.waitFor(`document.getElementById('reader').hidden && !document.getElementById('grid').hidden`, 'back to the river');
 
     // A shared clip opens as a share: its author is a door, and Follow is right there.
@@ -1077,13 +1079,13 @@ test('browser: every handle is a door: @names open their space and come back to 
     // From the share to the space and back to the very same share, as it was.
     await page.eval(`document.querySelector('#reader .byline .handle').click()`);
     await spaceOpen('fay');
-    await page.eval(`document.querySelector('#reader .reader-top button').click()`);
+    await page.eval(`document.querySelector('#readerControls .reader-top button').click()`);
     await page.waitFor(`document.querySelector('#reader h1')?.textContent === 'Just for fay'`, 'back to the share');
     assert.equal(await page.eval(`document.querySelector('#reader .btn.follow').textContent`), 'Following @fay', 'the share comes back as you left it');
     assert.equal(await page.eval(`document.getElementById('reader').classList.contains('space')`), false);
 
     // A shared link opens in the reader, which still says who passed it on, with Follow for the original's author.
-    await page.eval(`document.querySelector('#reader .reader-top button').click()`);
+    await page.eval(`document.querySelector('#readerControls .reader-top button').click()`);
     await page.waitFor(`document.getElementById('reader').hidden`, 'back to the river');
     await page.eval(`${find('A post by cy')}.querySelector('.item-main').click()`);
     await page.waitFor(`document.querySelector('#reader .shared-by .btn.follow')`, 'the reader with who shared it');
@@ -1093,7 +1095,7 @@ test('browser: every handle is a door: @names open their space and come back to 
     assert.deepEqual(await page.eval(`window.__calls.at(-1)`), { name: 'get_share', args: { id: 's_ben' } });
 
     // A Following portal's rows name their people as buttons too.
-    await page.eval(`document.querySelector('#reader .reader-top button').click()`);
+    await page.eval(`document.querySelector('#readerControls .reader-top button').click()`);
     await page.eval(`document.querySelector('[data-layout="columns"]').click()`);
     await page.waitFor(`!document.querySelector('#grid.river') && document.querySelector('#grid .item .item-meta .handle')`, 'handles in Following rows');
     assert.deepEqual(await page.eval(`[...document.querySelectorAll('#grid .item .item-meta .handle')].map((n) => n.textContent)`), ['@ben', '@cy', '@fay']);
@@ -1176,7 +1178,7 @@ test('browser: a portal opens to fill the room; the reader returns to it, and Es
     // The reader opens over the portal and comes back to it.
     await page.click('.level .item-main');
     await page.waitFor(`!document.getElementById('reader').hidden && document.querySelector('#reader h1')`, 'the reader');
-    await page.click('#reader .reader-top [aria-label="Back to your room"]');
+    await page.click('#readerControls .reader-top [aria-label="Back to your room"]');
     await page.waitFor(`document.getElementById('reader').hidden && document.querySelector('.level')`, 'back at the portal');
     assert.equal(await page.eval(`document.querySelectorAll('.level li').length`), 15, 'still showing what it showed');
     await escape();
@@ -1191,6 +1193,7 @@ test('browser: a portal opens to fill the room; the reader returns to it, and Es
     await profiles.put('default', room());
   }
 });
+
 
 test('browser: a local first run offers signing in from the welcome screen, and reports there', { skip }, async () => {
   // A local MCPortal in ghost mode whose hosted server can't be reached: the welcome
@@ -1209,6 +1212,9 @@ test('browser: a local first run offers signing in from the welcome screen, and 
     assert.match(report, /Couldn't start signing in/);
     assert.deepEqual(page.problems, []);
   } finally {
+    // Leave the fixture before closing it: the live preview may still have a request open.
+    await page.goto('about:blank');
+    ghost.server.closeAllConnections();
     await ghost.close();
     await rm(dataDir, { recursive: true, force: true });
   }
@@ -1293,6 +1299,12 @@ test('browser: kept passage follows moved text, declines duplicates and changed 
       await page.waitFor(`document.querySelector('.recall-hit')?.textContent.includes('Durable locator example')`,'the retained quote');
       await page.click('.recall-hit .recall-title');
       await page.waitFor(`document.querySelector('#recallPreview .btn')`,'the quote preview');
+      await page.eval(`[...document.querySelectorAll('#recallPreview button')].find(b=>b.textContent==='Read kept material').click()`);
+      await page.waitFor(`document.querySelector('#reader .body')?.textContent.includes(${JSON.stringify(quote)})`,'the original retained quote');
+      assert.equal(await page.eval(`document.querySelector('#readerControls button')?.getAttribute('aria-label')`),'Back to your reading experience');
+      assert.equal(await page.eval(`document.querySelector('#reader .row button')?.getAttribute('aria-label')`),null,'sharing keeps its own accessible name');
+      await page.click('#readerControls button');
+      await page.waitFor(`!document.querySelector('#experiences').hidden`,'return to the kept quote preview');
       await page.eval(`[...document.querySelectorAll('#recallPreview button')].find(b=>b.textContent==='Return to passage').click()`);
       await page.waitFor(`!document.querySelector('#reader').hidden && document.querySelector('#reader .body')`,'the passage reader');
       if (mode==='moved') {
@@ -1422,7 +1434,7 @@ test('browser: Space links: the room offers a follow of whoever brought you, say
     assert.deepEqual(await page.eval(`window.__calls.at(-1)`), { name: 'set_public_profile', args: { listed: true } });
     await page.eval(`[...document.querySelectorAll('#reader .space-printshop .btn')].find((b) => b.textContent.includes('Copy link')).click()`);
     await page.waitFor(`/mcportal\\.example\\/@reader|Copied your Space link/.test(document.getElementById('toast').textContent)`, 'the link copied or shown');
-    await page.eval(`document.querySelector('#reader .reader-top button').click()`);
+    await page.eval(`document.querySelector('#readerControls .reader-top button').click()`);
     await page.waitFor(`document.getElementById('reader').hidden`, 'back to the room');
     assert.notEqual(await page.eval(`getComputedStyle(document.getElementById('intros')).display`), 'none');
     assert.deepEqual(page.problems, []);
@@ -1482,7 +1494,7 @@ test('browser: the People portal: suggested people with the agent\'s reason, Fol
 
     await page.eval(`${people}[0].querySelector('.item-main').click()`);
     await page.waitFor(`!document.getElementById('reader').hidden && document.querySelector('#reader .space-head h1')?.textContent === 'ANA'`, "ana's space");
-    await page.eval(`document.querySelector('#reader .reader-top button').click()`);
+    await page.eval(`document.querySelector('#readerControls .reader-top button').click()`);
     await page.waitFor(`document.getElementById('reader').hidden`, 'back to the room');
 
     await page.eval(`document.querySelector('[data-layout="river"]').click()`);
@@ -1575,4 +1587,125 @@ test('browser: docs find searches current content and reading comfort follows pa
     await page.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: host });
     await page.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
   }
+});
+
+
+test('browser: source Back and Refresh remain below the universal controls after narrow large-text scrolling', { skip }, async () => {
+  const saved = Array.from({ length: 30 }, (_, i) => ({ url: `https://example.com/source-scroll-${i}`, title: `Source story ${i}`, savedAt: '2026-09-01T00:00:00.000Z' }));
+  await profiles.put('default', validateProfile({ ...room(), saved }));
+  try {
+    await page.send('Emulation.setDeviceMetricsOverride', { width: 380, height: 500, deviceScaleFactor: 1, mobile: false });
+    await openRoom();
+    await page.eval(`document.documentElement.style.fontSize = '200%'`);
+    await page.click('[data-portal="saved"] .portal-title');
+    await page.waitFor(`document.querySelector('.level')`, 'source view');
+    await page.eval(`window.scrollTo(0, 400)`);
+    await page.waitFor(`scrollY > 0`, 'source content scroll');
+    await page.waitFor(`(() => { const head = document.querySelector('.level-head'), back = head.querySelector('button').getBoundingClientRect(); return head.contains(document.elementFromPoint(back.left + back.width / 2, back.top + back.height / 2)); })()`, 'source transition completes with clickable actions');
+    const sourceActions = await page.eval<{ top: number; barBottom: number; hit: boolean; scroll: number; offset: string }>(`(() => { const head = document.querySelector('.level-head'), h = head.getBoundingClientRect(), b = document.querySelector('.bar').getBoundingClientRect(), back = head.querySelector('button').getBoundingClientRect(); return { top: h.top, barBottom: b.bottom, hit: head.contains(document.elementFromPoint(back.left + back.width / 2, back.top + back.height / 2)), scroll: scrollY, offset: getComputedStyle(head).top }; })()`);
+    assert.ok(Math.abs(sourceActions.top - sourceActions.barBottom) < 1 && sourceActions.hit, `source actions remain below universal row: ${JSON.stringify(sourceActions)}`);
+    await page.click('.level-head [aria-label="Refresh Saved"]');
+    await page.waitFor(`document.querySelectorAll('.level .item-main').length === 10`, 'source refresh completes');
+    await page.eval(`window.scrollTo(0, 400)`);
+    await page.click('.level-head [aria-label="Back to your room"]');
+    await page.waitFor(`!document.querySelector('.level')`, 'source Back returns to the room after scrolling');
+    assert.deepEqual(page.problems, []);
+  } finally {
+    await profiles.put('default', room());
+    await page.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+  }
+});
+
+test('browser: source previews ignore older replies, edits and mode changes and fit narrow views', { skip }, async () => {
+  const { identifier } = await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `
+    window.__scans = [];
+    const realFetch = window.fetch;
+    window.fetch = (url, init) => {
+      const call = init?.body && JSON.parse(init.body);
+      if (call?.params?.name === 'find_source') return new Promise(resolve => {
+        window.__scans.push((title, fail = false) => resolve(Response.json({ jsonrpc:'2.0', id:call.id, result: fail
+          ? { isError:true, content:[{type:'text',text:'Fixture offline'}] }
+          : {content:[], structuredContent:{candidates:[{source:'rss',config:{url:'https://example.com/feed.xml'},title,preview:[]}]}} })));
+      });
+      return realFetch(url, init);
+    };` });
+  const scan = async (value: string) => page.eval(`(() => { const input=document.getElementById('addInput'); input.value=${JSON.stringify(value)}; input.dispatchEvent(new Event('input')); document.getElementById('addForm').requestSubmit(); })()`);
+  try {
+    await openRoom(); await page.click('#btnAdd');
+    await scan('old'); await scan('new');
+    await page.waitFor(`window.__scans.length===2`, 'both source scans');
+    await page.eval(`window.__scans[1]('New result')`);
+    await page.waitFor(`document.getElementById('addResults').textContent.includes('New result')`, 'latest result');
+    await page.eval(`window.__scans[0]('Old result', true)`);
+    assert.match(await page.eval<string>(`document.getElementById('addResults').textContent`), /New result/);
+    assert.doesNotMatch(await page.eval<string>(`document.getElementById('addHint').textContent`), /offline/);
+    await scan('edited'); await page.waitFor(`window.__scans.length===3`, 'third scan');
+    await page.eval(`document.getElementById('addInput').value='different'; document.getElementById('addInput').dispatchEvent(new Event('input')); window.__scans[2]('Stale edit')`);
+    await page.eval(`new Promise(requestAnimationFrame)`);
+    assert.equal(await page.eval(`document.getElementById('addResults').textContent`), '');
+    await scan('switch'); await page.waitFor(`window.__scans.length===4`, 'fourth scan');
+    await page.click('#addStore'); await page.eval(`window.__scans[3]('Stale mode')`);
+    await page.eval(`new Promise(requestAnimationFrame)`);
+    assert.equal(await page.eval(`document.getElementById('addResults').textContent`), '');
+    await page.click('#addFeed'); await scan('');
+    assert.match(await page.eval<string>(`document.getElementById('addHint').textContent`), /Enter a site/);
+    await scan('long'); await page.waitFor(`window.__scans.length===5`, 'long result scan');
+    await page.eval(`window.__scans[4]('Long source title '.repeat(50))`);
+    await page.send('Emulation.setDeviceMetricsOverride', { width: 320, height: 600, deviceScaleFactor: 1, mobile: false });
+    await page.eval(`document.documentElement.style.fontSize='200%'`);
+    await page.waitFor(`document.querySelector('.cand-title')`, 'long source title');
+    assert.ok(await page.eval(`document.documentElement.scrollWidth <= innerWidth`));
+    await page.eval(`document.querySelector('.cand button').focus()`);
+    await page.send('Input.dispatchKeyEvent', {type:'rawKeyDown', key:'Escape', code:'Escape'});
+    assert.equal(await page.eval(`document.activeElement.id`), 'btnAdd');
+    assert.equal(await page.eval(`document.getElementById('addSheet').hidden`), true);
+    assert.deepEqual(page.problems, []);
+  } finally {
+    await page.send('Page.removeScriptToEvaluateOnNewDocument', { identifier });
+    await page.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+  }
+});
+
+test('browser: import reports persist partial success and retry without losing completed subscriptions', { skip }, async () => {
+  const { identifier } = await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `
+    window.__imports = 0; window.__refreshFail = false;
+    const realFetch = window.fetch;
+    window.fetch = async (url, init) => {
+      const call = init?.body && JSON.parse(init.body), name=call?.params?.name;
+      if(name==='import_opml') {
+        window.__imports++; window.__refreshFail=true;
+        return Response.json({jsonrpc:'2.0',id:call.id,result:{content:[],structuredContent:{profile:{},total:2,
+          imported:1, added:[{url:'https://example.com/kept',title:window.__imports===1?'Already kept':'Recovered'}],
+          alreadyPresent:window.__imports===1?0:1,deferred:[],failed:window.__imports===1?[{url:'https://example.com/offline',title:'Offline source',error:'Fixture offline'}]:[]}}});
+      }
+      if(name==='open_room' && window.__refreshFail) { window.__refreshFail=false; return Response.json({jsonrpc:'2.0',id:call.id,result:{isError:true,content:[{type:'text',text:'Refresh offline'}]}}); }
+      return realFetch(url,init);
+    };` });
+  try {
+    await openRoom(); await page.click('#btnAdd');
+    await page.eval(`(() => {const f=document.getElementById('opmlFile'), data=new DataTransfer();data.items.add(new File(['<opml/>'],'feeds.opml',{type:'text/xml'}));f.files=data.files;f.dispatchEvent(new Event('change'));})()`);
+    await page.waitFor(`document.getElementById('importReport').textContent.includes('Offline source')`, 'partial report despite failed room refresh');
+    assert.equal(await page.eval(`document.activeElement.tagName`), 'H2');
+    assert.match(await page.eval<string>(`document.getElementById('importReport').textContent`), /Already kept.*Needs repair.*Fixture offline/);
+    await page.eval(`[...document.querySelectorAll('#importReport button')].find(b=>b.textContent==='Retry remaining subscriptions').click()`);
+    await page.waitFor(`document.getElementById('importReport').textContent.includes('Recovered')`, 'retry report');
+    assert.match(await page.eval<string>(`document.getElementById('importReport').textContent`), /1 added; 1 already present; 0 failed/);
+    assert.equal(await page.eval(`window.__imports`), 2);
+    await page.eval(`[...document.querySelectorAll('#importReport button')].find(b=>b.textContent==='Refresh room').click()`);
+    await page.waitFor(`document.getElementById('toast').textContent==='Room refreshed'`, 'non-writing refresh');
+    assert.equal(await page.eval(`window.__imports`), 2);
+    assert.deepEqual(page.problems, []);
+  } finally { await page.send('Page.removeScriptToEvaluateOnNewDocument', { identifier }); }
+});
+
+test('browser: Recall preview selection keeps keyboard focus and reader return restores the same result', { skip }, async () => {
+  await openRoom(); await page.click('#btnRecall');
+  await page.waitFor(`document.querySelectorAll('.recall-title').length>=2`, 'library results');
+  const title = await page.eval<string>(`document.querySelectorAll('.recall-title')[1].textContent`);
+  await page.eval(`document.querySelectorAll('.recall-title')[1].focus()`);
+  await page.send('Input.dispatchKeyEvent', {type:'rawKeyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
+  await page.send('Input.dispatchKeyEvent', {type:'char',text:'\r',key:'Enter'});
+  assert.equal(await page.eval(`document.activeElement.textContent`), title);
+  assert.equal(await page.eval(`document.activeElement.className`), 'recall-title');
+  assert.deepEqual(page.problems, []);
 });

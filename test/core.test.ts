@@ -757,3 +757,42 @@ test('cache: evicts by byte budget', async () => {
   await cache.get('huge', 60, async () => 'x'.repeat(20_000));
   assert.ok(cache.size.bytes <= 10_000, 'oversized values are not cached');
 });
+
+test('import_opml: overlapping imports and retries partition every feed without duplicating completed work', async () => {
+  const opml = '<opml><body><outline text="Good" xmlUrl="https://example.com/feed.xml"/><outline text="Recover" xmlUrl="https://retry.example/feed.xml"/></body></opml>';
+  let recover = false;
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  let arrivals = 0;
+  const c = newUser();
+  c.fetcher = async (url, options) => {
+    if (++arrivals === 2) release();
+    await gate;
+    if (url.startsWith('https://retry.example/') && !recover) return { url, status: 503, contentType: 'text/plain', text: 'offline', truncated: false };
+    return createFixtureFetcher()('https://example.com/feed.xml', options);
+  };
+  const responses = await Promise.all([call(c, 'import_opml', { opml }), call(c, 'import_opml', { opml })]);
+  assert.equal(responses.reduce((n, r) => n + r.structuredContent.imported, 0), 1);
+  assert.equal((await c.store.get(c.userId)).columns.flatMap(col => col.panels).filter(p => p.source === 'rss').length, 1);
+  for (const r of responses) {
+    const d = r.structuredContent;
+    assert.equal(d.imported + d.alreadyPresent + d.failed.length + d.deferred.length, d.total);
+    assert.equal(d.failed[0].url, 'https://retry.example/feed.xml');
+  }
+  recover = true; c.cache = new TtlCache();
+  const retried = (await call(c, 'import_opml', { opml })).structuredContent;
+  assert.equal(retried.imported, 1); assert.equal(retried.alreadyPresent, 1); assert.deepEqual(retried.failed, []);
+  assert.equal(retried.added[0].url, 'https://retry.example/feed.xml');
+});
+
+test('import_opml: total failure leaves welcome intact and capacity omissions name every remaining feed', async () => {
+  const c = newUser();
+  const failed = (await call(c, 'import_opml', { opml: '<opml><body><outline text="Offline" xmlUrl="https://nothing.example/feed"/></body></opml>' })).structuredContent;
+  assert.equal(failed.imported, 0); assert.equal(failed.failed.length, 1); assert.equal(failed.profile.onboarded, false);
+  const opml = '<opml><body>' + Array.from({length: 35}, (_, i) => `<outline text="Feed ${i}" xmlUrl="https://example.com/feed.xml?${i}"/>`).join('') + '</body></opml>';
+  const full = (await call(c, 'import_opml', { opml })).structuredContent;
+  assert.equal(full.imported, 32); assert.equal(full.deferred.length, 3);
+  assert.equal(full.added.length + full.deferred.length + full.failed.length + full.alreadyPresent, 35);
+  const retry = (await call(c, 'import_opml', { opml })).structuredContent;
+  assert.equal(retry.imported, 0); assert.equal(retry.alreadyPresent, 32); assert.equal(retry.deferred.length, 3);
+});

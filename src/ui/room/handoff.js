@@ -7,6 +7,35 @@
   /** The handoff this card was opened from, applied once its page has drawn. @type {Handoff | null} */
   let pendingHandoff = null;
 
+  /** The retained quote remains usable when fetching the source fails. @param {Handoff} handoff */
+  function showUnavailableHandoff(handoff) {
+    if (stopReading) stopReading();
+    const generation = ++readerGeneration;
+    docsState = null;
+    leaveExperience();
+    root.classList.add('article-view');
+    root.classList.remove('welcome-view');
+    $('roomName').textContent = 'handoff';
+    $('welcome').hidden = true; $('grid').hidden = true; $('reader').hidden = false;
+    $('reader').classList.remove('docs', 'space', 'toc-open');
+    $('reader').scrollTop = 0;
+    renderReader(readerTop(handoff.url, false), el('h1', null, handoff.title || 'Saved handoff'),
+      el('p', { role: 'status' }, 'The live page is unavailable. This is the passage retained when you sent the handoff.'),
+      handoff.passage ? el('blockquote', { class: 'handoff-note' }, handoff.passage) : el('p', null, 'No passage was retained with this handoff.'),
+      el('p', null, handoff.url),
+      el('button', { class: 'btn', onclick: async () => {
+        try {
+          const data = (await callTool('open_handoff', { code: handoff.code })).structuredContent;
+          if (generation !== readerGeneration) return;
+          pendingHandoff = data.handoff;
+          if ('unavailable' in data) { toast('The live page is still unavailable. Your retained handoff is here.'); return; }
+          if ('article' in data) showArticleCard(data.article, data.saved);
+          else showDocsCard(data);
+        } catch(error) { if (generation === readerGeneration) toast(errorText(error)); }
+      } }, 'Retry live page'));
+    setStatus('');
+  }
+
   /** The page now in the reader: its body, address, title and where it lives. */
   function currentPage() {
     const body = $first('[data-passage-url]', $('reader'));

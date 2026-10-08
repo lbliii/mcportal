@@ -22,7 +22,7 @@
     const reader = $('reader');
     rememberRoomNavigation();
     $('grid').hidden = true; reader.hidden = false; reader.classList.add('docs'); reader.scrollTop = 0; window.scrollTo(0, 0);
-    reader.replaceChildren(readerTop('', !options.card), docsMessage('Opening the docs…'));
+    renderReader(readerTop('', !options.card), docsMessage('Opening the docs…'));
     try {
       const data = (await callTool('open_docs', key)).structuredContent;
       if (generation !== readerGeneration) return;
@@ -30,7 +30,7 @@
     } catch (error) {
       if (generation !== readerGeneration) return;
       console.error('[mcportal] open_docs failed', key, error);
-      reader.replaceChildren(readerTop('', !options.card), el('div', { class: 'error' }, `These docs couldn't be opened (${errorText(error)}).`));
+      renderReader(readerTop('', !options.card), el('div', { class: 'error' }, `These docs couldn't be opened (${errorText(error)}).`));
     }
   }
 
@@ -73,7 +73,7 @@
           list.replaceChildren(hits.length
             ? el('ul', { class: 'docs-hits' }, hits.map((h) => el('li', null, el('a', { href: h.url, 'data-url': h.url, onclick: (/** @type {MouseEvent} */ e) => { e.preventDefault(); loadDocsPage(h.url); } }, h.title,
               el('span', { class: 'sub' }, h.kind === 'symbol' ? h.role : h.section || '')))))
-            : el('div', { class: 'docs-hits' }, el('div', { class: 'empty' }, 'No titles match.')));
+            : el('div', { class: 'docs-hits' }, el('div', { class: 'empty' }, 'No matches in page titles, symbols or previously opened text. Open a page to search its text, or try different keywords.')));
           markCurrentPage();
         } catch (error) {
           if (docsState !== requestState || search.value.trim() !== query) return;
@@ -87,12 +87,15 @@
       el('button', { class: 'btn docs-close', onclick: () => toggleDocsContents(false) }, 'Close contents'),
       docsState.parent ? el('button', { class: 'docs-up', onclick: () => { const up = /** @type {DocsState} */ (/** @type {DocsState} */ (docsState).parent); showDocs({ site: up.site, docs: up.docs }, up.key, { parent: up.parent, card: up.card }); } }, `← ${docsState.parent.site.title}`) : null,
       el('div', { class: 'docs-site' }, site.title), search, list);
-    reader.replaceChildren(el('div', { class: 'docs-grid' }, toc, el('div', { class: 'docs-page' }), el('nav', { class: 'docs-otp', 'aria-label': 'On this page' })));
+    renderReader(readerTop('', !options.card), el('div', { class: 'docs-grid' }, toc, el('div', { class: 'docs-page' }), el('nav', { class: 'docs-otp', 'aria-label': 'On this page' })));
     const first = site.sections.flatMap((s) => s.pages).find((p) => !p.index);
     const start = options.url || data.page || (first && first.url);
     if (start) loadDocsPage(start);
     // .docs-page was added just above.
-    else /** @type {HTMLElement} */ ($first('.docs-page', reader)).replaceChildren(readerTop('', !options.card), docsMessage('Pick a section on the left.'));
+    else {
+      setReaderControls(readerTop('', !options.card));
+      /** @type {HTMLElement} */ ($first('.docs-page', reader)).replaceChildren(docsMessage('Pick a section on the left.'));
+    }
   }
 
   function markCurrentPage() {
@@ -121,7 +124,7 @@
   function toggleDocsContents(open) {
     const reader = $('reader');
     reader.classList.toggle('toc-open', open);
-    const toggle = $first('.docs-toggle', reader);
+    const toggle = $first('.docs-toggle', $('readerControls'));
     toggle?.setAttribute('aria-expanded', String(open));
     const destination = open ? $first('.docs-search', reader) : toggle;
     destination?.scrollIntoView({ block: 'nearest', behavior: 'auto' });
@@ -165,7 +168,7 @@
       const minutes = Math.max(1, Math.round((page.wordCount || 0) / 230));
       const how = docsState.key.portalId ? `portalId "${docsState.key.portalId}"` : `docs "${String(docsState.key.docs).slice(0, 300)}"`;
       const body = passageSource(blockNodes(page.blocks, onLink), page.url, page.title, `Use read_doc_page with that url and ${how} for the rest of the page.`);
-      const title = el('h1', null, page.title);
+      const title = el('h1', { tabindex: '-1' }, page.title);
       readerTools(top, body, title);
       const heads = logicalBlocks(body).filter((node) => /^H[234]$/.test(node.tagName));
       if (heads.length > 1) {
@@ -173,8 +176,9 @@
         outline.classList.add('docs-outline');
         top.append(outline);
       }
-      column.replaceChildren(top,
-        el('div', { class: 'docs-crumb' }, [docsState.site.title, section].filter(Boolean).join(' › ')),
+      setReaderControls(top);
+      column.replaceChildren(
+        el('div', { class: 'docs-crumb' }, [docsState.site.title, section, here.hostname === 'raw.githubusercontent.com' ? `Version: ${decodeURIComponent(here.pathname.split('/')[3] || 'HEAD')}` : ''].filter(Boolean).join(' › ')),
         title,
         el('div', { class: 'byline' }, `${minutes} min read`),
         body,
@@ -183,6 +187,7 @@
       otp.replaceChildren(...(heads.length > 1 ? [el('div', { class: 'otp-title' }, 'On this page'),
         ...heads.slice(0, 60).map((h) => el('a', { class: h.tagName !== 'H2' ? 'l3' : null, href: `#${h.dataset.anchor}`, onclick: (/** @type {MouseEvent} */ e) => { e.preventDefault(); scrollToAnchor(h.dataset.anchor || ''); } }, h.textContent))] : []));
       column.removeAttribute('aria-busy');
+      title.focus({ preventScroll: true });
       const handed = (() => { const body = $first('[data-passage-url]', column); return body ? applyHandoff(body) : false; })();
       markCurrentPage();
       if (!handed && (!hash || !scrollToAnchor(hash))) { reader.scrollTop = 0; window.scrollTo(0, 0); }
@@ -198,7 +203,8 @@
       if (generation !== readerGeneration || docsState !== requestState) return;
       column.removeAttribute('aria-busy');
       console.error('[mcportal] read_doc_page failed', { url, ...docsState.key }, error);
-      column.replaceChildren(readerTop(url, !docsState.card), el('div', { class: 'error' }, `This page couldn't be read (${errorText(error)}).`),
+      setReaderControls(readerTop(url, !docsState.card));
+      column.replaceChildren(el('div', { class: 'error' }, `This page couldn't be read (${errorText(error)}).`),
         el('button', { class: 'btn', onclick: () => openLink(url) }, 'Open the original'));
     }
   }
@@ -263,7 +269,7 @@
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape' || e.defaultPrevented) return;
     if (passageBar) { hidePassageBar(); document.getSelection()?.removeAllRanges(); e.preventDefault(); return; }
-    const outline = $first('.reader-outline[open]', $('reader'));
+    const outline = $first('.passage-picker[open], .reader-outline[open]', $('readerControls'));
     if (outline instanceof HTMLDetailsElement) { outline.open = false; outline.querySelector('summary')?.focus(); e.preventDefault(); return; }
     if ($('reader').classList.contains('toc-open')) { toggleDocsContents(false); e.preventDefault(); return; }
     if (!$('reader').hidden) closeReader();

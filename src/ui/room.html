@@ -63,7 +63,7 @@
     <button class="btn" type="submit">Scan</button>
   </form>
   <div class="add-hint"><button class="link-btn" type="button" id="btnImportOpml">Import subscriptions from another reader (OPML)</button></div>
-  <div class="add-hint" id="addHint">Paste a site or feed and MCPortal finds what it can show. Sites with feeds, Reddit, YouTube, Bluesky, Mastodon, GitHub, Substack and more.</div>
+  <div class="add-hint" id="addHint" role="status" aria-live="polite" aria-atomic="true">Paste a site or feed and MCPortal finds what it can show. Sites with feeds, Reddit, YouTube, Bluesky, Mastodon, GitHub, Substack and more.</div>
   <ul class="cands" id="addResults"></ul>
 </section>
 <main id="grid" class="grid" aria-live="polite">
@@ -71,8 +71,12 @@
 </main>
 <section id="experiences" class="experiences" hidden></section>
 <section id="welcome" class="welcome" hidden></section>
+<section id="importReport" class="import-report" aria-label="Subscription import results" hidden></section>
 <input type="file" id="opmlFile" accept=".opml,.xml,text/xml,application/xml,text/x-opml" hidden>
-<article id="reader" class="reader" hidden></article>
+<section class="reader-shell" aria-label="Reader">
+  <div id="readerControls"></div>
+  <article id="reader" class="reader" hidden></article>
+</section>
 <div class="toast" id="toast" role="status"></div>
 
 <script>

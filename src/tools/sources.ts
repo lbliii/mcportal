@@ -179,39 +179,48 @@ export const SOURCE_TOOLS: ToolDef[] = [
       });
       const working = loaded.filter((l) => l.ok).slice(0, Math.max(0, room));
       const failed = loaded.filter((l) => !l.ok);
-      const specs: PortalInput[] = working.map((l) => {
+      const specs: Array<SourceSettings<'rss'> & { id: string; title?: string }> = working.map((l) => {
         const title = clean(l.feed.title || l.title, 80);
         return { id: slugId(l.feed.title || l.title || 'feed'), source: 'rss', ...(title ? { title } : {}), config: { url: l.feed.url, limit: 10 } };
       });
-      if (!before.onboarded && !specs.length) return toolError(`None of the ${loaded.length} feeds tried loaded (${clean(failed[0]?.error, 120)}).`, 'upstream_error');
       // Group by folder, keeping the order folders first appear in their file.
       const folderOrder = [...new Set(working.map((l) => l.feed.category ?? ''))];
       const byCategory = [...working].sort((a, b) => folderOrder.indexOf(a.feed.category ?? '') - folderOrder.indexOf(b.feed.category ?? ''));
       const ordered = byCategory.map((l) => specs[working.indexOf(l)]!);
-      const { profile, addedCount } = await ctx.store.update(ctx.userId, (current) => {
+      const { profile, added, alreadyPresent } = await ctx.store.update(ctx.userId, (current) => {
+        // Discovery can overlap another import/add. Recheck identity inside the
+        // atomic update so retries and concurrent imports never duplicate feeds.
+        const present = new Set(current.columns.flatMap((c) => c.panels).flatMap((p) => p.source === 'rss' ? [p.config.url] : []));
+        const alreadyPresent = feeds.filter((f) => present.has(f.url)).length;
         let profile: Profile;
-        if (!current.onboarded) {
+        if (!specs.length) profile = current;
+        else if (!current.onboarded) {
           // New user: their reader's folders become the room, in order, over up to 8 columns.
           profile = withLayout(current, { layout: 'shelves', columns: spreadColumns(ordered), onboarded: true });
         } else {
           profile = current;
           for (const spec of specs) {
+            if (spec.source === 'rss' && present.has(spec.config.url)) continue;
             const added = addPortalTo(profile, spec);
             if ('error' in added) break;
             profile = added.profile;
+            if (spec.source === 'rss') present.add(spec.config.url);
           }
         }
-        const addedCount = profile.columns.flatMap((c) => c.panels).length - (current.onboarded ? current.columns.flatMap((c) => c.panels).length : 0);
-        return { profile, result: { profile, addedCount } };
+        const oldUrls = new Set(current.columns.flatMap((c) => c.panels).flatMap((p) => p.source === 'rss' ? [p.config.url] : []));
+        const added = profile.columns.flatMap((c) => c.panels).flatMap((p) => p.source === 'rss' && !oldUrls.has(p.config.url) ? [{ url: p.config.url, title: p.title ?? p.config.url }] : []);
+        return { profile, result: { profile, added, alreadyPresent } };
       });
-      const notTried = fresh.length - candidates.length;
+      const present = new Set(profile.columns.flatMap((c) => c.panels).flatMap((p) => p.source === 'rss' ? [p.config.url] : []));
+      const failures = failed.filter((f) => !present.has(f.feed.url)).map((f) => ({ url: f.feed.url, title: f.feed.title, error: f.error }));
+      const deferred = feeds.filter((f) => !present.has(f.url) && !failures.some((failed) => failed.url === f.url));
       const lines = [
-        `Imported ${addedCount} of ${feeds.length} feed(s)${title ? ` from "${title}"` : ''}.`,
-        feeds.length - fresh.length ? `${feeds.length - fresh.length} were already in the room.` : '',
-        failed.length ? `${failed.length} didn't load: ${failed.slice(0, 5).map((f) => f.feed.title).join(', ')}${failed.length > 5 ? '…' : ''}.` : '',
-        notTried > 0 || working.length < loaded.filter((l) => l.ok).length ? 'The room is full, so some feeds were left out; remove portals to make space.' : '',
+        `Imported ${added.length} of ${feeds.length} feed(s)${title ? ` from "${title}"` : ''}.`,
+        alreadyPresent ? `${alreadyPresent} were already in the room.` : '',
+        failures.length ? `${failures.length} didn't load: ${failures.slice(0, 5).map((f) => f.title).join(', ')}${failures.length > 5 ? '…' : ''}.` : '',
+        deferred.length ? `${deferred.length} were left out by the room or per-import limit. Make space if needed, then retry.` : '',
       ].filter(Boolean);
-      return ok(lines.join('\n'), { profile, imported: addedCount, failed: failed.map((f) => ({ url: f.feed.url, title: f.feed.title, error: f.error })), total: feeds.length } satisfies ToolResults['import_opml']);
+      return ok(lines.join('\n'), { profile, imported: added.length, added, alreadyPresent, deferred, failed: failures, total: feeds.length } satisfies ToolResults['import_opml']);
     },
   },
 ];

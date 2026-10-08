@@ -8,7 +8,7 @@ import { parseAttrs } from '../lib/html.ts';
 import { linkTarget, toneOf } from '../lib/markdown.ts';
 import { clean, decodeEntities, INLINE, safeHttpUrl } from '../lib/text.ts';
 import { articleStructure } from './reader/structure.ts';
-import { articleDate, articleMetadata, titleKey } from './reader/metadata.ts';
+import { articleDate, articleMetadata, titleKey, withoutSite } from './reader/metadata.ts';
 import type { ArticleBlock, CalloutTone, Fetcher, Span } from '../types.ts';
 
 export interface Extracted {
@@ -391,6 +391,9 @@ export function extractArticle(html: string, baseUrl?: string, limits: { blocks:
 
   const metadata = articleMetadata(meta, docTitle, structure.scripts, structure.authors, structure.dates, baseUrl);
   const title = metadata.title;
+  // A matching JSON-LD article may use a shorter headline than its page H1/OG
+  // variant. Recognize exact metadata alternatives rather than fuzzy prefixes.
+  const titleKeys = new Set([title, meta['og:title'], docTitle].filter((value): value is string => !!value).map((value) => titleKey(withoutSite(value, metadata.siteName, baseUrl))));
   const preferred: Zone | undefined = found.some((b) => b.zone === 'article') ? 'article' : found.some((b) => b.zone === 'main') ? 'main' : undefined;
   const blocks: ArticleBlock[] = [];
   let chars = 0;
@@ -410,7 +413,7 @@ export function extractArticle(html: string, baseUrl?: string, limits: { blocks:
     }
     if (b.media) { const key = b.media.url; if (seenMedia.has(key)) continue; seenMedia.add(key); }
     if (b.type === 'h' && SHARE_HEADING.test(b.text) && isChrome(found[i + 1])) continue;
-    if (b.type === 'h' && (docs ? b.text === title : (blocks.length === 0 || b.level === 1 && blocks.length < 3) && titleKey(b.text) === titleKey(title))) continue;
+    if (b.type === 'h' && (docs ? b.text === title : (blocks.length === 0 || b.level === 1 && blocks.length < 3) && titleKeys.has(titleKey(b.text)))) continue;
     if (!docs && blocks.length < 4 && metadata.byline && b.text.replace(/^by\s+/i, '') === metadata.byline) continue;
     if (!docs && blocks.length < 4 && (articleDate(b.text) === metadata.publishedAt && metadata.publishedAt || articleDate(b.text) === metadata.updatedAt && metadata.updatedAt)) continue;
     if (blocks.length >= limits.blocks || chars + b.text.length > limits.totalChars) break;

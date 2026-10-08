@@ -64,7 +64,7 @@
     $('recallResults').replaceChildren(...recallResult.hits.map(hit => el('article', { class: `recall-hit${recallPreview?.ref === hit.ref ? ' selected' : ''}`, 'data-ref': hit.ref },
       selectEvidenceButton(hit),
       el('div', { class: 'experience-kicker' }, libraryLabel(hit)),
-      el('button', { class: 'recall-title', 'aria-pressed': String(recallPreview?.ref === hit.ref), onclick: () => { recallPreview = hit; drawRecallResults(); } }, hit.title),
+      el('button', { class: 'recall-title', 'aria-pressed': String(recallPreview?.ref === hit.ref), onclick: () => { recallPreview = hit; drawRecallResults(); $first(`[data-ref="${CSS.escape(hit.ref)}"] .recall-title`, $('recallResults'))?.focus({ preventScroll: true }); } }, hit.title),
       el('p', { class: 'experience-muted' }, `${hit.source} · ${ago(hit.updatedAt)}`),
       hit.excerpt ? el('p', { class: hit.clipKind === 'quote' ? 'recall-quote' : 'recall-excerpt' }, hit.excerpt) : null,
       hit.matched.length ? el('small', { class: 'experience-muted' }, `Matched: ${hit.matched.join(', ')}`) : null,

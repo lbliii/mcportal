@@ -16,12 +16,12 @@ before(async () => { if (skip) return; app = await startApp({ allowUnauthenticat
 after(async () => { if (skip) return; await page.close(); await app.close(); });
 
 /** Use the real MCP bridge with rich synthetic tool results, without involving the parser. */
-async function open(options: { reading?: Partial<ReadingState>; handoff?: Partial<Handoff>; width?: number; article?: Article } = {}): Promise<void> {
+async function open(options: { reading?: Partial<ReadingState>; handoff?: Partial<Handoff>; width?: number; height?: number; mode?: 'inline' | 'fullscreen'; article?: Article } = {}): Promise<void> {
   page.problems.length = 0;
-  await page.send('Emulation.setDeviceMetricsOverride', { width: options.width || 1000, height: 850, deviceScaleFactor: 1, mobile: false });
+  await page.send('Emulation.setDeviceMetricsOverride', { width: options.width || 1000, height: options.height || 850, deviceScaleFactor: 1, mobile: false });
   const { identifier } = await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `
     Object.defineProperty(window, '__MCPORTAL_DEV__', { get: () => undefined, set: () => {} });
-    window.__calls = []; window.__imageBatches = []; window.__reading = ${JSON.stringify(options.reading || null)};
+    window.__calls = []; window.__hostCalls = []; window.__imageBatches = []; window.__reading = ${JSON.stringify(options.reading || null)};
     let release; const imageGate = new Promise(resolve => release = resolve); window.__releaseImages = () => release();
     window.addEventListener('message', async event => {
       const msg = event.data;
@@ -31,8 +31,9 @@ async function open(options: { reading?: Partial<ReadingState>; handoff?: Partia
       }
       if (!msg?.id || !msg.method) return;
       event.stopImmediatePropagation();
+      window.__hostCalls.push({ method:msg.method, params:msg.params });
       let result = {};
-      if (msg.method === 'ui/initialize') result = { hostCapabilities: { serverTools: true, updateModelContext: true, openLinks: true }, hostContext: { theme: 'light', displayMode: 'inline', availableDisplayModes: ['inline', 'fullscreen'] } };
+      if (msg.method === 'ui/initialize') result = { hostCapabilities: { serverTools: true, updateModelContext: true, openLinks: true }, hostContext: { theme: 'light', displayMode: '${options.mode || 'inline'}', availableDisplayModes: ['inline', 'fullscreen'] } };
       if (msg.method === 'tools/call') {
         const { name, arguments: args } = msg.params;
         window.__calls.push({ name, args });
@@ -82,8 +83,8 @@ test('reader UI: semantic groups, composable marks, metadata and outline survive
   await page.click('.reader-outline summary');
   await page.click('.reader-outline a:last-child');
   await page.waitFor(`document.activeElement.textContent === 'Closing notes'`, 'outline navigation to focus its heading');
-  const toolbar = await page.eval<{ top: number; reader: number; visible: boolean }>(`(() => { const n = document.querySelector('.reader-top'); const r = n.getBoundingClientRect(); const top = document.getElementById('reader').getBoundingClientRect().top; return { top: r.top, reader: top, visible: r.bottom > 0 && r.top < innerHeight }; })()`);
-  assert.ok(toolbar.visible && Math.abs(toolbar.top - toolbar.reader) <= 20, `reader actions remain at the scroll viewport edge: ${JSON.stringify(toolbar)}`);
+  const toolbar = await page.eval<{ top: number; reader: number; visible: boolean }>(`(() => { const n = document.querySelector('.reader-top'); const r = n.getBoundingClientRect(); const top = document.getElementById('reader').getBoundingClientRect().top; return { top: r.bottom, reader: top, visible: r.bottom > 0 && r.top < innerHeight }; })()`);
+  assert.ok(toolbar.visible && Math.abs(toolbar.top - toolbar.reader) <= 1, `reader actions sit outside the scroll viewport: ${JSON.stringify(toolbar)}`);
   assert.ok(await page.eval<boolean>(`document.documentElement.scrollWidth <= innerWidth`), 'narrow reader fits the viewport');
   await page.eval(`window.postMessage({ jsonrpc: '2.0', method: 'ui/notifications/host-context-changed', params: { displayMode: 'fullscreen', theme: 'dark' } }, '*')`);
   await page.waitFor(`document.documentElement.classList.contains('fullscreen')`, 'fullscreen reader');
@@ -265,5 +266,68 @@ test('reader UI: page find matches literal text across formatting without changi
   assert.equal(await page.eval(`document.getElementById('readerFind').hidden`), false, 'Ctrl+F opens page find within the reader');
   assert.ok(await page.eval<boolean>(`document.documentElement.scrollWidth <= innerWidth`));
   assert.equal(await page.eval(`window.__calls.some(c => JSON.stringify(c).includes('[a+b]'))`), false, 'find queries remain local');
+  assert.deepEqual(page.problems, []);
+});
+
+test('reader UI: expanded frame fills the viewport, plain controls span the canvas, and mode changes preserve the passage', { skip }, async () => {
+  for (const width of [1000, 380]) {
+    await open({ width, height: 984, mode: 'fullscreen', reading: { status: 'opened', anchor: { block: 20, heading: 'preparation' }, progress: 0.5 } });
+    await page.waitFor(`document.querySelector('#reader').scrollTop > 0`, 'expanded saved passage');
+    const measure = () => page.eval<{ bottom: number; top: number; barBottom: number; controlsTop: number; controlsBottom: number; width: number; barWidth: number; background: string; border: string; scroll: number; pageScroll: number; blockTop: number }>(`(() => {
+      const reader = document.querySelector('#reader'), top = document.querySelector('.reader-top'), bar = document.querySelector('.bar');
+      const r = reader.getBoundingClientRect(), t = top.getBoundingClientRect(), b = bar.getBoundingClientRect(), style = getComputedStyle(top);
+      return { bottom: r.bottom, top: r.top, barBottom: b.bottom, controlsTop: t.top, controlsBottom: t.bottom, width: t.width, barWidth: b.width, background: style.backgroundColor, border: style.borderBottomWidth, scroll: reader.scrollTop, pageScroll: scrollY, blockTop: document.querySelector('[data-reader-block="20"]').getBoundingClientRect().top };
+    })()`);
+    let layout = await measure();
+    assert.ok(Math.abs(layout.bottom - 984) <= 1, 'reader reaches the viewport bottom');
+    assert.equal(layout.width, layout.barWidth, 'both toolbar rows span the app');
+    assert.equal(layout.controlsTop, layout.barBottom, 'controls follow the universal row');
+    assert.equal(layout.top, layout.controlsBottom, 'scrolling starts below the controls');
+    assert.equal(layout.background, 'rgba(0, 0, 0, 0)'); assert.equal(layout.border, '0px');
+    assert.equal(layout.pageScroll, 0, 'only the article viewport scrolls');
+    assert.ok(layout.blockTop >= layout.top && layout.blockTop < layout.top + 40, 'resumed text is below the controls');
+    await page.eval(`document.documentElement.style.fontSize = '150%'; document.querySelector('[data-reader-block="20"]').scrollIntoView({ block: 'start' });`);
+    layout = await measure();
+    assert.ok(Math.abs(layout.bottom - 984) <= 1 && layout.blockTop >= layout.top, 'larger text retains viewport coverage and visible passage');
+    assert.ok(await page.eval(`document.documentElement.scrollWidth <= innerWidth`), 'large text fits a narrow frame');
+    await page.eval(`window.postMessage({ jsonrpc: '2.0', method: 'ui/notifications/host-context-changed', params: { displayMode: 'inline' } }, '*')`);
+    await page.waitFor(`!document.documentElement.classList.contains('fullscreen')`, 'bounded inline card');
+    assert.ok(await page.eval<number>(`document.querySelector('#reader').clientHeight`) <= 640, 'inline article stays bounded');
+    assert.ok(await page.eval<number>(`document.querySelector('#reader').scrollTop`) > 0, 'switching to inline retains the reading position');
+    await page.eval(`window.postMessage({ jsonrpc: '2.0', method: 'ui/notifications/host-context-changed', params: { displayMode: 'fullscreen' } }, '*')`);
+    await page.waitFor(`document.documentElement.classList.contains('fullscreen')`, 'expanded again');
+    await page.eval(`document.querySelector('[data-reader-block="20"]').scrollIntoView({ block: 'start' })`);
+    layout = await measure();
+    assert.equal(layout.pageScroll, 0); assert.ok(layout.blockTop >= layout.top, 'returning expanded keeps the article beneath controls');
+    await page.send('Emulation.setDeviceMetricsOverride', { width, height: 670, deviceScaleFactor: 1, mobile: false });
+    await page.waitFor(`Math.abs(document.querySelector('#reader').getBoundingClientRect().bottom - 670) < 1`, 'reader follows a resized viewport');
+    assert.equal(await page.eval(`scrollY`), 0, 'resizing keeps one article scroll owner');
+    assert.deepEqual(page.problems, []);
+  }
+});
+
+
+test('reader UI: a short expanded article shows its real ending without a clipped card', { skip }, async () => {
+  await open({ mode: 'fullscreen', height: 984, article: { ...article, wordCount: 20, blocks: [{ type: 'p', text: 'A short complete article.' }] } });
+  assert.ok(await page.eval(`(() => { const reader = document.querySelector('#reader'), end = document.querySelector('.read-end').getBoundingClientRect(); return reader.scrollHeight === reader.clientHeight && end.bottom <= reader.getBoundingClientRect().bottom; })()`), 'the complete short article and completion action fit naturally');
+  assert.deepEqual(page.problems, []);
+});
+
+test('reader UI: keyboard passage chooser exposes source scope and sends only selected authored text', { skip }, async () => {
+  await open({width:360});
+  await page.eval(`document.querySelector('.passage-picker summary').focus()`);
+  await page.send('Input.dispatchKeyEvent', {type:'rawKeyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
+  await page.send('Input.dispatchKeyEvent', {type:'char',text:'\r',key:'Enter'});
+  assert.equal(await page.eval(`document.querySelector('.passage-picker').open`), true);
+  assert.match(await page.eval<string>(`document.querySelector('.passage-picker-panel').textContent`), /Only this passage is used/);
+  await page.eval(`(() => {const s=document.querySelector('[aria-label="Passage to use"]');s.value=s.options[1].value;s.dispatchEvent(new Event('change'));})()`);
+  const text = await page.eval<string>(`document.querySelector('.passage-preview').textContent`);
+  await page.eval(`[...document.querySelectorAll('.passage-picker button')].find(b=>b.textContent==='Ask about this').click()`);
+  await page.waitFor(`window.__hostCalls.some(c=>c.method==='ui/update-model-context' && c.params.structuredContent?.passage)`, 'passage context');
+  assert.equal(await page.eval(`window.__hostCalls.find(c=>c.method==='ui/update-model-context' && c.params.structuredContent?.passage).params.structuredContent.passage.text`), text);
+  await page.send('Input.dispatchKeyEvent', {type:'rawKeyDown',key:'Escape',code:'Escape'});
+  assert.equal(await page.eval(`document.querySelector('.passage-picker').open`), false);
+  assert.equal(await page.eval(`document.activeElement.textContent`), 'Choose passage');
+  assert.ok(await page.eval(`document.documentElement.scrollWidth <= innerWidth`));
   assert.deepEqual(page.problems, []);
 });

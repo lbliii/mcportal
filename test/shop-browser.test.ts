@@ -15,7 +15,7 @@ test('Shop browser: scope preview → confirm → gallery → save → pause/res
   const app=await startApp({allowUnauthenticated:true},async(url,options)=>url.startsWith(SHOP)?fetcher(url,options):createFixtureFetcher()(url,options),{store,watchStore,now:()=>now,cache:new TtlCache({now:()=>now})});
   const page=await Page.open(chrome!);
   try {
-    await page.goto(app.base+'/preview');await page.waitFor(`document.querySelector('#btnAdd')&&!document.querySelector('#mainBar').hidden`,'room ready');
+    await page.goto(app.base+'/preview');await page.waitFor(`document.querySelector('#btnAdd')&&!document.querySelector('#mainBar').hidden && document.querySelector('.continue-reading')?.getAttribute('aria-busy')==='false' && !document.querySelector('.skeleton')`,'room hydration ready before measuring click coordinates');
     await page.click('#btnAdd');await page.click('#addStore');
     await page.eval(`document.querySelector('#addInput').value=${JSON.stringify(SHOP)};document.querySelector('#storeCollection').value='clothing';document.querySelector('#addForm').requestSubmit()`);
     await page.waitFor(`document.querySelector('.shop-preview > .btn')`,'store preview');

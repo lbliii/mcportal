@@ -25,6 +25,32 @@
     return body;
   }
 
+  /** Native controls offer the same passage actions without precision selection.
+   * @param {HTMLElement} body
+   */
+  function passagePicker(body) {
+    const blocks = logicalBlocks(body);
+    // Copy only authored text, excluding embedded code/media action labels.
+    const choices = blocks.map((node, block) => ({ block, text: readerTextRuns(node).map(run => run.map(t => t.textContent).join('')).join('\n').trim().slice(0, PASSAGE_CHARS) })).filter(p => p.text.length >= 3);
+    const select = el('select', { 'aria-label': 'Passage to use' }, choices.map(p => el('option', { value: String(p.block) }, `${p.block + 1}. ${p.text.replace(/\s+/g, ' ').slice(0, 100)}`)));
+    const preview = el('blockquote', { class: 'passage-preview' });
+    const chosen = () => {
+      const p = choices.find(p => p.block === Number(select.value));
+      return p ? { ...p, url: body.dataset.passageUrl ?? '', title: body.dataset.passageTitle ?? '', heading: headingAt(body, p.block), hint: body.dataset.passageHint ?? '' } : null;
+    };
+    const show = () => { preview.textContent = chosen()?.text ?? 'No text passages on this page.'; };
+    select.addEventListener('change', show); show();
+    const canAsk = Boolean(hostCapabilities.updateModelContext);
+    const canWrite = Boolean(DEV || hostCapabilities.serverTools);
+    return el('details', { class: 'passage-picker' }, el('summary', null, 'Choose passage'),
+      el('div', { class: 'passage-picker-panel' }, el('p', null, body.dataset.passageUrl ?? ''), select, preview,
+        el('p', null, `Only this passage is used (up to ${PASSAGE_CHARS.toLocaleString()} characters).`),
+        canAsk ? el('button', { class: 'btn', onclick: () => { const p = chosen(); if (p) askAboutPassage(p); } }, 'Ask about this') : null,
+        canWrite ? el('button', { class: 'btn', onclick: () => { const p = chosen(); if (p) clipPassage(p); } }, 'Clip quote') : null,
+        canWrite ? el('button', { class: 'btn', onclick: () => { const p = chosen(); if (p) sendToNewChat(p); } }, 'Send to new chat') : null,
+        el('button', { class: 'btn', onclick: () => { const p = chosen(); if (p) copyPassage(p); } }, 'Copy quote')));
+  }
+
   /** Logical content units, independent of semantic list/quote containers.
    * Older clip/card bodies use direct children, so they remain selectable.
    * @param {Element} body @returns {HTMLElement[]}
@@ -109,7 +135,7 @@
    * @param {HTMLElement} reader
    */
   function readerVisibleTop(reader) {
-    return Math.max(0, reader.getBoundingClientRect().top, $first('.reader-top', reader)?.getBoundingClientRect().bottom || 0);
+    return Math.max(0, reader.getBoundingClientRect().top);
   }
 
   function hidePassageBar() {

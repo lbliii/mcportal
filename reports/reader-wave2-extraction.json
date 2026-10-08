@@ -1,0 +1,198 @@
+{
+  "inspectedOn": "2026-10-04",
+  "baselineCommit": "448f8a2",
+  "method": "Fresh safeFetch responses bypassing cache, untruncated at the 1.5 MB bound; before and after parsers inspect identical response bytes. Public publisher bodies remain in temporary files only. Output counts and unchanged blocks establish bounded differences, not complete article fidelity.",
+  "samples": [
+    {
+      "source": "colossal",
+      "url": "https://www.thisiscolossal.com/2026/10/gaia-alari-animation/",
+      "httpStatus": 200,
+      "fetchTruncated": false,
+      "inputBytes": 302189,
+      "inputSha256": "cb3597fa8c79aae298fb9e7d9ef3a2edf88c3f38d507f1a318c452ed88412f86",
+      "before": {
+        "blocks": 8,
+        "words": 100,
+        "figures": 4,
+        "media": 2,
+        "headings": 0,
+        "paragraphs": 2
+      },
+      "after": {
+        "blocks": 8,
+        "words": 100,
+        "figures": 4,
+        "media": 2,
+        "headings": 0,
+        "paragraphs": 2
+      },
+      "onlyExistingBlocksRetained": true,
+      "allMetadataUnchanged": true,
+      "removedBlocks": [],
+      "manualCompletenessVerified": false
+    },
+    {
+      "source": "dezeen",
+      "url": "https://www.dezeen.com/2026/10/04/museum-vonk-studio-marco-vermeulen/",
+      "httpStatus": 200,
+      "fetchTruncated": false,
+      "inputBytes": 398133,
+      "inputSha256": "b148353166ba355fedb7a5d4ecd3d1eacd7483a99323ad18592268901a88da59",
+      "before": {
+        "blocks": 40,
+        "words": 765,
+        "figures": 9,
+        "media": 0,
+        "headings": 1,
+        "paragraphs": 30
+      },
+      "after": {
+        "blocks": 39,
+        "words": 764,
+        "figures": 9,
+        "media": 0,
+        "headings": 0,
+        "paragraphs": 30
+      },
+      "onlyExistingBlocksRetained": true,
+      "allMetadataUnchanged": true,
+      "removedBlocks": [
+        {
+          "type": "h",
+          "textSha256": "c412c6de9a863b0ff1bf20d2faff20c3948ac66f79e87613342701b896bf37e4",
+          "chars": 6,
+          "role": "SVG-only share toolbar heading"
+        }
+      ],
+      "manualCompletenessVerified": false
+    },
+    {
+      "source": "slashfilm",
+      "url": "https://www.slashfilm.com/2276428/behemoth-review-pedro-pascal-tony-gilroy-movie/",
+      "httpStatus": 200,
+      "fetchTruncated": false,
+      "inputBytes": 65624,
+      "inputSha256": "b2c0293e30e82ce1e954266c876d263f1f790f5fd994266fd9b4b73b26a9d40e",
+      "before": {
+        "blocks": 21,
+        "words": 1214,
+        "figures": 4,
+        "media": 0,
+        "headings": 4,
+        "paragraphs": 13
+      },
+      "after": {
+        "blocks": 20,
+        "words": 1197,
+        "figures": 4,
+        "media": 0,
+        "headings": 3,
+        "paragraphs": 13
+      },
+      "onlyExistingBlocksRetained": true,
+      "allMetadataUnchanged": true,
+      "removedBlocks": [
+        {
+          "type": "h",
+          "textSha256": "1fb875e2cd8a7849224c0baf4048bed16e9fdcaa03f07213beab33081d02e095",
+          "chars": 111,
+          "role": "exact alternate metadata headline"
+        }
+      ],
+      "manualCompletenessVerified": false
+    },
+    {
+      "source": "polygon",
+      "url": "https://www.polygon.com/10-perfect-hard-sci-fi-books-that-are-masterpieces-from-the-first-10-pages/",
+      "httpStatus": 200,
+      "fetchTruncated": false,
+      "inputBytes": 303849,
+      "inputSha256": "e9a5225313c885bcd828711b959e318fff22c34f16641d6fff02de206cb6818e",
+      "before": {
+        "blocks": 45,
+        "words": 1979,
+        "figures": 11,
+        "media": 0,
+        "headings": 10,
+        "paragraphs": 24
+      },
+      "after": {
+        "blocks": 45,
+        "words": 1979,
+        "figures": 11,
+        "media": 0,
+        "headings": 10,
+        "paragraphs": 24
+      },
+      "onlyExistingBlocksRetained": true,
+      "allMetadataUnchanged": true,
+      "removedBlocks": [],
+      "manualCompletenessVerified": false
+    },
+    {
+      "source": "collider",
+      "url": "https://collider.com/matt-damon-bourne-trilogy-streaming-netflix-october-2026/",
+      "httpStatus": 200,
+      "fetchTruncated": false,
+      "inputBytes": 384461,
+      "inputSha256": "5ed8941f34c04307eed40f0978f4dae6f35c83ec916fba7fecf4eff77d5a35ee",
+      "before": {
+        "blocks": 44,
+        "words": 1171,
+        "figures": 8,
+        "media": 1,
+        "headings": 4,
+        "paragraphs": 31
+      },
+      "after": {
+        "blocks": 38,
+        "words": 525,
+        "figures": 8,
+        "media": 1,
+        "headings": 4,
+        "paragraphs": 25
+      },
+      "onlyExistingBlocksRetained": true,
+      "allMetadataUnchanged": true,
+      "removedBlocks": [
+        {
+          "type": "p",
+          "textSha256": "d210b327dd695fc461755cb29ba6e0191dc7d7b28521a60ca739e69b0ba4acc9",
+          "chars": 156,
+          "role": "interactive quiz result"
+        },
+        {
+          "type": "p",
+          "textSha256": "e90c08d017418f3c1c41c5556529e676a7cf585ef9fbd60428bef68d4210b867",
+          "chars": 681,
+          "role": "interactive quiz result"
+        },
+        {
+          "type": "p",
+          "textSha256": "529e86d047af5dfcf4b8ea43ec5b87e3d7e3ecd3c58b4df77429c25ef5b1ec5e",
+          "chars": 719,
+          "role": "interactive quiz result"
+        },
+        {
+          "type": "p",
+          "textSha256": "e43a5f9551dbf577909e85525a762c543b41c259fcdc17ba9b10b3d5941b3221",
+          "chars": 793,
+          "role": "interactive quiz result"
+        },
+        {
+          "type": "p",
+          "textSha256": "be0236ad65959b4203ea972bc23e4dc868714586663ebee8096e82035f912418",
+          "chars": 704,
+          "role": "interactive quiz result"
+        },
+        {
+          "type": "p",
+          "textSha256": "4a1d86600e77cdc4dc44948fc4945a490343794a64cbf3de71c35fbc9339649c",
+          "chars": 766,
+          "role": "interactive quiz result"
+        }
+      ],
+      "manualCompletenessVerified": false
+    }
+  ]
+}

@@ -36,10 +36,34 @@
     }
   }
 
-  // The room bar can wrap in a narrow host. Keep fullscreen actions below its
-  // actual height instead of guessing a fixed offset.
-  const readerBar = $first('.bar');
-  if (readerBar) new ResizeObserver(() => root.style.setProperty('--mp-reader-bar-height', `${readerBar.getBoundingClientRect().height}px`)).observe(readerBar);
+  // Controls belong to the full-width shell, outside the scrolling article. Keep
+  // #reader as the content viewport so history, selections and social views share
+  // the same scroll owner in inline cards, preview and expanded host frames.
+  /** @param {...(Node | string)} nodes */
+  function renderReader(...nodes) {
+    const top = nodes.find((node) => node instanceof HTMLElement && node.classList.contains('reader-top'));
+    setReaderControls(top instanceof HTMLElement ? top : null);
+    $('reader').replaceChildren(...nodes.filter((node) => node !== top));
+    const heading = $first('h1', $('reader'));
+    heading?.setAttribute('tabindex', '-1');
+    heading?.focus({ preventScroll: true });
+  }
+
+  /** @param {HTMLElement | null} top */
+  function setReaderControls(top) {
+    if (top) {
+      top.setAttribute('role', 'group');
+      top.setAttribute('aria-label', 'Reader controls');
+    }
+    $('readerControls').replaceChildren(...(top ? [top] : []));
+  }
+
+  // The universal row can wrap: source navigation sticks below its measured edge.
+  const roomBar = $first('.bar');
+  if (roomBar) new ResizeObserver(() => { root.style.setProperty('--mp-bar-height', `${roomBar.getBoundingClientRect().height}px`); }).observe(roomBar);
+
+  // Docs sidebars fit the actual content viewport, even when either toolbar wraps.
+  new ResizeObserver(([entry]) => { root.style.setProperty('--mp-reader-height', `${entry.contentRect.height}px`); }).observe($('reader'));
 
   // Reader blocks (articles, docs pages, note clips) as DOM. Everything is built as text;
   // links are only http(s), opened through the host, or #anchors within the same view.
@@ -71,7 +95,7 @@
     const reader = target.closest('.reader');
     // An inline card owns its scroll area. Scrolling every ancestor can move
     // that area underneath the room bar in the host's iframe.
-    if (reader instanceof HTMLElement && !root.classList.contains('fullscreen')) {
+    if (reader instanceof HTMLElement) {
       reader.scrollTop += target.getBoundingClientRect().top - readerVisibleTop(reader) - 12;
     } else target.scrollIntoView({ block: 'start', behavior: 'auto' });
     target.focus({ preventScroll: true });
@@ -247,7 +271,7 @@
     $('grid').hidden = true;
     const reader = $('reader');
     reader.hidden = false; reader.scrollTop = 0;
-    reader.replaceChildren(...articleNodes(a, null, false));
+    renderReader(...articleNodes(a, null, false));
     setStatus('');
     const body = $first('[data-passage-url]', reader);
     trackReading(a.url, a.title, reader, !(body && applyHandoff(body)));
@@ -263,7 +287,7 @@
       setStatus('');
       $('grid').hidden = true;
       $('reader').hidden = false;
-      $('reader').replaceChildren(readerTop(url, false), el('div', { class: 'error' }, `Reader view isn't available for this page (${errorText(error)}).`));
+      renderReader(readerTop(url, false), el('div', { class: 'error' }, `Reader view isn't available for this page (${errorText(error)}).`));
     }
   }
 
@@ -276,7 +300,7 @@
     // The story grows into the reader's title (where the browser can animate it).
     await transition(() => {
       $('grid').hidden = true; reader.hidden = false; reader.scrollTop = 0; window.scrollTo(0, 0);
-      reader.replaceChildren(readerTop(item.url, true), el('h1', null, item.title), el('div', { class: 'byline' }, 'Unrolling the scroll…'));
+      renderReader(readerTop(item.url, true), el('h1', null, item.title), el('div', { class: 'byline' }, 'Unrolling the scroll…'));
     }, takeZoomSource(), () => $first('h1', reader));
     if (generation !== readerGeneration) return;
     try {
@@ -286,7 +310,7 @@
       // A follow's story reblogs their post; anything else posts the link.
       const nodes = articleNodes(a, portal.title, true, undefined, reblogTarget(item, portal, item.share));
       if (item.share) nodes.splice(3, 0, sharedBy(item, item.share));   // after the title and byline: who passed it to you
-      reader.replaceChildren(...nodes);
+      renderReader(...nodes);
       trackReading(a.url, a.title, reader);
       if (!DEV) {
         const safeTitle = String(a.title).replace(/[\u0000-\u001f\u007f\u2028\u2029"]/g, ' ').slice(0, 160);
@@ -297,7 +321,7 @@
       }
     } catch (error) {
       if (generation !== readerGeneration) return;
-      reader.replaceChildren(readerTop(item.url, true), el('h1', null, item.title), ...(item.share ? [sharedBy(item, item.share)] : []),
+      renderReader(readerTop(item.url, true), el('h1', null, item.title), ...(item.share ? [sharedBy(item, item.share)] : []),
         el('div', { class: 'error' }, `Reader view isn't available for this page (${errorText(error)}).`),
         el('button', { class: 'btn', onclick: () => openLink(item.url) }, 'Open the original'));
     }

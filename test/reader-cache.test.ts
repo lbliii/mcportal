@@ -4,10 +4,11 @@ import { TtlCache } from '../src/lib/cache.ts';
 import { createFixtureFetcher } from '../src/lib/fixture-fetch.ts';
 import { loadArticle } from '../src/sources.ts';
 
-test('reader cache refreshes legacy extractions and reuses structured content across accounts', async () => {
+test('reader cache refreshes legacy and older structured extractions and reuses current content across accounts', async () => {
   const url = 'https://yashgarg.dev/posts/hijacking-ps5-rtmp-stream/';
   const cache = new TtlCache();
   await cache.get(`reader:${url}`, 3600, async () => ({ finalUrl: url, title: 'Old extraction', blocks: [], wordCount: 0 }));
+  await cache.get(`reader:v2:${url}`, 3600, async () => ({ finalUrl: url, title: 'Old extraction', blocks: [{ type: 'p', text: 'Quiz results' }], wordCount: 2 }));
   const calls: string[] = [];
   const fetcher = createFixtureFetcher(calls);
   const first = await loadArticle(url, { cache, fetcher });

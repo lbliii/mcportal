@@ -61,9 +61,8 @@ export const HANDOFF_TOOLS: ToolDef[] = [
       try {
         page = await readPage(handoff, ctx);
       } catch (error) {
-        return toolFailure(error, `Could not open handoff ${handoff.code}: `);
+        page = toolFailure(error, `Could not open handoff ${handoff.code}: `);
       }
-      if (!('view' in page)) return page;   // a refusal from the reader or the docs tools
       await ctx.handoffs.markOpened(ctx.userId, handoff.code);
       const others = waiting.filter((h) => h.code !== handoff.code).map((h) => h.code);
       const text = [
@@ -71,10 +70,10 @@ export const HANDOFF_TOOLS: ToolDef[] = [
         handoff.passage || handoff.anchor?.heading
           ? untrusted(handoff.url, [handoff.anchor?.heading ? `heading: ${handoff.anchor.heading}` : '', handoff.passage ? `the passage they selected:\n${handoff.passage}` : ''].filter(Boolean).join('\n'))
           : '',
-        page.text,
+        'view' in page ? page.text : 'The live page could not be loaded. Only the stored handoff above is available; do not infer the rest of the page. Retry open_handoff with the same code or open the original URL.',
         others.length ? `Other handoffs waiting: ${others.join(', ')}.` : '',
       ].filter(Boolean).join('\n\n');
-      return ok(text, { ...page.view, handoff: { ...handoff, openedAt: new Date().toISOString() } } as ToolResults['open_handoff']);
+      return ok(text, { ...('view' in page ? page.view : { unavailable: true }), handoff: { ...handoff, openedAt: new Date().toISOString() } } as ToolResults['open_handoff']);
     },
   },
   {
