@@ -41,6 +41,8 @@ The [milestones](https://github.com/lbliii/mcportal/milestones) describe four de
 
 These are outcome groups, not package versions or a promise that all work happens serially. Use issue dependencies for real ordering. Dates and individual assignees remain unset until there is a commitment; claiming an issue is an explicit ownership action.
 
+The [planning flywheel](planning-flywheel.md) keeps one to two prepared outcomes ahead of the earliest open managed milestone. Completion triggers an evidence review, and the coordinator replenishes the buffer through the repo's research skill. Managed readiness records distinguish researched plans from drafts; empty milestones do not count.
+
 ## Labels
 
 Keep existing repository labels. The added taxonomy has three independent dimensions plus triage:

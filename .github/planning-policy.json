@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "repository": "lbliii/mcportal",
+  "minimumAhead": 1,
+  "targetAhead": 2,
+  "readyMaxAgeDays": 45,
+  "requestAuthors": ["github-actions[bot]", "lbliii"]
+}

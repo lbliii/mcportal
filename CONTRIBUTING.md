@@ -102,6 +102,8 @@ Use [GitHub Issues](https://github.com/lbliii/mcportal/issues) for tasks and res
 
 The issue chooser includes bug, feature, task, research and epic forms. Use the PR template to describe the resulting behavior and actual validation; link a parent epic without closing it unless its whole outcome is complete.
 
+After completing a milestone or changing its scope, run `npm run planning:check`. The [planning flywheel](docs/how-to/planning-flywheel.md) explains the automatic research queue and how we keep the next two milestones prepared.
+
 ## Before you open a pull request
 
 - `npm run check` passes.
