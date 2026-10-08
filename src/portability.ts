@@ -31,6 +31,8 @@ import type { ArticleBlock } from './types.ts';
 export const EXPORT_FORMATS = ['mcportal', 'bookmarks', 'clips', 'opml'] as const;
 export type ExportFormat = (typeof EXPORT_FORMATS)[number];
 export const EXPORT_VERSION = 3;
+/** Full exports can include 50 MB of clips, collections, watches and JSON overhead. */
+export const EXPORT_MAX_BYTES = 80 * 1024 * 1024;
 
 export interface ExportFile {
   filename: string;

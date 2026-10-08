@@ -33,7 +33,7 @@ import { boundaryOf, parseMultipart } from './lib/multipart.ts';
 import { escapeHtml, PAGE_CSP, readBody, readForm, redirect, sameOrigin, sendHtml } from './lib/web.ts';
 import { page } from './page.ts';
 import { PageSessions, type PageSession } from './page-sessions.ts';
-import { buildExport, describeImport, EXPORT_FORMATS, importExport, parseExport, type ExportFile, type ExportFormat } from './portability.ts';
+import { buildExport, describeImport, EXPORT_MAX_BYTES, EXPORT_FORMATS, importExport, parseExport, type ExportFile, type ExportFormat } from './portability.ts';
 import type { PublicProfiles } from './public-profiles.ts';
 import { SpaceLinks } from './space-links.ts';
 import type { Social } from './social.ts';
@@ -49,7 +49,7 @@ const DOWNLOAD_MS = 15 * 60 * 1000;
 const MAX_ENTRIES = 500;
 const MAX_FORM = 2048;
 /** An export holds 50 MB of clips and up to 12.8 MB of collections; allow JSON overhead. */
-export const MAX_UPLOAD = 80 * 1024 * 1024;
+export const MAX_UPLOAD = EXPORT_MAX_BYTES;
 
 export interface AccountDeps {
   trustProxy?: boolean | undefined;

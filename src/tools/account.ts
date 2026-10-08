@@ -10,7 +10,7 @@ import { homedir } from 'node:os';
 import { SPACE_INPUT } from '../space-input.ts';
 import type { PublicProfileInput } from '../public-profiles.ts';
 import { clean } from '../lib/text.ts';
-import { describeImport, EXPORT_FORMATS, importExport, parseExport, type ExportFormat } from '../portability.ts';
+import { describeImport, EXPORT_MAX_BYTES, EXPORT_FORMATS, importExport, parseExport, type ExportFormat } from '../portability.ts';
 import { SPACE_SETTINGS_SCHEMA, publicSpaceProfile, MAX_FEATURED, suggestHandle, type PublicProfile } from '../public-profiles.ts';
 import type { ToolResults } from './results.ts';
 import { describeIdentity, HOSTED_ONLY, identityOf, socialActive, socialEntry, ok, toolError, toolFailure, untrusted, type ToolDef } from './kit.ts';
@@ -173,7 +173,7 @@ export const ACCOUNT_TOOLS: ToolDef[] = [
         if (!/\.json$/i.test(file)) return toolError('path must be a .json MCPortal export file.');
         const info = await stat(file).catch(() => undefined);
         if (!info?.isFile()) return toolError(`No file at ${clean(file, 200)}.`, 'not_found');
-        if (info.size > 60 * 1024 * 1024) return toolError('That file is over 60 MB; it isn\'t an MCPortal export.');
+        if (info.size > EXPORT_MAX_BYTES) return toolError('That file is over 80 MB; it isn\'t an MCPortal export.');
         text = await readFile(file, 'utf8');
       } else if (ctx.uploadLink) {
         const link = ctx.uploadLink();

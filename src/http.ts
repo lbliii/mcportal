@@ -334,7 +334,7 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
         text = (await readBody(req, MAX_UPLOAD)).toString('utf8');
       } catch (error) {
         const tooLarge = errorCode(error) === 'limit_exceeded';
-        return json(tooLarge ? 413 : 400, { error: tooLarge ? 'too_large' : 'bad_request', error_description: tooLarge ? 'Over 60 MB' : 'Unreadable body' }, tooLarge ? { connection: 'close' } : {});
+        return json(tooLarge ? 413 : 400, { error: tooLarge ? 'too_large' : 'bad_request', error_description: tooLarge ? 'Over 80 MB' : 'Unreadable body' }, tooLarge ? { connection: 'close' } : {});
       }
       try {
         const result = await importExport(parseExport(text), userId, { store: deps.store, watchStore, reading, clips, collections, experiences, publicProfiles: deps.publicProfiles });
