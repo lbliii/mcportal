@@ -1,3 +1,4 @@
+import { COMPATIBILITY_PATH, compatibilityMetadata } from './link/compatibility.ts';
 /**
  * Streamable HTTP transport + OAuth + preview, as a testable app factory.
  *
@@ -366,6 +367,9 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
     }
     if (!hostname || !config.allowedHosts.includes(hostname)) {
       return sendError(res, 421, 'unknown_host', 'Unknown host; set MCPORTAL_PUBLIC_URL or MCPORTAL_ALLOWED_HOSTS');
+    }
+    if (url.pathname === COMPATIBILITY_PATH && req.method === 'GET') {
+      return send(res, 200, JSON.stringify(compatibilityMetadata(config.publicUrl)), 'application/json');
     }
     const origin = req.headers.origin;
     if (origin && (url.pathname === '/mcp' || url.pathname.startsWith('/api/'))) {
