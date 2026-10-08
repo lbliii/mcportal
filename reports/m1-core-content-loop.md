@@ -2,7 +2,7 @@
 
 Date: October 8, 2026. Baseline: main `75e8e240f9c7f157ef290efd15b5caadc4a73941` (v0.11.0). Candidate branch: `codex/m1-core-content-loop`, incorporating reader integration `c9184c992d05c9e90a1d2b4b7a96a5d5b941066a` and the repairs described below.
 
-The engineering and authorized proxy-study work is ready for review. **M1 is not yet fully certified:** actual-host validation in #114 remains open. On October 8 the user explicitly requested skipping VoiceOver testing; spoken screen-reader output remains unverified and is not claimed. The remaining #115 native non-default passage-choice check passed in Chrome Guest with VoiceOver off; #115 is ready under that explicit testing skip. Do not close #104 or the milestone on the strength of fixtures, accessibility-tree inspection, or the successful connected text result.
+M1 acceptance evidence is complete for integration through [PR #139](https://github.com/lbliii/mcportal/pull/139), with the user-authorized agent-proxy substitution and VoiceOver testing skip. The actual Codex/local-identity loop now includes passage selection, clipping, direct agent receipt, separate-chat retrieval, fresh-view restoration and exact source-block return. Other hosts and broader sign-in certification remain explicitly untested. Spoken screen-reader output remains unverified and is not claimed.
 
 The user explicitly requested agent user proxies in place of recruiting participants and running an elapsed one-week trial. Twelve role briefs (six developers, six researchers) were exercised in two balanced rounds; four original roles returned in logical day 2/day 7 simulations. Those are synthetic scenarios run by three study agents, not twelve humans or independent model samples. Actual tool results, browser behavior, and fresh-process storage reads are distinguished from scripted choices and simulated interpretations in each report. No spontaneous adoption, human preference, time saving, screen-reader speech, or product-market-fit claim follows.
 
@@ -14,11 +14,11 @@ The user explicitly requested agent user proxies in place of recruiting particip
 | [#111 formative rounds](https://github.com/lbliii/mcportal/issues/111) | Both cohorts completed two rounds; failures ranked below, repaired and retested | Ready under the same substitution |
 | [#112 field use](https://github.com/lbliii/mcportal/issues/112) | Four returning roles; eight logical day 2/day 7 retrieval checkpoints; explicit prompted/scripted distinctions and a seven-day expiry boundary | Ready only as the authorized simulation, not an elapsed human trial |
 | [#113 reader integration](https://github.com/lbliii/mcportal/issues/113) | Combined candidate reconciled with current tabs, Recall, find, comfort and navigation; PR disposition below | Merge this candidate once; retire overlapping PRs as part of that integration |
-| [#114 actual hosts](https://github.com/lbliii/mcportal/issues/114) | Actual Codex candidate UI exercised clipping, Recall, source links, semantic position restoration, clipboard fallback and fresh-clip restoration; separate-chat handoff/clip retrieval passed | **Open:** rendered handoff return location and fresh-resource icon verification remain; direct agent receipt now verified and broader host limits recorded |
+| [#114 actual hosts](https://github.com/lbliii/mcportal/issues/114) | Actual Codex candidate UI exercised clipping, Recall, source links, semantic position restoration, clipboard fallback and fresh-clip restoration; separate-chat handoff/clip retrieval passed | Ready: direct agent receipt, reopened handoff block 1 and fresh-resource icon repair verified; broader host limits recorded |
 | [#115 accessibility](https://github.com/lbliii/mcportal/issues/115) | Four reproduced keyboard blockers fixed; native keyboard including non-default passage choice, reflow, forced colors, reduced motion and AX checks recorded | Ready with this candidate under the user's explicit VoiceOver testing skip; no spoken-output or full-conformance claim |
 | [#116 source recovery](https://github.com/lbliii/mcportal/issues/116) | Latest-request previews, partial import details, safe retry and refresh recovery implemented and tested | Ready with this candidate |
 | [#103 validation epic](https://github.com/lbliii/mcportal/issues/103) | Bounded proxy evidence and decision recorded | Close with #110–#112 only while retaining the explicit simulation scope |
-| [#104 reading epic](https://github.com/lbliii/mcportal/issues/104) | Engineering fixes complete in candidate; #115 ready under the explicit testing skip | Keep open until #114 is validated and this candidate is integrated |
+| [#104 reading epic](https://github.com/lbliii/mcportal/issues/104) | Engineering fixes and declared Codex core loop verified; #115 ready under the explicit testing skip | Close with this integration and child-issue disposition |
 
 ## Reader PR integration
 
@@ -31,7 +31,7 @@ Use the combined branch once. The component work is already combined in #60; mer
 | [#58 extraction](https://github.com/lbliii/mcportal/pull/58) | `d5fa9f8` | Included through #60; no separate merge |
 | [#59 media](https://github.com/lbliii/mcportal/pull/59) | `39e9584` | Included through #60; no separate merge |
 
-All four old PRs remain open while this candidate is reviewed. Close them as superseded only when this integration is accepted. Extraction removes duplicate metadata/widgets while retaining authored content; media requests and cache bytes are bounded, failures can retry, and detached readers cannot receive old media writes. Reader controls sit outside the content scroll area and retain current reading tabs, find, comfort, source outline, docs navigation and passage restoration.
+PR #139 is the single integration route. Retire the four older PRs as superseded when it merges; their commits are already included, so no separate integration is needed. Extraction removes duplicate metadata/widgets while retaining authored content; media requests and cache bytes are bounded, failures can retry, and detached readers cannot receive old media writes. Reader controls sit outside the content scroll area and retain current reading tabs, find, comfort, source outline, docs navigation and passage restoration.
 
 ## Ranked findings and repairs
 
@@ -69,19 +69,19 @@ The final `npm run check` passed: **576 tests, 550 passed, 0 failed, 26 skipped*
 
 Coverage includes 320/360-pixel layouts with 200% root text, wide and expanded frames, toolbar/content scroll ownership, docs internal links/outline, literal find and comfort, source/media failures, passage fencing, context-only/message-only fallbacks, denied links and clipboard, reading return position, retained quote relocation and ambiguity, stale source requests, import partition/concurrency, and unavailable-handoff retry. Root text enlargement is not OS magnification or a claim about every browser zoom mode.
 
-## Actual-host evidence and remaining checklist
+## Actual-host evidence and certification limits
 
 The [Codex host validation report](m1-host-validation.md) records the October 8 candidate walkthrough and screenshots. Codex version `26.1002.52244`, build `13536`, was identified from installed app metadata. The isolated local `mcportal-m1` connection served the candidate in an expanded MCP Apps view at 949 × 852 CSS pixels. Public docs and RFC 8259 supplied all test content; the user's normal room and public deployment were not changed.
 
 The actual candidate chooser exposed the source and exact paragraph. Clip quote saved it, Send to new chat created its handoff, and a separate real chat retrieved both with matching source, quotation and block locator. Docs navigation focused the new heading; the original-source action opened the corresponding GitHub page. Recall preserved its query and return focus. The reader restored its saved semantic block after return. Clipboard copying fell back to selected text with useful feedback. After the expanded panel closed, a fresh Get clip view restored the retained quotation independently of the old iframe.
 
-Ask about this delivered the fixed chat message and exact fenced paragraph to a subsequent model turn; the received source URL, title and structured passage matched the chooser and retained clip. The reopened handoff's rendered return location also remains pending. The fresh-clip check revealed an oversized Share icon, repaired by applying the existing icon token to text-button icons. The follow-up type/design checks and 28 existing passage, reader and navigation tests passed; visual verification in a fresh resource remains pending.
+Ask about this delivered the fixed chat message and exact fenced paragraph to a subsequent model turn; the received source URL, title and structured passage matched the chooser and retained clip. The reopened handoff displayed the retained quote and returned block 1 to 15.8 pixels below the reader top. The fresh-clip check revealed an oversized Share icon, repaired by applying the existing icon token to text-button icons. The follow-up type/design checks and 28 existing passage, reader and navigation tests passed. A fresh host resource verified the repaired 16-pixel icon and normal button height.
 
 | Environment | Evidence from this run | Status |
 | --- | --- | --- |
 | Local Chrome fixture MCP host | UI/render, capability combinations, source-scope payloads, denied-action fallbacks, display changes and persistence | Automated coverage only |
 | Codex with public MCPortal | Public article text/structured result and expanded reader DOM/layout | Older UI; excluded from candidate certification |
-| Codex with local `mcportal-m1` | Actual candidate UI flow, fresh retained clip, semantic return position, separate-chat handoff/clip retrieval and useful fenced text | Local test identity; direct agent receipt verified; final handoff-view check pending |
+| Codex with local `mcportal-m1` | Actual candidate UI flow, fresh retained clip, semantic return position, separate-chat handoff/clip retrieval and useful fenced text | Core loop verified with local test identity, direct agent receipt and fresh handoff-view restoration |
 | Claude desktop, Claude web/mobile, Claude Code, ChatGPT | No current candidate walkthrough | Untested for this candidate |
 | Screen reader | Browser AX semantics and native keyboard paths | Spoken output explicitly skipped |
 
