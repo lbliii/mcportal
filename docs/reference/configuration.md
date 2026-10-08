@@ -66,6 +66,7 @@ Set GitHub OAuth, a static token, or both. With neither, the server runs only on
 | `MCPORTAL_DATA_DIR` | `~/.mcportal` (`/data` in the Docker image) | Folder for file storage. See [data](data.md) | both |
 | `DATABASE_URL` | none | Postgres connection string. When set, the HTTP server stores everything in Postgres, importing any files from the data folder once. Stdio ignores it. On Railway: `${{Postgres.DATABASE_URL}}` | hosted |
 | `GITHUB_TOKEN` | none | GitHub token for GitHub portals: about 5,000 API requests an hour instead of about 60. Needs no scopes | both |
+| `TICKETMASTER_API_KEY` | none | Enables verified artist lookup and event checks for reading watches. Calendar watches work without it. A linked computer uses the hosted server's key | both |
 | `MCPORTAL_HOSTED_URL` | `https://mcportal.lol` | The hosted MCPortal a local one signs in to with `link_account`. Point it at your own server | local |
 | `MCPORTAL_FIXTURES` | off | `1` serves canned data from `test/fixtures` instead of the network, for offline demos | both |
 

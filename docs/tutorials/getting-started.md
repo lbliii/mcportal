@@ -111,7 +111,9 @@ Your agent gives you a link. Open it on this computer and sign in with GitHub. Y
 
 Anyone with a GitHub account can sign in to the hosted service.
 
-Signed in, you get a Space: a public page of what you choose to share. Try:
+Signed in, claim a handle to create your Space: a page of what you choose to share. Choose a paperback, magazine or patch and a cover in its print shop. A new Space is public by default, with a web page and RSS feed; uncheck **Public Space** if you want it to stay within signed-in MCPortal. Discovery listing is a separate, optional choice.
+
+Then try:
 
 ```text
 share the article I saved, with a note: the second half is the good part
@@ -125,3 +127,6 @@ Follow other readers and their posts appear in your room. Reblog one with your o
 - [Tool reference](../reference/tools.md): everything your agent can do with MCPortal.
 - [Reading](../explanation/reading.md): how reader view, highlights and clips work.
 - [Social](../explanation/social.md): Spaces, shares and follows.
+- [Customize your Space](../how-to/customize-space.md): cover, pinned post, audiences, web visibility and discovery.
+- [Organize reading](../how-to/organize-reading.md): Recall, desks, comparisons, trails and catch-up, currently on `main` under Unreleased.
+- [Watch reading and events](../how-to/watch-reading.md) and [Follow stores](../how-to/follow-stores.md): Changes, Upcoming and Shop, currently on `main` under Unreleased.

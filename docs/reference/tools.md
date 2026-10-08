@@ -2,14 +2,7 @@
 
 Every tool MCPortal offers your agent, grouped by area. The registry is [`src/tools/index.ts`](../../src/tools/index.ts); each area has its own module beside it. Tool descriptions in the code are what the model reads; this page summarizes them.
 
-## Store follows
-
-| Tool | Hints | What it does | Inputs |
-|---|---|---|---|
-| `watch` | `OW` | Preview a supported Shopify catalogue without writing; confirm the user’s chosen preview to follow it and add Shop. Checks happen on demand. | `kind*` (`store`), `url`, `scope` (`collection`, `salesOnly`), or `select` |
-| `unwatch` | `D` | Remove a follow or pause/resume it. Saved links stay saved. | `id*`, `paused` |
-
-Shop is the private `watches` source, created by confirmation. Use `open_room` for watch IDs and `refresh_portal` for an explicit check. [Following stores](../how-to/follow-stores.md) lists coverage and limits.
+This reference follows `main`; reading collections, reading watches, catch-up, store follows and automatic Space sections are currently [Unreleased](../../CHANGELOG.md#unreleased).
 
 ## Reading the tables
 
@@ -30,7 +23,7 @@ Shop is the private `watches` source, created by confirmation. Use `open_room` f
 |---|---|---|---|
 | `open_room` | `RO` `OW` | Opens the room: every portal in the user's layout, with what's new and each portal's id. Shows the welcome for a new user. | `setup` |
 | `build_room` | `D` | Builds the room from up to 4 starter packs. Replaces the layout; saved items stay. | `packs*`, `layout` |
-| `arrange_room` | — | Moves portals, sets column widths, retitles or reconfigures portals, renames the room, switches layout or where stories open. Only what you name changes. | `move`, `width`, `retitle`, `configure`, `name`, `layout`, `openIn` |
+| `arrange_room` | — | Moves portals, sets column widths, retitles or reconfigures portals, renames the room, switches layout, portal presentation or where stories open. Only what you name changes. | `move`, `width`, `retitle`, `configure`, `name`, `layout`, `openIn`, `view` |
 | `remove_portal` | `D` | Removes portals by id or title. Saved items and clips stay. | `portals*` |
 | `pin_portal` | — | Shows results the agent fetched with another tool (Jira, Slack, a database) as a portal, or refreshes one. MCPortal never contacts that tool. | `items*`, `portalId`, `title`, `from`, `recipe`, `column` |
 | `list_new_items` | `RO` `OW` | Lists what the user hasn't seen, each with a ref, plus taste signals for ranking. | `portals` |
@@ -50,6 +43,8 @@ Layouts are `columns`, `shelves`, `river`, `catalogue` (compact illustrated rows
 
 Source types: `hn`, `rss`, `github`, `docs`, `saved`, `clips`, `following`, `lobby`. Pinned portals come only from `pin_portal`, and the People portal only from `suggest_people`.
 
+Shop (`watches`) is created by a confirmed store follow. Reading watches use the account-owned `changes` and `upcoming` sources. These features have their own tools below.
+
 ## Reading
 
 | Tool | Hints | What it does | Inputs |
@@ -57,6 +52,33 @@ Source types: `hn`, `rss`, `github`, `docs`, `saved`, `clips`, `following`, `lob
 | `read_article` | `RO` `OW` | Opens a web page in reader view and shows it as a card. | `url*` |
 | `list_reading` | `RO` | Lists pages the user opened and hasn't finished, newest first. | `unfinished`, `limit` |
 | `open_handoff` | `RO` `OW` | Opens a page the user sent from the reader to a new chat ("Open MCPortal handoff k7q2xm"). Without a code, opens the newest unopened one. | `code` |
+
+## Reading collections and watches
+
+| Tool | Hints | What it does | Inputs |
+|---|---|---|---|
+| `search_library` | `RO` | Opens Recall Shelf and searches saved links, retained clip text and reading history without fetching pages. | `query`, `kind`, `site`, `tag`, `status`, `limit`, `offset` |
+| `open_collection` | `RO` `OW` | Opens a private desk, kept comparison or trail with evidence and live sources; omit the id to list collections. | `id`, `refresh` |
+| `update_collection` | `D` | Creates or edits a collection, its entries, live portals, trail progress or a cited agent orientation. Removal deletes membership only. | `action*`, `id`, `kind`, `title`, `purpose`, `entries`, `livePortals`, `refs`, `completed`, `skipped`, `orientation` |
+| `show_comparison` | `RO` | Shows two or three sources beside an explicitly supplied agent interpretation with validated citations. Temporary until kept. | `question*`, `sources*`, `interpretation*` |
+| `watch_reading` | `D` `OW` | Manages page/release/calendar/artist watches; lists or opens dated findings, checks, pauses, removes or acknowledges them, or resolves an artist identity. | `action*`, `id`, `kind`, `title`, `url`, `repo`, `artistId`, `city`, `country`, `timezone`, `paused`, `query`, `findingIds` |
+
+`search_library.kind` accepts `saved`, `reading` or a clip kind. Reading `status` is `seen`, `opened` or `read`. Results page with `limit` (1–50) and `offset`.
+
+Collection kinds are `desk`, `comparison` and `trail`. Changes use `create`, `edit`, `add`, `replace`, `remove`, `reorder`, `complete`, `orientation` or `delete`. Entries use `clip:ID` or `url:URL` refs. An orientation needs `text` and `refs` naming current entries; a reorder names every entry. Comparison sources each need `ref` and `title`; `interpretation` needs `text` and citations to those sources.
+
+Reading watch actions are `list`, `add`, `pause`, `delete`, `check`, `acknowledge`, `find_artist` and `open`. Kinds are `page`, `releases`, `calendar` and `artist`. Artist follows require a verified `artistId` returned by `find_artist`, plus city and a two-letter country code. Artist lookup needs `TICKETMASTER_API_KEY`; calendar watches work without it.
+
+`arrange_room.view` takes `{ portal, view }` entries. Views are `default`, `list`, `cards`, `quotes`, `gallery` and `changelog`; unsupported source preferences fall back visibly. See [Organize reading](../how-to/organize-reading.md), [Watch reading and events](../how-to/watch-reading.md), and [Reading experiences](../explanation/reading-experiences.md) for behavior and limits.
+
+## Store follows
+
+| Tool | Hints | What it does | Inputs |
+|---|---|---|---|
+| `watch` | `OW` | Previews a supported Shopify catalogue without writing; confirms the user's selected preview to follow it and add Shop. Checks happen on demand. | `kind*` (`store`), `url`, `scope` (`collection`, `salesOnly`), or `select` |
+| `unwatch` | `D` | Removes a follow or pauses/resumes it. Saved links stay saved. | `id*`, `paused` |
+
+Shop is the private `watches` source, created by confirmation. Use `open_room` for watch IDs and `refresh_portal` for an explicit check. [Following stores](../how-to/follow-stores.md) lists coverage and limits. Its on-demand checks are separate from the `watch_reading` worker.
 
 ## Docs
 
@@ -70,14 +92,14 @@ Source types: `hn`, `rss`, `github`, `docs`, `saved`, `clips`, `following`, `lob
 
 | Tool | Hints | What it does | Inputs |
 |---|---|---|---|
-| `save_item` | — | Saves a link for later with an optional source description and thumbnail, or edits a saved link. The personal note stays separate. The first save adds a Saved portal. | `url*`, `title`, `note`, `source`, `description`, `imageUrl` |
+| `save_item` | — | Saves a link for later with an optional source description, thumbnail or validated event metadata, or edits a saved link. The personal note stays separate. The first save adds a Saved portal. | `url*`, `title`, `note`, `source`, `description`, `imageUrl`, `event` |
 | `remove_saved` | `D` | Removes one saved link. | `url*` |
 
 ## Clips
 
 | Tool | Hints | What it does | Inputs |
 |---|---|---|---|
-| `clip` | — | Keeps a quote, exchange, note, table, image or link from the chat, verbatim. The first clip adds a Clips portal. | `kind*`, `content`, `turns`, `title`, `note`, `tags`, `source`, `attribution` |
+| `clip` | — | Keeps a quote, exchange, note, table, image or link from the chat, verbatim. Article sources can include a passage locator. The first clip adds a Clips portal. | `kind*`, `content`, `turns`, `title`, `note`, `tags`, `source`, `attribution` |
 | `search_clips` | `RO` | Finds clips by words, kind or tag. Returns summaries. | `query`, `kind`, `tag`, `limit`, `before` |
 | `get_clip` | `RO` | Shows one clip in full, as a card. | `id*` |
 | `update_clip` | — | Changes a clip's title, note or tags. Content can't change. | `id*`, `title`, `note`, `tags` |
@@ -105,6 +127,8 @@ Hosted servers only. A local MCPortal that isn't signed in has no social layer, 
 | `find_people` | `RO` | Suggests listed people who share the user's topics (`about`), sites (`sources`) or taste (`like`); with none, their room. Each comes with reasons drawn only from what they made public. | `about`, `sources`, `like` |
 | `suggest_people` | — | Keeps picks from `find_people` in the People portal, best first, each with a one-line reason. Suggestions last 30 days. | `picks*` |
 | `report` | — | Reports a share or person to the admins with a reason. | `reason*`, `shareId`, `handle` |
+
+`set_public_profile` also accepts `showSources`, `showPeople`, `sourceCuration` and `peopleCuration`. The first two independently opt into automatic sections after an owner preview in `open_space`. Each curation object takes optional `pinned`, `order` and `hidden` arrays of opaque keys from that preview. They never change subscriptions or follows. Automatic sections currently appear only to signed-in Space visitors; web pages keep explicitly published recommendations. See [Customize your Space](../how-to/customize-space.md#show-sources-and-people).
 
 Social tools appear in stages so they cost the model nothing until used:
 
@@ -136,6 +160,7 @@ The room UI calls these through the MCP Apps bridge. They are declared with `_me
 | `record_reading` | Records that a URL was seen, opened or read, with progress |
 | `get_reading` | Returns where the user left off in a URL |
 | `pass_person` | The People portal's Not for me: removes the suggestion, and `find_people` remembers the pass for 90 days |
+| `catch_up` | Captures and resumes a finite set of unseen stories. Actions: `open`, `start`, `skip`, `finish`, `end`; inputs include `count`, `portalIds`, `sessionId` and `index`. Finishing/ending marks only the captured set seen, never articles read |
 
 ## Usage cost
 
@@ -144,9 +169,10 @@ On a hosted server each call spends units from the per-user budget ([`MCPORTAL_L
 | Units | Tools |
 |---|---|
 | 20 | `import_opml`, `import_portal` |
+| 8 | `watch` |
 | 5 | `find_source`, `export_data` |
 | 3 | `open_room`, `list_new_items`, `open_handoff` |
-| 2 | `read_source`, `add_portal`, `refresh_portal`, `read_article`, `open_docs`, `read_doc_page`, `find_people` |
+| 2 | `read_source`, `add_portal`, `refresh_portal`, `read_article`, `open_docs`, `read_doc_page`, `find_people`, `open_collection`, `watch_reading`, `catch_up` |
 | 1 to 4 | `get_thumbnails` (1, plus 1 per 8 URLs) |
 | 1 | Everything else |
 
@@ -163,20 +189,13 @@ On a hosted server each call spends units from the per-user budget ([`MCPORTAL_L
 | Clip image | 500 KB |
 | Clip table | 50 columns × 500 rows |
 | Clips per user | 1,000, or 50 MB |
+| Private collections | 50 per account; 200 entries, 8 live portals and 256 KB each |
+| Comparison sources | 2–3 |
+| Catch-up | 30 captured stories |
+| Reading watches | 20 per account; 40 findings retained for 30 days |
+| Store follows | 20 per account; 200 product observations and 30 findings per follow |
+| Full import upload | 80 MB |
 
 Cache lifetimes: Hacker News 2 minutes, GitHub 5 minutes, feeds 10 minutes, reader pages 1 hour, docs indexes 1 day. Saved, clips, pinned and Following portals are never cached.
 
 Space inks: `atomic`, `space-age`, `pulp`, `olive-drab`, `pink-moon`, `mars`, `mission`, `harbor`. Motifs: `arches`, `orbits`, `portal`, `gravity`, `doorway`. Formats: `paperback`, `magazine`, `patch`. `reroll: true` changes the stored seed only. `frequency` is up to four topics of 24 characters; `travelers` up to six listed handles. An empty `pinnedShareId` unpins. `hiddenStamps` accepts `charter`, `brought`, `signal`, `volume`. The agent must get approval for exact bio and topic wording. `public: false` withdraws the web page and feed immediately, but cannot recall copies or feed-reader caches. `listed` controls discovery separately.
-
-## Reading experiences
-
-| Tool | Behavior | Main arguments |
-|---|---|---|
-| `search_library` | Search saved links, retained clips and reading history | `query`, kind/site/tag/status filters, pagination |
-| `open_collection` | Open or list private desks, comparisons and trails | `id` |
-| `update_collection` | Keep and arrange evidence, notes, progress and a cited orientation | `action`, `id`, entries and evidence `refs` |
-| `show_comparison` | Show two or three sources beside explicit agent interpretation | sources, question, interpretation and citations |
-| `watch_reading` | Manage page/release/calendar/artist reading watches and findings | `action`, `kind`, address or confirmed artist, `id` |
-| `catch_up` (app-only) | Capture, resume, finish/skip and explicitly end a finite session | `action`, count, portal IDs, session ID and index |
-
-`arrange_room.view` chooses a source-supported portal presentation. `save_item.event` retains validated public event metadata. [Behavior, evidence and limits](../explanation/reading-experiences.md).

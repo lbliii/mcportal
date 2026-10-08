@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import { PAGE_CSP } from '../src/lib/web.ts';
+import { installationPrompt } from '../src/installation.ts';
 import { handshake, page as webPage } from '../src/page.ts';
 import { LinkFile } from '../src/link/link-file.ts';
 import { startSignIn } from '../src/link/signin.ts';
@@ -73,6 +74,33 @@ async function inspect(page: Page): Promise<void> {
   })()`);
   assert.ok(ratios.every((r) => r >= 4.5), `readable card text: ${ratios}`);
 }
+
+test('browser: setup prompt can be selected and copied without scripts, including narrow and dark views', { skip }, async () => {
+  // Characters that could close the textarea must remain plain prompt text.
+  const publicUrl = 'https://reader.example/</textarea><script>hostile()</script>';
+  const app = await startApp({ publicUrl, staticToken: 'fixture' });
+  const page = await Page.open(chrome!);
+  try {
+    for (const width of [1280, 320]) {
+      await page.send('Emulation.setDeviceMetricsOverride', { width, height: 984, deviceScaleFactor: 1, mobile: false });
+      await page.goto(`${app.base}/?viewport=${width}#get-it`);
+      await page.waitFor(`document.querySelector('#install-prompt')`, 'setup prompt');
+      assert.equal(await page.eval(`document.querySelectorAll('script').length`), 0);
+      assert.equal(await page.eval(`document.querySelector('#install-prompt').value`), installationPrompt(publicUrl), 'HTML metacharacters survive as text');
+      assert.ok(await page.eval(`document.querySelector('#install-prompt').readOnly`));
+      assert.equal(await page.eval(`document.querySelector('label[for="install-prompt"]').control.id`), 'install-prompt');
+      await page.eval(`document.querySelector('#install-prompt').focus()`);
+      await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'a', code: 'KeyA', modifiers: process.platform === 'darwin' ? 4 : 2, windowsVirtualKeyCode: 65, commands: ['selectAll'] });
+      await page.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'a', code: 'KeyA', modifiers: process.platform === 'darwin' ? 4 : 2, windowsVirtualKeyCode: 65 });
+      assert.ok(await page.eval(`(() => { const p=document.querySelector('#install-prompt');return document.activeElement===p && p.selectionStart===0 && p.selectionEnd===p.value.length; })()`), 'keyboard select-all selects the complete prompt');
+      assert.ok(await page.eval(`document.documentElement.scrollWidth <= innerWidth`), 'setup fits a narrow viewport');
+      assert.ok(await page.eval(`document.querySelector('#install-prompt').getBoundingClientRect().width <= innerWidth`));
+    }
+    await page.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'dark' }] });
+    assert.ok(await page.eval(`document.querySelector('#install-prompt').getBoundingClientRect().height >= 180`));
+    assert.deepEqual(page.problems, []);
+  } finally { await page.close(); await app.close(); }
+});
 
 test('browser: consent and local callback success/denial keep assets, controls and diagnostics at narrow enlarged text and dark mode', { skip }, async () => {
   const app = await startApp({ github: { clientId: 'fixture', clientSecret: 'fixture' } });
