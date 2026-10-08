@@ -26,7 +26,8 @@
     "footprint": "node scripts/footprint.ts",
     "eval:tools": "node scripts/eval-tools.ts",
     "release": "node scripts/release.ts",
-    "support:check": "node scripts/check-support.ts"
+    "support:check": "node scripts/check-support.ts",
+    "planning:check": "node scripts/planning-horizon.ts"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.131.0",

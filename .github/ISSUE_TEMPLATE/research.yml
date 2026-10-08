@@ -1,0 +1,32 @@
+name: Research or design decision
+description: Resolve uncertainty with evidence and a recorded decision.
+labels: ["type:research", needs-triage]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Decision to make
+      description: What uncertainty blocks progress, for whom, and why does it matter?
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Existing evidence and hypotheses
+      description: Link current code, user observations, or sources. Distinguish observations from assumptions.
+    validations:
+      required: true
+  - type: textarea
+    id: method
+    attributes:
+      label: Method and scope
+      description: Describe the bounded audit, experiment, prototype, or participant tasks and a stopping condition.
+    validations:
+      required: true
+  - type: textarea
+    id: deliverable
+    attributes:
+      label: Decision artifact and acceptance
+      description: What evidence, recommendation, limitations, and follow-up issues will close this task?
+    validations:
+      required: true

@@ -1,0 +1,32 @@
+name: Epic
+description: Organize several related tasks around a user outcome.
+labels: ["type:epic", needs-triage]
+body:
+  - type: textarea
+    id: outcome
+    attributes:
+      label: User outcome
+      description: Who benefits and what will become possible? Link the supporting plan.
+    validations:
+      required: true
+  - type: textarea
+    id: baseline
+    attributes:
+      label: Current baseline and boundaries
+      description: What already exists? What belongs in this epic, and what is separate?
+    validations:
+      required: true
+  - type: textarea
+    id: exit
+    attributes:
+      label: Exit criteria
+      description: Define the evidence needed to close the epic. Child issues being closed is necessary but may not establish the user outcome.
+    validations:
+      required: true
+  - type: textarea
+    id: breakdown
+    attributes:
+      label: Work breakdown and dependencies
+      description: Link existing tasks/PRs or outline the missing tasks. After creation, add native sub-issues and blocking relationships; avoid duplicate task lists.
+    validations:
+      required: true

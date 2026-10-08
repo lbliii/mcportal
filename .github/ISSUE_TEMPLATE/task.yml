@@ -1,0 +1,38 @@
+name: Implementation task
+description: Define a bounded change that can be implemented and reviewed.
+labels: ["type:task", needs-triage]
+body:
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Problem and outcome
+      description: State the current behavior and the resulting behavior. Link the parent epic or supporting plan.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and starting points
+      description: Name the relevant existing behavior, files or contracts, and the boundaries of this task.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Use observable, checkable outcomes, including important error and compatibility behavior.
+      placeholder: "- [ ] …\n- [ ] …"
+    validations:
+      required: true
+  - type: textarea
+    id: validation
+    attributes:
+      label: Validation
+      description: Relevant automated checks, manual host/UI evidence, or a documentation review. Follow CONTRIBUTING.md; avoid tests that only restate implementation.
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies and open decisions
+      description: Link blocking issues and existing PRs. Use native sub-issue and dependency relationships after creation.
