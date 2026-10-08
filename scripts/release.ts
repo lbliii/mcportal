@@ -1,3 +1,5 @@
+import { checkSupport } from './check-support.ts';
+import { releaseArtifacts } from './release-artifacts.ts';
 /**
  * Cutting a release, in two steps so it goes through review like any other change:
  *
@@ -167,16 +169,20 @@ async function publish(dryRun: boolean): Promise<void> {
     if (versions.some((v) => v !== version)) throw new Error(`${file} says ${versions.join(', ')}, not ${version}.`);
   }
   const notes = changelogSection(await readFile(at('CHANGELOG.md'), 'utf8'), version);
+  await checkSupport();
   const commit = git('rev-parse', '--short', 'HEAD');
   if (dryRun) {
     console.log(`Would tag ${commit} as ${tag} and create the GitHub release "MCPortal ${tag}". Dry run: nothing changed.`);
     return;
   }
+  // Validate before publishing a tag or release, including schema/upgrade regression tests.
+  execFileSync('npm', ['run', 'check', '--silent'], { cwd: ROOT, stdio: 'inherit' });
+  const artifacts = await releaseArtifacts(await mkdtemp(path.join(tmpdir(), 'mcportal-artifacts-')), version);
   git('tag', '-a', tag, '-m', `MCPortal ${tag}`);
   git('push', '--quiet', 'origin', tag);
   const notesFile = path.join(await mkdtemp(path.join(tmpdir(), 'mcportal-release-')), 'notes.md');
   await writeFile(notesFile, `${notes}\n`);
-  console.log(gh('release', 'create', tag, '--verify-tag', '--title', `MCPortal ${tag}`, '--notes-file', notesFile));
+  console.log(gh('release', 'create', tag, ...artifacts, '--verify-tag', '--title', `MCPortal ${tag}`, '--notes-file', notesFile));
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
