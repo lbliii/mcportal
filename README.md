@@ -33,9 +33,11 @@ MCPortal is an MCP server with an [MCP Apps](https://modelcontextprotocol.io/ext
 
 New here? The [getting started tutorial](docs/tutorials/getting-started.md) takes you from install to a working room in a few minutes.
 
-## New on main
+Want your agent to set up the hosted connection? Use the [copyable setup prompt](docs/how-to/install.md#ask-your-agent), also available in the site's [Get it section](https://mcportal.lol/#get-it). Coding agents can configure supported hosts; other agents can walk you through the settings and GitHub sign-in.
 
-The latest work below is in this checkout and listed under [Unreleased](CHANGELOG.md#unreleased). Hosted and plugin availability follows deployments and [releases](https://github.com/lbliii/mcportal/releases); check your installed version before trying it.
+## Recent additions
+
+The latest reading features are listed below. The [changelog](CHANGELOG.md) tracks their release status; hosted and plugin availability follows deployments and [releases](https://github.com/lbliii/mcportal/releases). Check your installed version before trying them.
 
 | Feature | What to try | Guide |
 |---|---|---|

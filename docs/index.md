@@ -14,7 +14,7 @@ For newcomers who want to see MCPortal work.
 
 For people who know what they want and need the steps.
 
-- [Install](how-to/install.md): every host (Claude Code, Cowork, Claude desktop, Codex, hosted connector), ghost mode vs signing in, updating and uninstalling.
+- [Install](how-to/install.md): a copyable agent setup prompt, remote and local host options (Claude Code, Cowork, Claude desktop, Codex), ghost mode vs signing in, updating and uninstalling.
 - [Customize your Space](how-to/customize-space.md): cover, format, public page and RSS, audiences, discovery and automatic sections.
 - [Organize reading](how-to/organize-reading.md): find kept material, make desks, compare sources, follow trails and finish a finite catch-up.
 - [Watch reading and events](how-to/watch-reading.md): page changes, repository releases, public calendars and verified artists.

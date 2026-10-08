@@ -8,7 +8,34 @@ A local install needs Node.js 22.18 or newer (any Node 24 works). Node runs MCPo
 
 The hosted connector needs nothing on your computer.
 
+## Ask your agent
+
+Paste this into the agent you want to connect:
+
+```text
+Help me connect MCPortal to this agent.
+Read https://mcportal.lol/install.md and add https://mcportal.lol/mcp as a remote MCP server using this host's supported setup.
+If I need to change settings or sign in with GitHub, walk me through it. Then verify the connection and help me open my room.
+```
+
+A coding agent that can manage its host's MCP configuration can do the setup. A chat-only agent may need to walk you through connector settings. You'll complete GitHub sign-in in your browser. Giving an agent a link alone doesn't install a server.
+
+The landing page's **Get it** section has the same prompt. Agents can read the site's [installation guide](https://mcportal.lol/install.md) directly or find it through [llms.txt](https://mcportal.lol/llms.txt). On a self-hosted instance, use that instance's guide and endpoint.
+
 ## Claude Code
+
+### Hosted connection
+
+From your terminal:
+
+```bash
+claude mcp add --transport http mcportal --scope user https://mcportal.lol/mcp
+claude mcp list
+```
+
+In Claude Code, run `/mcp`, choose `mcportal`, and complete the browser sign-in. User scope makes the server available across projects. Start a new session if needed, then ask "open my room". See [Claude Code's MCP instructions](https://code.claude.com/docs/en/mcp).
+
+### Local plugin
 
 In a Claude Code session:
 
@@ -28,9 +55,9 @@ The plugin adds the MCPortal server, the `/portal` command, and a skill that tel
 3. Install `mcportal`.
 4. Ask "open my room".
 
-## Claude desktop
+## Claude desktop: local install
 
-Claude desktop launches MCPortal from a copy of the repository.
+For a hosted connection in Claude desktop, follow [Hosted connector](#hosted-connector). For a local room, Claude desktop launches MCPortal from a copy of the repository.
 
 1. Clone the repository:
 
@@ -62,6 +89,27 @@ To update, run `git pull` in `/path/to/mcportal` and restart Claude desktop.
 
 ## Codex
 
+### Hosted connection
+
+With the Codex CLI available:
+
+```bash
+codex mcp add mcportal --url https://mcportal.lol/mcp
+codex mcp login mcportal
+codex mcp list
+```
+
+Complete sign-in in your browser, then start a new session if needed and ask "open my room". If you use MCP settings instead, add a remote server with the same URL. The equivalent entry in `~/.codex/config.toml` is:
+
+```toml
+[mcp_servers.mcportal]
+url = "https://mcportal.lol/mcp"
+```
+
+Keep your other configuration entries. See [Codex's MCP instructions](https://developers.openai.com/codex/mcp).
+
+### Local source install
+
 1. Clone the repository to `/path/to/mcportal`, as above.
 2. Add MCPortal to `~/.codex/config.toml`:
 
@@ -75,16 +123,18 @@ To update, run `git pull` in `/path/to/mcportal` and restart Claude desktop.
 
 ## Hosted connector
 
-Use this in hosts that let you add a custom connector by URL, such as Claude on the web.
+Use this in hosts that support a remote Streamable HTTP server with OAuth, such as Claude on the web or desktop. A visual room requires MCP Apps support; other MCP hosts can use the tools through chat.
 
-1. Add a custom connector with this URL:
+1. Open your host's connector settings. In Claude, open **Connectors**, usually under **Customize**, then choose **Add custom connector** and name it **MCPortal**. Enter this URL:
 
    ```text
    https://mcportal.lol/mcp
    ```
 
 2. Your host sends you to MCPortal's consent screen, then to GitHub to sign in.
-3. Ask "open my room".
+3. Enable the connector in your conversation if needed, then ask "open my room".
+
+Organization accounts may require an owner to add a connector first. See [Claude's custom connector instructions](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp).
 
 Anyone with a GitHub account can sign in. A [self-hosted](self-host.md) server may be invite-only; if sign-in there says your account isn't allowed, ask whoever runs it for an invite.
 
@@ -132,8 +182,10 @@ New versions load in your next session. [CHANGELOG.md](../../CHANGELOG.md) lists
 
 1. If you're signed in, sign out first, so the sign-in is revoked and your room is copied back.
 2. Remove MCPortal from your host:
-   - Claude Code: `claude plugin uninstall mcportal@mcportal`, or use `/plugin`.
-   - Claude desktop or Codex: delete the `mcportal` entry from the config file, then delete `/path/to/mcportal`.
+   - Claude Code local plugin: `claude plugin uninstall mcportal@mcportal`, or use `/plugin`.
+   - Claude Code hosted server: `claude mcp remove mcportal --scope user`.
+   - Codex: `codex mcp remove mcportal`. Delete `/path/to/mcportal` too if you installed from source.
+   - Claude desktop local server: delete the `mcportal` entry from the config file, then delete `/path/to/mcportal`.
    - Hosted connector: remove it in your host's connector settings.
 3. Delete `~/.mcportal` to remove everything a local MCPortal stored. (If you set `MCPORTAL_DATA_DIR`, delete that folder instead.)
 

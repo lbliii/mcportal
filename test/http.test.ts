@@ -218,6 +218,39 @@ test('public pages: landing, privacy and support render without scripts; images 
   }
 });
 
+test('agent installation guides are public, use the configured instance and retain host and route boundaries', async () => {
+  for (const invited of [false, true]) {
+    const app = await startApp({
+      publicUrl: 'https://reader.example',
+      staticToken: 'private-test-token',
+      github: { clientId: 'fixture', clientSecret: 'private-test-github-secret' },
+      allowedGithubUsers: invited ? ['invited-reader'] : [],
+    });
+    try {
+      const guide = await raw(app.port, { path: '/install.md' });
+      assert.equal(guide.status, 200);
+      assert.match(guide.headers['content-type'] as string, /^text\/markdown; charset=utf-8$/);
+      assert.match(guide.body, /codex mcp add mcportal --url https:\/\/reader\.example\/mcp/);
+      assert.match(guide.body, /claude mcp add --transport http mcportal --scope user https:\/\/reader\.example\/mcp/);
+      assert.match(guide.body, invited ? /This instance is invite-only/ : /Anyone with a GitHub account can sign in/);
+      const index = await raw(app.port, { path: '/llms.txt' });
+      assert.equal(index.status, 200);
+      assert.match(index.headers['content-type'] as string, /^text\/plain; charset=utf-8$/);
+      assert.match(index.body, /\[Installation guide\]\(https:\/\/reader\.example\/install\.md\)/);
+      for (const response of [guide, index]) {
+        assert.equal(response.headers['x-content-type-options'], 'nosniff');
+        assert.doesNotMatch(response.body, /mcportal\.lol|private-test-token|private-test-github-secret/);
+      }
+      assert.equal((await raw(app.port, { method: 'POST', path: '/mcp', headers: json, body: RPC_PING })).status, 401, 'public setup does not bypass MCP authentication');
+      assert.equal((await raw(app.port, { path: '/install.md', headers: { host: 'untrusted.example' } })).status, 421);
+      for (const route of ['/install.md/private', '/llms.txt/private', '/docs/how-to/install.md', '/installation.ts']) {
+        assert.equal((await raw(app.port, { path: route })).status, 404, 'only the two exact public routes are exposed');
+      }
+      assert.equal((await raw(app.port, { method: 'POST', path: '/install.md' })).status, 404);
+    } finally { await app.close(); }
+  }
+});
+
 test('contact: one address for support and security, security.txt, and the law in the terms', async () => {
   assert.throws(() => configFromEnv({ MCPORTAL_CONTACT_EMAIL: 'not an email' }, '/tmp/x'), /isn't an email address/);
   const site = configFromEnv({ MCPORTAL_CONTACT_EMAIL: 'hello@mcportal.example', MCPORTAL_JURISDICTION: 'the State of Oregon, USA', MCPORTAL_OPERATOR: 'Jane Doe', MCPORTAL_SOURCE_URL: 'https://github.com/example/mcportal' }, '/tmp/x').site!;
