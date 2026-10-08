@@ -77,6 +77,11 @@ export class Page {
     page.session = sessionId;
     await page.send('Runtime.enable');
     await page.send('Page.enable');
+    // The attached target is separate from Chrome's initial blank tab. Give it
+    // foreground focus so native keyboard and pointer input reaches this page
+    // consistently on headless Linux as well as macOS.
+    await page.send('Page.bringToFront');
+    await page.send('Emulation.setFocusEmulationEnabled', { enabled: true });
     await page.send('Emulation.setDeviceMetricsOverride', { width: viewport.width, height: viewport.height, deviceScaleFactor: 1, mobile: false });
     return page;
   }
@@ -151,7 +156,8 @@ export class Page {
       const hit = r.width && r.height ? document.elementFromPoint(point.x, point.y) : null;
       return hit && (hit === n || n.contains(hit)) ? point : null;
     })()`, `a clickable ${selector}`);
-    for (const type of ['mousePressed', 'mouseReleased']) await this.send('Input.dispatchMouseEvent', { type, x: box.x, y: box.y, button: 'left', clickCount: 1 });
+    await this.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: box.x, y: box.y });
+    for (const type of ['mousePressed', 'mouseReleased']) await this.send('Input.dispatchMouseEvent', { type, x: box.x, y: box.y, button: 'left', buttons: type === 'mousePressed' ? 1 : 0, clickCount: 1 });
   }
 
   async close(): Promise<void> {
