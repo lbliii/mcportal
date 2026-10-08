@@ -14,7 +14,7 @@ The user explicitly requested agent user proxies in place of recruiting particip
 | [#111 formative rounds](https://github.com/lbliii/mcportal/issues/111) | Both cohorts completed two rounds; failures ranked below, repaired and retested | Ready under the same substitution |
 | [#112 field use](https://github.com/lbliii/mcportal/issues/112) | Four returning roles; eight logical day 2/day 7 retrieval checkpoints; explicit prompted/scripted distinctions and a seven-day expiry boundary | Ready only as the authorized simulation, not an elapsed human trial |
 | [#113 reader integration](https://github.com/lbliii/mcportal/issues/113) | Combined candidate reconciled with current tabs, Recall, find, comfort and navigation; PR disposition below | Merge this candidate once; retire overlapping PRs as part of that integration |
-| [#114 actual hosts](https://github.com/lbliii/mcportal/issues/114) | Fixture fallbacks and navigation pass; public connected read returned content | **Open:** actual host rendering, consent, teardown and new-chat chain unverified |
+| [#114 actual hosts](https://github.com/lbliii/mcportal/issues/114) | Fixture fallbacks and navigation pass; the public deployment rendered in Codex; isolated candidate tools now work in two chats | **Open:** candidate UI flow, consent, teardown and new-chat handoff chain unverified |
 | [#115 accessibility](https://github.com/lbliii/mcportal/issues/115) | Four reproduced keyboard blockers fixed; native keyboard including non-default passage choice, reflow, forced colors, reduced motion and AX checks recorded | Ready with this candidate under the user's explicit VoiceOver testing skip; no spoken-output or full-conformance claim |
 | [#116 source recovery](https://github.com/lbliii/mcportal/issues/116) | Latest-request previews, partial import details, safe retry and refresh recovery implemented and tested | Ready with this candidate |
 | [#103 validation epic](https://github.com/lbliii/mcportal/issues/103) | Bounded proxy evidence and decision recorded | Close with #110–#112 only while retaining the explicit simulation scope |
@@ -71,14 +71,19 @@ Coverage includes 320/360-pixel layouts with 200% root text, wide and expanded f
 
 ## Actual-host evidence and remaining checklist
 
-On October 8, the connected MCPortal `read_article` tool returned the public RFC 8259 information page (final URL `https://www.rfc-editor.org/info/rfc8259/`, 4,020 words). This is a real connected tool/text smoke check. Its deployed server revision was not verified as this candidate. No successful actual-host render, source-selection UI, permission dialog, or new-chat result is claimed.
+On October 8, the connected public MCPortal `read_article` tool returned the RFC 8259 information page (final URL `https://www.rfc-editor.org/info/rfc8259/`, 4,020 words). After the user expanded its card, the supported MCP Apps browser exposed the actual Codex reader. Its title, source, content and fullscreen control rendered. The controls' DOM parent was `#reader`, and “Choose passage” was absent. These observed build markers differ from the candidate, whose controls live in `#readerControls` and include the passage chooser. This is public-deployment render evidence, not certification of the candidate.
 
-Computer-use inventory showed no expanded MCP App tab. Selecting the native Codex app was denied by the computer-use tool, so the run did not bypass that boundary. A request to expand the reader into the inspectable MCP App side panel remains the next host-validation step. The app version and actual capability response were not obtainable in this run.
+The initial lack of an expanded MCP App tab was resolved by the user's expansion. Native Codex inspection remained denied; that boundary was not bypassed. Installed app metadata identifies `com.openai.codex`, version `26.1002.52244`, build `13536`. This is installed-version evidence, not a captured `ui/initialize` host-info response. Raw host capabilities have not been captured.
+
+A separate local STDIO connection, `mcportal-m1`, now runs the candidate checkout with an isolated temporary data directory and local test identity. A direct startup/resource preflight at `7198db611efd9c18b6a86dee3ae4acb789c2fc7d` confirmed successful initialization and the candidate's passage chooser and external reader-control markers. The user restarted MCP connections. A fresh validation chat exposed 36 candidate tools and successfully called `read_article` for the same RFC page (21 blocks, 4,020 words). The original chat then acquired those tools too and repeated the read successfully. These are two real chat/tool invocations, not yet a cross-chat handoff or UI-continuity result.
+
+The candidate's live `open_docs` call for this repository's main-branch docs returned six sections and 34 pages with source URLs and an untrusted-content boundary. An intentionally missing `open_handoff` code returned a useful error explaining the seven-day lifetime and the reader's recovery action. These establish useful text-only results and errors. The candidate card still needs expansion before its controls, source selection, agent context, consent and teardown/reopen behavior can be inspected. The temporary `mcportal-m1` registration should be removed after validation; its test data are separate from the user's normal room.
 
 | Environment | Evidence from this run | Status |
 | --- | --- | --- |
 | Local Chrome fixture MCP host | UI/render, declared capability combinations, source-scope payloads, denied-action fallbacks, display changes and persistence fixtures | Automated coverage only |
-| Connected Codex tool path | Public article text/structured result | UI and end-to-end flow unverified |
+| Codex with public MCPortal | Public article text/structured result and expanded reader DOM/layout | Older UI; not candidate certification |
+| Codex with local `mcportal-m1` | Candidate article calls in two chats, live docs outline and recoverable missing-handoff error; isolated test state | Candidate UI and end-to-end flow unverified |
 | Claude desktop, Claude web/mobile, Claude Code, ChatGPT | No current candidate walkthrough | Untested for this candidate |
 | Screen reader | Browser AX semantics and native keyboard paths | Spoken output untested |
 

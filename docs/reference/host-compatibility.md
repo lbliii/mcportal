@@ -30,7 +30,7 @@ Hosts that omit the newer message and context fields get the inline reader.
 
 A host that renders no MCP Apps view still gets every tool's text result.
 
-The [October 8 M1 evidence report](../../reports/m1-core-content-loop.md) records current automated coverage and the attempted Codex check. No host acquired formal certification in that run: a connected public reader call succeeded, but the native host UI could not be inspected. Daily maintainer use above is historical context, not certification of the M1 integration.
+The [October 8 M1 evidence report](../../reports/m1-core-content-loop.md) records current automated coverage and partial Codex checks. The expanded public reader was inspected, but its UI predates the candidate. An isolated local candidate connection now returns article and docs content in Codex; its full UI and handoff flow remain unverified. No host acquired formal M1 certification. Daily maintainer use above is historical context, not certification of the M1 integration.
 
 ## Navigation
 
