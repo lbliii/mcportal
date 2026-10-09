@@ -124,10 +124,11 @@ test('linked: the room, saved items and clips live on the hosted account; tools 
     await mac.call('save_item', { url: 'https://example.com/kept', title: 'Kept' });
     assert.deepEqual((await h.store.get(accountId)).saved.map((s) => s.url), ['https://example.com/kept']);
 
-    const clipped = await mac.call('clip', { kind: 'quote', content: 'from the laptop', title: 'Laptop quote' });
+    const clipped = await mac.call('clip', { kind: 'quote', content: 'from the laptop', title: 'Laptop quote', source: { kind: 'article', url: 'https://example.com/v2', locator: { text: 'from the laptop', prefix: 'before ', suffix: ' after', digest: 'a'.repeat(64), revision: 'v2' } } });
     assert.equal(clipped.isError, undefined, clipped.content[0]!.text);
     const id = clipped.structuredContent.clip.id;
     assert.ok((await h.clips.get(accountId, id)), 'the id the tool reports is the hosted one');
+    assert.equal((await h.clips.get(accountId, id))?.source.locator?.digest, 'a'.repeat(64));
     assert.equal((await mac.call('get_clip', { id })).structuredContent.clip.data.text, 'from the laptop');
     assert.equal((await mac.call('search_clips', { query: 'laptop' })).structuredContent.clips.length, 1);
 
@@ -447,4 +448,55 @@ test('linked, sign-in gone: a refused refresh or a moved host means sign in agai
       assert.match(failed.content[0]!.text, /has moved.*Sign in again/);
     }
   }
+});
+
+
+test('linked: reading preferences follow the account across devices and preserve room layout', async () => {
+  const h = await hosted();
+  try {
+    const { accountId, tokens } = await h.signIn(42, 'lawrence');
+    const a = device(h.app, accountId, fixed(tokens.access_token));
+    const before = await h.store.get(accountId);
+    const result = await a.call('set_reading_preferences', { size: 'larger', measure: 'focused' });
+    assert.ok(!result.isError, result.content[0]?.text);
+    const b = device(h.app, accountId, fixed(tokens.access_token));
+    assert.deepEqual((await b.call('get_reading_preferences')).structuredContent.readerComfort, { size: 'larger', measure: 'focused' });
+    assert.deepEqual((await h.store.get(accountId)).columns, before.columns);
+    const other = await h.signIn(7, 'friend');
+    assert.equal((await device(h.app, other.accountId, fixed(other.tokens.access_token)).call('get_reading_preferences')).structuredContent.readerComfort.size, 'standard');
+    const oldProfile = { ...await b.ctx.store.get(accountId) };
+    delete oldProfile.readerComfort;
+    await b.ctx.store.put(accountId, oldProfile);
+    assert.equal((await h.store.get(accountId)).readerComfort?.size, 'larger');
+    await b.call('set_reading_preferences', { size: 'standard', measure: 'comfortable' });
+    assert.equal((await h.store.get(accountId)).readerComfort?.size, 'standard');
+  } finally { await h.app.close(); }
+});
+
+
+test('linked: a lost clip/share response is retried using the original request key', async () => {
+  const h = await hosted();
+  try {
+    const { accountId, tokens } = await h.signIn(42, 'lawrence');
+    let drop = 'clips.add';
+    const flaky = device(h.app, accountId, fixed(tokens.access_token), { fetch: async (url, init) => {
+      const response = await fetch(url, init);
+      if (drop && String(init?.body).includes(drop)) { drop = ''; throw new Error('injected response loss after commit'); }
+      return response;
+    } });
+    const args = { kind: 'quote', content: 'A durable retry test', requestKey: 'linked-clip-retry' };
+    const first = await flaky.call('clip', args);
+    assert.equal(first.isError, true);
+    const next = await flaky.call('clip', args);
+    assert.ok(!next.isError, next.content[0]?.text);
+    assert.equal((await h.clips.usage(accountId)).count, 1);
+    await flaky.call('set_public_profile', { handle: 'retry_user', displayName: 'Retry test' });
+    drop = 'social.share';
+    const share = { clipId: next.structuredContent.clip.id, requestKey: 'linked-share-retry', audience: 'everyone' };
+    assert.equal((await flaky.call('share', share)).isError, true);
+    const retried = await flaky.call('share', share);
+    assert.ok(!retried.isError, retried.content[0]?.text);
+    const again = await flaky.call('share', share);
+    assert.equal(again.structuredContent.share.id, retried.structuredContent.share.id);
+  } finally { await h.app.close(); }
 });

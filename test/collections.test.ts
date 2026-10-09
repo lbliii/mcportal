@@ -18,7 +18,7 @@ test('private desks persist, cite actual evidence, separate membership and trail
   try {
     const clips = new FileClipStore(dir), collections = new FileCollectionStore(dir), store = new MemoryProfileStore({ alice: { ...defaultProfile(), onboarded: true } });
     const ctx: ToolContext = { userId: 'alice', clips, collections, store, fetcher: createFixtureFetcher(), cache: new TtlCache() };
-    const clip = buildClip({ kind: 'quote', text: 'A heartbeat resumes work.', source: { kind: 'article', url: 'https://example.com/heartbeat', locator: { text: 'A heartbeat resumes work.', block: 5 } } });
+    const clip = buildClip({ kind: 'quote', text: 'A heartbeat resumes work.', source: { kind: 'article', url: 'https://example.com/heartbeat', locator: { text: 'A heartbeat resumes work.', block: 5, prefix: 'Before ', suffix: ' After', digest: 'a'.repeat(64), revision: 'v2' } } });
     await clips.add('alice', clip);
     const created = (await changeCollection({ action: 'create', title: 'Agents that remember', purpose: 'How work resumes', entries: [{ ref: `clip:${clip.id}`, title: clip.title, excerpt: 'An unwanted shadow copy' }, { ref: 'url:https://example.com/intro#where', title: 'Introduction' }], livePortals: ['hn-top'] }, ctx))!;
     assert.equal(created.entries[0]!.excerpt, undefined);

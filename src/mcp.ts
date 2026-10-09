@@ -3,6 +3,7 @@
  * stdio transports. Dependency-free on purpose: the plugin installs with no
  * `npm install`, and the surface is small enough to read in one sitting.
  */
+import { componentResult } from './tools/result-payload.ts';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { authorize, localActor } from './access.ts';
@@ -65,9 +66,9 @@ function instructions(ctx: ToolContext): string {
 const UI_DIR = new URL('./ui/', import.meta.url);
 /** Files inlined into the room where it says <!--include:name--> or /*include:name*\/, so the page stays self-contained. */
 export const UI_INCLUDES = [
-  'room/experiences.css', 'room/experiences.js', 'room/recall.js', 'room/collections.js', 'room/compare.js', 'room/views.js', 'room/catchup.js', 'room/watches.js',
+  'room/experiences.css', 'room/navigation.js', 'room/experiences.js', 'room/recall.js', 'room/collections.js', 'room/compare.js', 'room/views.js', 'room/catchup.js', 'room/watches.js',
   'design/tokens.css', 'design/primitives.css', 'design/palettes.js', 'design/theme.js', 'space-inks.js', 'space-format.js', 'space.css', 'art.js', 'brand/icons.js', 'brand/mark-line.svg', 'brand/badge.svg', 'brand/wordmark.svg',
-  'room/room.css', 'room/bridge.js', 'room/dom.js', 'room/room.js', 'room/items.js', 'room/layouts.js', 'room/river.js', 'room/levels.js', 'room/seen.js', 'room/reader.js', 'room/reader-tools.js', 'room/reading.js', 'room/passage.js', 'room/handoff.js', 'room/highlights.js', 'room/docs.js', 'room/social.js', 'room/reblog.js', 'room/add.js', 'room/shop.js', 'room/toolbar.js', 'room/boot.js',
+  'room/room.css', 'room/bridge.js', 'room/dom.js', 'room/room.js', 'room/items.js', 'room/layouts.js', 'room/river.js', 'room/levels.js', 'room/seen.js', 'room/reader.js', 'room/reader-tools.js', 'room/reading.js', 'room/passage.js', 'room/locator.js', 'room/handoff.js', 'room/highlights.js', 'room/docs.js', 'room/social.js', 'room/reblog.js', 'room/add.js', 'room/shop.js', 'room/toolbar.js', 'room/boot.js',
 ];
 
 /** JSON that is safe to embed inside a <script> element. */
@@ -161,7 +162,8 @@ async function callTool(params: Record<string, unknown>, ctx: ToolContext): Prom
   try {
     const result = await tool.handler(input, { ...ctx, log });
     if (!result.isError && REACH_TOOLS.has(name)) ctx.toolsChanged?.();
-    return done(result, result.isError ? 'error' : 'ok');
+    const mode = ctx.resultMode ?? (process.env.MCPORTAL_RESULT_MODE === 'component-v1' ? 'component-v1' : 'legacy');
+    return done(mode === 'component-v1' ? await componentResult(result, name, ctx) : result, result.isError ? 'error' : 'ok');
   } catch (error) {
     if (isAppError(error) && error.code !== 'internal') return done(toolError(clean(error.message, 500), error.code, error.details), 'error');
     const ref = requestId();

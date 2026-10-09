@@ -2,8 +2,9 @@
  * The structured content each tool returns to the room app: one contract for both
  * sides. Handlers check what they return against it (`satisfies ToolResults['x']`),
  * and the room's callTool() is typed by it (src/ui/ui.d.ts), so the server and the
- * UI can't drift apart without a type error. The model reads the text content;
- * this is what the app reads.
+ * UI can't drift apart without a type error. In legacy mode both text and this
+ * data are model-visible. Component mode moves this data to result _meta and
+ * puts ResultView in structuredContent; the bridge unwraps it before rendering.
  */
 import type { DocHit, DocPage, DocPageRef, DocSection, DocsToc } from '../adapters/docs.ts';
 import type { Clip, ClipSummary } from '../clips.ts';
@@ -75,6 +76,8 @@ export type SpaceResult = {
 };
 
 export type ToolResults = {
+  get_reading_preferences: { readerComfort: import('../profile.ts').ReaderComfort };
+  set_reading_preferences: { readerComfort: import('../profile.ts').ReaderComfort };
   watch: { preview?: WatchPreview; confirmed?: { id: string; displayName: string; origin: string; scope: StoreScope; paused: boolean }; profile?: Profile; portal?: PortalResult };
   unwatch: { removed: boolean };
   search_library: { library: LibraryResult };

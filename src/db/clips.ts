@@ -1,4 +1,6 @@
 /** Clips in mcportal_clips: content in `data`, everything else in `summary` for lists. */
+import { pgWriteReceipt } from './write-receipts.ts';
+import { missingReplay } from '../write-receipts.ts';
 import { clipQuotaProblem } from '../clip-stores.ts';
 import { CLIP_LIMITS, ClipError, clampLimit, normalizeTags, patchClip, queryWords, searchTextOf, summaryOf, type Clip, type ClipPatch, type ClipQuery, type ClipStore, type ClipSummary } from '../clips.ts';
 import { exactTermPattern } from '../lib/search.ts';
@@ -26,8 +28,10 @@ export class PgClipStore implements ClipStore {
     });
   }
 
-  add(userId: string, clip: Clip): Promise<Clip> {
-    return this.edit(userId, async store => {
+  add(userId: string, clip: Clip, requestKey?: string): Promise<Clip> {
+    return this.edit(userId, store => pgWriteReceipt(store.db, userId, 'clip', requestKey,
+      { kind: clip.kind, title: clip.title, note: clip.note, tags: clip.tags, source: clip.source, data: clip.data },
+      async id => (await store.get(userId, id)) ?? missingReplay(), async () => {
       const refused = clipQuotaProblem(await store.usage(userId), clip.bytes);
       if (refused) throw new ClipError(refused, 'limit_exceeded');
       await store.db.query(
@@ -35,8 +39,8 @@ export class PgClipStore implements ClipStore {
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
         [clip.id, userId, clip.kind, clip.title, JSON.stringify(clip.data), JSON.stringify(summaryOf(clip)), clip.tags, searchTextOf(clip), clip.bytes, clip.createdAt, clip.updatedAt],
       );
-      return clip;
-    });
+      return { id: clip.id, result: clip };
+    }));
   }
 
   async get(userId: string, id: string): Promise<Clip | undefined> {
@@ -103,6 +107,7 @@ export class PgClipStore implements ClipStore {
 
   deleteAll(userId: string): Promise<number> {
     return this.edit(userId, async store => {
+      await store.db.query("DELETE FROM mcportal_write_receipts WHERE user_id=$1 AND operation='clip'", [userId]);
       const r = await store.db.query(`DELETE FROM mcportal_clips WHERE user_id = $1`, [userId]);
       return r.rowCount ?? 0;
     });

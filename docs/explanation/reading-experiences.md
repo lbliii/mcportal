@@ -38,6 +38,14 @@ A background worker checks due reading watches every six hours, with durable lea
 
 ## State and limits
 
+### Reading comfort
+
+The reader's **Reading** controls save text size and line width privately in the existing room profile. They apply to articles and docs across reopened cards and linked devices; ghost mode keeps them locally. **Reset** saves the existing defaults: **Standard** text (1rem) and **Comfortable** lines (72ch). Large and Larger use 1.125rem and 1.25rem; Focused lines use 60ch. These relative sizes preserve browser text sizing. Host theme and room arrangement keep their own settings.
+
+The scope is account-wide because the existing profile already owns durable personal settings. Defaults retain the established reader appearance; this is a compatibility decision, not a finding about human preferences. A failed save is labeled as session-only. Older profiles get defaults, and writers that omit the new field preserve the saved value. Full exports include it; resetting or deleting the account removes the choice.
+
+### Stored reading state
+
 Collections and reading experience state belong to the caller. Files and PostgreSQL use atomic updates and revisions. Linked methods enforce authenticated ownership. Account deletion removes both stores. Full exports include them; additive imports remap clip and portal refs, preserve unavailable references visibly and pause imported watches for review. Private collections and watch state never enter public Spaces.
 
 | State | Limit |

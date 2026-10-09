@@ -7,13 +7,13 @@
   async function openWatches(screen) {
     watchScreen = screen; const generation = ++watchGeneration;
     enterExperience(screen); $('experiences').replaceChildren(el('p', {role:'status'}, 'Opening your watches…'));
-    try { const {watches} = (await callTool('watch_reading', {action:'list'})).structuredContent; if (generation === watchGeneration && experience === screen) showWatches(watches); }
-    catch (error) { if (generation === watchGeneration && experience === screen) $('experiences').replaceChildren(el('p',{class:'error'},errorText(error))); }
+    try { const {watches} = (await callTool('watch_reading', {action:'list'})).structuredContent; if (generation === watchGeneration && navigation.experience === screen) showWatches(watches); }
+    catch (error) { if (generation === watchGeneration && navigation.experience === screen) $('experiences').replaceChildren(el('p',{class:'error'},errorText(error))); }
   }
   /** @param {import('../reading-watches.ts').WatchResult} data */
   function showWatches(data) {
     watchData = data;
-    if (experience !== 'changes' && experience !== 'upcoming') watchScreen = data.watches.some(w => w.kind === 'page' || w.kind === 'releases') ? 'changes' : 'upcoming';
+    if (navigation.experience !== 'changes' && navigation.experience !== 'upcoming') watchScreen = data.watches.some(w => w.kind === 'page' || w.kind === 'releases') ? 'changes' : 'upcoming';
     enterExperience(watchScreen);
     const upcoming = watchScreen === 'upcoming', watches = data.watches.filter(w => upcoming ? w.kind === 'calendar' || w.kind === 'artist' : w.kind === 'page' || w.kind === 'releases');
     const title = upcoming ? 'Upcoming' : 'Changes';

@@ -73,3 +73,17 @@
   function present(list) {
     return /** @type {T[]} */ (list.filter((x) => x !== null && x !== undefined && x !== false));
   }
+
+  /** Pending actions keep their key until a response confirms the durable result.
+   * @type {Map<string, string>}
+   */
+  const pendingWriteKeys = new Map();
+  /** @param {string} operation @param {Record<string, unknown>} payload */
+  function pendingWriteKey(operation, payload) {
+    const identity = JSON.stringify([operation, payload]);
+    let key = pendingWriteKeys.get(identity);
+    if (!key) { key = crypto.randomUUID(); pendingWriteKeys.set(identity, key); }
+    return key;
+  }
+  /** @param {string} operation @param {Record<string, unknown>} payload */
+  function confirmWrite(operation, payload) { pendingWriteKeys.delete(JSON.stringify([operation, payload])); }

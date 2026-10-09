@@ -2,6 +2,7 @@
  * The handoff tools: create_handoff (the room app) and open_handoff (the model, in the
  * new chat). See src/handoffs.ts and docs/explanation/reading.md, phase 2.
  */
+import { LOCATOR_SCHEMA } from '../evidence.ts';
 import { HANDOFF_DAYS, normalizeCode, type Handoff } from '../handoffs.ts';
 import { DOCS_TOOLS } from './docs.ts';
 import { ok, toolError, toolFailure, untrusted, ROOM_URI, type CallToolResult, type ToolContext, type ToolDef } from './kit.ts';
@@ -94,6 +95,7 @@ export const HANDOFF_TOOLS: ToolDef[] = [
           properties: { kind: { enum: ['article', 'docs'] }, portalId: { type: 'string' }, docs: { type: 'string' } },
         },
         anchor: { type: 'object', additionalProperties: false, properties: { block: { type: 'integer', minimum: 0 }, heading: { type: 'string', maxLength: 300 } } },
+        locator: LOCATOR_SCHEMA,
         passage: { type: 'string', maxLength: 4000 },
       },
     },

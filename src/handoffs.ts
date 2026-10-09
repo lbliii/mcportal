@@ -6,6 +6,7 @@
  * Kept for HANDOFF_DAYS, at most HANDOFF_LIMIT per account (the oldest go first); deleted
  * with the account and not exported (they're pointers, not things the user made).
  */
+import { passageLocator, type PassageLocator } from './evidence.ts';
 import { randomInt } from 'node:crypto';
 import { readFile, rm } from 'node:fs/promises';
 import path from 'node:path';
@@ -34,12 +35,13 @@ export interface Handoff {
   anchor?: { block?: number; heading?: string };
   /** The passage they selected, if any. */
   passage?: string;
+  locator?: PassageLocator;
   createdAt: string;
   expiresAt: string;
   openedAt?: string;
 }
 
-export type HandoffInput = Pick<Handoff, 'url' | 'title' | 'place'> & Partial<Pick<Handoff, 'anchor' | 'passage'>>;
+export type HandoffInput = Pick<Handoff, 'url' | 'title' | 'place'> & Partial<Pick<Handoff, 'anchor' | 'passage' | 'locator'>>;
 
 export interface HandoffStore {
   create(userId: string, input: HandoffInput): Promise<Handoff>;
@@ -81,7 +83,9 @@ export function buildHandoff(raw: Record<string, unknown>, now = new Date(), cod
   const block = typeof anchorIn.block === 'number' && Number.isInteger(anchorIn.block) && anchorIn.block >= 0 ? anchorIn.block : undefined;
   const heading = clean(anchorIn.heading, 300) || undefined;
   const passage = typeof raw.passage === 'string' ? raw.passage.replace(/\r\n?/g, '\n').trim().slice(0, HANDOFF_PASSAGE_CHARS) : '';
+  const locator = passageLocator(raw.locator);
   return {
+    ...(locator ? { locator } : {}),
     code, url, title, place: where,
     ...(block !== undefined || heading ? { anchor: { ...(block !== undefined ? { block } : {}), ...(heading ? { heading } : {}) } } : {}),
     ...(passage ? { passage } : {}),

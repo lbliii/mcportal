@@ -12,6 +12,8 @@ The corpus was frozen before runtime changes. Both baseline splits were run agai
 
 The validation split was authored by the same implementer and held out from tuning, not supplied by independent people. It shares a corpus and query categories with development. This is a small regression evaluation, not human usability evidence or an estimate of population search quality. Queries d02/d03 reconstruct the previously observed M1 full-sentence/keyword failure pattern; they are disclosed development examples, not participant quotations. The validation split is now disclosed and should become regression material; future tuning needs fresh held-out queries.
 
+The frozen implementation and recorded results belong to commit `0bd1532` (PR #142). Subsequent M2 work adds retry receipts to the same clip-store files without retuning Recall. Verify the implementation freeze at that commit; use the benchmark and regression tests for the combined candidate. The historical timings below are not measurements of later changes.
+
 Four paths execute the real search implementation: files, Postgres, linked HTTP backed by files, and linked HTTP backed by Postgres. Linked runs use the actual StateClient, authentication and account-bound library API. They do not simulate external network latency or an agent host.
 
 Metrics:
@@ -81,7 +83,7 @@ TEST_DATABASE_URL=postgres://postgres@127.0.0.1:55439/postgres \
 TEST_DATABASE_URL=postgres://postgres@127.0.0.1:55439/postgres \
   npm run eval:recall -- --backend all --split validation --output /tmp/recall-validation.json --quiet
 
-# Corpus and frozen candidate implementation identity.
+# Corpus and frozen candidate implementation identity (at commit 0bd1532).
 shasum -a 256 -c evals/recall/results/validation-freeze.sha256
 
 # Required regression gate, including database contracts and real Chrome.

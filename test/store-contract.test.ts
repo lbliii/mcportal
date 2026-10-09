@@ -111,6 +111,62 @@ test('clip quota: existing over-limit accounts can shrink or keep the same size'
 });
 
 for (const b of BACKENDS) {
+  test(`contract (${b.name}): clip and share retries reconcile one commit and remember deletion`, { skip: b.skip }, async () => {
+    const clips = await b.clips(), social = await b.social(), owner = user('retry');
+    const makeClip = () => buildClip({ kind: 'quote', text: 'Exact retained evidence', source: { kind: 'article', url: 'https://example.com/v2' } });
+    // The first response is deliberately discarded after commit.
+    await clips.add(owner, makeClip(), 'lost-response-clip');
+    const results = await Promise.all(Array.from({ length: 6 }, () => clips.add(owner, makeClip(), 'lost-response-clip')));
+    assert.equal(new Set(results.map(c => c.id)).size, 1);
+    assert.equal((await clips.usage(owner)).count, 1);
+    await assert.rejects(clips.add(owner, buildClip({ kind: 'quote', text: 'Different' }), 'lost-response-clip'), { code: 'conflict' });
+    await clips.delete(owner, results[0]!.id);
+    await assert.rejects(clips.add(owner, makeClip(), 'lost-response-clip'), { code: 'failed_precondition' });
+    const makeShare = (id: string): Share => ({ id, accountId: owner, kind: 'link', url: 'https://example.com/v2', title: 'Version 2', audience: 'everyone', createdAt: new Date().toISOString() });
+    await social.addShare(makeShare(`${owner}-initial`), 'lost-response-share');
+    const shares = await Promise.all(Array.from({ length: 6 }, (_, i) => social.addShare(makeShare(`${owner}-${i}`), 'lost-response-share')));
+    assert.equal(new Set(shares.map(s => s.id)).size, 1);
+    assert.equal(await social.countShares(owner), 1);
+    await assert.rejects(social.addShare({ ...makeShare('changed'), title: 'Different' }, 'lost-response-share'), { code: 'conflict' });
+    await social.deleteShare(owner, shares[0]!.id);
+    await assert.rejects(social.addShare(makeShare('again'), 'lost-response-share'), { code: 'failed_precondition' });
+    await clips.deleteAll(owner); await social.forget(owner, new Date().toISOString());
+    assert.ok(await clips.add(owner, makeClip(), 'lost-response-clip'), 'account deletion removes its receipts');
+  });
+  test(`contract (${b.name}): retry key scope and expiry are explicit`, {skip:b.skip},async(t)=>{
+    let now=Date.now();t.mock.method(Date,'now',()=>now);
+    const clips=await b.clips(),social=await b.social(),owner=user('expiry'),other=user('scope');
+    const make=()=>buildClip({kind:'quote',text:'Same payload'});
+    const original=await clips.add(owner,make(),'same-request-key');
+    const independent=await clips.add(other,make(),'same-request-key');
+    assert.notEqual(original.id,independent.id);
+    const post:Share={id:`${owner}-post`,accountId:owner,kind:'link',url:'https://example.com',title:'Reblog',audience:'everyone',createdAt:new Date().toISOString(),reblogOf:{root:'original'}};
+    const share=await social.addShare(post,'same-request-key');
+    assert.equal((await social.addShare({...post,id:`${owner}-retry`},'same-request-key')).id,share.id,'reblog retry reconciles before duplicate-root check');
+    now+=7*86400000+1;
+    const after=await clips.add(owner,make(),'same-request-key');
+    assert.notEqual(after.id,original.id,'expired keys are new actions');
+    await social.deleteShare(owner,share.id);
+    assert.notEqual((await social.addShare({...post,id:`${owner}-new`},'same-request-key')).id,share.id);
+  });
+  test(`contract (${b.name}): reading comfort survives legacy writers and explicit reset`, { skip: b.skip }, async () => {
+    const store = await b.profiles(), id = user('comfort');
+    const defaults = defaultProfile();
+    await store.put(id, { ...defaults, readerComfort: { size: 'larger', measure: 'focused' } });
+    const version = await store.versioned(id);
+    await store.replaceIf(id, { ...defaults, name: 'Legacy edit' }, version.rev);
+    assert.deepEqual((await store.get(id)).readerComfort, { size: 'larger', measure: 'focused' });
+    await store.update(id, () => ({ profile: { ...defaults, name: 'Old update' }, result: undefined }));
+    assert.equal((await store.get(id)).readerComfort?.size, 'larger');
+    await store.put(id, defaults);
+    assert.equal((await store.get(id)).readerComfort?.size, 'larger');
+    await store.update(id, before => ({ profile: { ...before, readerComfort: { size: 'standard', measure: 'comfortable' } }, result: undefined }));
+    const reset = await store.get(id);
+    assert.deepEqual(reset.readerComfort, { size: 'standard', measure: 'comfortable' });
+    assert.deepEqual(reset.columns, defaults.columns);
+    await store.delete(id);
+    assert.equal((await store.get(id)).readerComfort, undefined);
+  });
   test(`contract (${b.name}): expired handoffs and editions are purged`, { skip: b.skip || (!b.expiring && 'file stores purge by file age (test/retention.test.ts)') }, async () => {
     let now = new Date(Date.UTC(2026, 0, 1));
     const { handoffs, editions } = await b.expiring!(() => now);

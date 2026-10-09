@@ -8,6 +8,7 @@ What MCPortal stores, where, and for how long; how to export it and delete it; a
 |---|---|---|
 | Account | GitHub numeric user id and login, role, how the account joined, dates | Until the account is deleted |
 | Room | Name, layout, portals and their settings, saved items, pinned results | Until changed or deleted |
+| Reading comfort | Private text-size and line-width choices, shared by articles and docs | Until reset or account deletion; included in the room profile/export |
 | Private collections | Links, clip refs, notes, orientations and trail progress | Until removed; 50 per account, 200 entries each |
 | Reading experiences | Captured catch-up, page/release/calendar/artist watches, baselines and inbox | 20 watches; 40 findings retained 30 days; 2 MB |
 | Saved items | Link, title, source, date, note, optional description, thumbnail and event metadata | Until removed (200 at most) |
@@ -19,6 +20,7 @@ What MCPortal stores, where, and for how long; how to export it and delete it; a
 | Handoffs | Link, title, place and selected passage sent to a new chat | 7 days, 50 at most |
 | Public profile | Handle, name, bio, Space title, cover (ink, motif, random seed), format, topics, pinned post, chosen travelers, hidden stamps, web visibility, listing, brought-aboard aggregate, featured portals, automatic-section visibility and private curation, reblog default | Until removed. A handle given up stays reserved for 30 days |
 | Shares | A copy of the shared link or clip, the note and the audience | Until removed |
+| Write receipts | Hashed retry key and payload fingerprint, original clip/share ID and expiry | Replay lasts seven days; expired records are pruned on subsequent keyed writes, and account deletion removes all receipts |
 | Follows, mutes, blocks | Pairs of account ids | Until changed |
 | Reports | Who reported what, why, and when | 180 days after resolution |
 | Sign-in tokens | One-way hashes, with the app that asked | Access 1 hour, refresh 30 days. Unused app registrations: 180 days |
@@ -36,7 +38,7 @@ A local MCPortal keeps everything in one folder: `MCPORTAL_DATA_DIR`, or `~/.mcp
 |---|---|
 | `watches/<sha256(user)>.json` | Private store follows and snapshots; atomic writes, invalid files are refused without being overwritten |
 | `<user>.json` | The room: layout, portals, saved items, pinned results (`default.json` unless `MCPORTAL_USER` is set) |
-| `clips/<user>.json` | Clips |
+| `clips/<user>.json` | Clips and their retry receipts |
 | `collections/data.json` | Account-owned collections with atomic shared-document updates |
 | `experiences/data.json` | Account-owned reading sessions, subscriptions and findings with revisions |
 | `reading/<hash>.json` | Reading history |
@@ -59,7 +61,9 @@ With `DATABASE_URL` set, the HTTP server stores everything in Postgres ([`src/db
 
 | Table | Contents |
 |---|---|
-| `mcportal_profiles` | Each account's room, as JSON, including its explicit share-audience preference |
+| `mcportal_profiles` | Each account's room, as JSON, including share-audience and reading-comfort preferences |
+| `mcportal_account_documents` | Collections and reading experiences, partitioned by account and document kind |
+| `mcportal_write_receipts` | Account/operation-scoped clip and share retry receipts |
 | `mcportal_watches` | Private store follows, product observations and findings |
 | `mcportal_clips` | Clips, with a summary for lists and a full-text search vector |
 | `mcportal_reading` | Reading history, one row per account and URL |
@@ -70,8 +74,8 @@ With `DATABASE_URL` set, the HTTP server stores everything in Postgres ([`src/db
 | `mcportal_follows`, `mcportal_mutes`, `mcportal_blocks` | Relationship pairs |
 | `mcportal_reports` | Reports and their status |
 | `mcportal_intros`, `mcportal_joins` | One-time Space-link follow suggestions and join notes |
-| `mcportal_kv` | Documents under fixed keys: `auth` (sign-in tokens and app registrations), `accounts` (accounts, invites, audit log), `public-profiles`, `collections`, `reading-experiences` |
-| `mcportal_meta` | The schema version |
+| `mcportal_kv` | Documents under fixed keys: `auth` (sign-in tokens and app registrations), `accounts` (accounts, invites, audit log), `public-profiles`; migrated collection/experience keys contain sentinels |
+| `mcportal_meta` | Schema version and completed migration markers |
 
 ## Retention
 
@@ -90,7 +94,7 @@ Caps (reading history, handoffs, seen marks) are enforced on write.
 | `clips` | `mcportal-clips-<time>.tar.gz` | Clips as Markdown |
 | `opml` | `mcportal-subscriptions-<time>.opml` | Feed sources as OPML |
 
-Hosted, the tool returns a one-time download link that expires in 15 minutes. Local, it writes to `exports/` and returns the path. Handoffs, highlights and seen marks are not exported.
+Hosted, the tool returns a one-time download link that expires in 15 minutes. Local, it writes to `exports/` and returns the path. Handoffs, highlights, seen marks and retry receipts are not exported.
 
 Full exports use version 3 and accept earlier exports on import. `import_portal` adds supported room and private reading data without replacing your existing material. Reading watches start paused for review; clip and portal references are remapped, and missing evidence stays visible. Hosted full-import uploads are limited to 80 MB.
 
@@ -121,4 +125,4 @@ Space fields were added in export version 2 and remain in version 3. Version 1 e
 
 Space profiles remain one document; these optional fields require no database migration. Stamps are computed from account creation, share weeks and Space age. Only the anonymous brought-aboard count is retained after join notes are consumed. Public HTML is cached in memory for at most a minute, with fresh visibility checks before reuse. Public pages and feeds expose only the owner's chosen public fields and everyone posts; private switches, moderation and removal affect subsequent requests. Copies already made outside MCPortal may persist.
 
-Private collections and reading experiences use the `collections` and `reading-experiences` PostgreSQL shared-document namespaces. Startup migration imports the corresponding files. Full imports pause reading watches for review, remap clip/portal references and retain missing evidence visibly; full upload limits are 80 MB. [Detailed limits](../explanation/reading-experiences.md#state-and-limits).
+Private collections and reading experiences use account-partitioned PostgreSQL rows. Startup imports the corresponding files and migrates legacy shared documents; upgrading across this boundary requires all writers to stop. Follow the [migration and rollback procedure](../how-to/migrate-account-documents.md). Full imports pause reading watches for review, remap clip/portal references and retain missing evidence visibly; full upload limits are 80 MB. [Detailed limits](../explanation/reading-experiences.md#state-and-limits).

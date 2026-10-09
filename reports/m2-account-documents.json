@@ -1,0 +1,24 @@
+{
+  "at": "2026-10-09T15:09:45.296Z",
+  "node": "v24.9.0",
+  "cpu": "Apple M2",
+  "method": "24 synthetic accounts, 4 collection and 4 experience writes each, concurrent across accounts, pool=5. Bytes are JSON query arguments/results, not network or disk bytes. No production-capacity claim.",
+  "baseline": {
+    "mode": "shared",
+    "accounts": 24,
+    "writes": 192,
+    "ms": 106.42,
+    "readBytes": 2570616,
+    "writeBytes": 2682120,
+    "calls": 960
+  },
+  "candidate": {
+    "mode": "partitioned",
+    "accounts": 24,
+    "writes": 192,
+    "ms": 28.98,
+    "readBytes": 119584,
+    "writeBytes": 122912,
+    "calls": 960
+  }
+}

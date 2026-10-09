@@ -343,6 +343,11 @@ test('browser: the original layouts retain opening, saving and reachable control
         const observed = await page.eval(`JSON.stringify({readerHidden:document.getElementById('reader').hidden,toast:document.getElementById('toast').textContent,buttons:[...document.querySelectorAll('[data-save-url="${ARTICLE}"]')].map(b=>({pressed:b.getAttribute('aria-pressed'),box:b.getBoundingClientRect()}))})`);
         throw new Error(`${layout}: ${error.message}; ${observed}`);
       });
+      // The button updates optimistically; only the committed profile proves removal.
+      const deadline = Date.now() + 5000;
+      while ((await profiles.get('default')).saved.some(item => item.url === ARTICLE) && Date.now() < deadline) {
+        await new Promise(resolve => setTimeout(resolve, 25));
+      }
       assert.equal((await profiles.get('default')).saved.some(item => item.url === ARTICLE), false);
       await tool('save_item', { url: ARTICLE, title: 'Hijacking the PS5' });
       await page.goto(`${app.base}/preview`);
@@ -987,7 +992,10 @@ test("browser: in the river, follows' shares and reblogs join their stories with
     await page.eval(`[...document.querySelectorAll('.reblog-menu [role="menuitem"]')].find((n) => n.textContent === 'Reblog').click()`);
     await page.waitFor(`${find('A post by cy')}.querySelector('.mi.reblog').classList.contains('on')`, 'the reblog to land');
     assert.equal((await read('A post by cy'))?.reblog?.label, 'Undo reblog (4 reblogs)');
-    assert.deepEqual(await page.eval(`window.__calls.at(-1)`), { name: 'share', args: { reblogOf: 's_ben', audience: 'everyone' } }, "it reblogs the post behind the story with its visible audience");
+    const reblogCall = await page.eval<any>(`window.__calls.at(-1)`);
+    assert.match(reblogCall.args.requestKey, /^[\w-]{8,100}$/);
+    const {requestKey: _reblogKey, ...reblogArgs} = reblogCall.args;
+    assert.deepEqual({name: reblogCall.name, args: reblogArgs}, { name: 'share', args: { reblogOf: 's_ben', audience: 'everyone' } }, "it reblogs the post behind the story with its visible audience");
     assert.match(await page.eval<string>(`document.getElementById('toast').textContent`), /Sent through the portal!/);
     await page.eval(`${find('A post by cy')}.querySelector('.mi.reblog').click()`);
     assert.deepEqual(await menu(), ['Undo reblog']);
@@ -1176,7 +1184,11 @@ test('browser: a standalone clip loads the saved audience before sharing, retrie
     assert.match(await page.eval<string>(`document.querySelector('.audience-help').textContent`), /Visible on your Space/);
     await page.click('.composer .row > button');
     await page.waitFor(`document.querySelector('.composer [role="status"]')`, 'the public clip share');
-    assert.deepEqual(await page.eval(`window.__shares`), [{ clipId: 'c_test', note: '', audience: 'everyone' }]);
+    const shares = await page.eval<any[]>(`window.__shares`);
+    assert.equal(shares.length, 1);
+    assert.match(shares[0].requestKey, /^[\w-]{8,100}$/);
+    const {requestKey: _shareKey, ...shareArgs} = shares[0];
+    assert.deepEqual(shareArgs, { clipId: 'c_test', note: '', audience: 'everyone' });
     assert.match(await page.eval<string>(`document.querySelector('.composer').textContent`), /Shared · Public/);
     assert.deepEqual(page.problems, []);
   } finally {
@@ -1339,7 +1351,7 @@ test('browser: kept passage follows moved text, declines duplicates and changed 
         await page.waitFor(`window.scrollY>500 || document.querySelector('#reader').scrollTop>500`,'unique text relocated beyond obsolete block');
         assert.equal(await page.eval(`Boolean(document.querySelector('#reader .handoff-note'))`),false);
       } else {
-        await page.waitFor(`document.querySelector('#reader .handoff-note')?.textContent.includes('could not be located')`,'honest unresolved passage');
+        await page.waitFor(`document.querySelector('#reader .handoff-note')?.textContent.includes(${JSON.stringify(mode === 'duplicate' ? 'occurs more than once' : 'could not be located')})`,'honest unresolved passage');
       }
       const stored=await tool('get_clip',{id:kept.clip.id});assert.equal(stored.clip.data.text,quote);
       assert.deepEqual(page.problems,[]);

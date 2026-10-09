@@ -75,6 +75,8 @@ export interface ToolContext extends SourceDeps {
   /** stdio: tell the client its tool list changed (signed in or out, a handle claimed or removed). */
   toolsChanged?: (() => void) | undefined;
   userId: string;
+  /** Explicit opt-in for a host verified to hide tool-result _meta from the model. */
+  resultMode?: 'legacy' | 'component-v1';
   /** Hosted server only: charged per tool call. Local stdio has none (unlimited). */
   budget?: UsageBudget | undefined;
   /** Who is acting (role, status). Absent = the local owner. */
@@ -93,6 +95,8 @@ export const labsOf = (ctx: Pick<ToolContext, 'labs'>): readonly string[] => ctx
 export const labOn = (ctx: Pick<ToolContext, 'labs'>, lab: string): boolean => labsOf(ctx).includes(lab);
 
 export interface CallToolResult {
+  /** Only component-only on hosts explicitly configured for that contract. */
+  _meta?: Record<string, unknown>;
   content: Array<{ type: 'text'; text: string }>;
   structuredContent?: Record<string, unknown>;
   isError?: boolean;

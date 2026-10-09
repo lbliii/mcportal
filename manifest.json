@@ -85,6 +85,10 @@
       "description": "Open a web page in reader view: clean title, byline and text, shown as a card."
     },
     {
+      "name": "read_result_page",
+      "description": "Read another text part from a component-mode result."
+    },
+    {
       "name": "save_item",
       "description": "Save or edit a bookmark with optional source description and thumbnail."
     },

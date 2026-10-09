@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import vm from 'node:vm';
+import {readFile} from 'node:fs/promises';
+const lifecycleSource=await readFile(new URL('../src/ui/room/navigation.js',import.meta.url),'utf8');
+function lifecycle(context:vm.Context){
+  context.document ??= {}; context.document.getSelection ??= ()=>null;
+  context.$$ ??= ()=>[];
+  context.hidePassageBar=()=>{}; context.HTMLElement ??= Object; context.SVGElement ??= class {};
+  vm.runInContext(lifecycleSource,context);
+}
 import { roomHtml } from '../src/mcp.ts';
 
 const html = await roomHtml();
@@ -70,6 +78,7 @@ test('returning to a room restores lane/column scroll and focus without reloadin
   const nodes: any = { grid: lane, reader: { hidden: false, classList: { remove() {} } }, roomName: {} };
   const positions: unknown[] = [];
   const context = vm.createContext({ pendingKeptLocator: null, restoreExperience: () => false, stopReading: null, refreshContinueReading() {}, $: (id: string) => nodes[id], $$: (selector: string, from: { querySelectorAll(s: string): unknown[] }) => from.querySelectorAll(selector), state: { profile: { name: 'My room' } }, root: { classList: { remove() {} } }, document: { activeElement: { focus: () => { focused = true; } } }, window: { scrollX: 0, scrollY: 150, scrollTo: (...args: unknown[]) => positions.push(args) } });
+  lifecycle(context);
   vm.runInContext(`let readerGeneration = 0, roomNavigation = null, articleUrl = null, clipId = null, docsArgs = null, spaceHandle = null, docsState = null; ${shipped('rememberRoomNavigation')} ${shipped('closeReader')} rememberRoomNavigation();`, context);
   lane.hidden = true; lane.scrollLeft = 0; column.scrollTop = 0;
   await vm.runInContext('closeReader()', context);
@@ -85,6 +94,7 @@ test('standalone card home clears card routing and loads a room', async () => {
   let loaded = 0;
   const nodes: any = { grid: { hidden: true }, reader: { classList: { remove() {} } } };
   const context = vm.createContext({ pendingKeptLocator: null, restoreExperience: () => false, stopReading: null, $: (id: string) => nodes[id], state: { profile: null }, root: { classList: { remove() {} } }, loadRoom: async () => { loaded++; } });
+  lifecycle(context);
   vm.runInContext(`let readerGeneration = 0, articleUrl = 'https://example.com', clipId = null, docsArgs = {}, spaceHandle = null, docsState = {}; ${shipped('closeReader')}`, context);
   await vm.runInContext('closeReader()', context);
   assert.equal(loaded, 1);
@@ -102,10 +112,11 @@ test('a late article result cannot replace the view after home navigation', asyn
   }
   const reader = { hidden: true, scrollTop: 0, replaceChildren: (...children: unknown[]) => replaced.push(children) };
   const context = vm.createContext({ pendingKeptLocator: null, restoreExperience: () => false, stopReading: null, $: (id: string) => id === 'reader' ? reader : id === 'readerControls' ? { replaceChildren: (...children: unknown[]) => controls.push(children) } : {}, HTMLElement: ReaderControls, rememberRoomNavigation() {}, window: { scrollTo() {} }, readerTop: () => new ReaderControls(), el() {}, $first: () => null, takeZoomSource: () => null, transition: async (update: () => void) => update(), callTool: () => new Promise((resolve) => { resolveTool = resolve; }), articleNodes: () => { throw new Error('Stale article rendered'); } });
+  lifecycle(context);
   vm.runInContext(`let readerGeneration = 0; ${shipped('renderReader')} ${shipped('setReaderControls')} ${shipped('openReader')}`, context);
   const opened = vm.runInContext(`openReader({url:'https://example.com'}, {title:'News'})`, context);
   await new Promise((done) => setImmediate(done));   // past the transition, waiting on read_article
-  vm.runInContext('readerGeneration++', context);
+  vm.runInContext("navigation.begin('room')", context);
   resolveTool({ structuredContent: { article: {} } });
   await opened;
   assert.equal(replaced.length, 1);

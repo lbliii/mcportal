@@ -2,7 +2,10 @@
 import { AppError } from '../lib/errors.ts';
 import type { PageQuery, Relation, Report, Share, SocialStore } from '../social.ts';
 import { DELETED_ID, DELETED_RESOLUTION, limitOf } from '../social-store.ts';
-import type { Queryable } from './schema.ts';
+import { pgWriteReceipt } from './write-receipts.ts';
+import { missingReplay } from '../write-receipts.ts';
+import { SOCIAL_LIMITS } from '../social.ts';
+import { transaction, type Queryable } from './schema.ts';
 
 const RELATION_TABLES: Record<Relation, string> = { follows: 'mcportal_follows', mutes: 'mcportal_mutes', blocks: 'mcportal_blocks', intros: 'mcportal_intros', joins: 'mcportal_joins' };
 
@@ -14,15 +17,24 @@ export class PgSocialStore implements SocialStore {
     this.db = db;
   }
 
-  async addShare(share: Share): Promise<void> {
-    try {
-      await this.db.query(`INSERT INTO mcportal_shares (id, account_id, data, created_at, hidden_at, root_id) VALUES ($1, $2, $3, $4, $5, $6)`,
-        [share.id, share.accountId, JSON.stringify(share), share.createdAt, share.hiddenAt ?? null, share.reblogOf?.root ?? null]);
-    } catch (error) {
-      // mcportal_shares_one_reblog: one reblog per account per original, even when two race.
-      if ((error as { code?: string }).code === '23505' && share.reblogOf) throw new AppError('conflict', 'You already reblogged it', { cause: error });
-      throw error;
-    }
+  async addShare(share: Share, requestKey?: string): Promise<Share> {
+    const { id: _id, createdAt: _at, ...payload } = share;
+    return transaction(this.db, async tx => {
+      await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`shares:${share.accountId}`]);
+      const store = new PgSocialStore(tx);
+      return pgWriteReceipt(tx, share.accountId, 'share', requestKey, payload,
+        async id => { const old = await store.getShare(id); return old?.accountId === share.accountId ? old : missingReplay(); }, async () => {
+          if (await store.countShares(share.accountId) >= SOCIAL_LIMITS.sharesPerUser) throw new AppError('limit_exceeded', 'Remove a post before publishing another.');
+          try {
+            await tx.query(`INSERT INTO mcportal_shares (id, account_id, data, created_at, hidden_at, root_id) VALUES ($1, $2, $3, $4, $5, $6)`,
+              [share.id, share.accountId, JSON.stringify(share), share.createdAt, share.hiddenAt ?? null, share.reblogOf?.root ?? null]);
+          } catch (error) {
+            if ((error as { code?: string }).code === '23505' && share.reblogOf) throw new AppError('conflict', 'You already reblogged it', { cause: error });
+            throw error;
+          }
+          return { id: share.id, result: share };
+        });
+    });
   }
 
   private row(r: { data: Share; hidden_at: Date | string | null }): Share {
@@ -147,6 +159,7 @@ export class PgSocialStore implements SocialStore {
   }
 
   async forget(accountId: string, at: string): Promise<void> {
+    await this.db.query("DELETE FROM mcportal_write_receipts WHERE user_id=$1 AND operation='share'", [accountId]);
     const shares = (await this.db.query<{ id: string }>(`SELECT id FROM mcportal_shares WHERE account_id = $1`, [accountId])).rows.map((r) => r.id);
     await this.db.query(`DELETE FROM mcportal_shares WHERE account_id = $1`, [accountId]);
     for (const table of Object.values(RELATION_TABLES)) await this.db.query(`DELETE FROM ${table} WHERE a = $1 OR b = $1`, [accountId]);

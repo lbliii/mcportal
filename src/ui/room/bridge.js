@@ -59,6 +59,7 @@
       return;
     }
     if (msg.id !== undefined) {   // request from host
+      if (msg.method === 'ui/resource-teardown') navigation.teardown();
       const ok = msg.method === 'ping' || msg.method === 'ui/resource-teardown';
       window.parent.postMessage(ok ? { jsonrpc: '2.0', id: msg.id, result: {} }
         : { jsonrpc: '2.0', id: msg.id, error: { code: -32601, message: 'Method not found' } }, '*');
@@ -77,6 +78,7 @@
    * @param {Record<string, any>} params host data, checked field by field below
    */
   function onHostNotification(method, params) {
+    if (navigation.is('closed')) return;
     if (method === 'ui/notifications/tool-input' || method === 'ui/notifications/tool-input-partial') {
       toolRunning = true;   // the host is running our tool: wait for its result
       const args = params.arguments || {};
@@ -88,7 +90,7 @@
       setStatus('Stand by…');
     } else if (method === 'ui/notifications/tool-result') {
       toolRunning = false;
-      const data = params.structuredContent;
+      const data = componentData(params);
       pendingHandoff = data && data.handoff && typeof data.handoff.url === 'string' ? data.handoff : null;   // open_handoff: open at the sent place
       if (params.isError) {
         gotInitialResult = true;
@@ -166,7 +168,18 @@
       const text = (/** @type {Array<{ text?: string }>} */ (result.content || [])).map((c) => c.text).filter(Boolean).join(' ');
       throw new Error(text || `${name} failed`);
     }
+    if (result) result.structuredContent = componentData(result);
     return result || {};
+  }
+
+  /** Full typed data is available only under a host's component metadata contract.
+   * @param {Record<string, any>} result @returns {any}
+   */
+  function componentData(result) {
+    if (result.structuredContent?.resultView?.format !== 'component-v1') return result.structuredContent;
+    const data = result._meta?.['mcportal/component-v1'];
+    if (!data || typeof data !== 'object') throw new Error('This host did not deliver the component data. The attributed text remains in chat. Use legacy result mode for this host');
+    return data;
   }
 
   /** @param {string} url */

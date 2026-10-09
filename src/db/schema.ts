@@ -47,7 +47,7 @@ export async function connect(url: string, options: { searchPath?: string } = {}
   return pool as unknown as Queryable;
 }
 
-export const SCHEMA_VERSION = '11';
+export const SCHEMA_VERSION = '13';
 
 export async function ensureSchema(db: Queryable): Promise<void> {
   await db.query(`CREATE TABLE IF NOT EXISTS mcportal_meta (key text PRIMARY KEY, value text NOT NULL)`);
@@ -64,6 +64,10 @@ export async function ensureSchema(db: Queryable): Promise<void> {
     updated_at timestamptz NOT NULL DEFAULT now()
   )`);
   await db.query(`CREATE TABLE IF NOT EXISTS mcportal_reading (user_id text NOT NULL, url text NOT NULL, data jsonb NOT NULL, PRIMARY KEY(user_id, url))`);
+  // v13: bounded retry receipts, committed with the created object.
+  await db.query(`CREATE TABLE IF NOT EXISTS mcportal_write_receipts (user_id text NOT NULL, operation text NOT NULL, key text NOT NULL, data jsonb NOT NULL, expires_at bigint NOT NULL, PRIMARY KEY(user_id,operation,key))`);
+  // v12: account-sized collections and reading experience documents.
+  await db.query(`CREATE TABLE IF NOT EXISTS mcportal_account_documents (kind text NOT NULL CHECK (kind IN ('collections','reading-experiences')), user_id text NOT NULL, data jsonb NOT NULL, PRIMARY KEY(kind,user_id))`);
   // v11: private watch subscriptions, bounded snapshots and findings, locked per account.
   await db.query(`CREATE TABLE IF NOT EXISTS mcportal_watches (user_id text PRIMARY KEY, data jsonb NOT NULL)`);
   // v2: clips. Content in `data`; `summary` is everything but the content, for lists.

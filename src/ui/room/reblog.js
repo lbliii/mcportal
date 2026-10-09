@@ -151,10 +151,16 @@
    */
   async function postReblog(target, note, audience) {
     const extra = { ...(note ? { note } : {}), audience };
-    if (target.shareId) return (await callTool('share', { reblogOf: target.shareId, ...extra })).structuredContent.share;
+    if (target.shareId) {
+      const payload = { reblogOf: target.shareId, ...extra };
+      const result = (await callTool('share', { ...payload, requestKey: pendingWriteKey('share', payload) })).structuredContent.share;
+      confirmWrite('share', payload); return result;
+    }
     const url = target.url ?? '';
     if (!(await saveReblogLink(target))) return null;   // saving failed; changeSaved said why
-    return (await callTool('share', { savedUrl: url, ...extra })).structuredContent.share;
+    const payload = { savedUrl: url, ...extra };
+    const result = (await callTool('share', { ...payload, requestKey: pendingWriteKey('share', payload) })).structuredContent.share;
+    confirmWrite('share', payload); return result;
   }
 
   /** It happened: mark it everywhere, stamp the button, say so. @param {ReblogTarget} target @param {SharedItem} share @param {HTMLElement} [button] */

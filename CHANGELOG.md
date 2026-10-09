@@ -8,8 +8,13 @@
 
 ### Storage
 - Enforce clip count and byte quotas atomically per account in Postgres, including concurrent saves and metadata edits. Local stores also check metadata growth; edits that reduce size remain available at the limit.
+- Partition hosted collections and reading experiences by account, with a transactional migration and rollback procedure that requires stopped writers.
+- Add seven-day, account-scoped retry receipts for clip creation, shares and reblogs. Repeating the same request key returns the committed result; conflicting payloads and deleted results fail explicitly.
 
 ### Core content loop
+- Keep optional passage context, content digests and revisions with retained evidence. Reopening a passage distinguishes a unique match from moved, changed, ambiguous or unavailable source text.
+- Save reader text size and line width privately to the account, preserve them across older profile writers, and provide a reset.
+- Give room, reader, documentation and reading experiences a shared navigation lifecycle so stale responses cannot replace a newer view and Back restores room context.
 - Integrate reader wave 2 with full-height reading, separate controls, bounded image retries and improved article extraction while preserving Recall, reading tabs, page find and reading preferences.
 - Size clip Share icons consistently with other controls.
 - Add a keyboard passage chooser, useful reader destination focus and stable Recall preview focus. Documentation search explains its coverage and GitHub pages show their actual version.
@@ -18,6 +23,8 @@
 - Record two rounds of explicitly simulated developer/researcher proxy tasks and logical later-day retrieval, plus a bounded accessibility audit. These are not human usability or adoption evidence.
 
 ### For hosts and agents
+- Add an opt-in `component-v1` result mode with a 32 KiB model-visible result budget, paginated source text and complete private component data. Actual-host verification remains pending; legacy results stay the default.
+- Add `read_result_page`, an optional article `part`, and optional `requestKey` fields for clip creation and sharing. Reading preferences use app-only tools.
 - `search_library` adds optional `library.search` details with the effective query and coverage explanation. Existing result fields and input arguments remain compatible; older hosted results still render.
 - `import_opml` adds `added`, `alreadyPresent` and `deferred` result fields. A valid import with no working feeds returns its detailed outcome and leaves a new room unconfigured.
 - `open_handoff` may return `{ unavailable: true, handoff }` when the live source fails; its text still includes the fenced retained passage. No live article content is implied.
