@@ -7,6 +7,7 @@ import { readFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { CLIP_LIMITS, ClipError, clampLimit, normalizeTags, patchClip, queryWords, searchTextOf, summaryOf, type Clip, type ClipPatch, type ClipQuery, type ClipSummary } from './clips.ts';
 import { atomicWrite, defaultDataDir, KeyedMutex, safeFileId } from './lib/files.ts';
+import { matchesTerm } from './lib/search.ts';
 
 export interface ClipStore {
   /**
@@ -34,8 +35,9 @@ export function filterClips(clips: Clip[], query: ClipQuery = {}): ClipSummary[]
     .filter((c) => (!query.kind || c.kind === query.kind)
       && (!tag || c.tags.includes(tag))
       && (!query.before || c.createdAt < query.before)
-      && (!words.length || words.every((w) => searchTextOf(c).includes(w))))
-    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0))
+      && (!words.length || words.every((w) => searchTextOf(c).includes(w)))
+      && (!query.exactTerms?.length || query.exactTerms.every(w => matchesTerm(searchTextOf(c), w))))
+    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : query.exactTerms ? a.id.localeCompare(b.id) : 0))
     .slice(0, clampLimit(query.limit, 20, CLIP_LIMITS.perUser))
     .map(summaryOf);
 }

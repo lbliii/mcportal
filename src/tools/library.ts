@@ -10,7 +10,8 @@ export const LIBRARY_TOOLS: ToolDef[] = [{
   _meta: { ui: { resourceUri: ROOM_URI } },
   handler: async (args, ctx) => {
     const library = ctx.library ? await ctx.library.search(ctx.userId, args as LibraryQuery) : await searchLibrary(ctx.userId, args as LibraryQuery, ctx);
-    const text = library.hits.map(h => `${h.ref} | ${h.clipKind ?? (h.saved ? 'saved link' : 'reading')} | ${h.title} | ${h.source} | ${h.excerpt}${h.url ? ` | ${h.url}` : ''}`).join('\n');
-    return ok(`${library.total} match(es).${library.nextOffset !== null ? ` Next offset: ${library.nextOffset}.` : ''}\n${untrusted('Your retained material', text)}`, { library } satisfies ToolResults['search_library']);
+    const text = library.hits.map(h => `${h.ref} | ${h.clipKind ?? (h.saved ? 'saved link' : 'reading')} | ${h.title} | ${h.source} | ${h.excerpt}${h.url ? ` | ${h.url}` : ''}${h.matched.length ? ` | Matched: ${h.matched.join(', ')}` : ''}`).join('\n');
+    const search = library.search ? `${library.search.coverage}\n${untrusted('Search words', library.search.query)}\n` : '';
+    return ok(`${library.total} match(es).${library.nextOffset !== null ? ` Next offset: ${library.nextOffset}.` : ''}\n${search}${untrusted('Your retained material', text)}`, { library } satisfies ToolResults['search_library']);
   },
 }];

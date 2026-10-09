@@ -8,6 +8,8 @@ These features are currently on `main` under [Unreleased](../../CHANGELOG.md#unr
 
 **Recall Shelf** searches saved links, retained clip text and reading history together. Filters cover kind, site, tags and reading status. Results distinguish retained material from links that must be fetched again. Kept passages carry locators: reopening highlights an exact, unique text match; changed or ambiguous passages show a notice rather than guessing.
 
+Recall recognizes explicit search prefixes such as “Find the article about…” and removes surrounding title quotes. It keeps identifiers and versions distinct from longer lookalikes. Each result explains which fields matched, and the search explanation shows the words used and what was covered. Saved links and history contribute metadata, not the original page body; retained clips contribute up to 40,000 indexed characters. Use words from the source when a conceptual description finds nothing. See the [retrieval benchmark](../../evals/recall/README.md) for measured results and limitations.
+
 **Topic Desks** are private collections of links, clips, personal notes and selected live portals. Agent orientations are explicit requests, labeled as agent writing and tied to evidence refs. Removing membership never removes the underlying saved item or clip. Missing sources remain visible for repair.
 
 **Comparison** shows two or three sources in independently scrolling panes, with compact source tabs on narrow screens. Evidence passages and dated fetch information sit beside a separately labeled agent interpretation. Saving a comparison makes it a private collection. A missing source keeps the comparison editable.

@@ -25,6 +25,7 @@
     "check": "npm run typecheck && npm run design:check && npm test",
     "footprint": "node scripts/footprint.ts",
     "eval:tools": "node scripts/eval-tools.ts",
+    "eval:recall": "node scripts/eval-recall.ts",
     "release": "node scripts/release.ts",
     "support:check": "node scripts/check-support.ts",
     "planning:check": "node scripts/planning-horizon.ts"

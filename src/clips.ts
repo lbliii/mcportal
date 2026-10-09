@@ -82,6 +82,8 @@ export interface ClipQuery {
   tag?: string | undefined;
   /** Words that must all appear (title, note, tags, text). */
   query?: string | undefined;
+  /** Internal Recall constraint. Public clips.list keeps its existing query semantics. */
+  exactTerms?: string[] | undefined;
   limit?: number | undefined;
   /** Only clips created before this ISO time (paging). */
   before?: string | undefined;
