@@ -49,7 +49,8 @@ Shop (`watches`) is created by a confirmed store follow. Reading watches use the
 
 | Tool | Hints | What it does | Inputs |
 |---|---|---|---|
-| `read_article` | `RO` `OW` | Opens a web page in reader view and shows it as a card. | `url*` |
+| `read_article` | `RO` `OW` | Opens a web page in reader view and shows it as a card. Text parts are one-based; the card retains the complete extracted article. | `url*`, `part` |
+| `read_result_page` | `RO` | Continues a text result in opt-in component mode, using an account-scoped handle that expires within ten minutes. | `handle*`, `part*` |
 | `list_reading` | `RO` | Lists pages the user opened and hasn't finished, newest first. | `unfinished`, `limit` |
 | `open_handoff` | `RO` `OW` | Opens a page the user sent from the reader to a new chat ("Open MCPortal handoff k7q2xm"). Without a code, opens the newest unopened one. | `code` |
 
@@ -99,13 +100,15 @@ Shop is the private `watches` source, created by confirmation. Use `open_room` f
 
 | Tool | Hints | What it does | Inputs |
 |---|---|---|---|
-| `clip` | — | Keeps a quote, exchange, note, table, image or link from the chat, verbatim. Article sources can include a passage locator. The first clip adds a Clips portal. | `kind*`, `content`, `turns`, `title`, `note`, `tags`, `source`, `attribution` |
+| `clip` | — | Keeps a quote, exchange, note, table, image or link from the chat, verbatim. Article sources can include a passage locator. The first clip adds a Clips portal. | `kind*`, `content`, `turns`, `title`, `note`, `tags`, `source`, `attribution`, `requestKey` |
 | `search_clips` | `RO` | Finds clips by words, kind or tag. Returns summaries. | `query`, `kind`, `tag`, `limit`, `before` |
 | `get_clip` | `RO` | Shows one clip in full, as a card. | `id*` |
 | `update_clip` | — | Changes a clip's title, note or tags. Content can't change. | `id*`, `title`, `note`, `tags` |
 | `delete_clip` | `D` | Deletes one clip. | `id*` |
 
 Clip kinds: `quote`, `exchange`, `note`, `table`, `image`, `link`.
+
+Clip creation and `share` accept an optional `requestKey`. Reuse it with the same input to reconcile an uncertain response for seven days; intentional new actions need a new key. Conflicting input or a deleted original fails explicitly. [Retry scope, expiry and UI behavior](../explanation/retry-safety.md).
 
 ## Social
 
@@ -117,7 +120,7 @@ Hosted servers only. A local MCPortal that isn't signed in has no social layer, 
 | `get_public_profile` | `RO` | Returns the user's public profile and a suggested handle, or someone else's. | `handle` |
 | `set_public_profile` | `OW` | Creates or changes the public profile and Space: handle, name, bio, Space title, cover ink and motif, format, topics, own pinned post, listed fellow travelers, hidden stamps, web visibility (public by default), featured portals, default reblog setting, and whether `find_people` can suggest them (`listed`, off by default). | `handle`, `displayName`, `bio`, `spaceTitle`, `ink`, `motif`, `reroll`, `format`, `frequency`, `pinnedShareId`, `travelers`, `hiddenStamps`, `public`, `featuredPortalIds`, `reblogs`, `listed` |
 | `remove_public_profile` | `D` | Removes the handle, name and bio. The handle stays reserved for 30 days. | none |
-| `share` | `OW` | Shares a saved link or clip with a note, or reblogs a post, to followers or everyone who can see the Space (`followers` or `everyone`). | `savedUrl`, `clipId`, `reblogOf`, `note`, `audience`, `reblogs` |
+| `share` | `OW` | Shares a saved link or clip with a note, or reblogs a post, to followers or everyone who can see the Space (`followers` or `everyone`). | `savedUrl`, `clipId`, `reblogOf`, `note`, `audience`, `reblogs`, `requestKey` |
 | `unshare` | `D` | Removes a share or reblog. | `id*` |
 | `get_share` | `RO` | Shows one share or reblog in full, as a card, with `canFollow` when it offers a Follow. | `id*` |
 | `share_settings` | `D` `OW` | Changes who may reblog a post, or detaches it from someone's reblog (permanent). | `id*`, `reblogs`, `detach` |
@@ -159,6 +162,8 @@ The room UI calls these through the MCP Apps bridge. They are declared with `_me
 | `create_handoff` | Stores a page and selected passage under a short code for `open_handoff` |
 | `record_reading` | Records that a URL was seen, opened or read, with progress |
 | `get_reading` | Returns where the user left off in a URL |
+| `get_reading_preferences` | Returns private reader text size and line width, with defaults for legacy profiles |
+| `set_reading_preferences` | Saves reader text size (`standard`, `large`, `larger`) and line width (`comfortable`, `focused`) without changing room layout |
 | `pass_person` | The People portal's Not for me: removes the suggestion, and `find_people` remembers the pass for 90 days |
 | `catch_up` | Captures and resumes a finite set of unseen stories. Actions: `open`, `start`, `skip`, `finish`, `end`; inputs include `count`, `portalIds`, `sessionId` and `index`. Finishing/ending marks only the captured set seen, never articles read |
 

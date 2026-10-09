@@ -18,7 +18,7 @@ export async function resultFixtures() {
     if(url.includes('/unavailable'))throw new AppError('unavailable','Synthetic source unavailable');
     return {url,status:200,contentType:url.endsWith('llms.txt')?'text/plain':url.endsWith('.md')?'text/markdown':'text/html',truncated:false,text:url.endsWith('llms.txt')?`# Bench docs\n\n## Manual\n\n- [Long page](${url.replace('llms.txt','long.md')}): full body\n- [Other](https://example.com/other.md)\n- [Third](https://example.com/third.md)\n`:url.endsWith('.md')?body:`<html><head><title>Long article</title></head><body><article><h1>Long article</h1>${body.split('\n\n').map(p=>`<p>${p}</p>`).join('')}</article></body></html>`};
   }};
-  await ctx.store.put(ctx.userId,{...defaultProfile(),columns:[],saved:Array.from({length:100},(_,i)=>({url:`https://example.com/${i}`,title:`Retained item ${i} ${'more context '.repeat(8)}`,savedAt:new Date().toISOString()}))});
+  await ctx.store.put(ctx.userId,{...defaultProfile(),onboarded:true,columns:[{width:1,panels:[{id:'saved',source:'saved',title:'Saved',config:{limit:10}}]}],saved:Array.from({length:100},(_,i)=>({url:`https://example.com/${i}`,title:`Retained item ${i} ${'more context '.repeat(8)}`,savedAt:new Date().toISOString()}))});
   const clip=await ctx.clips!.add(ctx.userId,buildClip({kind:'quote',title:'Long quote',source:{kind:'article',url},text:'Retained quoted words. '.repeat(1200)}));
   const live=await ctx.handoffs!.create(ctx.userId,{url,title:'Live long source',place:{kind:'article'},passage:'Retained quoted words.'});
   const unavailable=await ctx.handoffs!.create(ctx.userId,{url:'https://example.com/unavailable',title:'Unavailable source',place:{kind:'article'},passage:'The original retained quote remains readable.'});

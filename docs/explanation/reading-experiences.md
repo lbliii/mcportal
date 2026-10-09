@@ -8,6 +8,8 @@ These features are currently on `main` under [Unreleased](../../CHANGELOG.md#unr
 
 **Recall Shelf** searches saved links, retained clip text and reading history together. Filters cover kind, site, tags and reading status. Results distinguish retained material from links that must be fetched again. Kept passages carry locators: reopening highlights an exact, unique text match; changed or ambiguous passages show a notice rather than guessing.
 
+Recall recognizes explicit search prefixes such as “Find the article about…” and removes surrounding title quotes. It keeps identifiers and versions distinct from longer lookalikes. Each result explains which fields matched, and the search explanation shows the words used and what was covered. Saved links and history contribute metadata, not the original page body; retained clips contribute up to 40,000 indexed characters. Use words from the source when a conceptual description finds nothing. See the [retrieval benchmark](../../evals/recall/README.md) for measured results and limitations.
+
 **Topic Desks** are private collections of links, clips, personal notes and selected live portals. Agent orientations are explicit requests, labeled as agent writing and tied to evidence refs. Removing membership never removes the underlying saved item or clip. Missing sources remain visible for repair.
 
 **Comparison** shows two or three sources in independently scrolling panes, with compact source tabs on narrow screens. Evidence passages and dated fetch information sit beside a separately labeled agent interpretation. Saving a comparison makes it a private collection. A missing source keeps the comparison editable.
@@ -35,6 +37,14 @@ Artist discovery needs the server's `TICKETMASTER_API_KEY`. The user selects a r
 A background worker checks due reading watches every six hours, with durable leases, retries and overdue status. Local workers pause while signed in to hosted state; linked clients use the hosted watch operation. Suspended accounts are skipped. No model runs in the worker.
 
 ## State and limits
+
+### Reading comfort
+
+The reader's **Reading** controls save text size and line width privately in the existing room profile. They apply to articles and docs across reopened cards and linked devices; ghost mode keeps them locally. **Reset** saves the existing defaults: **Standard** text (1rem) and **Comfortable** lines (72ch). Large and Larger use 1.125rem and 1.25rem; Focused lines use 60ch. These relative sizes preserve browser text sizing. Host theme and room arrangement keep their own settings.
+
+The scope is account-wide because the existing profile already owns durable personal settings. Defaults retain the established reader appearance; this is a compatibility decision, not a finding about human preferences. A failed save is labeled as session-only. Older profiles get defaults, and writers that omit the new field preserve the saved value. Full exports include it; resetting or deleting the account removes the choice.
+
+### Stored reading state
 
 Collections and reading experience state belong to the caller. Files and PostgreSQL use atomic updates and revisions. Linked methods enforce authenticated ownership. Account deletion removes both stores. Full exports include them; additive imports remap clip and portal refs, preserve unavailable references visibly and pause imported watches for review. Private collections and watch state never enter public Spaces.
 

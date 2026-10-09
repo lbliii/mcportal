@@ -10,10 +10,10 @@
   "cases": [
     {
       "name": "room",
-      "legacyModelBytes": 22845,
-      "componentModelBytes": 1280,
-      "completeWireBytes": 23177,
-      "componentDataBytes": 21888,
+      "legacyModelBytes": 24160,
+      "componentModelBytes": 1183,
+      "completeWireBytes": 24492,
+      "componentDataBytes": 23300,
       "parts": {
         "format": "component-v1",
         "tool": "open_room",
@@ -32,7 +32,7 @@
         "tool": "read_article",
         "part": 1,
         "parts": 2,
-        "handle": "56eee998-93ef-463d-b7aa-c6c16633db6c",
+        "handle": "975175ac-dec4-4a01-8cf6-997139fb6942",
         "expiresInSeconds": 600
       }
     },
@@ -60,7 +60,7 @@
         "tool": "get_clip",
         "part": 1,
         "parts": 3,
-        "handle": "8305addc-026f-4bb8-9319-ff932ee992c1",
+        "handle": "7bd1ff42-0044-4f83-a48a-de582d2b4109",
         "expiresInSeconds": 600
       }
     },
@@ -88,7 +88,7 @@
         "tool": "open_handoff",
         "part": 1,
         "parts": 2,
-        "handle": "4b10fdfe-c378-4d57-b23a-4440cd5c6997",
+        "handle": "4228f440-d654-4755-b3bf-7bd799f2d897",
         "expiresInSeconds": 600
       }
     },

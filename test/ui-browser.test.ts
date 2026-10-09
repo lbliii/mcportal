@@ -174,6 +174,34 @@ test('browser: Recall opens retained pages and returns with query, filters and f
   assert.deepEqual(page.problems, []);
 });
 
+test('browser: Recall explains normalized search, match provenance and bookmark coverage', { skip }, async () => {
+  await profiles.put('default', room());
+  await openRoom();
+  await page.click('#btnRecall');
+  await page.waitFor(`document.querySelector('.recall-hit')`, 'Recall results');
+  await page.eval(`document.querySelector('[aria-label="Search your library"]').value = 'Find the article about Hijacking'; document.querySelector('[aria-label="Filter by kind"]').value = 'saved'; document.querySelector('.recall-search').requestSubmit()`);
+  await page.waitFor(`document.querySelector('#recallCount').textContent.includes('1 match for')`, 'normalized search');
+  assert.match(await page.eval<string>(`document.querySelector('#recallCoverage').textContent`), /Search words: hijacking/);
+  assert.match(await page.eval<string>(`document.querySelector('.recall-hit').textContent`), /Matched: Saved title/);
+  assert.match(await page.eval<string>(`document.querySelector('#recallCoverage').textContent`), /Original page bodies are not searched/);
+  await page.eval(`document.querySelector('[aria-label="Search your library"]').value = 'nonexistent platypus'; document.querySelector('.recall-search').requestSubmit()`);
+  await page.waitFor(`document.querySelector('.experience-empty h2')?.textContent === 'No matching material'`, 'empty search');
+  assert.match(await page.eval<string>(`document.querySelector('.experience-empty').textContent`), /Saving a link does not retain its page text/);
+  // A newer UI must still render an older hosted result without search metadata.
+  await page.eval(`window.recallOriginalFetch = window.fetch; window.fetch = async (...args) => {
+    const response = await window.recallOriginalFetch(...args);
+    if (!String(args[0]).endsWith('/mcp')) return response;
+    const data = await response.clone().json();
+    if (!data.result?.structuredContent?.library) return response;
+    delete data.result.structuredContent.library.search;
+    return new Response(JSON.stringify(data), { status: response.status, headers: response.headers });
+  }; document.querySelector('[aria-label="Search your library"]').value = 'legacy'; document.querySelector('.recall-search').requestSubmit()`);
+  await page.waitFor(`document.querySelector('#recallCount').textContent.includes('legacy')`, 'old result');
+  assert.match(await page.eval<string>(`document.querySelector('#recallCoverage').textContent`), /Searches saved and reading metadata/);
+  await page.eval(`window.fetch = window.recallOriginalFetch; delete window.recallOriginalFetch`);
+  assert.deepEqual(page.problems, []);
+});
+
 test('browser: selected Recall material creates a desk, supports a trail and compares real sources on a narrow screen', { skip }, async () => {
   await profiles.update('default', profile => ({ profile: { ...profile, saved: [...profile.saved, { url: `${DOCS}/install.md`, title: 'Install Example Docs', savedAt: new Date().toISOString() }] }, result: undefined }));
   await openRoom();

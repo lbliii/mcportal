@@ -2,16 +2,19 @@
 
 ## Unreleased
 
+### Recall Shelf
+- Find saved material with conversational search prefixes or quoted titles, and keep identifiers and versions distinct from longer lookalikes. Results explain the matching fields, effective search words and indexed coverage; saved links do not imply retained page text.
+- Add a reproducible 40-query synthetic retrieval benchmark across file, Postgres and linked storage, with separate development/validation splits and source/passage checks.
+
 ### Storage
-- Partition hosted collections and reading experiences by account, with validated transactional migration and reconstruction rollback. Stop all writers for this storage transition; see `docs/how-to/migrate-account-documents.md`.
-- Reconcile clip/share retries with optional account-scoped request keys and seven-day receipts, including deleted-result tombstones.
 - Enforce clip count and byte quotas atomically per account in Postgres, including concurrent saves and metadata edits. Local stores also check metadata growth; edits that reduce size remain available at the limit.
+- Partition hosted collections and reading experiences by account, with a transactional migration and rollback procedure that requires stopped writers.
+- Add seven-day, account-scoped retry receipts for clip creation, shares and reblogs. Repeating the same request key returns the committed result; conflicting payloads and deleted results fail explicitly.
 
 ### Core content loop
-- Measure Recall against 40 frozen synthetic queries; improve exact version ranking and disclose the keyword fallback for empty natural-language searches and indexed coverage.
-- Keep bounded passage context and a representation digest with clips/handoffs; distinguish unique relocated text from ambiguous or unavailable matches.
-- Save reading size and width with the account, preserve them when older clients rewrite a profile, and persist explicit reset.
-- Centralize navigation ownership and return context for Recall, article/docs reading and handoff recovery.
+- Keep optional passage context, content digests and revisions with retained evidence. Reopening a passage distinguishes a unique match from moved, changed, ambiguous or unavailable source text.
+- Save reader text size and line width privately to the account, preserve them across older profile writers, and provide a reset.
+- Give room, reader, documentation and reading experiences a shared navigation lifecycle so stale responses cannot replace a newer view and Back restores room context.
 - Integrate reader wave 2 with full-height reading, separate controls, bounded image retries and improved article extraction while preserving Recall, reading tabs, page find and reading preferences.
 - Size clip Share icons consistently with other controls.
 - Add a keyboard passage chooser, useful reader destination focus and stable Recall preview focus. Documentation search explains its coverage and GitHub pages show their actual version.
@@ -20,8 +23,9 @@
 - Record two rounds of explicitly simulated developer/researcher proxy tasks and logical later-day retrieval, plus a bounded accessibility audit. These are not human usability or adoption evidence.
 
 ### For hosts and agents
-- Add an opt-in `component-v1` result contract with a 32 KiB complete model-visible budget, full component metadata and account-scoped text continuation. Legacy is still the default; actual-host metadata verification is required before enabling.
-- Add optional article `part`, clip/share `requestKey`, and passage context/digest/revision fields.
+- Add an opt-in `component-v1` result mode with a 32 KiB model-visible result budget, paginated source text and complete private component data. Actual-host verification remains pending; legacy results stay the default.
+- Add `read_result_page`, an optional article `part`, and optional `requestKey` fields for clip creation and sharing. Reading preferences use app-only tools.
+- `search_library` adds optional `library.search` details with the effective query and coverage explanation. Existing result fields and input arguments remain compatible; older hosted results still render.
 - `import_opml` adds `added`, `alreadyPresent` and `deferred` result fields. A valid import with no working feeds returns its detailed outcome and leaves a new room unconfigured.
 - `open_handoff` may return `{ unavailable: true, handoff }` when the live source fails; its text still includes the fenced retained passage. No live article content is implied.
 - Ship the new successful handoff variant in the next minor release under the compatibility policy; callers must handle unavailable live content before reading article/docs fields.

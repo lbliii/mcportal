@@ -3,6 +3,7 @@ import { pgWriteReceipt } from './write-receipts.ts';
 import { missingReplay } from '../write-receipts.ts';
 import { clipQuotaProblem } from '../clip-stores.ts';
 import { CLIP_LIMITS, ClipError, clampLimit, normalizeTags, patchClip, queryWords, searchTextOf, summaryOf, type Clip, type ClipPatch, type ClipQuery, type ClipStore, type ClipSummary } from '../clips.ts';
+import { exactTermPattern } from '../lib/search.ts';
 import { transaction, type Queryable } from './schema.ts';
 
 /** Escape LIKE wildcards so a search word matches literally. */
@@ -58,8 +59,9 @@ export class PgClipStore implements ClipStore {
     const tag = query.tag ? normalizeTags([query.tag])[0] : undefined;
     if (tag) add('? = ANY(tags)', tag);
     if (query.before && !Number.isNaN(Date.parse(query.before))) add('created_at < ?', query.before);
+    if (query.exactTerms?.length) add('search_text ~ ALL(?::text[])', query.exactTerms.map(term => exactTermPattern(term, true)));
     const words = queryWords(query.query);
-    let order = 'created_at DESC';
+    let order = 'created_at DESC, id ASC';
     if (words.length && words.every((word) => /^[\p{L}\p{N}]+$/u.test(word))) {
       values.push(words.join(' '));
       const fullText = `plainto_tsquery('english'::regconfig, $${values.length})`;
@@ -67,7 +69,7 @@ export class PgClipStore implements ClipStore {
       // Keep literal substring/punctuation and stopword-only queries useful while
       // also matching inflections. Parameters never become tsquery syntax.
       where.push(`(search_vector @@ ${fullText} OR search_text LIKE ALL($${values.length}::text[]))`);
-      order = `ts_rank_cd(search_vector, ${fullText}) DESC, created_at DESC`;
+      order = `ts_rank_cd(search_vector, ${fullText}) DESC, created_at DESC, id ASC`;
     } else if (words.length) {
       // Signs and identifier punctuation are literal, rather than silently
       // discarded by the full-text parser (e.g. 100% must not match 100).

@@ -3,6 +3,7 @@ import { CLIP_LIMITS, queryWords, type ClipKind, type ClipStore, type ClipSummar
 import { AppError } from './lib/errors.ts';
 import type { PassageLocator } from './evidence.ts';
 import { clean } from './lib/text.ts';
+import { isExactTerm, matchesTerm, recallWords } from './lib/search.ts';
 import type { Profile } from './profile.ts';
 import { canonicalReadingUrl, READING_LIMIT, type ReadingState, type ReadingStore } from './reading.ts';
 import type { ProfileStore } from './store.ts';
@@ -28,8 +29,12 @@ export interface LibraryHit {
   reading?: ReadingState;
   matched: string[];
 }
-export const LIBRARY_COVERAGE = 'Searches saved-link titles and notes, retained clip text and metadata, and reading-history titles and addresses. Saved links and history do not index live article bodies. Seen-only items appear only with the seen filter. Other accounts are never searched.';
-export interface LibraryResult { query: string; effectiveQuery?: string; coverage?: string; hits: LibraryHit[]; total: number; offset: number; nextOffset: number | null }
+export interface LibraryResult {
+  query: string; hits: LibraryHit[]; total: number; offset: number; nextOffset: number | null;
+  /** Additive: old hosted servers may omit search details. */
+  search?: { query: string; coverage: string };
+}
+export const LIBRARY_COVERAGE = 'Searches saved titles, addresses and notes; reading titles and addresses; and retained clip text and metadata (up to 40,000 indexed characters per clip). Original page bodies are not searched. Use words from the source; this is not semantic search.';
 export interface LibrarySearch { search(userId: string, query: LibraryQuery): Promise<LibraryResult> }
 export interface LibrarySources { store: ProfileStore; clips?: ClipStore | undefined; reading?: ReadingStore | undefined }
 export const LIBRARY_SCHEMA = { type: 'object', additionalProperties: false, properties: {
@@ -65,33 +70,37 @@ function docsFor(url: string, profile: Profile): string | undefined {
 }
 
 /** Match and rank metadata; clip-body matches are supplied by the clip store's text index. */
-function relevance(hit: LibraryHit, query: string, bodyMatch = false): number {
+function relevance(hit: LibraryHit, query: string, clip?: ClipSummary): number {
   const words = queryWords(query);
   const fields: Array<[string, string, number]> = [
-    ['Title', hit.title, 12], ['Note or preview', hit.excerpt, 5], ['Tag', hit.tags.join(' '), 8], ['Address or source', `${hit.url ?? ''} ${hit.source}`, 2],
+    [clip ? 'Clip title' : hit.saved ? 'Saved title' : 'Reading title', hit.title, 12],
+    ['Tag', hit.tags.join(' '), 8], ['Address or source', `${hit.url ?? ''} ${hit.source}`, 2],
   ];
+  if (clip) fields.push(['Clip note', clip.note ?? '', 5], ['Clip preview', clip.preview, 5], ['Source title', clip.source.title ?? '', 2]);
+  else fields.push(['Saved note', hit.excerpt, 5]);
   if (!words.length) return 0;
   const text = fields.map(f => f[1]).join(' ').toLowerCase();
-  if (!bodyMatch && !words.every(w => text.includes(w))) return -1;
-  let score = bodyMatch ? 1 : 0;
+  if (!clip && !words.every(w => matchesTerm(text, w))) return -1;
+  let score = clip ? 1 : 0;
   for (const [label, value, weight] of fields) {
     const lower = value.toLowerCase();
-    const matches = words.filter(w => lower.includes(w)).length;
+    const matches = words.filter(w => matchesTerm(lower, w)).length;
     if (!matches) continue;
     hit.matched.push(label);
     score += matches * weight;
     if (query.trim() && lower.includes(query.trim().toLowerCase())) score += weight * 2;
-    // Exact tokens outrank substrings: v2 must precede v20/v22, request_id precedes request_id_extra.
-    const tokens = lower.split(/[^\p{L}\p{N}_+.:%=-]+/u);
-    score += words.filter(w => tokens.includes(w)).length * weight * 3;
   }
-  if (bodyMatch && !words.every(w => text.includes(w))) hit.matched.push('Clip text');
+  // The clip index can match beyond the preview, including Postgres inflections
+  // in metadata. Do not claim an unseen match is necessarily in the source body.
+  if (clip && !words.every(w => matchesTerm(text, w))) hit.matched.push('Indexed clip text or metadata');
   return score;
 }
 
 /** The hosted API calls this with its own stores, avoiding linked-client list-page caps. */
-async function searchLiteral(userId: string, raw: LibraryQuery, stores: LibrarySources): Promise<LibraryResult> {
+export async function searchLibrary(userId: string, raw: LibraryQuery, stores: LibrarySources): Promise<LibraryResult> {
   const query = clean(raw.query, 300);
+  const searchQuery = queryWords(recallWords(query)).join(' ');
+  const exactTerms = queryWords(searchQuery).filter(isExactTerm);
   if (raw.kind !== undefined && !LIBRARY_KINDS.includes(raw.kind)) throw new AppError('invalid_argument', 'Unknown library kind.');
   if (raw.status !== undefined && !['seen', 'opened', 'read'].includes(raw.status)) throw new AppError('invalid_argument', 'Unknown reading status.');
   const limit = raw.limit ?? 25, offset = raw.offset ?? 0;
@@ -99,7 +108,7 @@ async function searchLiteral(userId: string, raw: LibraryQuery, stores: LibraryS
   const clipKind = raw.kind && raw.kind !== 'saved' && raw.kind !== 'reading' ? raw.kind : undefined;
   const [profile, clips, history] = await Promise.all([
     stores.store.get(userId),
-    raw.kind === 'saved' || raw.kind === 'reading' ? [] : (stores.clips?.list(userId, { query, ...(clipKind ? { kind: clipKind } : {}), ...(raw.tag ? { tag: raw.tag } : {}), limit: CLIP_LIMITS.perUser }) ?? []),
+    raw.kind === 'saved' || raw.kind === 'reading' ? [] : (stores.clips?.list(userId, { query: searchQuery, exactTerms, ...(clipKind ? { kind: clipKind } : {}), ...(raw.tag ? { tag: raw.tag } : {}), limit: CLIP_LIMITS.perUser }) ?? []),
     stores.reading?.list(userId, { limit: READING_LIMIT }) ?? [],
   ]);
   const pages = new Map<string, LibraryHit>();
@@ -124,7 +133,7 @@ async function searchLiteral(userId: string, raw: LibraryQuery, stores: LibraryS
   const ranked: Array<{ hit: LibraryHit; score: number; sourceRank: number }> = [];
   for (const hit of pages.values()) {
     if (clipKind || raw.tag || (raw.kind === 'saved' && !hit.saved) || (raw.kind === 'reading' && !hit.reading)) continue;
-    const score = relevance(hit, query);
+    const score = relevance(hit, searchQuery);
     if (score >= 0) ranked.push({ hit, score, sourceRank: 0 });
   }
   for (const [index, c] of clips.entries()) {
@@ -135,7 +144,7 @@ async function searchLiteral(userId: string, raw: LibraryQuery, stores: LibraryS
       updatedAt: c.updatedAt, saved: false, matched: [], ...(c.source.url && docsFor(c.source.url, profile) ? { docs: docsFor(c.source.url, profile)! } : {}),
     };
     // Preserve the store's relevance order for ties, including Postgres body matches.
-    ranked.push({ hit, score: relevance(hit, query, true), sourceRank: index });
+    ranked.push({ hit, score: relevance(hit, searchQuery, c), sourceRank: index });
   }
   const site = clean(raw.site, 200).toLowerCase();
   const matches = ranked.filter(({ hit }) => (!site || hit.source.toLowerCase().includes(site) || host(hit.url).includes(site)) && (!raw.status || hit.reading?.status === raw.status));
@@ -143,18 +152,5 @@ async function searchLiteral(userId: string, raw: LibraryQuery, stores: LibraryS
   const rank = (r: typeof ranked[number]) => r.score + (query && r.hit.kind === 'clip' ? 0.5 / (r.sourceRank + 1) : 0);
   matches.sort((a, b) => rank(b) - rank(a) || b.hit.updatedAt.localeCompare(a.hit.updatedAt) || a.hit.ref.localeCompare(b.hit.ref));
   const hits = matches.slice(offset, offset + limit).map(({ hit }) => hit);
-  return { query, coverage: LIBRARY_COVERAGE, hits, total: matches.length, offset, nextOffset: offset + hits.length < matches.length ? offset + hits.length : null };
-}
-
-/** A disclosed lexical retry for common recall questions, only after literal search misses.
- * Never remove identifier punctuation or broaden an already successful literal search.
- */
-export async function searchLibrary(userId: string, raw: LibraryQuery, stores: LibrarySources): Promise<LibraryResult> {
-  const literal = await searchLiteral(userId, raw, stores);
-  if (literal.total || !/^(?:where (?:was|is)|find (?:me )?(?:the|a)|what was)\b/i.test(literal.query)) return literal;
-  const keywords = literal.query.toLowerCase().replace(/[?]$/, '').split(/\s+/)
-    .filter(w => !new Set(['where', 'was', 'is', 'find', 'me', 'what', 'the', 'a', 'an', 'about', 'quote', 'page', 'article', 'that', 'of', 'and', 'in']).has(w));
-  if (keywords.length < 2 || keywords.join(' ') === literal.query) return literal;
-  const result = await searchLiteral(userId, { ...raw, query: keywords.join(' ') }, stores);
-  return { ...result, query: literal.query, effectiveQuery: keywords.join(' ') };
+  return { query, hits, total: matches.length, offset, nextOffset: offset + hits.length < matches.length ? offset + hits.length : null, search: { query: searchQuery, coverage: LIBRARY_COVERAGE } };
 }

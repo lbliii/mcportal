@@ -69,6 +69,7 @@ Set GitHub OAuth, a static token, or both. With neither, the server runs only on
 | `TICKETMASTER_API_KEY` | none | Enables verified artist lookup and event checks for reading watches. Calendar watches work without it. A linked computer uses the hosted server's key | both |
 | `MCPORTAL_HOSTED_URL` | `https://mcportal.lol` | The hosted MCPortal a local one signs in to with `link_account`. Point it at your own server | local |
 | `MCPORTAL_FIXTURES` | off | `1` serves canned data from `test/fixtures` instead of the network, for offline demos | both |
+| `MCPORTAL_RESULT_MODE` | `legacy` | `component-v1` enables bounded model-visible results with full component data in `_meta`. Use only after actual-host verification; see [result payloads](result-payloads.md) | both |
 
 ## Usage limits
 

@@ -1,0 +1,4419 @@
+{
+  "corpusHash": "6d6fc7e08839bae5bda77bfefad76a5355c4d3b90880b73eaf6ad8426125a82b",
+  "environment": {
+    "node": "v24.9.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpu": "Apple M2",
+    "runsPerQuery": 5
+  },
+  "results": [
+    {
+      "backend": "files",
+      "split": "development",
+      "summary": {
+        "retrievalAt5": {
+          "passed": 21,
+          "total": 22
+        },
+        "negativeCorrect": {
+          "passed": 6,
+          "total": 6
+        },
+        "sourceAt5": {
+          "passed": 2,
+          "total": 2
+        },
+        "passageAt5": {
+          "passed": 2,
+          "total": 2
+        },
+        "forbidden": 0,
+        "medianMs": 0.54,
+        "p95Ms": 0.804
+      },
+      "byType": {
+        "title": {
+          "retrievalAt5": {
+            "passed": 3,
+            "total": 3
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.584,
+          "p95Ms": 0.915
+        },
+        "recall": {
+          "retrievalAt5": {
+            "passed": 4,
+            "total": 5
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.562,
+          "p95Ms": 0.591
+        },
+        "identifier": {
+          "retrievalAt5": {
+            "passed": 2,
+            "total": 2
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.804,
+          "p95Ms": 0.804
+        },
+        "version": {
+          "retrievalAt5": {
+            "passed": 2,
+            "total": 2
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.57,
+          "p95Ms": 0.57
+        },
+        "quote": {
+          "retrievalAt5": {
+            "passed": 4,
+            "total": 4
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 2,
+            "total": 2
+          },
+          "passageAt5": {
+            "passed": 2,
+            "total": 2
+          },
+          "forbidden": 0,
+          "medianMs": 0.642,
+          "p95Ms": 0.652
+        },
+        "note": {
+          "retrievalAt5": {
+            "passed": 3,
+            "total": 3
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.534,
+          "p95Ms": 0.545
+        },
+        "duplicate": {
+          "retrievalAt5": {
+            "passed": 3,
+            "total": 3
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.484,
+          "p95Ms": 0.515
+        },
+        "coverage": {
+          "retrievalAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "negativeCorrect": {
+            "passed": 6,
+            "total": 6
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.516,
+          "p95Ms": 0.525
+        }
+      },
+      "cases": [
+        {
+          "id": "d01",
+          "type": "title",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/heartbeat"
+          ],
+          "topFive": [
+            "url:https://recall.example/heartbeat",
+            "clip:ccheckpoint",
+            "clip:cduplicate"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.915,
+          "total": 3
+        },
+        {
+          "id": "d02",
+          "type": "recall",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/heartbeat"
+          ],
+          "topFive": [
+            "url:https://recall.example/heartbeat",
+            "clip:ccheckpoint",
+            "clip:cduplicate"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.555,
+          "total": 3
+        },
+        {
+          "id": "d03",
+          "type": "recall",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/heartbeat"
+          ],
+          "topFive": [
+            "url:https://recall.example/heartbeat",
+            "clip:ccheckpoint",
+            "clip:cduplicate"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.562,
+          "total": 3
+        },
+        {
+          "id": "d04",
+          "type": "recall",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/restore"
+          ],
+          "topFive": [
+            "url:https://recall.example/restore",
+            "clip:crecovery"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.568,
+          "total": 2
+        },
+        {
+          "id": "d05",
+          "type": "title",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/schema"
+          ],
+          "topFive": [
+            "url:https://recall.example/schema",
+            "clip:csource-title"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.584,
+          "total": 2
+        },
+        {
+          "id": "d06",
+          "type": "identifier",
+          "coverage": "retained-text",
+          "expected": [
+            "clip:cidentifier"
+          ],
+          "topFive": [
+            "clip:cidentifier"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.651,
+          "total": 1
+        },
+        {
+          "id": "d07",
+          "type": "version",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/v2",
+            "clip:cv2"
+          ],
+          "topFive": [
+            "clip:cv2",
+            "url:https://recall.example/v2"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.54,
+          "total": 2
+        },
+        {
+          "id": "d08",
+          "type": "version",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/version",
+            "clip:cengine"
+          ],
+          "topFive": [
+            "url:https://recall.example/version",
+            "clip:cengine"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.57,
+          "total": 2
+        },
+        {
+          "id": "d09",
+          "type": "identifier",
+          "coverage": "retained-text",
+          "expected": [
+            "clip:cpercent"
+          ],
+          "topFive": [
+            "clip:cpercent"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.804,
+          "total": 1
+        },
+        {
+          "id": "d10",
+          "type": "quote",
+          "coverage": "retained-text",
+          "expected": [
+            "clip:ccheckpoint",
+            "clip:cduplicate"
+          ],
+          "topFive": [
+            "clip:ccheckpoint",
+            "clip:cduplicate"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": true,
+          "passageAt5": true,
+          "latencyMs": 0.642,
+          "total": 2
+        },
+        {
+          "id": "d11",
+          "type": "quote",
+          "coverage": "retained-text",
+          "expected": [
+            "clip:cdeep"
+          ],
+          "topFive": [
+            "clip:cdeep"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.57,
+          "total": 1
+        },
+        {
+          "id": "d12",
+          "type": "note",
+          "coverage": "metadata",
+          "expected": [
+            "clip:crecovery"
+          ],
+          "topFive": [
+            "clip:crecovery"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.534,
+          "total": 1
+        },
+        {
+          "id": "d13",
+          "type": "note",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/schema"
+          ],
+          "topFive": [
+            "url:https://recall.example/schema"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.545,
+          "total": 1
+        },
+        {
+          "id": "d14",
+          "type": "duplicate",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/heartbeat"
+          ],
+          "topFive": [
+            "url:https://recall.example/heartbeat"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.174,
+          "total": 1
+        },
+        {
+          "id": "d15",
+          "type": "duplicate",
+          "coverage": "metadata",
+          "expected": [
+            "clip:ccheckpoint",
+            "clip:cduplicate"
+          ],
+          "topFive": [
+            "clip:ccheckpoint",
+            "clip:cduplicate"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.484,
+          "total": 2
+        },
+        {
+          "id": "d16",
+          "type": "coverage",
+          "coverage": "unindexed",
+          "expected": [],
+          "topFive": [],
+          "retrievalAt5": null,
+          "negativeCorrect": true,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.523,
+          "total": 0
+        },
+        {
+          "id": "d17",
+          "type": "coverage",
+          "coverage": "unindexed",
+          "expected": [],
+          "topFive": [],
+          "retrievalAt5": null,
+          "negativeCorrect": true,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.525,
+          "total": 0
+        },
+        {
+          "id": "d18",
+          "type": "coverage",
+          "coverage": "private",
+          "expected": [],
+          "topFive": [],
+          "retrievalAt5": null,
+          "negativeCorrect": true,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.505,
+          "total": 0
+        },
+        {
+          "id": "d19",
+          "type": "coverage",
+          "coverage": "unindexed",
+          "expected": [],
+          "topFive": [],
+          "retrievalAt5": null,
+          "negativeCorrect": true,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.516,
+          "total": 0
+        },
+        {
+          "id": "d20",
+          "type": "title",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/history"
+          ],
+          "topFive": [
+            "url:https://recall.example/history"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.144,
+          "total": 1
+        },
+        {
+          "id": "d21",
+          "type": "quote",
+          "coverage": "retained-text",
+          "expected": [
+            "url:https://recall.example/schema",
+            "clip:csource-title"
+          ],
+          "topFive": [
+            "url:https://recall.example/schema",
+            "clip:csource-title"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.537,
+          "total": 2
+        },
+        {
+          "id": "d22",
+          "type": "quote",
+          "coverage": "retained-text",
+          "expected": [
+            "clip:crecovery"
+          ],
+          "topFive": [
+            "clip:crecovery"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": true,
+          "passageAt5": true,
+          "latencyMs": 0.652,
+          "total": 1
+        },
+        {
+          "id": "d23",
+          "type": "recall",
+          "coverage": "retained-text",
+          "expected": [
+            "clip:ccheckpoint"
+          ],
+          "topFive": [
+            "clip:ccheckpoint"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.526,
+          "total": 1
+        },
+        {
+          "id": "d24",
+          "type": "coverage",
+          "coverage": "unindexed",
+          "expected": [],
+          "topFive": [],
+          "retrievalAt5": null,
+          "negativeCorrect": true,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.513,
+          "total": 0
+        },
+        {
+          "id": "d25",
+          "type": "duplicate",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/selectors?version=2"
+          ],
+          "topFive": [
+            "url:https://recall.example/selectors?version=2"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.515,
+          "total": 1
+        },
+        {
+          "id": "d26",
+          "type": "coverage",
+          "coverage": "unindexed",
+          "expected": [],
+          "topFive": [],
+          "retrievalAt5": null,
+          "negativeCorrect": true,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.495,
+          "total": 0
+        },
+        {
+          "id": "d27",
+          "type": "recall",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/restore"
+          ],
+          "topFive": [],
+          "retrievalAt5": false,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.591,
+          "total": 0
+        },
+        {
+          "id": "d28",
+          "type": "note",
+          "coverage": "metadata",
+          "expected": [
+            "clip:ccheckpoint"
+          ],
+          "topFive": [
+            "clip:ccheckpoint"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.502,
+          "total": 1
+        }
+      ]
+    },
+    {
+      "backend": "postgres",
+      "split": "development",
+      "summary": {
+        "retrievalAt5": {
+          "passed": 21,
+          "total": 22
+        },
+        "negativeCorrect": {
+          "passed": 6,
+          "total": 6
+        },
+        "sourceAt5": {
+          "passed": 2,
+          "total": 2
+        },
+        "passageAt5": {
+          "passed": 2,
+          "total": 2
+        },
+        "forbidden": 0,
+        "medianMs": 0.268,
+        "p95Ms": 0.528
+      },
+      "byType": {
+        "title": {
+          "retrievalAt5": {
+            "passed": 3,
+            "total": 3
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.359,
+          "p95Ms": 0.528
+        },
+        "recall": {
+          "retrievalAt5": {
+            "passed": 4,
+            "total": 5
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.287,
+          "p95Ms": 0.335
+        },
+        "identifier": {
+          "retrievalAt5": {
+            "passed": 2,
+            "total": 2
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.61,
+          "p95Ms": 0.61
+        },
+        "version": {
+          "retrievalAt5": {
+            "passed": 2,
+            "total": 2
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.44,
+          "p95Ms": 0.44
+        },
+        "quote": {
+          "retrievalAt5": {
+            "passed": 4,
+            "total": 4
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 2,
+            "total": 2
+          },
+          "passageAt5": {
+            "passed": 2,
+            "total": 2
+          },
+          "forbidden": 0,
+          "medianMs": 0.247,
+          "p95Ms": 0.273
+        },
+        "note": {
+          "retrievalAt5": {
+            "passed": 3,
+            "total": 3
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.306,
+          "p95Ms": 0.412
+        },
+        "duplicate": {
+          "retrievalAt5": {
+            "passed": 3,
+            "total": 3
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.204,
+          "p95Ms": 0.242
+        },
+        "coverage": {
+          "retrievalAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "negativeCorrect": {
+            "passed": 6,
+            "total": 6
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.243,
+          "p95Ms": 0.288
+        }
+      },
+      "cases": [
+        {
+          "id": "d01",
+          "type": "title",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/heartbeat"
+          ],
+          "topFive": [
+            "url:https://recall.example/heartbeat",
+            "clip:ccheckpoint",
+            "clip:cduplicate"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.359,
+          "total": 3
+        },
+        {
+          "id": "d02",
+          "type": "recall",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/heartbeat"
+          ],
+          "topFive": [
+            "url:https://recall.example/heartbeat",
+            "clip:ccheckpoint",
+            "clip:cduplicate"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.287,
+          "total": 3
+        },
+        {
+          "id": "d03",
+          "type": "recall",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/heartbeat"
+          ],
+          "topFive": [
+            "url:https://recall.example/heartbeat",
+            "clip:ccheckpoint",
+            "clip:cduplicate"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.289,
+          "total": 3
+        },
+        {
+          "id": "d04",
+          "type": "recall",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/restore"
+          ],
+          "topFive": [
+            "url:https://recall.example/restore",
+            "clip:crecovery"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.335,
+          "total": 2
+        },
+        {
+          "id": "d05",
+          "type": "title",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/schema"
+          ],
+          "topFive": [
+            "url:https://recall.example/schema",
+            "clip:csource-title"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.528,
+          "total": 2
+        },
+        {
+          "id": "d06",
+          "type": "identifier",
+          "coverage": "retained-text",
+          "expected": [
+            "clip:cidentifier"
+          ],
+          "topFive": [
+            "clip:cidentifier"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.61,
+          "total": 1
+        },
+        {
+          "id": "d07",
+          "type": "version",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/v2",
+            "clip:cv2"
+          ],
+          "topFive": [
+            "clip:cv2",
+            "url:https://recall.example/v2"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.44,
+          "total": 2
+        },
+        {
+          "id": "d08",
+          "type": "version",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/version",
+            "clip:cengine"
+          ],
+          "topFive": [
+            "url:https://recall.example/version",
+            "clip:cengine"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.432,
+          "total": 2
+        },
+        {
+          "id": "d09",
+          "type": "identifier",
+          "coverage": "retained-text",
+          "expected": [
+            "clip:cpercent"
+          ],
+          "topFive": [
+            "clip:cpercent"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.44,
+          "total": 1
+        },
+        {
+          "id": "d10",
+          "type": "quote",
+          "coverage": "retained-text",
+          "expected": [
+            "clip:ccheckpoint",
+            "clip:cduplicate"
+          ],
+          "topFive": [
+            "clip:ccheckpoint",
+            "clip:cduplicate"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": true,
+          "passageAt5": true,
+          "latencyMs": 0.243,
+          "total": 2
+        },
+        {
+          "id": "d11",
+          "type": "quote",
+          "coverage": "retained-text",
+          "expected": [
+            "clip:cdeep"
+          ],
+          "topFive": [
+            "clip:cdeep"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.273,
+          "total": 1
+        },
+        {
+          "id": "d12",
+          "type": "note",
+          "coverage": "metadata",
+          "expected": [
+            "clip:crecovery"
+          ],
+          "topFive": [
+            "clip:crecovery"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.306,
+          "total": 1
+        },
+        {
+          "id": "d13",
+          "type": "note",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/schema"
+          ],
+          "topFive": [
+            "url:https://recall.example/schema",
+            "clip:csource-title"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.267,
+          "total": 2
+        },
+        {
+          "id": "d14",
+          "type": "duplicate",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/heartbeat"
+          ],
+          "topFive": [
+            "url:https://recall.example/heartbeat"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.193,
+          "total": 1
+        },
+        {
+          "id": "d15",
+          "type": "duplicate",
+          "coverage": "metadata",
+          "expected": [
+            "clip:ccheckpoint",
+            "clip:cduplicate"
+          ],
+          "topFive": [
+            "clip:ccheckpoint",
+            "clip:cduplicate"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.204,
+          "total": 2
+        },
+        {
+          "id": "d16",
+          "type": "coverage",
+          "coverage": "unindexed",
+          "expected": [],
+          "topFive": [],
+          "retrievalAt5": null,
+          "negativeCorrect": true,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.221,
+          "total": 0
+        },
+        {
+          "id": "d17",
+          "type": "coverage",
+          "coverage": "unindexed",
+          "expected": [],
+          "topFive": [],
+          "retrievalAt5": null,
+          "negativeCorrect": true,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.243,
+          "total": 0
+        },
+        {
+          "id": "d18",
+          "type": "coverage",
+          "coverage": "private",
+          "expected": [],
+          "topFive": [],
+          "retrievalAt5": null,
+          "negativeCorrect": true,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.22,
+          "total": 0
+        },
+        {
+          "id": "d19",
+          "type": "coverage",
+          "coverage": "unindexed",
+          "expected": [],
+          "topFive": [],
+          "retrievalAt5": null,
+          "negativeCorrect": true,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.241,
+          "total": 0
+        },
+        {
+          "id": "d20",
+          "type": "title",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/history"
+          ],
+          "topFive": [
+            "url:https://recall.example/history"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.177,
+          "total": 1
+        },
+        {
+          "id": "d21",
+          "type": "quote",
+          "coverage": "retained-text",
+          "expected": [
+            "url:https://recall.example/schema",
+            "clip:csource-title"
+          ],
+          "topFive": [
+            "url:https://recall.example/schema",
+            "clip:csource-title"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.247,
+          "total": 2
+        },
+        {
+          "id": "d22",
+          "type": "quote",
+          "coverage": "retained-text",
+          "expected": [
+            "clip:crecovery"
+          ],
+          "topFive": [
+            "clip:crecovery"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": true,
+          "passageAt5": true,
+          "latencyMs": 0.246,
+          "total": 1
+        },
+        {
+          "id": "d23",
+          "type": "recall",
+          "coverage": "retained-text",
+          "expected": [
+            "clip:ccheckpoint"
+          ],
+          "topFive": [
+            "clip:ccheckpoint"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.236,
+          "total": 1
+        },
+        {
+          "id": "d24",
+          "type": "coverage",
+          "coverage": "unindexed",
+          "expected": [],
+          "topFive": [],
+          "retrievalAt5": null,
+          "negativeCorrect": true,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.288,
+          "total": 0
+        },
+        {
+          "id": "d25",
+          "type": "duplicate",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/selectors?version=2"
+          ],
+          "topFive": [
+            "url:https://recall.example/selectors?version=2"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.242,
+          "total": 1
+        },
+        {
+          "id": "d26",
+          "type": "coverage",
+          "coverage": "unindexed",
+          "expected": [],
+          "topFive": [],
+          "retrievalAt5": null,
+          "negativeCorrect": true,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.268,
+          "total": 0
+        },
+        {
+          "id": "d27",
+          "type": "recall",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/restore"
+          ],
+          "topFive": [],
+          "retrievalAt5": false,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.262,
+          "total": 0
+        },
+        {
+          "id": "d28",
+          "type": "note",
+          "coverage": "metadata",
+          "expected": [
+            "clip:ccheckpoint"
+          ],
+          "topFive": [
+            "clip:ccheckpoint"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.412,
+          "total": 1
+        }
+      ]
+    },
+    {
+      "backend": "linked-files",
+      "split": "development",
+      "summary": {
+        "retrievalAt5": {
+          "passed": 21,
+          "total": 22
+        },
+        "negativeCorrect": {
+          "passed": 6,
+          "total": 6
+        },
+        "sourceAt5": {
+          "passed": 2,
+          "total": 2
+        },
+        "passageAt5": {
+          "passed": 2,
+          "total": 2
+        },
+        "forbidden": 0,
+        "medianMs": 0.932,
+        "p95Ms": 1.256
+      },
+      "byType": {
+        "title": {
+          "retrievalAt5": {
+            "passed": 3,
+            "total": 3
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.943,
+          "p95Ms": 1.679
+        },
+        "recall": {
+          "retrievalAt5": {
+            "passed": 4,
+            "total": 5
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 1.024,
+          "p95Ms": 1.256
+        },
+        "identifier": {
+          "retrievalAt5": {
+            "passed": 2,
+            "total": 2
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.958,
+          "p95Ms": 0.958
+        },
+        "version": {
+          "retrievalAt5": {
+            "passed": 2,
+            "total": 2
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.936,
+          "p95Ms": 0.936
+        },
+        "quote": {
+          "retrievalAt5": {
+            "passed": 4,
+            "total": 4
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 2,
+            "total": 2
+          },
+          "passageAt5": {
+            "passed": 2,
+            "total": 2
+          },
+          "forbidden": 0,
+          "medianMs": 0.988,
+          "p95Ms": 0.994
+        },
+        "note": {
+          "retrievalAt5": {
+            "passed": 3,
+            "total": 3
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.928,
+          "p95Ms": 0.957
+        },
+        "duplicate": {
+          "retrievalAt5": {
+            "passed": 3,
+            "total": 3
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.862,
+          "p95Ms": 0.873
+        },
+        "coverage": {
+          "retrievalAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "negativeCorrect": {
+            "passed": 6,
+            "total": 6
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.932,
+          "p95Ms": 0.94
+        }
+      },
+      "cases": [
+        {
+          "id": "d01",
+          "type": "title",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/heartbeat"
+          ],
+          "topFive": [
+            "url:https://recall.example/heartbeat",
+            "clip:ccheckpoint",
+            "clip:cduplicate"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 1.679,
+          "total": 3
+        },
+        {
+          "id": "d02",
+          "type": "recall",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/heartbeat"
+          ],
+          "topFive": [
+            "url:https://recall.example/heartbeat",
+            "clip:ccheckpoint",
+            "clip:cduplicate"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 1.256,
+          "total": 3
+        },
+        {
+          "id": "d03",
+          "type": "recall",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/heartbeat"
+          ],
+          "topFive": [
+            "url:https://recall.example/heartbeat",
+            "clip:ccheckpoint",
+            "clip:cduplicate"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 1.052,
+          "total": 3
+        },
+        {
+          "id": "d04",
+          "type": "recall",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/restore"
+          ],
+          "topFive": [
+            "url:https://recall.example/restore",
+            "clip:crecovery"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 1.024,
+          "total": 2
+        },
+        {
+          "id": "d05",
+          "type": "title",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/schema"
+          ],
+          "topFive": [
+            "url:https://recall.example/schema",
+            "clip:csource-title"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.943,
+          "total": 2
+        },
+        {
+          "id": "d06",
+          "type": "identifier",
+          "coverage": "retained-text",
+          "expected": [
+            "clip:cidentifier"
+          ],
+          "topFive": [
+            "clip:cidentifier"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.958,
+          "total": 1
+        },
+        {
+          "id": "d07",
+          "type": "version",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/v2",
+            "clip:cv2"
+          ],
+          "topFive": [
+            "clip:cv2",
+            "url:https://recall.example/v2"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.936,
+          "total": 2
+        },
+        {
+          "id": "d08",
+          "type": "version",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/version",
+            "clip:cengine"
+          ],
+          "topFive": [
+            "url:https://recall.example/version",
+            "clip:cengine"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.869,
+          "total": 2
+        },
+        {
+          "id": "d09",
+          "type": "identifier",
+          "coverage": "retained-text",
+          "expected": [
+            "clip:cpercent"
+          ],
+          "topFive": [
+            "clip:cpercent"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.93,
+          "total": 1
+        },
+        {
+          "id": "d10",
+          "type": "quote",
+          "coverage": "retained-text",
+          "expected": [
+            "clip:ccheckpoint",
+            "clip:cduplicate"
+          ],
+          "topFive": [
+            "clip:ccheckpoint",
+            "clip:cduplicate"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": true,
+          "passageAt5": true,
+          "latencyMs": 0.994,
+          "total": 2
+        },
+        {
+          "id": "d11",
+          "type": "quote",
+          "coverage": "retained-text",
+          "expected": [
+            "clip:cdeep"
+          ],
+          "topFive": [
+            "clip:cdeep"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.984,
+          "total": 1
+        },
+        {
+          "id": "d12",
+          "type": "note",
+          "coverage": "metadata",
+          "expected": [
+            "clip:crecovery"
+          ],
+          "topFive": [
+            "clip:crecovery"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.957,
+          "total": 1
+        },
+        {
+          "id": "d13",
+          "type": "note",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/schema"
+          ],
+          "topFive": [
+            "url:https://recall.example/schema"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.928,
+          "total": 1
+        },
+        {
+          "id": "d14",
+          "type": "duplicate",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/heartbeat"
+          ],
+          "topFive": [
+            "url:https://recall.example/heartbeat"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.514,
+          "total": 1
+        },
+        {
+          "id": "d15",
+          "type": "duplicate",
+          "coverage": "metadata",
+          "expected": [
+            "clip:ccheckpoint",
+            "clip:cduplicate"
+          ],
+          "topFive": [
+            "clip:ccheckpoint",
+            "clip:cduplicate"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.862,
+          "total": 2
+        },
+        {
+          "id": "d16",
+          "type": "coverage",
+          "coverage": "unindexed",
+          "expected": [],
+          "topFive": [],
+          "retrievalAt5": null,
+          "negativeCorrect": true,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.833,
+          "total": 0
+        },
+        {
+          "id": "d17",
+          "type": "coverage",
+          "coverage": "unindexed",
+          "expected": [],
+          "topFive": [],
+          "retrievalAt5": null,
+          "negativeCorrect": true,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.939,
+          "total": 0
+        },
+        {
+          "id": "d18",
+          "type": "coverage",
+          "coverage": "private",
+          "expected": [],
+          "topFive": [],
+          "retrievalAt5": null,
+          "negativeCorrect": true,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.94,
+          "total": 0
+        },
+        {
+          "id": "d19",
+          "type": "coverage",
+          "coverage": "unindexed",
+          "expected": [],
+          "topFive": [],
+          "retrievalAt5": null,
+          "negativeCorrect": true,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.932,
+          "total": 0
+        },
+        {
+          "id": "d20",
+          "type": "title",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/history"
+          ],
+          "topFive": [
+            "url:https://recall.example/history"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.551,
+          "total": 1
+        },
+        {
+          "id": "d21",
+          "type": "quote",
+          "coverage": "retained-text",
+          "expected": [
+            "url:https://recall.example/schema",
+            "clip:csource-title"
+          ],
+          "topFive": [
+            "url:https://recall.example/schema",
+            "clip:csource-title"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.988,
+          "total": 2
+        },
+        {
+          "id": "d22",
+          "type": "quote",
+          "coverage": "retained-text",
+          "expected": [
+            "clip:crecovery"
+          ],
+          "topFive": [
+            "clip:crecovery"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": true,
+          "passageAt5": true,
+          "latencyMs": 0.886,
+          "total": 1
+        },
+        {
+          "id": "d23",
+          "type": "recall",
+          "coverage": "retained-text",
+          "expected": [
+            "clip:ccheckpoint"
+          ],
+          "topFive": [
+            "clip:ccheckpoint"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.846,
+          "total": 1
+        },
+        {
+          "id": "d24",
+          "type": "coverage",
+          "coverage": "unindexed",
+          "expected": [],
+          "topFive": [],
+          "retrievalAt5": null,
+          "negativeCorrect": true,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.786,
+          "total": 0
+        },
+        {
+          "id": "d25",
+          "type": "duplicate",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/selectors?version=2"
+          ],
+          "topFive": [
+            "url:https://recall.example/selectors?version=2"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.873,
+          "total": 1
+        },
+        {
+          "id": "d26",
+          "type": "coverage",
+          "coverage": "unindexed",
+          "expected": [],
+          "topFive": [],
+          "retrievalAt5": null,
+          "negativeCorrect": true,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.849,
+          "total": 0
+        },
+        {
+          "id": "d27",
+          "type": "recall",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/restore"
+          ],
+          "topFive": [],
+          "retrievalAt5": false,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.815,
+          "total": 0
+        },
+        {
+          "id": "d28",
+          "type": "note",
+          "coverage": "metadata",
+          "expected": [
+            "clip:ccheckpoint"
+          ],
+          "topFive": [
+            "clip:ccheckpoint"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.815,
+          "total": 1
+        }
+      ]
+    },
+    {
+      "backend": "linked-postgres",
+      "split": "development",
+      "summary": {
+        "retrievalAt5": {
+          "passed": 21,
+          "total": 22
+        },
+        "negativeCorrect": {
+          "passed": 6,
+          "total": 6
+        },
+        "sourceAt5": {
+          "passed": 2,
+          "total": 2
+        },
+        "passageAt5": {
+          "passed": 2,
+          "total": 2
+        },
+        "forbidden": 0,
+        "medianMs": 0.617,
+        "p95Ms": 0.855
+      },
+      "byType": {
+        "title": {
+          "retrievalAt5": {
+            "passed": 3,
+            "total": 3
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.683,
+          "p95Ms": 0.748
+        },
+        "recall": {
+          "retrievalAt5": {
+            "passed": 4,
+            "total": 5
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.689,
+          "p95Ms": 0.8
+        },
+        "identifier": {
+          "retrievalAt5": {
+            "passed": 2,
+            "total": 2
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.96,
+          "p95Ms": 0.96
+        },
+        "version": {
+          "retrievalAt5": {
+            "passed": 2,
+            "total": 2
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.855,
+          "p95Ms": 0.855
+        },
+        "quote": {
+          "retrievalAt5": {
+            "passed": 4,
+            "total": 4
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 2,
+            "total": 2
+          },
+          "passageAt5": {
+            "passed": 2,
+            "total": 2
+          },
+          "forbidden": 0,
+          "medianMs": 0.571,
+          "p95Ms": 0.594
+        },
+        "note": {
+          "retrievalAt5": {
+            "passed": 3,
+            "total": 3
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.639,
+          "p95Ms": 0.648
+        },
+        "duplicate": {
+          "retrievalAt5": {
+            "passed": 3,
+            "total": 3
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.5,
+          "p95Ms": 0.566
+        },
+        "coverage": {
+          "retrievalAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "negativeCorrect": {
+            "passed": 6,
+            "total": 6
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.589,
+          "p95Ms": 0.79
+        }
+      },
+      "cases": [
+        {
+          "id": "d01",
+          "type": "title",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/heartbeat"
+          ],
+          "topFive": [
+            "url:https://recall.example/heartbeat",
+            "clip:ccheckpoint",
+            "clip:cduplicate"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.748,
+          "total": 3
+        },
+        {
+          "id": "d02",
+          "type": "recall",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/heartbeat"
+          ],
+          "topFive": [
+            "url:https://recall.example/heartbeat",
+            "clip:ccheckpoint",
+            "clip:cduplicate"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.689,
+          "total": 3
+        },
+        {
+          "id": "d03",
+          "type": "recall",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/heartbeat"
+          ],
+          "topFive": [
+            "url:https://recall.example/heartbeat",
+            "clip:ccheckpoint",
+            "clip:cduplicate"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.691,
+          "total": 3
+        },
+        {
+          "id": "d04",
+          "type": "recall",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/restore"
+          ],
+          "topFive": [
+            "url:https://recall.example/restore",
+            "clip:crecovery"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.61,
+          "total": 2
+        },
+        {
+          "id": "d05",
+          "type": "title",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/schema"
+          ],
+          "topFive": [
+            "url:https://recall.example/schema",
+            "clip:csource-title"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.683,
+          "total": 2
+        },
+        {
+          "id": "d06",
+          "type": "identifier",
+          "coverage": "retained-text",
+          "expected": [
+            "clip:cidentifier"
+          ],
+          "topFive": [
+            "clip:cidentifier"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.96,
+          "total": 1
+        },
+        {
+          "id": "d07",
+          "type": "version",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/v2",
+            "clip:cv2"
+          ],
+          "topFive": [
+            "clip:cv2",
+            "url:https://recall.example/v2"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.855,
+          "total": 2
+        },
+        {
+          "id": "d08",
+          "type": "version",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/version",
+            "clip:cengine"
+          ],
+          "topFive": [
+            "url:https://recall.example/version",
+            "clip:cengine"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.765,
+          "total": 2
+        },
+        {
+          "id": "d09",
+          "type": "identifier",
+          "coverage": "retained-text",
+          "expected": [
+            "clip:cpercent"
+          ],
+          "topFive": [
+            "clip:cpercent"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.741,
+          "total": 1
+        },
+        {
+          "id": "d10",
+          "type": "quote",
+          "coverage": "retained-text",
+          "expected": [
+            "clip:ccheckpoint",
+            "clip:cduplicate"
+          ],
+          "topFive": [
+            "clip:ccheckpoint",
+            "clip:cduplicate"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": true,
+          "passageAt5": true,
+          "latencyMs": 0.571,
+          "total": 2
+        },
+        {
+          "id": "d11",
+          "type": "quote",
+          "coverage": "retained-text",
+          "expected": [
+            "clip:cdeep"
+          ],
+          "topFive": [
+            "clip:cdeep"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.594,
+          "total": 1
+        },
+        {
+          "id": "d12",
+          "type": "note",
+          "coverage": "metadata",
+          "expected": [
+            "clip:crecovery"
+          ],
+          "topFive": [
+            "clip:crecovery"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.598,
+          "total": 1
+        },
+        {
+          "id": "d13",
+          "type": "note",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/schema"
+          ],
+          "topFive": [
+            "url:https://recall.example/schema",
+            "clip:csource-title"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.639,
+          "total": 2
+        },
+        {
+          "id": "d14",
+          "type": "duplicate",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/heartbeat"
+          ],
+          "topFive": [
+            "url:https://recall.example/heartbeat"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.465,
+          "total": 1
+        },
+        {
+          "id": "d15",
+          "type": "duplicate",
+          "coverage": "metadata",
+          "expected": [
+            "clip:ccheckpoint",
+            "clip:cduplicate"
+          ],
+          "topFive": [
+            "clip:ccheckpoint",
+            "clip:cduplicate"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.5,
+          "total": 2
+        },
+        {
+          "id": "d16",
+          "type": "coverage",
+          "coverage": "unindexed",
+          "expected": [],
+          "topFive": [],
+          "retrievalAt5": null,
+          "negativeCorrect": true,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.508,
+          "total": 0
+        },
+        {
+          "id": "d17",
+          "type": "coverage",
+          "coverage": "unindexed",
+          "expected": [],
+          "topFive": [],
+          "retrievalAt5": null,
+          "negativeCorrect": true,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.524,
+          "total": 0
+        },
+        {
+          "id": "d18",
+          "type": "coverage",
+          "coverage": "private",
+          "expected": [],
+          "topFive": [],
+          "retrievalAt5": null,
+          "negativeCorrect": true,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.56,
+          "total": 0
+        },
+        {
+          "id": "d19",
+          "type": "coverage",
+          "coverage": "unindexed",
+          "expected": [],
+          "topFive": [],
+          "retrievalAt5": null,
+          "negativeCorrect": true,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.79,
+          "total": 0
+        },
+        {
+          "id": "d20",
+          "type": "title",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/history"
+          ],
+          "topFive": [
+            "url:https://recall.example/history"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.497,
+          "total": 1
+        },
+        {
+          "id": "d21",
+          "type": "quote",
+          "coverage": "retained-text",
+          "expected": [
+            "url:https://recall.example/schema",
+            "clip:csource-title"
+          ],
+          "topFive": [
+            "url:https://recall.example/schema",
+            "clip:csource-title"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.544,
+          "total": 2
+        },
+        {
+          "id": "d22",
+          "type": "quote",
+          "coverage": "retained-text",
+          "expected": [
+            "clip:crecovery"
+          ],
+          "topFive": [
+            "clip:crecovery"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": true,
+          "passageAt5": true,
+          "latencyMs": 0.526,
+          "total": 1
+        },
+        {
+          "id": "d23",
+          "type": "recall",
+          "coverage": "retained-text",
+          "expected": [
+            "clip:ccheckpoint"
+          ],
+          "topFive": [
+            "clip:ccheckpoint"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.8,
+          "total": 1
+        },
+        {
+          "id": "d24",
+          "type": "coverage",
+          "coverage": "unindexed",
+          "expected": [],
+          "topFive": [],
+          "retrievalAt5": null,
+          "negativeCorrect": true,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.589,
+          "total": 0
+        },
+        {
+          "id": "d25",
+          "type": "duplicate",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/selectors?version=2"
+          ],
+          "topFive": [
+            "url:https://recall.example/selectors?version=2"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.566,
+          "total": 1
+        },
+        {
+          "id": "d26",
+          "type": "coverage",
+          "coverage": "unindexed",
+          "expected": [],
+          "topFive": [],
+          "retrievalAt5": null,
+          "negativeCorrect": true,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.64,
+          "total": 0
+        },
+        {
+          "id": "d27",
+          "type": "recall",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/restore"
+          ],
+          "topFive": [],
+          "retrievalAt5": false,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.617,
+          "total": 0
+        },
+        {
+          "id": "d28",
+          "type": "note",
+          "coverage": "metadata",
+          "expected": [
+            "clip:ccheckpoint"
+          ],
+          "topFive": [
+            "clip:ccheckpoint"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.648,
+          "total": 1
+        }
+      ]
+    },
+    {
+      "backend": "files",
+      "split": "validation",
+      "summary": {
+        "retrievalAt5": {
+          "passed": 9,
+          "total": 10
+        },
+        "negativeCorrect": {
+          "passed": 2,
+          "total": 2
+        },
+        "sourceAt5": {
+          "passed": 2,
+          "total": 2
+        },
+        "passageAt5": {
+          "passed": 2,
+          "total": 2
+        },
+        "forbidden": 0,
+        "medianMs": 0.546,
+        "p95Ms": 0.85
+      },
+      "byType": {
+        "identifier": {
+          "retrievalAt5": {
+            "passed": 1,
+            "total": 1
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.85,
+          "p95Ms": 0.85
+        },
+        "version": {
+          "retrievalAt5": {
+            "passed": 2,
+            "total": 2
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.609,
+          "p95Ms": 0.609
+        },
+        "title": {
+          "retrievalAt5": {
+            "passed": 1,
+            "total": 1
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.499,
+          "p95Ms": 0.499
+        },
+        "recall": {
+          "retrievalAt5": {
+            "passed": 1,
+            "total": 2
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.521,
+          "p95Ms": 0.521
+        },
+        "quote": {
+          "retrievalAt5": {
+            "passed": 2,
+            "total": 2
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 2,
+            "total": 2
+          },
+          "passageAt5": {
+            "passed": 2,
+            "total": 2
+          },
+          "forbidden": 0,
+          "medianMs": 0.582,
+          "p95Ms": 0.582
+        },
+        "note": {
+          "retrievalAt5": {
+            "passed": 1,
+            "total": 1
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.591,
+          "p95Ms": 0.591
+        },
+        "duplicate": {
+          "retrievalAt5": {
+            "passed": 1,
+            "total": 1
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.551,
+          "p95Ms": 0.551
+        },
+        "coverage": {
+          "retrievalAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "negativeCorrect": {
+            "passed": 2,
+            "total": 2
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.539,
+          "p95Ms": 0.539
+        }
+      },
+      "cases": [
+        {
+          "id": "v01",
+          "type": "identifier",
+          "coverage": "retained-text",
+          "expected": [
+            "clip:cidentifier-other"
+          ],
+          "topFive": [
+            "clip:cidentifier-other"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.85,
+          "total": 1
+        },
+        {
+          "id": "v02",
+          "type": "version",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/v20",
+            "clip:cv20"
+          ],
+          "topFive": [
+            "clip:cv20",
+            "url:https://recall.example/v20"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.609,
+          "total": 2
+        },
+        {
+          "id": "v03",
+          "type": "version",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/other-version",
+            "clip:cengine-other"
+          ],
+          "topFive": [
+            "url:https://recall.example/other-version",
+            "clip:cengine-other"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.546,
+          "total": 2
+        },
+        {
+          "id": "v04",
+          "type": "title",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/utf8"
+          ],
+          "topFive": [
+            "url:https://recall.example/utf8"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.499,
+          "total": 1
+        },
+        {
+          "id": "v05",
+          "type": "recall",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/replication"
+          ],
+          "topFive": [
+            "url:https://recall.example/replication",
+            "clip:creplica"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.521,
+          "total": 2
+        },
+        {
+          "id": "v06",
+          "type": "quote",
+          "coverage": "retained-text",
+          "expected": [
+            "clip:clease"
+          ],
+          "topFive": [
+            "clip:clease"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": true,
+          "passageAt5": true,
+          "latencyMs": 0.582,
+          "total": 1
+        },
+        {
+          "id": "v07",
+          "type": "note",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/replication"
+          ],
+          "topFive": [
+            "url:https://recall.example/replication"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.591,
+          "total": 1
+        },
+        {
+          "id": "v08",
+          "type": "duplicate",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/selectors?version=1"
+          ],
+          "topFive": [
+            "url:https://recall.example/selectors?version=1"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.551,
+          "total": 1
+        },
+        {
+          "id": "v09",
+          "type": "coverage",
+          "coverage": "private",
+          "expected": [],
+          "topFive": [],
+          "retrievalAt5": null,
+          "negativeCorrect": true,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.539,
+          "total": 0
+        },
+        {
+          "id": "v10",
+          "type": "coverage",
+          "coverage": "unindexed",
+          "expected": [],
+          "topFive": [],
+          "retrievalAt5": null,
+          "negativeCorrect": true,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.507,
+          "total": 0
+        },
+        {
+          "id": "v11",
+          "type": "quote",
+          "coverage": "retained-text",
+          "expected": [
+            "clip:creplica"
+          ],
+          "topFive": [
+            "clip:creplica"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": true,
+          "passageAt5": true,
+          "latencyMs": 0.519,
+          "total": 1
+        },
+        {
+          "id": "v12",
+          "type": "recall",
+          "coverage": "retained-text",
+          "expected": [
+            "clip:clease"
+          ],
+          "topFive": [],
+          "retrievalAt5": false,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.512,
+          "total": 0
+        }
+      ]
+    },
+    {
+      "backend": "postgres",
+      "split": "validation",
+      "summary": {
+        "retrievalAt5": {
+          "passed": 9,
+          "total": 10
+        },
+        "negativeCorrect": {
+          "passed": 2,
+          "total": 2
+        },
+        "sourceAt5": {
+          "passed": 2,
+          "total": 2
+        },
+        "passageAt5": {
+          "passed": 2,
+          "total": 2
+        },
+        "forbidden": 0,
+        "medianMs": 0.262,
+        "p95Ms": 0.64
+      },
+      "byType": {
+        "identifier": {
+          "retrievalAt5": {
+            "passed": 1,
+            "total": 1
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.64,
+          "p95Ms": 0.64
+        },
+        "version": {
+          "retrievalAt5": {
+            "passed": 2,
+            "total": 2
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.498,
+          "p95Ms": 0.498
+        },
+        "title": {
+          "retrievalAt5": {
+            "passed": 1,
+            "total": 1
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.244,
+          "p95Ms": 0.244
+        },
+        "recall": {
+          "retrievalAt5": {
+            "passed": 1,
+            "total": 2
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.267,
+          "p95Ms": 0.267
+        },
+        "quote": {
+          "retrievalAt5": {
+            "passed": 2,
+            "total": 2
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 2,
+            "total": 2
+          },
+          "passageAt5": {
+            "passed": 2,
+            "total": 2
+          },
+          "forbidden": 0,
+          "medianMs": 0.262,
+          "p95Ms": 0.262
+        },
+        "note": {
+          "retrievalAt5": {
+            "passed": 1,
+            "total": 1
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.251,
+          "p95Ms": 0.251
+        },
+        "duplicate": {
+          "retrievalAt5": {
+            "passed": 1,
+            "total": 1
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.221,
+          "p95Ms": 0.221
+        },
+        "coverage": {
+          "retrievalAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "negativeCorrect": {
+            "passed": 2,
+            "total": 2
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.319,
+          "p95Ms": 0.319
+        }
+      },
+      "cases": [
+        {
+          "id": "v01",
+          "type": "identifier",
+          "coverage": "retained-text",
+          "expected": [
+            "clip:cidentifier-other"
+          ],
+          "topFive": [
+            "clip:cidentifier-other"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.64,
+          "total": 1
+        },
+        {
+          "id": "v02",
+          "type": "version",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/v20",
+            "clip:cv20"
+          ],
+          "topFive": [
+            "clip:cv20",
+            "url:https://recall.example/v20"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.498,
+          "total": 2
+        },
+        {
+          "id": "v03",
+          "type": "version",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/other-version",
+            "clip:cengine-other"
+          ],
+          "topFive": [
+            "url:https://recall.example/other-version",
+            "clip:cengine-other"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.473,
+          "total": 2
+        },
+        {
+          "id": "v04",
+          "type": "title",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/utf8"
+          ],
+          "topFive": [
+            "url:https://recall.example/utf8"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.244,
+          "total": 1
+        },
+        {
+          "id": "v05",
+          "type": "recall",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/replication"
+          ],
+          "topFive": [
+            "url:https://recall.example/replication",
+            "clip:creplica"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.267,
+          "total": 2
+        },
+        {
+          "id": "v06",
+          "type": "quote",
+          "coverage": "retained-text",
+          "expected": [
+            "clip:clease"
+          ],
+          "topFive": [
+            "clip:clease"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": true,
+          "passageAt5": true,
+          "latencyMs": 0.262,
+          "total": 1
+        },
+        {
+          "id": "v07",
+          "type": "note",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/replication"
+          ],
+          "topFive": [
+            "url:https://recall.example/replication"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.251,
+          "total": 1
+        },
+        {
+          "id": "v08",
+          "type": "duplicate",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/selectors?version=1"
+          ],
+          "topFive": [
+            "url:https://recall.example/selectors?version=1"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.221,
+          "total": 1
+        },
+        {
+          "id": "v09",
+          "type": "coverage",
+          "coverage": "private",
+          "expected": [],
+          "topFive": [],
+          "retrievalAt5": null,
+          "negativeCorrect": true,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.319,
+          "total": 0
+        },
+        {
+          "id": "v10",
+          "type": "coverage",
+          "coverage": "unindexed",
+          "expected": [],
+          "topFive": [],
+          "retrievalAt5": null,
+          "negativeCorrect": true,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.214,
+          "total": 0
+        },
+        {
+          "id": "v11",
+          "type": "quote",
+          "coverage": "retained-text",
+          "expected": [
+            "clip:creplica"
+          ],
+          "topFive": [
+            "clip:creplica"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": true,
+          "passageAt5": true,
+          "latencyMs": 0.226,
+          "total": 1
+        },
+        {
+          "id": "v12",
+          "type": "recall",
+          "coverage": "retained-text",
+          "expected": [
+            "clip:clease"
+          ],
+          "topFive": [],
+          "retrievalAt5": false,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.224,
+          "total": 0
+        }
+      ]
+    },
+    {
+      "backend": "linked-files",
+      "split": "validation",
+      "summary": {
+        "retrievalAt5": {
+          "passed": 9,
+          "total": 10
+        },
+        "negativeCorrect": {
+          "passed": 2,
+          "total": 2
+        },
+        "sourceAt5": {
+          "passed": 2,
+          "total": 2
+        },
+        "passageAt5": {
+          "passed": 2,
+          "total": 2
+        },
+        "forbidden": 0,
+        "medianMs": 0.966,
+        "p95Ms": 1.623
+      },
+      "byType": {
+        "identifier": {
+          "retrievalAt5": {
+            "passed": 1,
+            "total": 1
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 1.623,
+          "p95Ms": 1.623
+        },
+        "version": {
+          "retrievalAt5": {
+            "passed": 2,
+            "total": 2
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 1.388,
+          "p95Ms": 1.388
+        },
+        "title": {
+          "retrievalAt5": {
+            "passed": 1,
+            "total": 1
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.974,
+          "p95Ms": 0.974
+        },
+        "recall": {
+          "retrievalAt5": {
+            "passed": 1,
+            "total": 2
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 1.051,
+          "p95Ms": 1.051
+        },
+        "quote": {
+          "retrievalAt5": {
+            "passed": 2,
+            "total": 2
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 2,
+            "total": 2
+          },
+          "passageAt5": {
+            "passed": 2,
+            "total": 2
+          },
+          "forbidden": 0,
+          "medianMs": 0.966,
+          "p95Ms": 0.966
+        },
+        "note": {
+          "retrievalAt5": {
+            "passed": 1,
+            "total": 1
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.958,
+          "p95Ms": 0.958
+        },
+        "duplicate": {
+          "retrievalAt5": {
+            "passed": 1,
+            "total": 1
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.915,
+          "p95Ms": 0.915
+        },
+        "coverage": {
+          "retrievalAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "negativeCorrect": {
+            "passed": 2,
+            "total": 2
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.912,
+          "p95Ms": 0.912
+        }
+      },
+      "cases": [
+        {
+          "id": "v01",
+          "type": "identifier",
+          "coverage": "retained-text",
+          "expected": [
+            "clip:cidentifier-other"
+          ],
+          "topFive": [
+            "clip:cidentifier-other"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 1.623,
+          "total": 1
+        },
+        {
+          "id": "v02",
+          "type": "version",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/v20",
+            "clip:cv20"
+          ],
+          "topFive": [
+            "clip:cv20",
+            "url:https://recall.example/v20"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 1.388,
+          "total": 2
+        },
+        {
+          "id": "v03",
+          "type": "version",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/other-version",
+            "clip:cengine-other"
+          ],
+          "topFive": [
+            "url:https://recall.example/other-version",
+            "clip:cengine-other"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 1.011,
+          "total": 2
+        },
+        {
+          "id": "v04",
+          "type": "title",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/utf8"
+          ],
+          "topFive": [
+            "url:https://recall.example/utf8"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.974,
+          "total": 1
+        },
+        {
+          "id": "v05",
+          "type": "recall",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/replication"
+          ],
+          "topFive": [
+            "url:https://recall.example/replication",
+            "clip:creplica"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 1.051,
+          "total": 2
+        },
+        {
+          "id": "v06",
+          "type": "quote",
+          "coverage": "retained-text",
+          "expected": [
+            "clip:clease"
+          ],
+          "topFive": [
+            "clip:clease"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": true,
+          "passageAt5": true,
+          "latencyMs": 0.966,
+          "total": 1
+        },
+        {
+          "id": "v07",
+          "type": "note",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/replication"
+          ],
+          "topFive": [
+            "url:https://recall.example/replication"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.958,
+          "total": 1
+        },
+        {
+          "id": "v08",
+          "type": "duplicate",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/selectors?version=1"
+          ],
+          "topFive": [
+            "url:https://recall.example/selectors?version=1"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.915,
+          "total": 1
+        },
+        {
+          "id": "v09",
+          "type": "coverage",
+          "coverage": "private",
+          "expected": [],
+          "topFive": [],
+          "retrievalAt5": null,
+          "negativeCorrect": true,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.912,
+          "total": 0
+        },
+        {
+          "id": "v10",
+          "type": "coverage",
+          "coverage": "unindexed",
+          "expected": [],
+          "topFive": [],
+          "retrievalAt5": null,
+          "negativeCorrect": true,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.869,
+          "total": 0
+        },
+        {
+          "id": "v11",
+          "type": "quote",
+          "coverage": "retained-text",
+          "expected": [
+            "clip:creplica"
+          ],
+          "topFive": [
+            "clip:creplica"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": true,
+          "passageAt5": true,
+          "latencyMs": 0.937,
+          "total": 1
+        },
+        {
+          "id": "v12",
+          "type": "recall",
+          "coverage": "retained-text",
+          "expected": [
+            "clip:clease"
+          ],
+          "topFive": [],
+          "retrievalAt5": false,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.868,
+          "total": 0
+        }
+      ]
+    },
+    {
+      "backend": "linked-postgres",
+      "split": "validation",
+      "summary": {
+        "retrievalAt5": {
+          "passed": 9,
+          "total": 10
+        },
+        "negativeCorrect": {
+          "passed": 2,
+          "total": 2
+        },
+        "sourceAt5": {
+          "passed": 2,
+          "total": 2
+        },
+        "passageAt5": {
+          "passed": 2,
+          "total": 2
+        },
+        "forbidden": 0,
+        "medianMs": 0.682,
+        "p95Ms": 1.063
+      },
+      "byType": {
+        "identifier": {
+          "retrievalAt5": {
+            "passed": 1,
+            "total": 1
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 1.063,
+          "p95Ms": 1.063
+        },
+        "version": {
+          "retrievalAt5": {
+            "passed": 2,
+            "total": 2
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.919,
+          "p95Ms": 0.919
+        },
+        "title": {
+          "retrievalAt5": {
+            "passed": 1,
+            "total": 1
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.601,
+          "p95Ms": 0.601
+        },
+        "recall": {
+          "retrievalAt5": {
+            "passed": 1,
+            "total": 2
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.786,
+          "p95Ms": 0.786
+        },
+        "quote": {
+          "retrievalAt5": {
+            "passed": 2,
+            "total": 2
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 2,
+            "total": 2
+          },
+          "passageAt5": {
+            "passed": 2,
+            "total": 2
+          },
+          "forbidden": 0,
+          "medianMs": 0.689,
+          "p95Ms": 0.689
+        },
+        "note": {
+          "retrievalAt5": {
+            "passed": 1,
+            "total": 1
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.59,
+          "p95Ms": 0.59
+        },
+        "duplicate": {
+          "retrievalAt5": {
+            "passed": 1,
+            "total": 1
+          },
+          "negativeCorrect": {
+            "passed": 0,
+            "total": 0
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.67,
+          "p95Ms": 0.67
+        },
+        "coverage": {
+          "retrievalAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "negativeCorrect": {
+            "passed": 2,
+            "total": 2
+          },
+          "sourceAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "passageAt5": {
+            "passed": 0,
+            "total": 0
+          },
+          "forbidden": 0,
+          "medianMs": 0.583,
+          "p95Ms": 0.583
+        }
+      },
+      "cases": [
+        {
+          "id": "v01",
+          "type": "identifier",
+          "coverage": "retained-text",
+          "expected": [
+            "clip:cidentifier-other"
+          ],
+          "topFive": [
+            "clip:cidentifier-other"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 1.063,
+          "total": 1
+        },
+        {
+          "id": "v02",
+          "type": "version",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/v20",
+            "clip:cv20"
+          ],
+          "topFive": [
+            "clip:cv20",
+            "url:https://recall.example/v20"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.919,
+          "total": 2
+        },
+        {
+          "id": "v03",
+          "type": "version",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/other-version",
+            "clip:cengine-other"
+          ],
+          "topFive": [
+            "url:https://recall.example/other-version",
+            "clip:cengine-other"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.798,
+          "total": 2
+        },
+        {
+          "id": "v04",
+          "type": "title",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/utf8"
+          ],
+          "topFive": [
+            "url:https://recall.example/utf8"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.601,
+          "total": 1
+        },
+        {
+          "id": "v05",
+          "type": "recall",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/replication"
+          ],
+          "topFive": [
+            "url:https://recall.example/replication",
+            "clip:creplica"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.786,
+          "total": 2
+        },
+        {
+          "id": "v06",
+          "type": "quote",
+          "coverage": "retained-text",
+          "expected": [
+            "clip:clease"
+          ],
+          "topFive": [
+            "clip:clease"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": true,
+          "passageAt5": true,
+          "latencyMs": 0.689,
+          "total": 1
+        },
+        {
+          "id": "v07",
+          "type": "note",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/replication"
+          ],
+          "topFive": [
+            "url:https://recall.example/replication"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.59,
+          "total": 1
+        },
+        {
+          "id": "v08",
+          "type": "duplicate",
+          "coverage": "metadata",
+          "expected": [
+            "url:https://recall.example/selectors?version=1"
+          ],
+          "topFive": [
+            "url:https://recall.example/selectors?version=1"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.67,
+          "total": 1
+        },
+        {
+          "id": "v09",
+          "type": "coverage",
+          "coverage": "private",
+          "expected": [],
+          "topFive": [],
+          "retrievalAt5": null,
+          "negativeCorrect": true,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.583,
+          "total": 0
+        },
+        {
+          "id": "v10",
+          "type": "coverage",
+          "coverage": "unindexed",
+          "expected": [],
+          "topFive": [],
+          "retrievalAt5": null,
+          "negativeCorrect": true,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.531,
+          "total": 0
+        },
+        {
+          "id": "v11",
+          "type": "quote",
+          "coverage": "retained-text",
+          "expected": [
+            "clip:creplica"
+          ],
+          "topFive": [
+            "clip:creplica"
+          ],
+          "retrievalAt5": true,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": true,
+          "passageAt5": true,
+          "latencyMs": 0.682,
+          "total": 1
+        },
+        {
+          "id": "v12",
+          "type": "recall",
+          "coverage": "retained-text",
+          "expected": [
+            "clip:clease"
+          ],
+          "topFive": [],
+          "retrievalAt5": false,
+          "negativeCorrect": null,
+          "forbiddenReturned": [],
+          "sourceAt5": null,
+          "passageAt5": null,
+          "latencyMs": 0.566,
+          "total": 0
+        }
+      ]
+    }
+  ],
+  "baseCommit": "716620b15516c50365613c05f4e5259451984bf5"
+}

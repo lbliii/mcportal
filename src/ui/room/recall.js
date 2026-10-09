@@ -31,6 +31,7 @@
     $('experiences').replaceChildren(el('header', { class: 'experience-heading' }, el('span', { class: 'experience-kicker' }, 'YOUR COMMONPLACE BOOK'), el('h1', null, 'Recall Shelf'),
       el('p', null, 'Find what stayed with you. Saved pages, kept passages and reading, together.')), search,
       el('p', { id: 'recallCount', class: 'experience-muted', role: 'status' }),
+      el('p', { id: 'recallCoverage', class: 'experience-muted' }),
       selectionTray(),
       el('div', { class: 'recall-body' }, el('div', { id: 'recallResults', class: 'recall-results' }), el('aside', { id: 'recallPreview', class: 'recall-preview', 'aria-label': 'Material preview' })));
     if (recallResult) drawRecallResults();
@@ -56,11 +57,14 @@
 
   /** @param {LibraryHit} hit */
   function libraryLabel(hit) {
-    return [hit.clipKind || (hit.saved ? 'Saved link' : 'History only'), hit.reading?.status, hit.origin === 'conversation' ? 'From a conversation' : '', ...hit.tags.map(t => `#${t}`)].filter(Boolean).join(' · ');
+    return [hit.clipKind || (hit.saved ? 'Saved page' : 'Reading'), hit.reading?.status, hit.origin === 'conversation' ? 'From a conversation' : '', ...hit.tags.map(t => `#${t}`)].filter(Boolean).join(' · ');
   }
   function drawRecallResults() {
     if (!recallResult) return;
-    $('recallCount').textContent = `${recallResult.total} ${recallResult.total === 1 ? 'match' : 'matches'}${recallResult.query ? ` for “${recallResult.query}”` : ' in your library'}.${recallResult.effectiveQuery ? ` No literal matches; searched keywords: “${recallResult.effectiveQuery}”.` : ''} ${recallResult.coverage || 'Saved links and history search titles and notes; clips search retained text. Live page bodies are not searched.'}`;
+    $('recallCount').textContent = `${recallResult.total} ${recallResult.total === 1 ? 'match' : 'matches'}${recallResult.query ? ` for “${recallResult.query}”` : ' in your library'}`;
+    $('recallCoverage').textContent = recallResult.search
+      ? `${recallResult.search.query ? `Search words: ${recallResult.search.query}. ` : ''}${recallResult.search.coverage}`
+      : 'Searches saved and reading metadata and retained clips. Original page bodies are not searched.';
     $('recallResults').replaceChildren(...recallResult.hits.map(hit => el('article', { class: `recall-hit${recallPreview?.ref === hit.ref ? ' selected' : ''}`, 'data-ref': hit.ref },
       selectEvidenceButton(hit),
       el('div', { class: 'experience-kicker' }, libraryLabel(hit)),
@@ -69,7 +73,7 @@
       hit.excerpt ? el('p', { class: hit.clipKind === 'quote' ? 'recall-quote' : 'recall-excerpt' }, hit.excerpt) : null,
       hit.matched.length ? el('small', { class: 'experience-muted' }, `Matched: ${hit.matched.join(', ')}`) : null,
       el('button', { class: 'link-btn', onclick: () => openLibraryHit(hit) }, hit.clipId ? 'Read kept material →' : 'Resume reading →'))));
-    if (!recallResult.hits.length) $('recallResults').append(el('div', { class: 'experience-empty' }, el('h2', null, 'Nothing here yet'), el('p', null, 'Try a shorter phrase or different filters. Keep a page or passage while reading and you can find it here later.')));
+    if (!recallResult.hits.length) $('recallResults').append(el('div', { class: 'experience-empty' }, el('h2', null, recallResult.query ? 'No matching material' : 'Nothing here yet'), el('p', null, 'Try words from the title, a saved note or a kept passage, or change your filters. Saving a link does not retain its page text.')));
     if (recallResult.nextOffset !== null) {
       const next = recallResult.nextOffset;
       $('recallResults').append(el('button', { class: 'btn', onclick: () => fetchRecall(next, true) }, 'Show more material'));
