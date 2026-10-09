@@ -29,7 +29,7 @@ test('Recall merges saved/history, searches retained bodies, ranks titles and ke
     assert.equal(found.hits[0]!.reading?.progress, .3);
     assert.equal(found.hits[0]!.url, 'https://example.com/guide?mode=one');
     assert.equal(found.hits[1]!.clipId, old.id, 'old full-body match outside preview and first clip page');
-    assert.deepEqual(found.hits[1]!.matched, ['Clip text']);
+    assert.deepEqual(found.hits[1]!.matched, ['Indexed clip text or metadata']);
     assert.equal((await searchLibrary('alice', { kind: 'saved' }, sources)).total, 2, 'query parameters distinguish documents');
     assert.equal((await searchLibrary('alice', { tag: 'memory', site: 'example.com' }, sources)).hits[0]!.clipId, old.id);
     assert.equal((await searchLibrary('alice', { status: 'seen' }, sources)).total, 1);

@@ -52,6 +52,7 @@ declare global {
     btnUpcoming: HTMLButtonElement;
     btnCatchup: HTMLButtonElement;
     experiences: HTMLElement;
+    recallCoverage: HTMLParagraphElement;
     comparisonInterpretation: HTMLElement;
     whoMenu: HTMLDivElement;
     grid: HTMLElement;

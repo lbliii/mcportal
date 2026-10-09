@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Recall Shelf
+- Find saved material with conversational search prefixes or quoted titles, and keep identifiers and versions distinct from longer lookalikes. Results explain the matching fields, effective search words and indexed coverage; saved links do not imply retained page text.
+- Add a reproducible 40-query synthetic retrieval benchmark across file, Postgres and linked storage, with separate development/validation splits and source/passage checks.
+
 ### Storage
 - Enforce clip count and byte quotas atomically per account in Postgres, including concurrent saves and metadata edits. Local stores also check metadata growth; edits that reduce size remain available at the limit.
 
@@ -14,6 +18,7 @@
 - Record two rounds of explicitly simulated developer/researcher proxy tasks and logical later-day retrieval, plus a bounded accessibility audit. These are not human usability or adoption evidence.
 
 ### For hosts and agents
+- `search_library` adds optional `library.search` details with the effective query and coverage explanation. Existing result fields and input arguments remain compatible; older hosted results still render.
 - `import_opml` adds `added`, `alreadyPresent` and `deferred` result fields. A valid import with no working feeds returns its detailed outcome and leaves a new room unconfigured.
 - `open_handoff` may return `{ unavailable: true, handoff }` when the live source fails; its text still includes the fenced retained passage. No live article content is implied.
 - Ship the new successful handoff variant in the next minor release under the compatibility policy; callers must handle unavailable live content before reading article/docs fields.

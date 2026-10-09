@@ -1,0 +1,5 @@
+6d6fc7e08839bae5bda77bfefad76a5355c4d3b90880b73eaf6ad8426125a82b  evals/recall/corpus.ts
+d401e5ec5f9e67556c8e893884af2cdf47831abfdafdc331d9206f2c4f633dd0  src/library.ts
+901ca737f721ba839241880556d813e9c5a58338f034ce44a1b03ca473b7a8b1  src/lib/search.ts
+7b4cface1cb73d98f5a37cad161c219ec905ece34b81cb19d53ee136340572f0  src/db/clips.ts
+1cdf1ef91f57a15feb6f4f290e576475adcdc3b3d6e6d51898a0fcf1c8bd1e78  src/clip-stores.ts
