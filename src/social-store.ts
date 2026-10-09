@@ -4,6 +4,8 @@
  * src/db/social.ts. Stores only store; the rules live in Social (social.ts), which
  * re-exports this module.
  */
+import { writeRequest, replayReceipt, newReceipt, missingReplay, type WriteReceipt } from './write-receipts.ts';
+import { SOCIAL_LIMITS } from './social.ts';
 import { DOCUMENT_MAX_AGE_MS, memoryPersistence, SharedDocument } from './lib/document.ts';
 import type { AuthPersistence } from './auth/store.ts';
 import { AppError } from './lib/errors.ts';
@@ -11,7 +13,7 @@ import type { PageQuery, Relation, Report, Share } from './social.ts';
 
 /** Storage only; no rules. */
 export interface SocialStore {
-  addShare(share: Share): Promise<void>;
+  addShare(share: Share, requestKey?: string): Promise<Share>;
   getShare(id: string): Promise<Share | undefined>;
   deleteShare(accountId: string, id: string): Promise<boolean>;
   setHidden(id: string, hiddenAt: string | null): Promise<boolean>;
@@ -57,6 +59,7 @@ export const DELETED_RESOLUTION = 'The account was deleted';
 export const limitOf = (q: PageQuery, fallback = 30, max = 100) => Math.min(max, Math.max(1, Math.round(Number(q.limit) || fallback)));
 
 interface Doc {
+  receipts: Array<WriteReceipt & { owner: string }>;
   shares: Share[];
   relations: Record<Relation, Array<[string, string, string]>>;   // [a, b, at]
   reports: Report[];
@@ -69,6 +72,7 @@ export class DocumentSocialStore implements SocialStore {
   /** Without persistence, the document lives in memory. */
   constructor(persistence: AuthPersistence = memoryPersistence()) {
     this.doc = new SharedDocument<Doc>(persistence, 'social', (d) => ({
+      receipts: d.receipts ?? [],
       shares: d.shares ?? [],
       relations: { follows: [], mutes: [], blocks: [], intros: [], joins: [], ...d.relations },
       reports: d.reports ?? [],
@@ -83,11 +87,21 @@ export class DocumentSocialStore implements SocialStore {
     return this.doc.update(change);
   }
 
-  async addShare(share: Share): Promise<void> {
-    await this.write((d) => {
+  async addShare(share: Share, requestKey?: string): Promise<Share> {
+    const { id: _id, createdAt: _at, ...payload } = share;
+    const request = writeRequest(requestKey, payload);
+    return this.write((d) => {
+      d.receipts = d.receipts.filter(r => r.expiresAt > Date.now());
+      const receipts = d.receipts.filter(r => r.owner === share.accountId);
+      const prior = request ? replayReceipt(receipts, request) : undefined;
+      if (prior) return structuredClone(d.shares.find(s => s.id === prior && s.accountId === share.accountId) ?? missingReplay());
+      const receipt = request ? newReceipt(request, share.id, receipts) : undefined;
+      if (d.shares.filter(s => s.accountId === share.accountId).length >= SOCIAL_LIMITS.sharesPerUser) throw new AppError('limit_exceeded', 'Remove a post before publishing another.');
       const root = share.reblogOf?.root;
       if (root && d.shares.some((s) => s.accountId === share.accountId && s.reblogOf?.root === root)) throw new AppError('conflict', 'You already reblogged it');
       d.shares.unshift(structuredClone(share));
+      if (receipt) d.receipts.push({ ...receipt, owner: share.accountId });
+      return structuredClone(share);
     });
   }
 
@@ -207,6 +221,7 @@ export class DocumentSocialStore implements SocialStore {
 
   async forget(accountId: string, at: string): Promise<void> {
     await this.write((d) => {
+      d.receipts = d.receipts.filter(r => r.owner !== accountId);
       const theirShares = new Set(d.shares.filter((s) => s.accountId === accountId).map((s) => s.id));
       d.shares = d.shares.filter((s) => s.accountId !== accountId);
       for (const r of Object.keys(d.relations) as Relation[]) d.relations[r] = d.relations[r].filter(([a, b]) => a !== accountId && b !== accountId);

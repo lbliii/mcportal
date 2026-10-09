@@ -33,8 +33,8 @@ window.addEventListener('message', async (e) => {
   const m = e.data;
   window.log.push({ method: m.method, params: m.params });
   if (m.method === 'ui/initialize') send({ id: m.id, result: { protocolVersion: '2026-01-26', hostInfo: { name: 'fixture-host', version: '1' }, hostCapabilities: caps, hostContext: {} } });
-  else if (m.method === 'ui/notifications/initialized') send({ method: 'ui/notifications/tool-result', params: await (await fetch('/initial' + location.search)).json() });
-  else if (m.method === 'tools/call') { const r = await (await fetch('/rpc', { method: 'POST', body: JSON.stringify(m) })).json(); send({ id: m.id, result: r.result, error: r.error }); }
+  else if (m.method === 'ui/notifications/initialized') { const r = await (await fetch('/initial' + location.search)).json(); const { _meta, ...visible } = r; window.transcript = visible; if (location.search.includes('dropMeta=1')) delete r._meta; send({ method: 'ui/notifications/tool-result', params: r }); }
+  else if (m.method === 'tools/call') { const r = await (await fetch('/rpc', { method: 'POST', body: JSON.stringify(m) })).json(); if (window.holdTool === m.params.name) await new Promise(resolve => window.releaseHeld = resolve); if (window.loseOnce === m.params.name) { window.loseOnce = ''; send({id:m.id,error:{message:'Response lost after commit'}}); } else send({ id: m.id, result: r.result, error: r.error }); }
   else if (m.id !== undefined) send({ id: m.id, result: {} });
 });
 </script></body></html>`;
@@ -112,6 +112,8 @@ test('passage: "Clip quote" keeps it as a quote clip with its source', { skip },
   const [clip] = await ctx.clips!.list('reader', { limit: 5 });
   assert.equal(clip?.kind, 'quote');
   assert.equal(clip?.source.url, ARTICLE);
+  assert.match(clip?.source.locator?.digest || '', /^[a-f0-9]{64}$/);
+  assert.ok(clip?.source.locator?.prefix || clip?.source.locator?.suffix, 'context captured with the selected passage');
   const data = (await ctx.clips!.get('reader', clip!.id))?.data;
   assert.equal(data?.kind === 'quote' ? data.text : null, text, 'the passage, verbatim');
   assert.deepEqual(page.problems, []);
@@ -200,4 +202,76 @@ test('highlights: the card shows each pick as the source\'s item with the agent\
   assert.deepEqual(marked, { portals: [{ portalId: a!.portalId, itemIds: [a!.item.id] }] });
   assert.equal(await page.eval(`${IN_FRAME}.document.querySelectorAll('.highlight').length`), 1, 'it leaves the card');
   assert.deepEqual(page.problems, []);
+});
+
+test('component contract fixture: full article renders with bounded transcript; stripped metadata fails visibly', {skip}, async()=>{
+  ctx.resultMode='component-v1';
+  try {
+    await selectParagraph('serverTools');
+    assert.ok(await page.eval<number>(`${IN_FRAME}.document.querySelectorAll('[data-passage-url] p').length`) > 2);
+    assert.ok(await page.eval<number>(`new TextEncoder().encode(JSON.stringify(window.transcript)).length`) < 32768);
+    assert.equal(await page.eval(`window.transcript.structuredContent.article`),undefined);
+    await page.goto(`${base}/?caps=serverTools&dropMeta=1`);
+    await page.waitFor(`${IN_FRAME}.document.querySelector('[role=alert]')?.textContent.includes('did not deliver the component data')`,'explicit unsupported-host fallback');
+    assert.equal(await page.eval(`window.transcript.structuredContent.resultView.format`),'component-v1');
+  } finally {ctx.resultMode='legacy'; page.problems.length=0;}
+});
+
+test('passage retry retains its request key after a committed response is lost', {skip}, async()=>{
+  await ctx.clips!.deleteAll(ctx.userId);
+  await selectParagraph('serverTools');
+  await page.eval(`window.loseOnce='clip'`);
+  await press('Clip quote');
+  await page.waitFor(`${IN_FRAME}.document.getElementById('toast').textContent.includes('Could not confirm')`,'uncertain save feedback');
+  assert.equal((await ctx.clips!.usage(ctx.userId)).count,1,'first save committed');
+  await page.eval(`(() => { const w=${IN_FRAME}; const p=w.document.querySelectorAll('[data-passage-url] p')[1]; const r=w.document.createRange(); r.selectNodeContents(p); const s=w.getSelection(); s.removeAllRanges(); s.addRange(r); })()`);
+  await page.waitFor(`${IN_FRAME}.document.querySelector('.passage-bar')`, 'select the same passage to retry');
+  await press('Clip quote');
+  await page.waitFor(`${IN_FRAME}.document.getElementById('toast').textContent.includes('Clipped')`,'retry confirmation');
+  const keys=await page.eval<string[]>(`window.log.filter(m=>m.method==='tools/call' && m.params.name==='clip').map(m=>m.params.arguments.requestKey)`);
+  assert.equal(keys.length,2);assert.equal(keys[0],keys[1]);
+  assert.equal((await ctx.clips!.usage(ctx.userId)).count,1,'no duplicate clip');
+  assert.deepEqual(page.problems,[]);
+});
+
+test('navigation teardown cancels a delayed handoff retry and retires selection controls', {skip}, async()=>{
+  const handoff=await ctx.handoffs!.create(ctx.userId,{url:ARTICLE,title:'Delayed retry',place:{kind:'article'},passage:'Retained passage'});
+  await page.goto(`${base}/?caps=serverTools`);
+  await page.waitFor(`${IN_FRAME}.document.querySelector('[data-passage-url]')`,'reader');
+  await page.eval(`send({method:'ui/notifications/tool-result',params:{structuredContent:{unavailable:true,handoff:${JSON.stringify(handoff)}}}});window.holdTool='open_handoff'`);
+  await page.waitFor(`${IN_FRAME}.document.querySelector('#reader h1')?.textContent==='Delayed retry'`,'unavailable view');
+  await page.eval(`[...${IN_FRAME}.document.querySelectorAll('button')].find(b=>b.textContent==='Retry live page').click()`);
+  await page.waitFor(`Boolean(window.releaseHeld)`,'delayed reply');
+  await page.eval(`send({id:9000,method:'ui/resource-teardown'});window.releaseHeld()`);
+  await page.waitFor(`window.log.some(m=>m.method===undefined)`,'teardown acknowledgement');
+  await new Promise(r=>setTimeout(r,50));
+  assert.equal(await page.eval(`${IN_FRAME}.document.querySelector('#reader h1').textContent`),'Delayed retry','late result cannot replace retired view');
+  assert.equal(await page.eval(`${IN_FRAME}.document.querySelector('.passage-bar')`),null);
+});
+
+test('reading preferences survive a fresh card and explicit reset persists', {skip},async()=>{
+  await ctx.store.update(ctx.userId,profile=>({profile:{...profile,readerComfort:{size:'larger',measure:'focused'}},result:undefined}));
+  await page.goto(`${base}/?caps=serverTools`);
+  await page.waitFor(`${IN_FRAME}.document.querySelector('[aria-label="Reading text size"]')?.value==='larger'`,'account preference loaded');
+  assert.equal(await page.eval(`${IN_FRAME}.document.querySelector('[aria-label="Reading line width"]').value`),'focused');
+  await page.eval(`[...${IN_FRAME}.document.querySelectorAll('#readerComfort button')].find(b=>b.textContent==='Reset').click()`);
+  await page.waitFor(`${IN_FRAME}.document.querySelector('#readerComfort [role=status]')?.textContent.includes('saved')`,'reset saved');
+  await page.goto(`${base}/?caps=serverTools`);
+  await page.waitFor(`${IN_FRAME}.document.querySelector('[aria-label="Reading text size"]')?.value==='standard'`,'default in a new card');
+  assert.deepEqual((await ctx.store.get(ctx.userId)).readerComfort,{size:'standard',measure:'comfortable'});
+});
+
+test('navigation Back cancels a delayed reader success or error without replacing the room', {skip},async()=>{
+  await ctx.store.update(ctx.userId,profile=>({profile:{...profile,onboarded:true},result:undefined}));
+  await page.goto(`${base}/?caps=serverTools`);
+  await page.waitFor(`${IN_FRAME}.document.querySelector('[data-passage-url]')`,'reader');
+  await page.eval(`${IN_FRAME}.document.querySelector('#readerControls button').click()`);
+  await page.waitFor(`!${IN_FRAME}.document.getElementById('grid').hidden && ${IN_FRAME}.document.querySelector('.item-main')`,'room');
+  await page.eval(`window.holdTool='read_article';${IN_FRAME}.document.querySelector('.item-main').click()`);
+  await page.waitFor(`Boolean(window.releaseHeld)`,'delayed article response');
+  await page.eval(`${IN_FRAME}.document.querySelector('#readerControls button').click();window.releaseHeld()`);
+  await page.waitFor(`!${IN_FRAME}.document.getElementById('grid').hidden`,'returned room');
+  await new Promise(r=>setTimeout(r,50));
+  assert.equal(await page.eval(`${IN_FRAME}.document.getElementById('reader').hidden`),true);
+  assert.equal(await page.eval(`${IN_FRAME}.document.querySelector('.passage-bar')`),null);
 });

@@ -38,29 +38,29 @@
   }
 
   async function fetchRecall(offset = 0, append = false) {
-    const generation = ++recallGeneration;
+    const generation = ++recallGeneration, view = navigation.token();
     $('recallResults').setAttribute('aria-busy', 'true');
     $('recallCount').textContent = 'Searching your kept material…';
     try {
       const { library } = (await callTool('search_library', { ...recallQuery, offset, limit: 25 })).structuredContent;
-      if (generation !== recallGeneration) return;
+      if (generation !== recallGeneration || !navigation.owns(view)) return;
       recallResult = append && recallResult ? { ...library, hits: [...recallResult.hits, ...library.hits] } : library;
       if (!append) recallPreview = library.hits[0] || null;
-      if (experience === 'recall') drawRecallResults();
+      if (navigation.experience === 'recall') drawRecallResults();
     } catch (error) {
-      if (generation !== recallGeneration || experience !== 'recall') return;
+      if (generation !== recallGeneration || !navigation.owns(view)) return;
       $('recallCount').textContent = `Could not search: ${errorText(error)}`;
       $('recallResults').replaceChildren(el('button', { class: 'btn', onclick: () => fetchRecall() }, 'Try again'));
-    } finally { if (generation === recallGeneration) $('recallResults').setAttribute('aria-busy', 'false'); }
+    } finally { if (generation === recallGeneration && navigation.owns(view)) $('recallResults').setAttribute('aria-busy', 'false'); }
   }
 
   /** @param {LibraryHit} hit */
   function libraryLabel(hit) {
-    return [hit.clipKind || (hit.saved ? 'Saved page' : 'Reading'), hit.reading?.status, hit.origin === 'conversation' ? 'From a conversation' : '', ...hit.tags.map(t => `#${t}`)].filter(Boolean).join(' · ');
+    return [hit.clipKind || (hit.saved ? 'Saved link' : 'History only'), hit.reading?.status, hit.origin === 'conversation' ? 'From a conversation' : '', ...hit.tags.map(t => `#${t}`)].filter(Boolean).join(' · ');
   }
   function drawRecallResults() {
     if (!recallResult) return;
-    $('recallCount').textContent = `${recallResult.total} ${recallResult.total === 1 ? 'match' : 'matches'}${recallResult.query ? ` for “${recallResult.query}”` : ' in your library'}`;
+    $('recallCount').textContent = `${recallResult.total} ${recallResult.total === 1 ? 'match' : 'matches'}${recallResult.query ? ` for “${recallResult.query}”` : ' in your library'}.${recallResult.effectiveQuery ? ` No literal matches; searched keywords: “${recallResult.effectiveQuery}”.` : ''} ${recallResult.coverage || 'Saved links and history search titles and notes; clips search retained text. Live page bodies are not searched.'}`;
     $('recallResults').replaceChildren(...recallResult.hits.map(hit => el('article', { class: `recall-hit${recallPreview?.ref === hit.ref ? ' selected' : ''}`, 'data-ref': hit.ref },
       selectEvidenceButton(hit),
       el('div', { class: 'experience-kicker' }, libraryLabel(hit)),

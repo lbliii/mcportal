@@ -9,8 +9,7 @@
 
   /** The retained quote remains usable when fetching the source fails. @param {Handoff} handoff */
   function showUnavailableHandoff(handoff) {
-    if (stopReading) stopReading();
-    const generation = ++readerGeneration;
+    const generation = navigation.begin('reader');
     docsState = null;
     leaveExperience();
     root.classList.add('article-view');
@@ -26,12 +25,12 @@
       el('button', { class: 'btn', onclick: async () => {
         try {
           const data = (await callTool('open_handoff', { code: handoff.code })).structuredContent;
-          if (generation !== readerGeneration) return;
+          if (!navigation.owns(generation)) return;
           pendingHandoff = data.handoff;
           if ('unavailable' in data) { toast('The live page is still unavailable. Your retained handoff is here.'); return; }
           if ('article' in data) showArticleCard(data.article, data.saved);
           else showDocsCard(data);
-        } catch(error) { if (generation === readerGeneration) toast(errorText(error)); }
+        } catch(error) { if (navigation.owns(generation)) toast(errorText(error)); }
       } }, 'Retry live page'));
     setStatus('');
   }
@@ -58,10 +57,13 @@
     const block = p ? p.block : firstVisibleBlock(page.body);
     const heading = headingAnchorAt(page.body, block);
     try {
+      const digest = await p?.digest;
+      const locator = p?.locator ? { ...p.locator, ...(digest ? { digest } : {}) } : undefined;
       const { prompt } = (await callTool('create_handoff', {
         url: page.url, title: page.title, place: page.place,
         anchor: { block, ...(heading ? { heading } : {}) },
         ...(p ? { passage: p.text } : {}),
+        ...(locator ? { locator } : {}),
       })).structuredContent;
       showHandoffSent(page.body, prompt);
     } catch (error) {
@@ -90,11 +92,13 @@
     const h = pendingHandoff;
     if (!h || h.url !== body.dataset.passageUrl) return false;
     pendingHandoff = null;
-    const target = h.anchor || h.passage ? logicalBlocks(body)[resolveBlock(body, h.anchor, h.passage)] : null;
+    const resolved = h.passage ? resolvePassageTexts(passageTexts(body), h.locator || { text: h.passage, ...h.anchor }) : null;
+    const target = resolved?.block !== undefined ? logicalBlocks(body)[resolved.block] : !h.passage && h.anchor ? logicalBlocks(body)[resolveBlock(body, h.anchor)] : null;
     // With a passage, show it first, and a way to its place in the page; without, go straight there.
     const note = el('div', { class: 'handoff-note' },
       el('div', { class: 'handoff-label' }, h.passage ? 'You sent this passage from your room' : 'Sent from your room'),
       h.passage ? el('blockquote', null, h.passage) : null,
+      resolved && !target ? el('p', { role: 'status' }, resolved.status === 'ambiguous' ? 'This quotation occurs more than once; no exact location was chosen.' : 'This quotation could not be located in the current page.') : null,
       h.passage && target ? el('button', { class: 'btn', type: 'button', onclick: () => target.scrollIntoView({ block: 'start', behavior: scrollBehavior() }) }, 'Go to it in the page') : null);
     body.before(note);
     (h.passage || !target ? note : target).scrollIntoView({ block: 'start' });

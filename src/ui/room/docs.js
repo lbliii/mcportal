@@ -17,18 +17,17 @@
 
   /** @param {DocsKey} key @param {DocsOptions} [options] */
   async function openDocs(key, options = {}) {
-    if (stopReading) stopReading();
-    const generation = ++readerGeneration;
+    const generation = navigation.begin('docs');
     const reader = $('reader');
     rememberRoomNavigation();
     $('grid').hidden = true; reader.hidden = false; reader.classList.add('docs'); reader.scrollTop = 0; window.scrollTo(0, 0);
     renderReader(readerTop('', !options.card), docsMessage('Opening the docs…'));
     try {
       const data = (await callTool('open_docs', key)).structuredContent;
-      if (generation !== readerGeneration) return;
+      if (!navigation.owns(generation)) return;
       showDocs(data, key, options);
     } catch (error) {
-      if (generation !== readerGeneration) return;
+      if (!navigation.owns(generation)) return;
       console.error('[mcportal] open_docs failed', key, error);
       renderReader(readerTop('', !options.card), el('div', { class: 'error' }, `These docs couldn't be opened (${errorText(error)}).`));
     }
@@ -47,6 +46,7 @@
 
   /** @param {DocsData} data @param {DocsKey | null} key @param {DocsOptions} [options] */
   function showDocs(data, key, options = {}) {
+    navigation.begin('docs');
     const site = data && data.site;
     if (!site || !Array.isArray(site.sections) || typeof data.docs !== 'string' ||
         site.sections.some((s) => !s || !Array.isArray(s.pages))) {
@@ -67,16 +67,16 @@
       if (query.length < 2) { list.replaceChildren(...docsTocNodes(site)); markCurrentPage(); return; }
       timer = setTimeout(async () => {
         try {
-          if (docsState !== requestState) return;
+          if (!navigation.is('docs') || docsState !== requestState) return;
           const { hits } = (await callTool('search_docs', { ...docsState.key, query, limit: 30 })).structuredContent;
-          if (docsState !== requestState || search.value.trim() !== query) return;
+          if (!navigation.is('docs') || docsState !== requestState || search.value.trim() !== query) return;
           list.replaceChildren(hits.length
             ? el('ul', { class: 'docs-hits' }, hits.map((h) => el('li', null, el('a', { href: h.url, 'data-url': h.url, onclick: (/** @type {MouseEvent} */ e) => { e.preventDefault(); loadDocsPage(h.url); } }, h.title,
               el('span', { class: 'sub' }, h.kind === 'symbol' ? h.role : h.section || '')))))
             : el('div', { class: 'docs-hits' }, el('div', { class: 'empty' }, 'No matches in page titles, symbols or previously opened text. Open a page to search its text, or try different keywords.')));
           markCurrentPage();
         } catch (error) {
-          if (docsState !== requestState || search.value.trim() !== query) return;
+          if (!navigation.is('docs') || docsState !== requestState || search.value.trim() !== query) return;
           console.error('[mcportal] search_docs failed', error);
           list.replaceChildren(el('div', { class: 'error', role: 'alert' }, errorText(error)));
         }
@@ -135,7 +135,6 @@
   async function loadDocsPage(target) {
     if (!docsState) return;
     const requestState = docsState;
-    const generation = ++readerGeneration;
     const [url, hash] = String(target).split('#');
     const reader = $('reader');
     // showDocs builds both whenever docsState is set.
@@ -143,13 +142,13 @@
     const otp = /** @type {HTMLElement} */ ($first('.docs-otp', reader));
     reader.classList.remove('toc-open');
     if (docsState.url === url && hash) { scrollToAnchor(hash); return; }
-    if (stopReading) stopReading();
+    const generation = navigation.begin('docs');
     otp.replaceChildren();
     column.setAttribute('aria-busy', 'true');
     column.replaceChildren(docsMessage('Loading…'));
     try {
       const data = (await callTool('read_doc_page', { url, ...docsState.key })).structuredContent;
-      if (generation !== readerGeneration || docsState !== requestState) return;
+      if (!navigation.owns(generation) || docsState !== requestState) return;
       const { page, section, prev, next, provenance } = data;
       docsState.url = url;
       const here = new URL(page.url);
@@ -200,7 +199,7 @@
         }, 5000).catch(() => {});
       }
     } catch (error) {
-      if (generation !== readerGeneration || docsState !== requestState) return;
+      if (!navigation.owns(generation) || docsState !== requestState) return;
       column.removeAttribute('aria-busy');
       console.error('[mcportal] read_doc_page failed', { url, ...docsState.key }, error);
       setReaderControls(readerTop(url, !docsState.card));
@@ -237,17 +236,8 @@
     trackReaderToolbar(toolbar);
     return toolbar;
   }
-  let readerGeneration = 0;
-  /** @type {{ x: number, y: number, focus: HTMLElement | SVGElement | null, positions: Array<{ node: HTMLElement, left: number, top: number }> } | null} */
-  let roomNavigation = null;
-  function rememberRoomNavigation() {
-    if ($('grid').hidden || roomNavigation) return;
-    roomNavigation = { x: window.scrollX, y: window.scrollY, focus: /** @type {HTMLElement | SVGElement | null} */ (document.activeElement),   // an HTML or SVG element, both focusable
-      positions: [$('grid'), ...$$('.items, .shelf-row', $('grid'))].map((node) => ({ node, left: node.scrollLeft, top: node.scrollTop })) };
-  }
   async function closeReader() {
-    readerGeneration++;
-    if (stopReading) stopReading();
+    navigation.begin('room');
     articleUrl = null; clipId = null; docsArgs = null; spaceHandle = null; docsState = null;
     pendingKeptLocator = null;
     root.classList.remove('article-view');
@@ -257,12 +247,7 @@
     $('grid').hidden = false;
     if (!state.profile) { await loadRoom(); return; }
     $('roomName').textContent = state.profile.name;
-    if (roomNavigation) {
-      const previous = roomNavigation; roomNavigation = null;
-      for (const { node, left, top } of previous.positions) { node.scrollLeft = left; node.scrollTop = top; }
-      previous.focus?.focus({ preventScroll: true });
-      window.scrollTo(previous.x, previous.y);
-    }
+    navigation.restoreRoom();
     refreshContinueReading();
   }
   // Escape steps out one level: the reader to where it opened from, an open portal to the room.

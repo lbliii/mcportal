@@ -119,7 +119,22 @@ export interface SourceConfigs {
 
 export type SourceConfig = SourceConfigs[SourceKind];
 
+export interface ReaderComfort { size: 'standard' | 'large' | 'larger'; measure: 'comfortable' | 'focused' }
+export const DEFAULT_READER_COMFORT: ReaderComfort = { size: 'standard', measure: 'comfortable' };
+export const READER_COMFORT_SCHEMA = { type: 'object', additionalProperties: false, required: ['size', 'measure'], properties: {
+  size: { type: 'string', enum: ['standard', 'large', 'larger'] }, measure: { type: 'string', enum: ['comfortable', 'focused'] },
+} };
+export function readerComfortOf(raw: unknown): ReaderComfort {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { ...DEFAULT_READER_COMFORT };
+  const p = raw as Record<string, unknown>;
+  return { size: p.size === 'large' || p.size === 'larger' ? p.size : 'standard', measure: p.measure === 'focused' ? 'focused' : 'comfortable' };
+}
+/** Older writers omit fields they do not know. Reset writes explicit defaults. */
+export function preserveProfileSettings(before: Profile, next: Profile): Profile {
+  return next.readerComfort === undefined && before.readerComfort ? { ...next, readerComfort: before.readerComfort } : next;
+}
 export interface Profile {
+  readerComfort?: ReaderComfort;
   version: 1;
   name: string;
   layout: Layout;
@@ -347,7 +362,7 @@ export function validateProfile(input: unknown, now = new Date()): Profile {
   const pins = normalizePins(input.pins, pinnedIds, now);
   const shareAudience = input.shareAudience === 'everyone' || input.shareAudience === 'followers' ? input.shareAudience : undefined;
   const people = normalizePeople(input.people, now);
-  return { version: 1, name, layout, openIn, ...(shareAudience ? { shareAudience } : {}), columns, saved: normalizeSaved(input.saved, now), pins, onboarded, ...(people ? { people } : {}), updatedAt: now.toISOString() };
+  return { version: 1, name, layout, openIn, ...(input.readerComfort !== undefined ? { readerComfort: readerComfortOf(input.readerComfort) } : {}), ...(shareAudience ? { shareAudience } : {}), columns, saved: normalizeSaved(input.saved, now), pins, onboarded, ...(people ? { people } : {}), updatedAt: now.toISOString() };
 }
 
 /** Suggestions and passes: valid handles only, the reason cleaned, expired ones dropped, one per handle, capped. */

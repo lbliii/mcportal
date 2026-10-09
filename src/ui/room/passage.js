@@ -6,7 +6,7 @@
   // Nothing is sent until the user clicks.
   const PASSAGE_CHARS = 2000;
   const ASK_TEXT = "Let's talk about the passage I just highlighted in MCPortal.";
-  /** @typedef {{ text: string, url: string, title: string, heading: string, block: number, hint: string }} Passage  block: the index of its first block in the page body */
+  /** @typedef {{ text: string, url: string, title: string, heading: string, block: number, hint: string, locator?: import('../evidence.ts').PassageLocator, digest?: Promise<string | undefined> }} Passage  block: the index of its first block in the page body */
   /** The selection the bar acts on, captured when it was shown. @type {Passage | null} */
   let passage = null;
   /** @type {HTMLElement | null} */
@@ -22,6 +22,7 @@
     body.dataset.passageUrl = url;
     body.dataset.passageTitle = title;
     body.dataset.passageHint = hint;
+    passageDigest(body);
     return body;
   }
 
@@ -36,7 +37,7 @@
     const preview = el('blockquote', { class: 'passage-preview' });
     const chosen = () => {
       const p = choices.find(p => p.block === Number(select.value));
-      return p ? { ...p, url: body.dataset.passageUrl ?? '', title: body.dataset.passageTitle ?? '', heading: headingAt(body, p.block), hint: body.dataset.passageHint ?? '' } : null;
+      return p ? { ...p, locator: capturePassageLocator(body, p.block, p.text), digest: passageDigest(body), url: body.dataset.passageUrl ?? '', title: body.dataset.passageTitle ?? '', heading: headingAt(body, p.block), hint: body.dataset.passageHint ?? '' } : null;
     };
     const show = () => { preview.textContent = chosen()?.text ?? 'No text passages on this page.'; };
     select.addEventListener('change', show); show();
@@ -106,7 +107,7 @@
     if (text.length < 3) return null;
     const nodes = logicalBlocks(body);
     const block = Math.max(0, nodes.findIndex((node) => node === start || node.contains(start)));
-    return { text: text.slice(0, PASSAGE_CHARS), url: body.dataset.passageUrl ?? '', title: body.dataset.passageTitle ?? '', heading: headingAt(body, block), block, hint: body.dataset.passageHint ?? '' };
+    return { text: text.slice(0, PASSAGE_CHARS), locator: capturePassageLocator(body, block, text), digest: passageDigest(body), url: body.dataset.passageUrl ?? '', title: body.dataset.passageTitle ?? '', heading: headingAt(body, block), block, hint: body.dataset.passageHint ?? '' };
   }
 
   /** The nearest heading at or before a block of a page body, for "the part about …". @param {Element} body @param {number} index */
@@ -227,7 +228,11 @@
   async function clipPassage(p) {
     hidePassageBar();
     try {
-      const data = (await callTool('clip', { kind: 'quote', content: p.text, source: { kind: 'article', url: p.url, title: p.title, locator: { block: p.block, ...(p.heading ? { heading: p.heading } : {}), text: p.text.slice(0, 300) } } })).structuredContent;
+      const digest = await p.digest;
+      const locator = { ...(p.locator || { block: p.block, ...(p.heading ? { heading: p.heading } : {}), text: p.text.slice(0, 300) }), ...(digest ? { digest } : {}) };
+      const payload = { kind: 'quote', content: p.text, source: { kind: 'article', url: p.url, title: p.title, locator } };
+      const data = (await callTool('clip', { ...payload, requestKey: pendingWriteKey('clip', payload) })).structuredContent;
+      confirmWrite('clip', payload);
       if (state.profile) {
         state.profile = data.profile;
         for (const portal of data.portals) state.portals.set(portal.portalId, portal);
@@ -235,7 +240,7 @@
       }
       toast(data.layoutChanged ? 'Clipped! A Clips portal has materialized in your room.' : 'Clipped!');
     } catch (error) {
-      toast(`Curses! Couldn't clip that: ${errorText(error)}`);
+      toast(`Could not confirm the clip: ${errorText(error)}. Retry the same passage to check the save.`);
     }
   }
 

@@ -58,3 +58,27 @@ test('Recall pagination is deterministic across kinds, and empty queries show re
     await assert.rejects(searchLibrary('u', { limit: 51 }, sources), /limit/);
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
+
+test('Recall prioritizes exact versions and discloses a bounded keyword retry without widening successful queries', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'mcportal-recall-precision-'));
+  try {
+    const store = new MemoryProfileStore({ alice: { ...defaultProfile(), saved: ['v22', 'v20', 'v2'].map(version => ({
+      url: `https://example.com/${version}`, title: `SDK ${version}`, savedAt: '2026-01-01T00:00:00Z',
+    })) } });
+    const clips = new FileClipStore(dir);
+    const clip = await clips.add('alice', buildClip({ kind: 'quote', text: 'The worker renews its lease before the heartbeat deadline.' }));
+    await clips.add('bob', buildClip({ kind: 'quote', text: 'The worker private password.' }));
+    const sources = { store, clips };
+    const exact = await searchLibrary('alice', { query: 'v2' }, sources);
+    assert.equal(exact.hits[0]!.url, 'https://example.com/v2');
+    assert.equal(exact.effectiveQuery, undefined);
+    const retry = await searchLibrary('alice', { query: 'Where was the quote about the worker heartbeat deadline?' }, sources);
+    assert.equal(retry.hits[0]!.clipId, clip.id);
+    assert.equal(retry.effectiveQuery, 'worker heartbeat deadline');
+    assert.match(retry.coverage!, /do not index live article bodies/);
+    assert.equal((await searchLibrary('alice', { query: 'Where was the private password?' }, sources)).total, 0);
+    assert.equal((await searchLibrary('alice', { query: 'v99.99' }, sources)).effectiveQuery, undefined);
+    const first = await searchLibrary('alice', { query: 'Where was the quote about the worker heartbeat deadline?', limit: 1 }, sources);
+    assert.deepEqual(first.hits, retry.hits);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});

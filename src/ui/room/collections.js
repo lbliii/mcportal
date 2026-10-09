@@ -68,9 +68,9 @@
     try {
       const data = (await callTool('open_collection')).structuredContent;
       collectionList = data.collections; collectionSources = data.sources;
-      if (experience !== 'collections') return;
+      if (navigation.experience !== 'collections') return;
       drawCollectionCards();
-    } catch (error) { if (experience === 'collections') $('collectionCards').textContent = `Could not load collections: ${errorText(error)}`; }
+    } catch (error) { if (navigation.experience === 'collections') $('collectionCards').textContent = `Could not load collections: ${errorText(error)}`; }
   }
   function drawCollectionCards() {
     $('collectionCards').replaceChildren(...collectionList.map(c => el('article', { class: 'collection-card' }, el('span', { class: 'experience-kicker' }, c.kind),
@@ -85,11 +85,11 @@
     $('experiences').replaceChildren(el('p', { class: 'experience-muted', role: 'status' }, 'Opening your collection…'));
     try {
       const data = (await callTool('open_collection', { id, refresh })).structuredContent;
-      if (generation !== deskGeneration || experience !== 'desk') return;
+      if (generation !== deskGeneration || navigation.experience !== 'desk') return;
       collectionList = data.collections; collectionSources = data.sources;
       if (!data.desk) throw new Error('This collection is unavailable.');
       showDesk(data.desk);
-    } catch (error) { if (generation === deskGeneration && experience === 'desk') $('experiences').replaceChildren(el('p', { class: 'error', role: 'alert' }, errorText(error)), el('button', { class: 'btn', onclick: () => showCollections() }, 'Back to your desks')); }
+    } catch (error) { if (generation === deskGeneration && navigation.experience === 'desk') $('experiences').replaceChildren(el('p', { class: 'error', role: 'alert' }, errorText(error)), el('button', { class: 'btn', onclick: () => showCollections() }, 'Back to your desks')); }
   }
   /** @param {CollectionChange} change */
   async function changeDesk(change) {

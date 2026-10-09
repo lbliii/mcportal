@@ -69,7 +69,7 @@ export class PgProfileStore implements ProfileStore {
   private async write(userId: string, profile: Profile, db: Queryable = this.db): Promise<number> {
     const { rows } = await db.query<{ rev: string }>(
       `INSERT INTO mcportal_profiles (user_id, data) VALUES ($1, $2)
-       ON CONFLICT (user_id) DO UPDATE SET data = EXCLUDED.data, rev = mcportal_profiles.rev + 1, updated_at = now()
+       ON CONFLICT (user_id) DO UPDATE SET data = CASE WHEN NOT (EXCLUDED.data ? 'readerComfort') AND mcportal_profiles.data ? 'readerComfort' THEN jsonb_set(EXCLUDED.data, '{readerComfort}', mcportal_profiles.data->'readerComfort') ELSE EXCLUDED.data END, rev = mcportal_profiles.rev + 1, updated_at = now()
        RETURNING rev`,
       [userId, JSON.stringify(profile)],
     );

@@ -1,5 +1,7 @@
   // room/reader-tools.js: page-local find and reading comfort, shared by articles and docs.
-  // Preferences last for this open view's session; neither queries nor settings leave the card.
+  // Comfort is saved in the account profile; find queries remain local to the card.
+  let comfortGeneration = 0;
+  let comfortWrites = Promise.resolve();
   const readerComfort = { size: 'standard', measure: 'comfortable' };
 
   /** Preserve the visible content block while typography or the controls reflow.
@@ -9,9 +11,11 @@
     const reader = $('reader');
     const anchor = logicalBlocks(body).find((node) => node.getBoundingClientRect().bottom > readerVisibleTop(reader));
     const offset = anchor ? anchor.getBoundingClientRect().top - readerVisibleTop(reader) : 0;
+    const scroll = reader.scrollTop, windowY = window.scrollY;
     change();
     requestAnimationFrame(() => {
-      if (!anchor?.isConnected) return;
+      // A resume, anchor jump or user scroll made after this change owns the position.
+      if (!anchor?.isConnected || reader.scrollTop !== scroll || window.scrollY !== windowY) return;
       const delta = anchor.getBoundingClientRect().top - readerVisibleTop(reader) - offset;
       reader.scrollTop += delta;
     });
@@ -66,10 +70,18 @@
     size.value = readerComfort.size; measure.value = readerComfort.measure;
     const reset = el('button', { class: 'btn' }, 'Reset');
     const closeComfort = el('button', { class: 'btn', 'aria-label': 'Close reading settings' }, 'Close');
+    const comfortStatus = el('small', { role: 'status' }, 'Applies to articles and docs. Saved with your account, or locally in ghost mode.');
     const comfort = el('div', { id: 'readerComfort', class: 'reader-panel reader-comfort', hidden: true, role: 'group', 'aria-label': 'Reading settings' },
       el('label', null, 'Text size', size), el('label', null, 'Line width', measure), reset, closeComfort,
-      el('small', null, 'Applies to articles and docs in this open session.'));
+      comfortStatus);
     top.append(findToggle, comfortToggle, find, comfort);
+    const loadedAt = comfortGeneration;
+    if (DEV || hostCapabilities.serverTools) comfortWrites.then(() => callTool('get_reading_preferences', {})).then(result => {
+      if (!body.isConnected || loadedAt !== comfortGeneration) return;
+      const prefs = result.structuredContent.readerComfort;
+      if (prefs.size === readerComfort.size && prefs.measure === readerComfort.measure) return;
+      keepReaderPlace(body, () => { Object.assign(readerComfort, prefs); size.value = prefs.size; measure.value = prefs.measure; applyReaderComfort(body, title); });
+    }).catch(() => { if (body.isConnected) comfortStatus.textContent = 'Using session settings; saved preferences could not be loaded.'; });
 
     /** @type {HTMLElement[][]} One match may span several inline marks. */
     let matches = [];
@@ -159,7 +171,19 @@
       else if (returnFocus) comfortToggle.focus({ preventScroll: true });
     }
     function changeComfort() {
+      const generation = ++comfortGeneration;
       keepReaderPlace(body, () => { readerComfort.size = size.value; readerComfort.measure = measure.value; applyReaderComfort(body, title); });
+      const change = { ...readerComfort };
+      comfortStatus.textContent = 'Saving reading preferences…';
+      comfortWrites = comfortWrites.then(async () => {
+        try {
+          await callTool('set_reading_preferences', change);
+          if (state.profile) state.profile.readerComfort = { size: change.size === 'larger' ? 'larger' : change.size === 'large' ? 'large' : 'standard', measure: change.measure === 'focused' ? 'focused' : 'comfortable' };
+          if (generation === comfortGeneration && body.isConnected) comfortStatus.textContent = 'Reading preferences saved.';
+        } catch (error) {
+          if (generation === comfortGeneration && body.isConnected) comfortStatus.textContent = `Applied for this session; could not save: ${errorText(error)}`;
+        }
+      });
     }
     findToggle.addEventListener('click', () => toggleFind(find.hidden));
     comfortToggle.addEventListener('click', () => toggleComfort(comfort.hidden));

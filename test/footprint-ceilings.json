@@ -1,17 +1,17 @@
 {
   "totals": {
-    "local": 5805,
-    "linked": 7742,
-    "hosted-new": 7058,
-    "hosted-active": 7679,
-    "hosted-labs": 7679
+    "local": 6059,
+    "linked": 8018,
+    "hosted-new": 7312,
+    "hosted-active": 7955,
+    "hosted-labs": 7955
   },
   "tools": {
     "account_settings": 61,
     "add_portal": 136,
     "arrange_room": 463,
     "build_room": 145,
-    "clip": 423,
+    "clip": 510,
     "delete_clip": 49,
     "export_data": 97,
     "find_people": 126,
@@ -33,8 +33,9 @@
     "open_room": 106,
     "open_space": 69,
     "pin_portal": 333,
-    "read_article": 71,
+    "read_article": 102,
     "read_doc_page": 172,
+    "read_result_page": 89,
     "read_source": 100,
     "relationship": 119,
     "remove_portal": 83,
@@ -46,7 +47,7 @@
     "search_docs": 129,
     "search_library": 167,
     "set_public_profile": 716,
-    "share": 163,
+    "share": 185,
     "share_settings": 90,
     "show_comparison": 259,
     "show_highlights": 143,
@@ -55,7 +56,7 @@
     "unshare": 49,
     "unwatch": 85,
     "update_clip": 102,
-    "update_collection": 460,
+    "update_collection": 507,
     "watch": 216,
     "watch_reading": 266
   }

@@ -28,7 +28,7 @@
     const src = clip.source || {};
     const from = src.url ? (src.title || new URL(src.url).hostname) : src.kind === 'conversation' ? 'a conversation' : (src.title || '');
     const top = el('div', { class: 'reader-top' },
-      iconButton('back', experienceReturn ? 'Back to your reading experience' : withBack ? 'Back to your room' : 'Open your room', closeReader, 'ib'),
+      iconButton('back', navigation.hasReturn ? 'Back to your reading experience' : withBack ? 'Back to your room' : 'Open your room', closeReader, 'ib'),
       src.url && isHttpUrl(src.url) ? iconButton('external', 'Open where it came from', () => openLink(src.url ?? ''), 'ib') : null);  // checked just before
     return present([top, el('h1', null, clip.title),
       el('div', { class: 'byline' }, [`${clip.kind[0].toUpperCase()}${clip.kind.slice(1)}`, from ? `from ${from}` : '', `clipped ${ago(clip.createdAt)}`].filter(Boolean).join(' · ')),
@@ -157,7 +157,9 @@
       const selected = audience.value();
       audience.disable(true);
       try {
-        const result = await callTool('share', { ...target, note: note.value, audience: selected });
+        const payload = { ...target, note: note.value, audience: selected };
+        const result = await callTool('share', { ...payload, requestKey: pendingWriteKey('share', payload) });
+        confirmWrite('share', payload);
         rememberShareAudience(result.structuredContent.share);
         box.replaceChildren(el('div', { role: 'status' }, `${verb === 'Reblog' ? 'Reblogged' : 'Shared'} · ${result.structuredContent.share.audience === 'everyone' ? 'Public' : 'Followers only'}. ${audienceHelp(result.structuredContent.share.audience)}`));
         onDone?.(result.structuredContent.share);

@@ -1,3 +1,4 @@
+import { REQUEST_KEY_SCHEMA } from '../write-receipts.ts';
 /**
  * Sharing tools: share (and reblog), unshare, get_share, share_settings, list_shares,
  * relationship, list_connections, report. Everything other people wrote (notes, titles,
@@ -221,6 +222,7 @@ export const SOCIAL_TOOLS: ToolDef[] = [
       type: 'object',
       additionalProperties: false,
       properties: {
+        requestKey: REQUEST_KEY_SCHEMA,
         savedUrl: { type: 'string', description: 'URL of a saved item' },
         clipId: { type: 'string' },
         note: { type: 'string', maxLength: 500 },
@@ -234,7 +236,7 @@ export const SOCIAL_TOOLS: ToolDef[] = [
       if (!ctx.social) return toolError(HOSTED_ONLY.sharing, 'unavailable');
       try {
         if (typeof args.reblogOf === 'string' && args.reblogOf) {
-          const reblog = await ctx.social.reblog(ctx.userId, { id: args.reblogOf, note: args.note, audience: args.audience });
+          const reblog = await ctx.social.reblog(ctx.userId, { requestKey: args.requestKey as string | undefined, id: args.reblogOf, note: args.note, audience: args.audience });
           const original = reblog.original && 'author' in reblog.original ? `@${reblog.original.author.handle}'s post` : 'the post';
           return ok(`Reblogged ${original} (id ${reblog.id}; undo with unshare).\n${untrusted('your reblog', shareLine(reblog))}`, { share: reblog } satisfies ToolResults['share']);
         }
@@ -249,7 +251,7 @@ export const SOCIAL_TOOLS: ToolDef[] = [
           if (!saved) return toolError('Share a saved item (savedUrl, save it first with save_item) or a clip (clipId).');
           input = { kind: 'link', title: saved.title, url: saved.url, description: saved.description, image: saved.image, note: args.note, audience: args.audience, reblogs: args.reblogs };
         }
-        const shared = await ctx.social.share(ctx.userId, input);
+        const shared = await ctx.social.share(ctx.userId, { ...input, requestKey: args.requestKey as string | undefined });
         return ok(`Shared (id ${shared.id}).\n${untrusted('your share', shareLine(shared))}`, { share: shared } satisfies ToolResults['share']);
       } catch (error) {
         return fail(error);

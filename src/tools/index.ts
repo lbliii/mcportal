@@ -9,6 +9,7 @@ import { DOCS_TOOLS } from './docs.ts';
 import { HANDOFF_TOOLS } from './handoffs.ts';
 import { HIGHLIGHT_TOOLS } from './highlights.ts';
 import type { ToolDef } from './kit.ts';
+import { RESULT_PAGE_TOOLS } from './result-payload.ts';
 import { READER_TOOLS } from './reader.ts';
 import { READING_TOOLS } from './reading.ts';
 import { ROOM_TOOLS } from './room.ts';
@@ -28,6 +29,7 @@ export const TOOLS: readonly ToolDef[] = [
   ...SOURCE_TOOLS,
   ...WATCH_TOOLS,
   ...READER_TOOLS,
+  ...RESULT_PAGE_TOOLS,
   ...SAVED_TOOLS,
   ...DOCS_TOOLS,
   ...HANDOFF_TOOLS,

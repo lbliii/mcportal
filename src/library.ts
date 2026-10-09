@@ -28,7 +28,8 @@ export interface LibraryHit {
   reading?: ReadingState;
   matched: string[];
 }
-export interface LibraryResult { query: string; hits: LibraryHit[]; total: number; offset: number; nextOffset: number | null }
+export const LIBRARY_COVERAGE = 'Searches saved-link titles and notes, retained clip text and metadata, and reading-history titles and addresses. Saved links and history do not index live article bodies. Seen-only items appear only with the seen filter. Other accounts are never searched.';
+export interface LibraryResult { query: string; effectiveQuery?: string; coverage?: string; hits: LibraryHit[]; total: number; offset: number; nextOffset: number | null }
 export interface LibrarySearch { search(userId: string, query: LibraryQuery): Promise<LibraryResult> }
 export interface LibrarySources { store: ProfileStore; clips?: ClipStore | undefined; reading?: ReadingStore | undefined }
 export const LIBRARY_SCHEMA = { type: 'object', additionalProperties: false, properties: {
@@ -80,13 +81,16 @@ function relevance(hit: LibraryHit, query: string, bodyMatch = false): number {
     hit.matched.push(label);
     score += matches * weight;
     if (query.trim() && lower.includes(query.trim().toLowerCase())) score += weight * 2;
+    // Exact tokens outrank substrings: v2 must precede v20/v22, request_id precedes request_id_extra.
+    const tokens = lower.split(/[^\p{L}\p{N}_+.:%=-]+/u);
+    score += words.filter(w => tokens.includes(w)).length * weight * 3;
   }
-  if (bodyMatch && !hit.matched.length) hit.matched.push('Clip text');
+  if (bodyMatch && !words.every(w => text.includes(w))) hit.matched.push('Clip text');
   return score;
 }
 
 /** The hosted API calls this with its own stores, avoiding linked-client list-page caps. */
-export async function searchLibrary(userId: string, raw: LibraryQuery, stores: LibrarySources): Promise<LibraryResult> {
+async function searchLiteral(userId: string, raw: LibraryQuery, stores: LibrarySources): Promise<LibraryResult> {
   const query = clean(raw.query, 300);
   if (raw.kind !== undefined && !LIBRARY_KINDS.includes(raw.kind)) throw new AppError('invalid_argument', 'Unknown library kind.');
   if (raw.status !== undefined && !['seen', 'opened', 'read'].includes(raw.status)) throw new AppError('invalid_argument', 'Unknown reading status.');
@@ -139,5 +143,18 @@ export async function searchLibrary(userId: string, raw: LibraryQuery, stores: L
   const rank = (r: typeof ranked[number]) => r.score + (query && r.hit.kind === 'clip' ? 0.5 / (r.sourceRank + 1) : 0);
   matches.sort((a, b) => rank(b) - rank(a) || b.hit.updatedAt.localeCompare(a.hit.updatedAt) || a.hit.ref.localeCompare(b.hit.ref));
   const hits = matches.slice(offset, offset + limit).map(({ hit }) => hit);
-  return { query, hits, total: matches.length, offset, nextOffset: offset + hits.length < matches.length ? offset + hits.length : null };
+  return { query, coverage: LIBRARY_COVERAGE, hits, total: matches.length, offset, nextOffset: offset + hits.length < matches.length ? offset + hits.length : null };
+}
+
+/** A disclosed lexical retry for common recall questions, only after literal search misses.
+ * Never remove identifier punctuation or broaden an already successful literal search.
+ */
+export async function searchLibrary(userId: string, raw: LibraryQuery, stores: LibrarySources): Promise<LibraryResult> {
+  const literal = await searchLiteral(userId, raw, stores);
+  if (literal.total || !/^(?:where (?:was|is)|find (?:me )?(?:the|a)|what was)\b/i.test(literal.query)) return literal;
+  const keywords = literal.query.toLowerCase().replace(/[?]$/, '').split(/\s+/)
+    .filter(w => !new Set(['where', 'was', 'is', 'find', 'me', 'what', 'the', 'a', 'an', 'about', 'quote', 'page', 'article', 'that', 'of', 'and', 'in']).has(w));
+  if (keywords.length < 2 || keywords.join(' ') === literal.query) return literal;
+  const result = await searchLiteral(userId, { ...raw, query: keywords.join(' ') }, stores);
+  return { ...result, query: literal.query, effectiveQuery: keywords.join(' ') };
 }

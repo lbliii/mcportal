@@ -124,7 +124,7 @@
 
   /** Incoming agent output updates the existing comparison without resetting its reading positions. @param {import('../comparison.ts').ComparisonResult} result */
   function showComparisonResult(result) {
-    if (experience !== 'compare' || comparisonHits.map(h => h.ref).join('|') !== result.sources.map(h => h.ref).join('|')) { showComparison(result.sources); for (const h of result.sources) if (h.excerpt && !h.clipId) comparisonPassages.set(h.ref,h.excerpt); drawComparisonPassages(); }
+    if (navigation.experience !== 'compare' || comparisonHits.map(h => h.ref).join('|') !== result.sources.map(h => h.ref).join('|')) { showComparison(result.sources); for (const h of result.sources) if (h.excerpt && !h.clipId) comparisonPassages.set(h.ref,h.excerpt); drawComparisonPassages(); }
     comparisonQuestion = result.question; comparisonOrientation = result.orientation;
     const question = $first('input', $('experiences')); if (question instanceof HTMLInputElement) question.value = result.question;
     $('comparisonInterpretation').replaceChildren(el('span', {class:'experience-kicker'}, 'AGENT INTERPRETATION'), el('h2',null,'Agreements, differences and open questions'), el('p',{class:'agent-writing'},result.orientation.text), el('small',{class:'experience-muted'},`Agent-written ${new Date(result.orientation.createdAt).toLocaleString()}`), el('div',{class:'orientation-citations'},result.orientation.refs.map(ref => { const hit = comparisonHits.find(h => h.ref === ref); return hit ? el('button',{class:'link-btn',onclick:()=>openLibraryHit(hit)},hit.title) : el('span',{class:'error'},'Unavailable evidence'); })));

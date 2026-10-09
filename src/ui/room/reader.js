@@ -265,6 +265,7 @@
   // This view belongs to a read_article call: it is a reader card, not a room.
   /** @param {Article} a @param {boolean} saved */
   function showArticleCard(a, saved) {
+    navigation.begin('reader');
     if (saved) state.saved.add(a.url);
     root.classList.add('article-view');
     $('roomName').textContent = 'reader';
@@ -279,11 +280,14 @@
 
   /** @param {string} url */
   async function loadArticleCard(url) {
+    const generation = navigation.begin('reader');
     setStatus('Stand by…');
     try {
       const result = await callTool('read_article', { url });
+      if (!navigation.owns(generation)) return;
       showArticleCard(result.structuredContent.article, result.structuredContent.saved);
     } catch (error) {
+      if (!navigation.owns(generation)) return;
       setStatus('');
       $('grid').hidden = true;
       $('reader').hidden = false;
@@ -293,8 +297,7 @@
 
   /** @param {ReadableItem} item @param {PortalResult} portal */
   async function openReader(item, portal) {
-    if (stopReading) stopReading();
-    const generation = ++readerGeneration;
+    const generation = navigation.begin('reader');
     const reader = $('reader');
     rememberRoomNavigation();
     // The story grows into the reader's title (where the browser can animate it).
@@ -302,10 +305,10 @@
       $('grid').hidden = true; reader.hidden = false; reader.scrollTop = 0; window.scrollTo(0, 0);
       renderReader(readerTop(item.url, true), el('h1', null, item.title), el('div', { class: 'byline' }, 'Unrolling the scroll…'));
     }, takeZoomSource(), () => $first('h1', reader));
-    if (generation !== readerGeneration) return;
+    if (!navigation.owns(generation)) return;
     try {
       const result = await callTool('read_article', { url: item.url });
-      if (generation !== readerGeneration) return;
+      if (!navigation.owns(generation)) return;
       const a = result.structuredContent.article;
       // A follow's story reblogs their post; anything else posts the link.
       const nodes = articleNodes(a, portal.title, true, undefined, reblogTarget(item, portal, item.share));
@@ -320,7 +323,7 @@
         }, 5000).catch(() => {});
       }
     } catch (error) {
-      if (generation !== readerGeneration) return;
+      if (!navigation.owns(generation)) return;
       renderReader(readerTop(item.url, true), el('h1', null, item.title), ...(item.share ? [sharedBy(item, item.share)] : []),
         el('div', { class: 'error' }, `Reader view isn't available for this page (${errorText(error)}).`),
         el('button', { class: 'btn', onclick: () => openLink(item.url) }, 'Open the original'));

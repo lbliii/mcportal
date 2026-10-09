@@ -1,3 +1,4 @@
+import { REQUEST_KEY_SCHEMA } from '../write-receipts.ts';
 /**
  * The hosted state API's methods: the storage and social interfaces the tools use
  * (ProfileStore, ClipStore, ReadingStore, SeenStore, HandoffStore, EditionStore, SocialService,
@@ -129,7 +130,7 @@ export const API_METHODS: Record<string, ApiMethod> = {
       const preserveViews = (before: Profile): Profile => {
         const known = new Map(before.columns.flatMap(c => c.panels).map(p => [p.id, p.view]));
         const keptEvents = new Map(before.saved.filter(s => s.event).map(s => [s.url, s.event!]));
-        return { ...valid, saved: valid.saved.map(s => !s.event && keptEvents.has(s.url) ? { ...s, event: keptEvents.get(s.url)! } : s), columns: valid.columns.map(c => ({ ...c, panels: c.panels.map(p => p.view === undefined && known.get(p.id) !== undefined ? { ...p, view: known.get(p.id)! } : p) })) };
+        return { ...valid, ...(valid.readerComfort === undefined && before.readerComfort ? { readerComfort: before.readerComfort } : {}), saved: valid.saved.map(s => !s.event && keptEvents.has(s.url) ? { ...s, event: keptEvents.get(s.url)! } : s), columns: valid.columns.map(c => ({ ...c, panels: c.panels.map(p => p.view === undefined && known.get(p.id) !== undefined ? { ...p, view: known.get(p.id)! } : p) })) };
       };
       if (ifMatch !== undefined) return { rev: await ctx.store.replaceIf(ctx.userId, preserveViews(await ctx.store.get(ctx.userId)), ifMatch) };
       await ctx.store.update(ctx.userId, before => ({ profile: preserveViews(before), result: undefined }));
@@ -152,11 +153,11 @@ export const API_METHODS: Record<string, ApiMethod> = {
 
   // ---- clips
   /** Rebuilt from its content, exactly like a new clip, with an id this server picks. */
-  'clips.add': params<{ clip: Record<string, unknown> }>(
-    { type: 'object', required: ['clip'], additionalProperties: false, properties: { clip: { type: 'object' } } },
-    async ({ clip }, ctx) => {
+  'clips.add': params<{ clip: Record<string, unknown>; requestKey?: string }>(
+    { type: 'object', required: ['clip'], additionalProperties: false, properties: { clip: { type: 'object' }, requestKey: REQUEST_KEY_SCHEMA } },
+    async ({ clip, requestKey }, ctx) => {
       if (!CLIP_KINDS.includes(clip.kind as ClipKind)) throw new AppError('invalid_argument', 'Unknown clip kind.');
-      return clipsOf(ctx).add(ctx.userId, buildClip(clipInput(clip), new Date(), newClipId()));
+      return clipsOf(ctx).add(ctx.userId, buildClip(clipInput(clip), new Date(), newClipId()), requestKey);
     }, 'write'),
   'clips.get': params<{ id: string }>({ type: 'object', required: ['id'], additionalProperties: false, properties: { id } },
     async (p, ctx) => (await clipsOf(ctx).get(ctx.userId, p.id)) ?? null),
@@ -256,23 +257,23 @@ export const API_METHODS: Record<string, ApiMethod> = {
   'social.resolve': params<{ handle: string }>({ type: 'object', required: ['handle'], additionalProperties: false, properties: { handle } },
     async (p, ctx) => publicRef(await socialOf(ctx).resolve(ctx.userId, p.handle), ctx)),
   /** A clip or saved item the server looks up itself, as the share tool does; never content from the request. */
-  'social.share': params<{ clipId?: string; savedUrl?: string; note?: string; audience?: string; reblogs?: string }>(
-    { type: 'object', additionalProperties: false, properties: { clipId: id, savedUrl: { type: 'string', maxLength: 2000 }, note: { type: 'string', maxLength: 500 }, audience: { type: 'string', enum: AUDIENCES }, reblogs: { type: 'string', enum: REBLOG_RULES } } },
+  'social.share': params<{ requestKey?: string; clipId?: string; savedUrl?: string; note?: string; audience?: string; reblogs?: string }>(
+    { type: 'object', additionalProperties: false, properties: { requestKey: REQUEST_KEY_SCHEMA, clipId: id, savedUrl: { type: 'string', maxLength: 2000 }, note: { type: 'string', maxLength: 500 }, audience: { type: 'string', enum: AUDIENCES }, reblogs: { type: 'string', enum: REBLOG_RULES } } },
     async (p, ctx) => {
       const social = socialOf(ctx);
       if (p.clipId) {
         const clip = await clipsOf(ctx).get(ctx.userId, p.clipId);
         if (!clip) throw new AppError('not_found', `No clip with id "${clean(p.clipId, 40)}".`);
-        return social.share(ctx.userId, { kind: 'clip', title: clip.title, url: clip.source.url, clip, note: p.note, audience: p.audience, reblogs: p.reblogs });
+        return social.share(ctx.userId, { requestKey: p.requestKey, kind: 'clip', title: clip.title, url: clip.source.url, clip, note: p.note, audience: p.audience, reblogs: p.reblogs });
       }
       const url = httpUrl(p.savedUrl);
       const saved = url ? (await ctx.store.get(ctx.userId)).saved.find((s) => s.url === url) : undefined;
       if (!saved) throw new AppError('invalid_argument', 'Share a saved item (savedUrl) or a clip (clipId).');
-      return social.share(ctx.userId, { kind: 'link', title: saved.title, url: saved.url, description: saved.description, image: saved.image, note: p.note, audience: p.audience, reblogs: p.reblogs });
+      return social.share(ctx.userId, { requestKey: p.requestKey, kind: 'link', title: saved.title, url: saved.url, description: saved.description, image: saved.image, note: p.note, audience: p.audience, reblogs: p.reblogs });
     }, 'write'),
   /** A post the server looks up by id, as share does: nothing of the original comes from the request. */
-  'social.reblog': params<{ id: string; note?: string; audience?: string }>(
-    { type: 'object', required: ['id'], additionalProperties: false, properties: { id, note: { type: 'string', maxLength: 500 }, audience: { type: 'string', enum: AUDIENCES } } },
+  'social.reblog': params<{ requestKey?: string; id: string; note?: string; audience?: string }>(
+    { type: 'object', required: ['id'], additionalProperties: false, properties: { requestKey: REQUEST_KEY_SCHEMA, id, note: { type: 'string', maxLength: 500 }, audience: { type: 'string', enum: AUDIENCES } } },
     (p, ctx) => socialOf(ctx).reblog(ctx.userId, p), 'write'),
   'social.shareSettings': params<{ id: string; reblogs?: string; detach?: string }>(
     { type: 'object', required: ['id'], additionalProperties: false, properties: { id, reblogs: { type: 'string', enum: REBLOG_RULES }, detach: id } },

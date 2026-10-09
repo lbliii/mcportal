@@ -9,7 +9,7 @@ import path from 'node:path';
 import { AppError, errorMessage } from './lib/errors.ts';
 import { atomicWrite, defaultDataDir, KeyedMutex, safeFileId } from './lib/files.ts';
 import { processLogger } from './lib/log.ts';
-import { defaultProfile, validateProfile, type Profile } from './profile.ts';
+import { defaultProfile, validateProfile, preserveProfileSettings, type Profile } from './profile.ts';
 
 /** What an update's change returns: the profile to save (none means no write) and what to hand back. */
 export interface ProfileChange<T> {
@@ -81,16 +81,16 @@ export class FileProfileStore implements ProfileStore {
     return this.mutex.run(userId, async () => {
       const { profile: current, rev } = await this.read(userId);
       const { profile, result } = change(current);
-      if (profile) await this.write(userId, profile, rev + 1);
+      if (profile) await this.write(userId, preserveProfileSettings(current, profile), rev + 1);
       return result;
     });
   }
 
   replaceIf(userId: string, profile: Profile, ifMatch: number): Promise<number> {
     return this.mutex.run(userId, async () => {
-      const { rev } = await this.read(userId);
+      const { profile: current, rev } = await this.read(userId);
       if (rev !== ifMatch) throw revisionConflict(ifMatch, rev);
-      await this.write(userId, profile, rev + 1);
+      await this.write(userId, preserveProfileSettings(current, profile), rev + 1);
       return rev + 1;
     });
   }
@@ -123,7 +123,7 @@ export class FileProfileStore implements ProfileStore {
   }
 
   put(userId: string, profile: Profile): Promise<void> {
-    return this.mutex.run(userId, async () => this.write(userId, profile, (await this.read(userId)).rev + 1));
+    return this.mutex.run(userId, async () => { const before = await this.read(userId); await this.write(userId, preserveProfileSettings(before.profile, profile), before.rev + 1); });
   }
 
   /** The room, and any unreadable copies set aside for it (`<id>.corrupt-<time>.json`). */
@@ -158,7 +158,7 @@ export class MemoryProfileStore implements ProfileStore {
 
   private write(userId: string, profile: Profile): number {
     const rev = (this.profiles.get(userId)?.rev ?? 0) + 1;
-    this.profiles.set(userId, { profile: structuredClone(profile), rev });
+    this.profiles.set(userId, { profile: structuredClone(preserveProfileSettings(this.read(userId).profile, profile)), rev });
     return rev;
   }
 

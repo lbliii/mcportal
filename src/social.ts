@@ -310,9 +310,9 @@ export class Social {
   }
 
   /** A new post by `author`: the profile and limit checks every post passes, and its note cleaned. */
-  private async post(author: string, input: { note?: unknown; audience?: unknown }, fields: Omit<Share, 'id' | 'accountId' | 'note' | 'audience' | 'createdAt'>): Promise<SharedItem> {
+  private async post(author: string, input: { note?: unknown; audience?: unknown; requestKey?: string | undefined }, fields: Omit<Share, 'id' | 'accountId' | 'note' | 'audience' | 'createdAt'>): Promise<SharedItem> {
     if (!(await this.profiles.get(author))) throw new SocialError('Sharing needs a public profile, so people know who shared it. Create one with set_public_profile first', 'failed_precondition');
-    if ((await this.store.countShares(author)) >= SOCIAL_LIMITS.sharesPerUser) throw new SocialError(`You have ${SOCIAL_LIMITS.sharesPerUser} posts, the most MCPortal keeps. Remove some with unshare`, 'limit_exceeded');
+    if (input.requestKey === undefined && (await this.store.countShares(author)) >= SOCIAL_LIMITS.sharesPerUser) throw new SocialError(`You have ${SOCIAL_LIMITS.sharesPerUser} posts, the most MCPortal keeps. Remove some with unshare`, 'limit_exceeded');
     if (input.audience !== undefined && !(AUDIENCES as readonly unknown[]).includes(input.audience)) throw new SocialError(`audience must be one of ${AUDIENCES.join(', ')}`);
     const audience: Audience = input.audience === 'everyone' || input.audience === 'followers'
       ? input.audience : (await this.preferences?.get(author))?.shareAudience ?? 'everyone';
@@ -329,11 +329,11 @@ export class Social {
     if (input.audience !== undefined) await this.preferences?.update(author, (profile) => ({
       ...(profile.shareAudience !== audience ? { profile: { ...profile, shareAudience: audience } } : {}), result: undefined,
     }));
-    await this.store.addShare(share);
-    return (await this.present(author, [share]))[0]!;
+    const stored = await this.store.addShare(share, input.requestKey);
+    return (await this.present(author, [stored]))[0]!;
   }
 
-  async share(author: string, input: { kind: 'link' | 'clip'; title: string; url?: string | undefined; clip?: Clip | undefined; description?: string | undefined; image?: LinkPreview['image'] | undefined; note?: unknown; audience?: unknown; reblogs?: unknown }): Promise<SharedItem> {
+  async share(author: string, input: { requestKey?: string | undefined; kind: 'link' | 'clip'; title: string; url?: string | undefined; clip?: Clip | undefined; description?: string | undefined; image?: LinkPreview['image'] | undefined; note?: unknown; audience?: unknown; reblogs?: unknown }): Promise<SharedItem> {
     // Who may reblog it: what the post says, else the author's default (absent: anyone).
     const reblogs = (REBLOG_RULES as readonly unknown[]).includes(input.reblogs) ? input.reblogs as ReblogRule : (await this.profiles.get(author))?.reblogs;
     return this.post(author, input, {
@@ -350,7 +350,7 @@ export class Social {
    * Reblog a post the author can see. A reblog of a reblog reblogs its original, crediting
    * the one it came through. One reblog per person per original; the original's rule decides.
    */
-  async reblog(author: string, input: { id: string; note?: unknown; audience?: unknown }): Promise<SharedItem> {
+  async reblog(author: string, input: { requestKey?: string | undefined; id: string; note?: unknown; audience?: unknown }): Promise<SharedItem> {
     const seen = await this.store.getShare(String(input.id));
     if (!seen || !(await this.canSee(author, seen))) throw new SocialError('No such post', 'not_found');
     if (seen.detachedAt) throw new SocialError('Its author removed the original from that reblog', 'failed_precondition');
@@ -359,7 +359,7 @@ export class Social {
     const refused = await this.refusal(author, root);
     if (refused) throw new SocialError(refused.message, refused.code);
     const existing = (await this.store.reblogsBy(author, [root.id])).get(root.id);
-    if (existing) throw new SocialError(`You already reblogged it (${existing}); undo with unshare`, 'conflict');
+    if (existing && !input.requestKey) throw new SocialError(`You already reblogged it (${existing}); undo with unshare`, 'conflict');
     const via = seen.reblogOf && seen.accountId !== author ? seen.id : undefined;
     return this.post(author, input, {
       kind: root.kind,

@@ -1,0 +1,109 @@
+{
+  "environment": {
+    "node": "v24.9.0",
+    "platform": "darwin",
+    "arch": "arm64"
+  },
+  "corpus": "Synthetic 100 saved items; 1000 section markdown body; 26 KB quote; 15 KB comparison interpretation. Not production latency or token measurements.",
+  "contract": "component-v1 explicitly assumes tool-result _meta is component-only. Legacy retains complete structuredContent and has no model result budget. Actual-host validation is required before enabling.",
+  "modelBudgetBytes": 32768,
+  "cases": [
+    {
+      "name": "room",
+      "legacyModelBytes": 22845,
+      "componentModelBytes": 1280,
+      "completeWireBytes": 23177,
+      "componentDataBytes": 21888,
+      "parts": {
+        "format": "component-v1",
+        "tool": "open_room",
+        "part": 1,
+        "parts": 1
+      }
+    },
+    {
+      "name": "article",
+      "legacyModelBytes": 116329,
+      "componentModelBytes": 12573,
+      "completeWireBytes": 116487,
+      "componentDataBytes": 103905,
+      "parts": {
+        "format": "component-v1",
+        "tool": "read_article",
+        "part": 1,
+        "parts": 2,
+        "handle": "56eee998-93ef-463d-b7aa-c6c16633db6c",
+        "expiresInSeconds": 600
+      }
+    },
+    {
+      "name": "docs",
+      "legacyModelBytes": 420578,
+      "componentModelBytes": 10864,
+      "completeWireBytes": 420918,
+      "componentDataBytes": 410045,
+      "parts": {
+        "format": "component-v1",
+        "tool": "read_doc_page",
+        "part": 1,
+        "parts": 1
+      }
+    },
+    {
+      "name": "clip",
+      "legacyModelBytes": 55986,
+      "componentModelBytes": 12565,
+      "completeWireBytes": 40638,
+      "componentDataBytes": 28064,
+      "parts": {
+        "format": "component-v1",
+        "tool": "get_clip",
+        "part": 1,
+        "parts": 3,
+        "handle": "8305addc-026f-4bb8-9319-ff932ee992c1",
+        "expiresInSeconds": 600
+      }
+    },
+    {
+      "name": "comparison",
+      "legacyModelBytes": 19735,
+      "componentModelBytes": 446,
+      "completeWireBytes": 20079,
+      "componentDataBytes": 19624,
+      "parts": {
+        "format": "component-v1",
+        "tool": "show_comparison",
+        "part": 1,
+        "parts": 1
+      }
+    },
+    {
+      "name": "handoff-live",
+      "legacyModelBytes": 116966,
+      "componentModelBytes": 12573,
+      "completeWireBytes": 116753,
+      "componentDataBytes": 104171,
+      "parts": {
+        "format": "component-v1",
+        "tool": "open_handoff",
+        "part": 1,
+        "parts": 2,
+        "handle": "4b10fdfe-c378-4d57-b23a-4440cd5c6997",
+        "expiresInSeconds": 600
+      }
+    },
+    {
+      "name": "handoff-unavailable",
+      "legacyModelBytes": 956,
+      "componentModelBytes": 941,
+      "completeWireBytes": 1294,
+      "componentDataBytes": 344,
+      "parts": {
+        "format": "component-v1",
+        "tool": "open_handoff",
+        "part": 1,
+        "parts": 1
+      }
+    }
+  ]
+}

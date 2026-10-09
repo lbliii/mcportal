@@ -3,9 +3,15 @@
 ## Unreleased
 
 ### Storage
+- Partition hosted collections and reading experiences by account, with validated transactional migration and reconstruction rollback. Stop all writers for this storage transition; see `docs/how-to/migrate-account-documents.md`.
+- Reconcile clip/share retries with optional account-scoped request keys and seven-day receipts, including deleted-result tombstones.
 - Enforce clip count and byte quotas atomically per account in Postgres, including concurrent saves and metadata edits. Local stores also check metadata growth; edits that reduce size remain available at the limit.
 
 ### Core content loop
+- Measure Recall against 40 frozen synthetic queries; improve exact version ranking and disclose the keyword fallback for empty natural-language searches and indexed coverage.
+- Keep bounded passage context and a representation digest with clips/handoffs; distinguish unique relocated text from ambiguous or unavailable matches.
+- Save reading size and width with the account, preserve them when older clients rewrite a profile, and persist explicit reset.
+- Centralize navigation ownership and return context for Recall, article/docs reading and handoff recovery.
 - Integrate reader wave 2 with full-height reading, separate controls, bounded image retries and improved article extraction while preserving Recall, reading tabs, page find and reading preferences.
 - Size clip Share icons consistently with other controls.
 - Add a keyboard passage chooser, useful reader destination focus and stable Recall preview focus. Documentation search explains its coverage and GitHub pages show their actual version.
@@ -14,6 +20,8 @@
 - Record two rounds of explicitly simulated developer/researcher proxy tasks and logical later-day retrieval, plus a bounded accessibility audit. These are not human usability or adoption evidence.
 
 ### For hosts and agents
+- Add an opt-in `component-v1` result contract with a 32 KiB complete model-visible budget, full component metadata and account-scoped text continuation. Legacy is still the default; actual-host metadata verification is required before enabling.
+- Add optional article `part`, clip/share `requestKey`, and passage context/digest/revision fields.
 - `import_opml` adds `added`, `alreadyPresent` and `deferred` result fields. A valid import with no working feeds returns its detailed outcome and leaves a new room unconfigured.
 - `open_handoff` may return `{ unavailable: true, handoff }` when the live source fails; its text still includes the fenced retained passage. No live article content is implied.
 - Ship the new successful handoff variant in the next minor release under the compatibility policy; callers must handle unavailable live content before reading article/docs fields.

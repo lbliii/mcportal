@@ -24,3 +24,5 @@ export { PgSeenStore } from './db/seen.ts';
 export { PgEditionStore } from './db/editions.ts';
 export { pgAuthPersistence } from './db/auth.ts';
 export { importFiles, importWatchFiles } from './db/import.ts';
+
+export { PgCollectionStore, PgExperienceStore, migrateAccountDocuments, restoreLegacyAccountDocuments } from './db/account-documents.ts';

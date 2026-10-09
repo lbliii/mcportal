@@ -8,8 +8,8 @@
     $('experiences').replaceChildren(el('p', { class: 'experience-muted', role: 'status' }, 'Opening your reading session…'));
     try {
       const { session } = (await callTool('catch_up', { action: 'open' })).structuredContent;
-      if (generation === catchupGeneration && experience === 'catchup') showCatchup(session);
-    } catch (error) { if (generation === catchupGeneration && experience === 'catchup') $('experiences').replaceChildren(el('p', { class: 'error', role: 'alert' }, errorText(error)), el('button', { class: 'btn', onclick: () => openCatchup() }, 'Try again')); }
+      if (generation === catchupGeneration && navigation.experience === 'catchup') showCatchup(session);
+    } catch (error) { if (generation === catchupGeneration && navigation.experience === 'catchup') $('experiences').replaceChildren(el('p', { class: 'error', role: 'alert' }, errorText(error)), el('button', { class: 'btn', onclick: () => openCatchup() }, 'Try again')); }
   }
   /** @param {CatchupSession | null} session */
   function showCatchup(session) {
@@ -53,7 +53,7 @@
       go.disabled = true; status.textContent = 'Capturing currently retrieved unseen stories…';
       try {
         const { session } = (await callTool('catch_up', { action: 'start', count: Number(count.value), ...(sources.length ? { portalIds: selected } : {}) })).structuredContent;
-        if (experience === 'catchup') showCatchup(session);
+        if (navigation.experience === 'catchup') showCatchup(session);
       } catch (error) { status.textContent = errorText(error); go.disabled = false; }
     });
     return form;
@@ -65,7 +65,7 @@
     for (const button of $$('.catchup-story button, .catchup-finish, .catchup-end button')) button.setAttribute('disabled', '');
     try {
       const { session } = (await callTool('catch_up', { action, sessionId: current.id, index: current.cursor })).structuredContent;
-      if (experience === 'catchup') showCatchup(session);
+      if (navigation.experience === 'catchup') showCatchup(session);
     } catch (error) { toast(errorText(error)); openCatchup(); }
   }
   /** @param {CapturedStory} story */

@@ -177,10 +177,10 @@ export class RemoteProfileStore extends Linked implements ProfileStore {
 
 export class RemoteClipStore extends Linked implements ClipStore {
   /** The hosted server builds the clip again from its content and picks the id; the clip it stored comes back. */
-  async add(userId: string, clip: Clip): Promise<Clip> {
+  async add(userId: string, clip: Clip, requestKey?: string): Promise<Clip> {
     this.mine(userId);
     const { kind, title, note, tags, source, data } = clip;
-    return this.client.call<Clip>('clips.add', { clip: dropUndefined({ kind, title, note, tags, source, data }) });
+    return this.client.call<Clip>('clips.add', { clip: dropUndefined({ kind, title, note, tags, source, data }), ...(requestKey ? { requestKey } : {}) });
   }
 
   async get(userId: string, id: string): Promise<Clip | undefined> {
@@ -346,11 +346,11 @@ export function remoteSocial(client: StateClient, accountId: string): SocialServ
     async share(author, input) {
       as(author);
       const target = input.kind === 'clip' ? { clipId: input.clip?.id } : { savedUrl: input.url };
-      return client.call('social.share', dropUndefined({ ...target, note: typeof input.note === 'string' ? input.note : undefined, audience: typeof input.audience === 'string' ? input.audience : undefined, reblogs: typeof input.reblogs === 'string' ? input.reblogs : undefined }));
+      return client.call('social.share', dropUndefined({ ...target, requestKey: input.requestKey, note: typeof input.note === 'string' ? input.note : undefined, audience: typeof input.audience === 'string' ? input.audience : undefined, reblogs: typeof input.reblogs === 'string' ? input.reblogs : undefined }));
     },
     async reblog(author, input) {
       as(author);
-      return client.call('social.reblog', dropUndefined({ id: input.id, note: typeof input.note === 'string' ? input.note : undefined, audience: typeof input.audience === 'string' ? input.audience : undefined }));
+      return client.call('social.reblog', dropUndefined({ id: input.id, requestKey: input.requestKey, note: typeof input.note === 'string' ? input.note : undefined, audience: typeof input.audience === 'string' ? input.audience : undefined }));
     },
     async shareSettings(author, id, change) {
       as(author);

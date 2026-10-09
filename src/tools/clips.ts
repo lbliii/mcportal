@@ -3,6 +3,7 @@
  * Clips come only from explicit requests, and everything read back from them is
  * fenced as untrusted: a quote from an article can carry instructions.
  */
+import { REQUEST_KEY_SCHEMA } from '../write-receipts.ts';
 import { buildClip, fromContent, CLIP_KINDS, CLIP_LIMITS, clampLimit, clipText, queryWords, summaryOf, type Clip, type ClipKind, type ClipStore, type ClipSummary } from '../clips.ts';
 import type { Profile } from '../profile.ts';
 import { LOCATOR_SCHEMA } from '../evidence.ts';
@@ -40,6 +41,7 @@ export const CLIP_TOOLS: ToolDef[] = [
     description: [
       "Keep something from this chat (or an article) in the user's clips, only when they ask to clip or keep it; a link to read later is save_item.",
       'Copy the content verbatim. Give a short title, the user\'s own words as note, and tags if they named any.',
+      'Use the same requestKey when retrying an uncertain save (retained seven days).',
       'The first clip adds a Clips portal to the room; say so.',
     ].join(' '),
     inputSchema: {
@@ -47,6 +49,7 @@ export const CLIP_TOOLS: ToolDef[] = [
       required: ['kind'],
       additionalProperties: false,
       properties: {
+        requestKey: REQUEST_KEY_SCHEMA,
         kind: kindProperty,
         title: { type: 'string', maxLength: CLIP_LIMITS.title },
         note: { type: 'string', description: "Why it's worth keeping, in the user's words" },
@@ -72,7 +75,7 @@ export const CLIP_TOOLS: ToolDef[] = [
       if (!ctx.clips) return noStore();
       let clip: Clip;
       try {
-        clip = await ctx.clips.add(ctx.userId, buildClip(fromContent(args)));
+        clip = await ctx.clips.add(ctx.userId, buildClip(fromContent(args)), args.requestKey as string | undefined);
       } catch (error) {
         return toolFailure(error, 'Not clipped: ');
       }

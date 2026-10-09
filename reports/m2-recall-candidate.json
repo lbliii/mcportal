@@ -1,0 +1,1985 @@
+{
+  "at": "2026-10-09T13:59:19.001Z",
+  "node": "v24.9.0",
+  "os": "darwin arm64",
+  "cpu": "Apple M2",
+  "corpusSha256": "36900acaff6b36d88f659c55785190df80e8bd7634aae2e5abca0b9dfef4bf54",
+  "queriesSha256": "f98897b8ed038bd75fc04ad51e550833352fb5b32d083830b4a4e1069a62b0c7",
+  "corpus": {
+    "saved": 10,
+    "clips": 12,
+    "history": 3,
+    "privateClips": 1
+  },
+  "protocol": "40 synthetic cases frozen before ranking changes; 24 development, 16 heldout; sequential cold-first then warm reads. Passage return requires authorized clip retrieval; source pages are never fetched. Negative correctness is separate from indexed coverage. No human-study claim.",
+  "modes": [
+    {
+      "mode": "files",
+      "groups": [
+        {
+          "group": "development/identifier",
+          "passed": 3,
+          "total": 3,
+          "passages": 0,
+          "passageCases": 0
+        },
+        {
+          "group": "development/version",
+          "passed": 3,
+          "total": 3,
+          "passages": 0,
+          "passageCases": 0
+        },
+        {
+          "group": "development/title",
+          "passed": 2,
+          "total": 2,
+          "passages": 0,
+          "passageCases": 0
+        },
+        {
+          "group": "development/recall",
+          "passed": 2,
+          "total": 2,
+          "passages": 0,
+          "passageCases": 0
+        },
+        {
+          "group": "development/quote",
+          "passed": 3,
+          "total": 3,
+          "passages": 3,
+          "passageCases": 3
+        },
+        {
+          "group": "development/note",
+          "passed": 3,
+          "total": 3,
+          "passages": 0,
+          "passageCases": 0
+        },
+        {
+          "group": "development/duplicate",
+          "passed": 2,
+          "total": 2,
+          "passages": 0,
+          "passageCases": 0
+        },
+        {
+          "group": "development/absent",
+          "passed": 3,
+          "total": 3,
+          "passages": 0,
+          "passageCases": 0
+        },
+        {
+          "group": "development/history",
+          "passed": 1,
+          "total": 1,
+          "passages": 0,
+          "passageCases": 0
+        },
+        {
+          "group": "development/coverage",
+          "passed": 2,
+          "total": 2,
+          "passages": 1,
+          "passageCases": 1
+        },
+        {
+          "group": "heldout/identifier",
+          "passed": 2,
+          "total": 2,
+          "passages": 0,
+          "passageCases": 0
+        },
+        {
+          "group": "heldout/version",
+          "passed": 2,
+          "total": 2,
+          "passages": 0,
+          "passageCases": 0
+        },
+        {
+          "group": "heldout/title",
+          "passed": 2,
+          "total": 2,
+          "passages": 0,
+          "passageCases": 0
+        },
+        {
+          "group": "heldout/recall",
+          "passed": 2,
+          "total": 2,
+          "passages": 0,
+          "passageCases": 0
+        },
+        {
+          "group": "heldout/quote",
+          "passed": 2,
+          "total": 2,
+          "passages": 2,
+          "passageCases": 2
+        },
+        {
+          "group": "heldout/note",
+          "passed": 2,
+          "total": 2,
+          "passages": 0,
+          "passageCases": 0
+        },
+        {
+          "group": "heldout/duplicate",
+          "passed": 1,
+          "total": 1,
+          "passages": 0,
+          "passageCases": 0
+        },
+        {
+          "group": "heldout/absent",
+          "passed": 2,
+          "total": 2,
+          "passages": 0,
+          "passageCases": 0
+        },
+        {
+          "group": "heldout/history",
+          "passed": 1,
+          "total": 1,
+          "passages": 0,
+          "passageCases": 0
+        }
+      ],
+      "p50Ms": 0.217,
+      "p95Ms": 0.578,
+      "results": [
+        {
+          "id": "d01",
+          "split": "development",
+          "type": "identifier",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 1.888,
+          "refs": [
+            "url:https://docs.example/node/v22/fs",
+            "url:https://docs.example/node/v24/fs"
+          ]
+        },
+        {
+          "id": "d02",
+          "split": "development",
+          "type": "version",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.312,
+          "refs": [
+            "url:https://docs.example/node/v22/fs"
+          ]
+        },
+        {
+          "id": "d03",
+          "split": "development",
+          "type": "version",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.279,
+          "refs": [
+            "url:https://docs.example/sdk?version=2",
+            "url:https://docs.example/node/v22/fs",
+            "url:https://docs.example/node/v24/fs",
+            "url:https://docs.example/sdk?version=20"
+          ]
+        },
+        {
+          "id": "d04",
+          "split": "development",
+          "type": "version",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.367,
+          "refs": [
+            "url:https://docs.example/sdk?version=20"
+          ]
+        },
+        {
+          "id": "d05",
+          "split": "development",
+          "type": "title",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.29,
+          "refs": [
+            "url:https://docs.example/postgres/locks"
+          ]
+        },
+        {
+          "id": "d06",
+          "split": "development",
+          "type": "title",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.232,
+          "refs": [
+            "url:https://example.org/retention"
+          ]
+        },
+        {
+          "id": "d07",
+          "split": "development",
+          "type": "recall",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.578,
+          "refs": [
+            "clip:cl_benchmark_1",
+            "clip:cl_benchmark_7"
+          ]
+        },
+        {
+          "id": "d08",
+          "split": "development",
+          "type": "recall",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.282,
+          "refs": [
+            "clip:cl_benchmark_1",
+            "clip:cl_benchmark_7"
+          ]
+        },
+        {
+          "id": "d09",
+          "split": "development",
+          "type": "quote",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": true,
+          "ms": 0.274,
+          "refs": [
+            "clip:cl_benchmark_0"
+          ]
+        },
+        {
+          "id": "d10",
+          "split": "development",
+          "type": "quote",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": true,
+          "ms": 0.224,
+          "refs": [
+            "clip:cl_benchmark_1"
+          ]
+        },
+        {
+          "id": "d11",
+          "split": "development",
+          "type": "note",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.255,
+          "refs": [
+            "clip:cl_benchmark_2"
+          ]
+        },
+        {
+          "id": "d12",
+          "split": "development",
+          "type": "note",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.223,
+          "refs": [
+            "clip:cl_benchmark_2"
+          ]
+        },
+        {
+          "id": "d13",
+          "split": "development",
+          "type": "duplicate",
+          "indexed": true,
+          "topFive": true,
+          "topOne": false,
+          "passageReturned": null,
+          "ms": 0.24,
+          "refs": [
+            "clip:cl_benchmark_7",
+            "clip:cl_benchmark_1"
+          ]
+        },
+        {
+          "id": "d14",
+          "split": "development",
+          "type": "duplicate",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.254,
+          "refs": [
+            "url:https://example.org/discussion"
+          ]
+        },
+        {
+          "id": "d15",
+          "split": "development",
+          "type": "absent",
+          "indexed": false,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.266,
+          "refs": []
+        },
+        {
+          "id": "d16",
+          "split": "development",
+          "type": "absent",
+          "indexed": false,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.216,
+          "refs": []
+        },
+        {
+          "id": "d17",
+          "split": "development",
+          "type": "quote",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": true,
+          "ms": 0.263,
+          "refs": [
+            "clip:cl_benchmark_3"
+          ]
+        },
+        {
+          "id": "d18",
+          "split": "development",
+          "type": "identifier",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.21,
+          "refs": [
+            "clip:cl_benchmark_4"
+          ]
+        },
+        {
+          "id": "d19",
+          "split": "development",
+          "type": "identifier",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.204,
+          "refs": [
+            "clip:cl_benchmark_5"
+          ]
+        },
+        {
+          "id": "d20",
+          "split": "development",
+          "type": "note",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.206,
+          "refs": [
+            "clip:cl_benchmark_2"
+          ]
+        },
+        {
+          "id": "d21",
+          "split": "development",
+          "type": "history",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.208,
+          "refs": [
+            "url:https://example.org/only-history"
+          ]
+        },
+        {
+          "id": "d22",
+          "split": "development",
+          "type": "absent",
+          "indexed": false,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.193,
+          "refs": []
+        },
+        {
+          "id": "d23",
+          "split": "development",
+          "type": "coverage",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": true,
+          "ms": 0.206,
+          "refs": [
+            "clip:cl_benchmark_0"
+          ]
+        },
+        {
+          "id": "d24",
+          "split": "development",
+          "type": "coverage",
+          "indexed": false,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.161,
+          "refs": []
+        },
+        {
+          "id": "h01",
+          "split": "heldout",
+          "type": "identifier",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.282,
+          "refs": [
+            "clip:cl_benchmark_8"
+          ]
+        },
+        {
+          "id": "h02",
+          "split": "heldout",
+          "type": "identifier",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.246,
+          "refs": [
+            "url:https://docs.example/sdk/request-id"
+          ]
+        },
+        {
+          "id": "h03",
+          "split": "heldout",
+          "type": "version",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.211,
+          "refs": [
+            "clip:cl_benchmark_9"
+          ]
+        },
+        {
+          "id": "h04",
+          "split": "heldout",
+          "type": "version",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.202,
+          "refs": [
+            "url:https://docs.example/node/v24/fs"
+          ]
+        },
+        {
+          "id": "h05",
+          "split": "heldout",
+          "type": "title",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.209,
+          "refs": [
+            "url:https://docs.example/css/overflow"
+          ]
+        },
+        {
+          "id": "h06",
+          "split": "heldout",
+          "type": "title",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.444,
+          "refs": [
+            "clip:cl_benchmark_11"
+          ]
+        },
+        {
+          "id": "h07",
+          "split": "heldout",
+          "type": "recall",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.212,
+          "refs": [
+            "clip:cl_benchmark_10"
+          ]
+        },
+        {
+          "id": "h08",
+          "split": "heldout",
+          "type": "recall",
+          "indexed": false,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.217,
+          "refs": []
+        },
+        {
+          "id": "h09",
+          "split": "heldout",
+          "type": "quote",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": true,
+          "ms": 0.189,
+          "refs": [
+            "clip:cl_benchmark_11"
+          ]
+        },
+        {
+          "id": "h10",
+          "split": "heldout",
+          "type": "quote",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": true,
+          "ms": 0.199,
+          "refs": [
+            "clip:cl_benchmark_6"
+          ]
+        },
+        {
+          "id": "h11",
+          "split": "heldout",
+          "type": "note",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.175,
+          "refs": [
+            "clip:cl_benchmark_10"
+          ]
+        },
+        {
+          "id": "h12",
+          "split": "heldout",
+          "type": "note",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.185,
+          "refs": [
+            "clip:cl_benchmark_8"
+          ]
+        },
+        {
+          "id": "h13",
+          "split": "heldout",
+          "type": "duplicate",
+          "indexed": true,
+          "topFive": true,
+          "topOne": false,
+          "passageReturned": null,
+          "ms": 0.198,
+          "refs": [
+            "clip:cl_benchmark_1",
+            "clip:cl_benchmark_7"
+          ]
+        },
+        {
+          "id": "h14",
+          "split": "heldout",
+          "type": "absent",
+          "indexed": false,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.172,
+          "refs": []
+        },
+        {
+          "id": "h15",
+          "split": "heldout",
+          "type": "absent",
+          "indexed": false,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.169,
+          "refs": []
+        },
+        {
+          "id": "h16",
+          "split": "heldout",
+          "type": "history",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.192,
+          "refs": [
+            "url:https://example.org/only-history"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "linked-files",
+      "groups": [
+        {
+          "group": "development/identifier",
+          "passed": 3,
+          "total": 3,
+          "passages": 0,
+          "passageCases": 0
+        },
+        {
+          "group": "development/version",
+          "passed": 3,
+          "total": 3,
+          "passages": 0,
+          "passageCases": 0
+        },
+        {
+          "group": "development/title",
+          "passed": 2,
+          "total": 2,
+          "passages": 0,
+          "passageCases": 0
+        },
+        {
+          "group": "development/recall",
+          "passed": 2,
+          "total": 2,
+          "passages": 0,
+          "passageCases": 0
+        },
+        {
+          "group": "development/quote",
+          "passed": 3,
+          "total": 3,
+          "passages": 3,
+          "passageCases": 3
+        },
+        {
+          "group": "development/note",
+          "passed": 3,
+          "total": 3,
+          "passages": 0,
+          "passageCases": 0
+        },
+        {
+          "group": "development/duplicate",
+          "passed": 2,
+          "total": 2,
+          "passages": 0,
+          "passageCases": 0
+        },
+        {
+          "group": "development/absent",
+          "passed": 3,
+          "total": 3,
+          "passages": 0,
+          "passageCases": 0
+        },
+        {
+          "group": "development/history",
+          "passed": 1,
+          "total": 1,
+          "passages": 0,
+          "passageCases": 0
+        },
+        {
+          "group": "development/coverage",
+          "passed": 2,
+          "total": 2,
+          "passages": 1,
+          "passageCases": 1
+        },
+        {
+          "group": "heldout/identifier",
+          "passed": 2,
+          "total": 2,
+          "passages": 0,
+          "passageCases": 0
+        },
+        {
+          "group": "heldout/version",
+          "passed": 2,
+          "total": 2,
+          "passages": 0,
+          "passageCases": 0
+        },
+        {
+          "group": "heldout/title",
+          "passed": 2,
+          "total": 2,
+          "passages": 0,
+          "passageCases": 0
+        },
+        {
+          "group": "heldout/recall",
+          "passed": 2,
+          "total": 2,
+          "passages": 0,
+          "passageCases": 0
+        },
+        {
+          "group": "heldout/quote",
+          "passed": 2,
+          "total": 2,
+          "passages": 2,
+          "passageCases": 2
+        },
+        {
+          "group": "heldout/note",
+          "passed": 2,
+          "total": 2,
+          "passages": 0,
+          "passageCases": 0
+        },
+        {
+          "group": "heldout/duplicate",
+          "passed": 1,
+          "total": 1,
+          "passages": 0,
+          "passageCases": 0
+        },
+        {
+          "group": "heldout/absent",
+          "passed": 2,
+          "total": 2,
+          "passages": 0,
+          "passageCases": 0
+        },
+        {
+          "group": "heldout/history",
+          "passed": 1,
+          "total": 1,
+          "passages": 0,
+          "passageCases": 0
+        }
+      ],
+      "p50Ms": 0.677,
+      "p95Ms": 1.815,
+      "results": [
+        {
+          "id": "d01",
+          "split": "development",
+          "type": "identifier",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 13.716,
+          "refs": [
+            "url:https://docs.example/node/v22/fs",
+            "url:https://docs.example/node/v24/fs"
+          ]
+        },
+        {
+          "id": "d02",
+          "split": "development",
+          "type": "version",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 1.815,
+          "refs": [
+            "url:https://docs.example/node/v22/fs"
+          ]
+        },
+        {
+          "id": "d03",
+          "split": "development",
+          "type": "version",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 1.32,
+          "refs": [
+            "url:https://docs.example/sdk?version=2",
+            "url:https://docs.example/node/v22/fs",
+            "url:https://docs.example/node/v24/fs",
+            "url:https://docs.example/sdk?version=20"
+          ]
+        },
+        {
+          "id": "d04",
+          "split": "development",
+          "type": "version",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 1.188,
+          "refs": [
+            "url:https://docs.example/sdk?version=20"
+          ]
+        },
+        {
+          "id": "d05",
+          "split": "development",
+          "type": "title",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 1.214,
+          "refs": [
+            "url:https://docs.example/postgres/locks"
+          ]
+        },
+        {
+          "id": "d06",
+          "split": "development",
+          "type": "title",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 1.115,
+          "refs": [
+            "url:https://example.org/retention"
+          ]
+        },
+        {
+          "id": "d07",
+          "split": "development",
+          "type": "recall",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 1.263,
+          "refs": [
+            "clip:cl_benchmark_1",
+            "clip:cl_benchmark_7"
+          ]
+        },
+        {
+          "id": "d08",
+          "split": "development",
+          "type": "recall",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 1.046,
+          "refs": [
+            "clip:cl_benchmark_1",
+            "clip:cl_benchmark_7"
+          ]
+        },
+        {
+          "id": "d09",
+          "split": "development",
+          "type": "quote",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": true,
+          "ms": 1.203,
+          "refs": [
+            "clip:cl_benchmark_0"
+          ]
+        },
+        {
+          "id": "d10",
+          "split": "development",
+          "type": "quote",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": true,
+          "ms": 0.879,
+          "refs": [
+            "clip:cl_benchmark_1"
+          ]
+        },
+        {
+          "id": "d11",
+          "split": "development",
+          "type": "note",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 1.152,
+          "refs": [
+            "clip:cl_benchmark_2"
+          ]
+        },
+        {
+          "id": "d12",
+          "split": "development",
+          "type": "note",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.707,
+          "refs": [
+            "clip:cl_benchmark_2"
+          ]
+        },
+        {
+          "id": "d13",
+          "split": "development",
+          "type": "duplicate",
+          "indexed": true,
+          "topFive": true,
+          "topOne": false,
+          "passageReturned": null,
+          "ms": 0.68,
+          "refs": [
+            "clip:cl_benchmark_7",
+            "clip:cl_benchmark_1"
+          ]
+        },
+        {
+          "id": "d14",
+          "split": "development",
+          "type": "duplicate",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.672,
+          "refs": [
+            "url:https://example.org/discussion"
+          ]
+        },
+        {
+          "id": "d15",
+          "split": "development",
+          "type": "absent",
+          "indexed": false,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.637,
+          "refs": []
+        },
+        {
+          "id": "d16",
+          "split": "development",
+          "type": "absent",
+          "indexed": false,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.65,
+          "refs": []
+        },
+        {
+          "id": "d17",
+          "split": "development",
+          "type": "quote",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": true,
+          "ms": 0.596,
+          "refs": [
+            "clip:cl_benchmark_3"
+          ]
+        },
+        {
+          "id": "d18",
+          "split": "development",
+          "type": "identifier",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.627,
+          "refs": [
+            "clip:cl_benchmark_4"
+          ]
+        },
+        {
+          "id": "d19",
+          "split": "development",
+          "type": "identifier",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.625,
+          "refs": [
+            "clip:cl_benchmark_5"
+          ]
+        },
+        {
+          "id": "d20",
+          "split": "development",
+          "type": "note",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.676,
+          "refs": [
+            "clip:cl_benchmark_2"
+          ]
+        },
+        {
+          "id": "d21",
+          "split": "development",
+          "type": "history",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.647,
+          "refs": [
+            "url:https://example.org/only-history"
+          ]
+        },
+        {
+          "id": "d22",
+          "split": "development",
+          "type": "absent",
+          "indexed": false,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.695,
+          "refs": []
+        },
+        {
+          "id": "d23",
+          "split": "development",
+          "type": "coverage",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": true,
+          "ms": 0.648,
+          "refs": [
+            "clip:cl_benchmark_0"
+          ]
+        },
+        {
+          "id": "d24",
+          "split": "development",
+          "type": "coverage",
+          "indexed": false,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.599,
+          "refs": []
+        },
+        {
+          "id": "h01",
+          "split": "heldout",
+          "type": "identifier",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.657,
+          "refs": [
+            "clip:cl_benchmark_8"
+          ]
+        },
+        {
+          "id": "h02",
+          "split": "heldout",
+          "type": "identifier",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.677,
+          "refs": [
+            "url:https://docs.example/sdk/request-id"
+          ]
+        },
+        {
+          "id": "h03",
+          "split": "heldout",
+          "type": "version",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.775,
+          "refs": [
+            "clip:cl_benchmark_9"
+          ]
+        },
+        {
+          "id": "h04",
+          "split": "heldout",
+          "type": "version",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.609,
+          "refs": [
+            "url:https://docs.example/node/v24/fs"
+          ]
+        },
+        {
+          "id": "h05",
+          "split": "heldout",
+          "type": "title",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.598,
+          "refs": [
+            "url:https://docs.example/css/overflow"
+          ]
+        },
+        {
+          "id": "h06",
+          "split": "heldout",
+          "type": "title",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.671,
+          "refs": [
+            "clip:cl_benchmark_11"
+          ]
+        },
+        {
+          "id": "h07",
+          "split": "heldout",
+          "type": "recall",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 1.171,
+          "refs": [
+            "clip:cl_benchmark_10"
+          ]
+        },
+        {
+          "id": "h08",
+          "split": "heldout",
+          "type": "recall",
+          "indexed": false,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.635,
+          "refs": []
+        },
+        {
+          "id": "h09",
+          "split": "heldout",
+          "type": "quote",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": true,
+          "ms": 0.706,
+          "refs": [
+            "clip:cl_benchmark_11"
+          ]
+        },
+        {
+          "id": "h10",
+          "split": "heldout",
+          "type": "quote",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": true,
+          "ms": 0.678,
+          "refs": [
+            "clip:cl_benchmark_6"
+          ]
+        },
+        {
+          "id": "h11",
+          "split": "heldout",
+          "type": "note",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.673,
+          "refs": [
+            "clip:cl_benchmark_10"
+          ]
+        },
+        {
+          "id": "h12",
+          "split": "heldout",
+          "type": "note",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.705,
+          "refs": [
+            "clip:cl_benchmark_8"
+          ]
+        },
+        {
+          "id": "h13",
+          "split": "heldout",
+          "type": "duplicate",
+          "indexed": true,
+          "topFive": true,
+          "topOne": false,
+          "passageReturned": null,
+          "ms": 0.668,
+          "refs": [
+            "clip:cl_benchmark_1",
+            "clip:cl_benchmark_7"
+          ]
+        },
+        {
+          "id": "h14",
+          "split": "heldout",
+          "type": "absent",
+          "indexed": false,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.608,
+          "refs": []
+        },
+        {
+          "id": "h15",
+          "split": "heldout",
+          "type": "absent",
+          "indexed": false,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.551,
+          "refs": []
+        },
+        {
+          "id": "h16",
+          "split": "heldout",
+          "type": "history",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.563,
+          "refs": [
+            "url:https://example.org/only-history"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "postgres",
+      "groups": [
+        {
+          "group": "development/identifier",
+          "passed": 3,
+          "total": 3,
+          "passages": 0,
+          "passageCases": 0
+        },
+        {
+          "group": "development/version",
+          "passed": 3,
+          "total": 3,
+          "passages": 0,
+          "passageCases": 0
+        },
+        {
+          "group": "development/title",
+          "passed": 2,
+          "total": 2,
+          "passages": 0,
+          "passageCases": 0
+        },
+        {
+          "group": "development/recall",
+          "passed": 2,
+          "total": 2,
+          "passages": 0,
+          "passageCases": 0
+        },
+        {
+          "group": "development/quote",
+          "passed": 3,
+          "total": 3,
+          "passages": 3,
+          "passageCases": 3
+        },
+        {
+          "group": "development/note",
+          "passed": 3,
+          "total": 3,
+          "passages": 0,
+          "passageCases": 0
+        },
+        {
+          "group": "development/duplicate",
+          "passed": 2,
+          "total": 2,
+          "passages": 0,
+          "passageCases": 0
+        },
+        {
+          "group": "development/absent",
+          "passed": 3,
+          "total": 3,
+          "passages": 0,
+          "passageCases": 0
+        },
+        {
+          "group": "development/history",
+          "passed": 1,
+          "total": 1,
+          "passages": 0,
+          "passageCases": 0
+        },
+        {
+          "group": "development/coverage",
+          "passed": 2,
+          "total": 2,
+          "passages": 1,
+          "passageCases": 1
+        },
+        {
+          "group": "heldout/identifier",
+          "passed": 2,
+          "total": 2,
+          "passages": 0,
+          "passageCases": 0
+        },
+        {
+          "group": "heldout/version",
+          "passed": 2,
+          "total": 2,
+          "passages": 0,
+          "passageCases": 0
+        },
+        {
+          "group": "heldout/title",
+          "passed": 2,
+          "total": 2,
+          "passages": 0,
+          "passageCases": 0
+        },
+        {
+          "group": "heldout/recall",
+          "passed": 2,
+          "total": 2,
+          "passages": 0,
+          "passageCases": 0
+        },
+        {
+          "group": "heldout/quote",
+          "passed": 2,
+          "total": 2,
+          "passages": 2,
+          "passageCases": 2
+        },
+        {
+          "group": "heldout/note",
+          "passed": 2,
+          "total": 2,
+          "passages": 0,
+          "passageCases": 0
+        },
+        {
+          "group": "heldout/duplicate",
+          "passed": 1,
+          "total": 1,
+          "passages": 0,
+          "passageCases": 0
+        },
+        {
+          "group": "heldout/absent",
+          "passed": 2,
+          "total": 2,
+          "passages": 0,
+          "passageCases": 0
+        },
+        {
+          "group": "heldout/history",
+          "passed": 1,
+          "total": 1,
+          "passages": 0,
+          "passageCases": 0
+        }
+      ],
+      "p50Ms": 0.266,
+      "p95Ms": 0.873,
+      "results": [
+        {
+          "id": "d01",
+          "split": "development",
+          "type": "identifier",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 3.126,
+          "refs": [
+            "url:https://docs.example/node/v22/fs",
+            "url:https://docs.example/node/v24/fs"
+          ]
+        },
+        {
+          "id": "d02",
+          "split": "development",
+          "type": "version",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.873,
+          "refs": [
+            "url:https://docs.example/node/v22/fs"
+          ]
+        },
+        {
+          "id": "d03",
+          "split": "development",
+          "type": "version",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.41,
+          "refs": [
+            "url:https://docs.example/sdk?version=2",
+            "url:https://docs.example/node/v22/fs",
+            "url:https://docs.example/node/v24/fs",
+            "url:https://docs.example/sdk?version=20"
+          ]
+        },
+        {
+          "id": "d04",
+          "split": "development",
+          "type": "version",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.265,
+          "refs": [
+            "url:https://docs.example/sdk?version=20"
+          ]
+        },
+        {
+          "id": "d05",
+          "split": "development",
+          "type": "title",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.872,
+          "refs": [
+            "url:https://docs.example/postgres/locks"
+          ]
+        },
+        {
+          "id": "d06",
+          "split": "development",
+          "type": "title",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.792,
+          "refs": [
+            "url:https://example.org/retention"
+          ]
+        },
+        {
+          "id": "d07",
+          "split": "development",
+          "type": "recall",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.566,
+          "refs": [
+            "clip:cl_benchmark_1",
+            "clip:cl_benchmark_7"
+          ]
+        },
+        {
+          "id": "d08",
+          "split": "development",
+          "type": "recall",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.31,
+          "refs": [
+            "clip:cl_benchmark_1",
+            "clip:cl_benchmark_7"
+          ]
+        },
+        {
+          "id": "d09",
+          "split": "development",
+          "type": "quote",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": true,
+          "ms": 0.341,
+          "refs": [
+            "clip:cl_benchmark_0"
+          ]
+        },
+        {
+          "id": "d10",
+          "split": "development",
+          "type": "quote",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": true,
+          "ms": 0.273,
+          "refs": [
+            "clip:cl_benchmark_1"
+          ]
+        },
+        {
+          "id": "d11",
+          "split": "development",
+          "type": "note",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.293,
+          "refs": [
+            "clip:cl_benchmark_2"
+          ]
+        },
+        {
+          "id": "d12",
+          "split": "development",
+          "type": "note",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.266,
+          "refs": [
+            "clip:cl_benchmark_2"
+          ]
+        },
+        {
+          "id": "d13",
+          "split": "development",
+          "type": "duplicate",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.361,
+          "refs": [
+            "clip:cl_benchmark_1",
+            "clip:cl_benchmark_7"
+          ]
+        },
+        {
+          "id": "d14",
+          "split": "development",
+          "type": "duplicate",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.245,
+          "refs": [
+            "url:https://example.org/discussion"
+          ]
+        },
+        {
+          "id": "d15",
+          "split": "development",
+          "type": "absent",
+          "indexed": false,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.248,
+          "refs": []
+        },
+        {
+          "id": "d16",
+          "split": "development",
+          "type": "absent",
+          "indexed": false,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.228,
+          "refs": []
+        },
+        {
+          "id": "d17",
+          "split": "development",
+          "type": "quote",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": true,
+          "ms": 0.26,
+          "refs": [
+            "clip:cl_benchmark_3"
+          ]
+        },
+        {
+          "id": "d18",
+          "split": "development",
+          "type": "identifier",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.281,
+          "refs": [
+            "clip:cl_benchmark_4"
+          ]
+        },
+        {
+          "id": "d19",
+          "split": "development",
+          "type": "identifier",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.274,
+          "refs": [
+            "clip:cl_benchmark_5"
+          ]
+        },
+        {
+          "id": "d20",
+          "split": "development",
+          "type": "note",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.241,
+          "refs": [
+            "clip:cl_benchmark_2"
+          ]
+        },
+        {
+          "id": "d21",
+          "split": "development",
+          "type": "history",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.21,
+          "refs": [
+            "url:https://example.org/only-history"
+          ]
+        },
+        {
+          "id": "d22",
+          "split": "development",
+          "type": "absent",
+          "indexed": false,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.213,
+          "refs": []
+        },
+        {
+          "id": "d23",
+          "split": "development",
+          "type": "coverage",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": true,
+          "ms": 0.245,
+          "refs": [
+            "clip:cl_benchmark_0"
+          ]
+        },
+        {
+          "id": "d24",
+          "split": "development",
+          "type": "coverage",
+          "indexed": false,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.198,
+          "refs": []
+        },
+        {
+          "id": "h01",
+          "split": "heldout",
+          "type": "identifier",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.24,
+          "refs": [
+            "clip:cl_benchmark_8"
+          ]
+        },
+        {
+          "id": "h02",
+          "split": "heldout",
+          "type": "identifier",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.236,
+          "refs": [
+            "url:https://docs.example/sdk/request-id"
+          ]
+        },
+        {
+          "id": "h03",
+          "split": "heldout",
+          "type": "version",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.226,
+          "refs": [
+            "clip:cl_benchmark_9"
+          ]
+        },
+        {
+          "id": "h04",
+          "split": "heldout",
+          "type": "version",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.215,
+          "refs": [
+            "url:https://docs.example/node/v24/fs"
+          ]
+        },
+        {
+          "id": "h05",
+          "split": "heldout",
+          "type": "title",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.226,
+          "refs": [
+            "url:https://docs.example/css/overflow"
+          ]
+        },
+        {
+          "id": "h06",
+          "split": "heldout",
+          "type": "title",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.219,
+          "refs": [
+            "clip:cl_benchmark_11"
+          ]
+        },
+        {
+          "id": "h07",
+          "split": "heldout",
+          "type": "recall",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.27,
+          "refs": [
+            "clip:cl_benchmark_10"
+          ]
+        },
+        {
+          "id": "h08",
+          "split": "heldout",
+          "type": "recall",
+          "indexed": false,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.268,
+          "refs": []
+        },
+        {
+          "id": "h09",
+          "split": "heldout",
+          "type": "quote",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": true,
+          "ms": 0.267,
+          "refs": [
+            "clip:cl_benchmark_11"
+          ]
+        },
+        {
+          "id": "h10",
+          "split": "heldout",
+          "type": "quote",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": true,
+          "ms": 0.271,
+          "refs": [
+            "clip:cl_benchmark_6"
+          ]
+        },
+        {
+          "id": "h11",
+          "split": "heldout",
+          "type": "note",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.228,
+          "refs": [
+            "clip:cl_benchmark_10"
+          ]
+        },
+        {
+          "id": "h12",
+          "split": "heldout",
+          "type": "note",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.244,
+          "refs": [
+            "clip:cl_benchmark_8"
+          ]
+        },
+        {
+          "id": "h13",
+          "split": "heldout",
+          "type": "duplicate",
+          "indexed": true,
+          "topFive": true,
+          "topOne": false,
+          "passageReturned": null,
+          "ms": 0.248,
+          "refs": [
+            "clip:cl_benchmark_1",
+            "clip:cl_benchmark_7"
+          ]
+        },
+        {
+          "id": "h14",
+          "split": "heldout",
+          "type": "absent",
+          "indexed": false,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.231,
+          "refs": []
+        },
+        {
+          "id": "h15",
+          "split": "heldout",
+          "type": "absent",
+          "indexed": false,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.279,
+          "refs": []
+        },
+        {
+          "id": "h16",
+          "split": "heldout",
+          "type": "history",
+          "indexed": true,
+          "topFive": true,
+          "topOne": true,
+          "passageReturned": null,
+          "ms": 0.284,
+          "refs": [
+            "url:https://example.org/only-history"
+          ]
+        }
+      ]
+    }
+  ]
+}

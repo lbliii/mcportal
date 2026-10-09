@@ -3,6 +3,7 @@
  * tests, one JSON file per user locally) that hold a user's clips as one document.
  * Postgres has its own in src/db/clips.ts. Re-exported from clips.ts.
  */
+import { writeRequest, replayReceipt, newReceipt, missingReplay, type WriteReceipt } from './write-receipts.ts';
 import { readFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { CLIP_LIMITS, ClipError, clampLimit, normalizeTags, patchClip, queryWords, searchTextOf, summaryOf, type Clip, type ClipPatch, type ClipQuery, type ClipSummary } from './clips.ts';
@@ -14,7 +15,7 @@ export interface ClipStore {
    * afterwards (a linked MCPortal's hosted server builds it again and assigns the id).
    * Throws ClipError when the user is at a limit.
    */
-  add(userId: string, clip: Clip): Promise<Clip>;
+  add(userId: string, clip: Clip, requestKey?: string): Promise<Clip>;
   get(userId: string, id: string): Promise<Clip | undefined>;
   /** Newest first, without content. */
   list(userId: string, query?: ClipQuery): Promise<ClipSummary[]>;
@@ -49,35 +50,44 @@ export function clipQuotaProblem(usage: { count: number; bytes: number }, adding
 }
 
 /** A whole user's clips in one place (memory or one file), behind the store interface. */
+interface ClipDocument { clips: Clip[]; receipts: WriteReceipt[] }
 abstract class DocumentClipStore implements ClipStore {
-  private mutex = new KeyedMutex();
-  protected abstract load(userId: string): Promise<Clip[]>;
-  protected abstract save(userId: string, clips: Clip[]): Promise<void>;
+  protected mutex = new KeyedMutex();
+  protected lockKey(userId: string) { return userId; }
+  protected abstract load(userId: string): Promise<ClipDocument>;
+  protected abstract save(userId: string, doc: ClipDocument): Promise<void>;
   protected now: () => Date = () => new Date();
 
-  private edit<T>(userId: string, change: (clips: Clip[]) => { clips?: Clip[]; result: T }): Promise<T> {
-    return this.mutex.run(userId, async () => {
-      const { clips, result } = change(await this.load(userId));
-      if (clips) await this.save(userId, clips);
+  private edit<T>(userId: string, change: (clips: Clip[], receipts: WriteReceipt[]) => { clips?: Clip[]; result: T }): Promise<T> {
+    return this.mutex.run(this.lockKey(userId), async () => {
+      const doc = await this.load(userId);
+      doc.receipts = doc.receipts.filter(r => r.expiresAt > Date.now());
+      const { clips, result } = change(doc.clips, doc.receipts);
+      if (clips) await this.save(userId, { clips, receipts: doc.receipts });
       return result;
     });
   }
 
-  add(userId: string, clip: Clip): Promise<Clip> {
-    return this.edit(userId, (clips) => {
+  add(userId: string, clip: Clip, requestKey?: string): Promise<Clip> {
+    const request = writeRequest(requestKey, { kind: clip.kind, title: clip.title, note: clip.note, tags: clip.tags, source: clip.source, data: clip.data });
+    return this.edit(userId, (clips, receipts) => {
+      const prior = request ? replayReceipt(receipts, request) : undefined;
+      if (prior) return { result: structuredClone(clips.find(c => c.id === prior) ?? missingReplay()) };
+      const receipt = request ? newReceipt(request, clip.id, receipts) : undefined;
       const refused = clipQuotaProblem({ count: clips.length, bytes: clips.reduce((sum, c) => sum + c.bytes, 0) }, clip.bytes);
       if (refused) throw new ClipError(refused, 'limit_exceeded');
+      if (receipt) receipts.push(receipt);
       return { clips: [clip, ...clips.filter((c) => c.id !== clip.id)], result: structuredClone(clip) };
     });
   }
 
   async get(userId: string, id: string): Promise<Clip | undefined> {
-    const clips = await this.mutex.run(userId, () => this.load(userId));
+    const { clips } = await this.mutex.run(this.lockKey(userId), () => this.load(userId));
     return structuredClone(clips.find((c) => c.id === id));
   }
 
   async list(userId: string, query?: ClipQuery): Promise<ClipSummary[]> {
-    return filterClips(await this.mutex.run(userId, () => this.load(userId)), query);
+    return filterClips((await this.mutex.run(this.lockKey(userId), () => this.load(userId))).clips, query);
   }
 
   update(userId: string, id: string, patch: ClipPatch): Promise<Clip | undefined> {
@@ -99,24 +109,24 @@ abstract class DocumentClipStore implements ClipStore {
   }
 
   deleteAll(userId: string): Promise<number> {
-    return this.edit(userId, (clips) => ({ clips: [], result: clips.length }));
+    return this.edit(userId, (clips, receipts) => { receipts.length = 0; return { clips: [], result: clips.length }; });
   }
 
   async usage(userId: string): Promise<{ count: number; bytes: number }> {
-    const clips = await this.mutex.run(userId, () => this.load(userId));
+    const { clips } = await this.mutex.run(this.lockKey(userId), () => this.load(userId));
     return { count: clips.length, bytes: clips.reduce((sum, c) => sum + c.bytes, 0) };
   }
 }
 
 export class MemoryClipStore extends DocumentClipStore {
-  private data = new Map<string, Clip[]>();
+  private data = new Map<string, ClipDocument>();
 
-  protected async load(userId: string): Promise<Clip[]> {
-    return structuredClone(this.data.get(userId) ?? []);
+  protected async load(userId: string): Promise<ClipDocument> {
+    return structuredClone(this.data.get(userId) ?? { clips: [], receipts: [] });
   }
 
-  protected async save(userId: string, clips: Clip[]): Promise<void> {
-    this.data.set(userId, structuredClone(clips));
+  protected async save(userId: string, doc: ClipDocument): Promise<void> {
+    this.data.set(userId, structuredClone(doc));
   }
 }
 
@@ -124,33 +134,37 @@ export class MemoryClipStore extends DocumentClipStore {
  * `<dataDir>/clips/<user>.json`, written atomically. A subdirectory, so the
  * Postgres import (top-level *.json only) never mistakes it for a profile.
  */
+const fileClipMutex = new KeyedMutex();
 export class FileClipStore extends DocumentClipStore {
   dir: string;
 
   constructor(dataDir = defaultDataDir()) {
     super();
+    this.mutex = fileClipMutex;
     this.dir = path.join(dataDir, 'clips');
   }
 
+  protected override lockKey(userId: string) { return this.file(userId); }
   private file(userId: string): string {
     return path.join(this.dir, `${safeFileId(userId)}.json`);
   }
 
-  protected async load(userId: string): Promise<Clip[]> {
+  protected async load(userId: string): Promise<ClipDocument> {
     let raw: string;
     try {
       raw = await readFile(this.file(userId), 'utf8');
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { clips: [], receipts: [] };
       throw error;
     }
-    const parsed = JSON.parse(raw) as { clips?: unknown };
-    return Array.isArray(parsed.clips) ? (parsed.clips as Clip[]) : [];
+    const parsed = JSON.parse(raw) as ClipDocument;
+    if (!Array.isArray(parsed.clips) || (parsed.receipts !== undefined && !Array.isArray(parsed.receipts))) throw new Error('Unreadable clips document');
+    return { clips: parsed.clips, receipts: parsed.receipts ?? [] };
   }
 
   /** No clips, no file (deleting them all, or the account, leaves nothing behind). */
-  protected async save(userId: string, clips: Clip[]): Promise<void> {
-    if (!clips.length) return rm(this.file(userId), { force: true });
-    await atomicWrite(this.file(userId), `${JSON.stringify({ version: 1, clips })}\n`);
+  protected async save(userId: string, doc: ClipDocument): Promise<void> {
+    if (!doc.clips.length && !doc.receipts.length) return rm(this.file(userId), { force: true });
+    await atomicWrite(this.file(userId), `${JSON.stringify({ version: 1, ...doc })}\n`);
   }
 }
