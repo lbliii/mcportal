@@ -343,6 +343,11 @@ test('browser: the original layouts retain opening, saving and reachable control
         const observed = await page.eval(`JSON.stringify({readerHidden:document.getElementById('reader').hidden,toast:document.getElementById('toast').textContent,buttons:[...document.querySelectorAll('[data-save-url="${ARTICLE}"]')].map(b=>({pressed:b.getAttribute('aria-pressed'),box:b.getBoundingClientRect()}))})`);
         throw new Error(`${layout}: ${error.message}; ${observed}`);
       });
+      // The button updates optimistically; only the committed profile proves removal.
+      const deadline = Date.now() + 5000;
+      while ((await profiles.get('default')).saved.some(item => item.url === ARTICLE) && Date.now() < deadline) {
+        await new Promise(resolve => setTimeout(resolve, 25));
+      }
       assert.equal((await profiles.get('default')).saved.some(item => item.url === ARTICLE), false);
       await tool('save_item', { url: ARTICLE, title: 'Hijacking the PS5' });
       await page.goto(`${app.base}/preview`);
