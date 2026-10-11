@@ -35,9 +35,10 @@ test('optional tasks retain compact chrome and usable fields across narrow width
    await page.waitFor(`document.querySelector('#experiences:not([hidden]) ${view==='library'?'.recall-hit':'.ui-screen-header'}')` ,'optional task '+view).catch(async error=>{throw new Error(error.message+' '+JSON.stringify(await page.eval(`({url:location.href,body:document.body.innerText.slice(0,1800)})`))+' '+JSON.stringify(page.problems));});
    if(view==='changes'||view==='events')await page.click('.watch-add summary');
    if(view==='collections')await page.click('.collection-setup summary');
-   for(const width of [360,760,1000])for(const scale of [1,2]){
+   await page.eval(`document.head.append(Object.assign(document.createElement('style'),{id:'densityScrollbars'}))`);
+   for(const width of [360,760,1000])for(const scale of [1,2])for(const reservedScrollbars of [false,true]){
     await page.send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:false});
-    await page.eval(`document.documentElement.style.fontSize='${scale*100}%';document.documentElement.dataset.theme='${scale===1?'light':'dark'}'`);
+    await page.eval(`document.documentElement.style.fontSize='${scale*100}%';document.documentElement.dataset.theme='${scale===1?'light':'dark'}';document.querySelector('#densityScrollbars').textContent=${JSON.stringify(reservedScrollbars?'::-webkit-scrollbar {width:15px;height:15px} .experiences {scrollbar-gutter:stable}':'')}`);
     // Allow ResizeObserver (comparison tabs) and layout to settle.
     await page.eval(`new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))`);
     const failures=await page.eval<string[]>(`(()=>{
@@ -45,7 +46,9 @@ test('optional tasks retain compact chrome and usable fields across narrow width
      if(scope.scrollWidth>scope.clientWidth+1)fail.push('horizontal task overflow');
      for(const h of scope.querySelectorAll('.ui-screen-header h1'))if(parseFloat(getComputedStyle(h).fontSize)>${18*scale+.1})fail.push('oversized heading');
      for(const button of scope.querySelectorAll('button'))if(visible(button)&&getComputedStyle(button).textDecorationLine.includes('underline'))fail.push('underlined action');
-     for(const input of scope.querySelectorAll('.ui-search-row input,.watch-setup input:not([type=checkbox])'))if(visible(input)&&input.getBoundingClientRect().width<Math.min(${200*scale},${width}-60))fail.push('squeezed field');
+     // Use the task viewport after scrollbar gutters, keeping the same 60px inset budget.
+     const minimumFieldWidth=Math.min(${200*scale},scope.clientWidth-60);
+     for(const input of scope.querySelectorAll('.ui-search-row input,.watch-setup input:not([type=checkbox])'))if(visible(input)&&input.getBoundingClientRect().width<minimumFieldWidth)fail.push('squeezed field: '+input.getBoundingClientRect().width+'px; minimum '+minimumFieldWidth+'px');
      for(const split of scope.querySelectorAll('.ui-split')){
       const [main,aside]=split.children;
       if(${width}===360&&aside.getBoundingClientRect().top<main.getBoundingClientRect().bottom-1)fail.push('supporting pane failed to stack');
@@ -57,8 +60,9 @@ test('optional tasks retain compact chrome and usable fields across narrow width
      }
      return fail;
     })()`);
-    assert.deepEqual(failures,[],`${view} at ${width}px/${scale*100}%`);
+    assert.deepEqual(failures,[],`${view} at ${width}px/${scale*100}%${reservedScrollbars?' with reserved scrollbars':''}`);
    }
+   await page.eval(`document.querySelector('#densityScrollbars').remove()`);
    await page.send('Emulation.setTouchEmulationEnabled',{enabled:true});
    await page.eval(`document.documentElement.style.fontSize='100%'`);
    assert.equal(await page.eval(`(()=>{const fields=[...document.querySelectorAll('#experiences input.field[type=checkbox]')].filter(n=>n.getClientRects().length);return fields.every(n=>n.offsetWidth<=16&&n.closest('label')?.offsetHeight>=44)})()`),true,view+' checkbox glyph/target separation');

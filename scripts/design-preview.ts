@@ -126,7 +126,7 @@ createServer(async(req,res)=>{try{
   const scale=parseFloat(w.getComputedStyle(d.documentElement).fontSize)/16;
   for(const h of d.querySelectorAll('.ui-screen-header h1'))if(visible(h)&&parseFloat(w.getComputedStyle(h).fontSize)>18*scale+.1)fail.push('oversized task heading');
   for(const c of d.querySelectorAll('input[type=checkbox].field'))if(visible(c)&&c.getBoundingClientRect().width>16*scale+.1)fail.push('oversized checkbox glyph');
-  for(const input of d.querySelectorAll('.ui-search-row input,.watch-setup input:not([type=checkbox])'))if(visible(input)&&input.getBoundingClientRect().width<Math.min(200*scale,w.innerWidth-60))fail.push('squeezed search/setup field');
+  for(const input of d.querySelectorAll('.ui-search-row input,.watch-setup input:not([type=checkbox])'))if(visible(input)&&input.getBoundingClientRect().width<Math.min(200*scale,(input.closest('.experiences')||d.documentElement).clientWidth-60))fail.push('squeezed search/setup field');
   for(const n of d.querySelectorAll('.ui-result-row'))if(visible(n)&&w.innerWidth>=760&&scale===1&&n.getBoundingClientRect().height>140)fail.push('oversized result row');
   // A host window without focus never shows focus rings: say so rather than fail every case.
   const focusScope=d.querySelector('dialog[open]')||d;const first=[...focusScope.querySelectorAll('button')].find(n=>visible(n)&&!n.disabled);if(first&&!document.hasFocus())focusUnchecked=true;else if(first){first.focus();const s=w.getComputedStyle(first);if(s.outlineStyle==='none'||parseFloat(s.outlineWidth)<2)fail.push('missing keyboard focus');}
