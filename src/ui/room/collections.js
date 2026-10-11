@@ -36,26 +36,28 @@
   function selectionTray() {
     return el('div', { class: 'selection-tray experience-row', hidden: !selectedEvidence.size },
       el('span', null, `${selectedEvidence.size} selected`),
-      el('button', { class: 'btn', onclick: () => showCollections(true) }, 'Create collection'),
+      uiButton({label:'Create collection', onClick:() => showCollections(true)}),
       el('button', { id: 'btnCompare', class: 'btn', disabled: selectedEvidence.size < 2 || selectedEvidence.size > 3, 'aria-label': `Compare (${selectedEvidence.size})`, onclick: () => showComparison([...selectedEvidence.values()]) }, icon('compare'), el('span', null, selectedEvidence.size < 2 || selectedEvidence.size > 3 ? 'Compare · select 2–3' : 'Compare')),
       el('button', { class: 'link-btn', onclick: () => { selectedEvidence.clear(); updateSelection(); } }, 'Clear'));
   }
   async function showCollections(fromSelection = false) {
     enterExperience('collections');
     $('experiences').replaceChildren(el('header', { class: 'experience-heading' }, el('button', { class: 'link-btn', onclick: () => showRecall() }, '← Library'), el('h1', null, 'Collections')),
-      el('div', { id: 'collectionCreate' }), el('div', { id: 'collectionCards', class: 'collection-cards', 'aria-live': 'polite' }, 'Loading your collections…'));
+      el('div', { id: 'collectionCreate' }), el('div', { id: 'collectionCards', class: 'collection-cards', 'aria-live': 'polite' }, uiFeedback({kind:'loading', message:'Loading your collections…'})));
     const title = el('input', { type: 'text', required: true, maxlength: 200, placeholder: 'Agents that remember', 'aria-label': 'Collection title' });
     const purpose = el('input', { type: 'text', maxlength: 1000, placeholder: 'What are you trying to understand?', 'aria-label': 'Collection purpose' });
     const note = el('p', { class: 'experience-muted', role: 'status' }, fromSelection ? `${selectedEvidence.size} selected items will be kept here.` : 'Add saved links and quotes from Library.');
-    const create = el('button', { class: 'btn primary', type: 'submit' }, 'Create collection');
-    const form = el('form', { class: 'collection-create' }, title, purpose, create, note);
+    const titleField = uiField(title, {label:'Collection title', hiddenLabel:true});
+    const purposeField = uiField(purpose, {label:'Collection purpose', hiddenLabel:true});
+    const create = uiButton({label:'Create collection', emphasis:'primary', type:'submit'});
+    const form = el('form', { class: 'collection-create' }, titleField.element, purposeField.element, create, note);
     form.addEventListener('submit', async e => {
-      e.preventDefault(); create.disabled = true;
+      e.preventDefault(); if (create.disabled) return; uiBusy(create, true); titleField.setError();
       try {
         const { collection } = (await callTool('update_collection', { action: 'create', title: title.value.trim(), purpose: purpose.value.trim(), ...(fromSelection ? { entries: [...selectedEvidence.values()].map(hitEntry) } : {}) })).structuredContent;
         if (!collection) throw new Error('The collection was not created.');
         selectedEvidence.clear(); updateSelection(); openDesk(collection.id);
-      } catch (error) { note.textContent = errorText(error); create.disabled = false; }
+      } catch (error) { titleField.setError(errorText(error)); title.focus(); } finally { uiBusy(create, false); }
     });
     $('collectionCreate').append(el('details', { class: 'collection-setup', open: fromSelection }, el('summary', null, 'New collection'), form));
     try {
@@ -63,14 +65,14 @@
       collectionList = data.collections; collectionSources = data.sources;
       if (experience !== 'collections') return;
       drawCollectionCards();
-    } catch (error) { if (experience === 'collections') $('collectionCards').textContent = `Could not load collections: ${errorText(error)}`; }
+    } catch (error) { if (experience === 'collections') $('collectionCards').replaceChildren(uiFeedback({kind:'error', message:`Could not load collections: ${errorText(error)}`, action:uiButton({label:'Try again', onClick:()=>showCollections(fromSelection)})})); }
   }
   function drawCollectionCards() {
-    $('collectionCards').replaceChildren(...collectionList.map(c => el('article', { class: 'collection-card' }, el('span', { class: 'experience-kicker' }, c.kind),
-      el('h2', null, c.title), el('p', null, c.purpose || 'A collection of kept reading.'),
-      el('p', { class: 'experience-muted' }, `${c.entries.length} kept · ${c.livePortals.length} live sources · updated ${ago(c.updatedAt)}`),
-      el('button', { class: 'btn', onclick: () => openDesk(c.id) }, c.kind === 'trail' ? 'Follow trail →' : c.kind === 'comparison' ? 'Reopen comparison →' : 'Open collection →'))));
-    if (!collectionList.length) $('collectionCards').append(el('div', { class: 'experience-empty' }, el('h2', null, 'Room for an idea'), el('p', null, 'Create your first collection above, or select a few pieces in Library and bring them together.')));
+    $('collectionCards').replaceChildren(...collectionList.map(c => uiCard({className:'collection-card', title:c.title,
+      description:c.purpose || 'A collection of kept reading.',
+      meta:`${c.entries.length} kept · ${c.livePortals.length} live sources · updated ${ago(c.updatedAt)}`,
+      actions:[uiButton({label:c.kind === 'trail' ? 'Follow trail →' : c.kind === 'comparison' ? 'Reopen comparison →' : 'Open collection →', onClick:()=>openDesk(c.id)})]})));
+    if (!collectionList.length) $('collectionCards').append(uiFeedback({kind:'empty', title:'Room for an idea', message:'Create your first collection above, or select a few pieces in Library and bring them together.'}));
   }
   async function openDesk(id = '', refresh = false) {
     const generation = ++deskGeneration;
@@ -82,7 +84,7 @@
       collectionList = data.collections; collectionSources = data.sources;
       if (!data.desk) throw new Error('This collection is unavailable.');
       showDesk(data.desk);
-    } catch (error) { if (generation === deskGeneration && experience === 'desk') $('experiences').replaceChildren(el('p', { class: 'error', role: 'alert' }, errorText(error)), el('button', { class: 'btn', onclick: () => showCollections() }, 'Back to collections')); }
+    } catch (error) { if (generation === deskGeneration && experience === 'desk') $('experiences').replaceChildren(el('p', { class: 'error', role: 'alert' }, errorText(error)), uiButton({label:'Back to collections', onClick:() => showCollections()})); }
   }
   /** @param {CollectionChange} change */
   async function changeDesk(change) {
@@ -99,18 +101,18 @@
     enterExperience('desk');
     const heading = el('header', { class: 'experience-heading' }, el('button', { class: 'link-btn', onclick: () => showCollections() }, '← Your collections'), el('div', { class: 'experience-kicker' }, c.kind === 'trail' ? 'READ WITH A DIRECTION' : 'COLLECTION'), el('h1', null, c.title), el('p', null, c.purpose),
       el('div', { class: 'experience-row' }, el('span', { class: 'experience-muted' }, `${c.entries.length} kept pieces · updated ${ago(c.updatedAt)}`),
-        el('button', { class: 'btn', onclick: () => showRecall() }, 'Find more material'),
-        el('button', { class: 'btn', onclick: () => editDesk(c) }, 'Edit collection'),
-        el('button', { class: 'btn', onclick: () => changeDesk({ action: 'edit', kind: c.kind === 'trail' ? 'desk' : 'trail' }) }, c.kind === 'trail' ? 'View as collection' : 'Read as a trail')));
+        uiButton({label:'Find more material', onClick:() => showRecall()}),
+        uiButton({label:'Edit collection', onClick:() => editDesk(c)}),
+        uiButton({label:c.kind === 'trail' ? 'View as collection' : 'Read as a trail', onClick:() => changeDesk({ action: 'edit', kind: c.kind === 'trail' ? 'desk' : 'trail' })})));
     const kept = el('section', { class: 'desk-kept' }, el('h2', null, c.kind === 'trail' ? 'Your reading path' : 'Kept for this question'),
       c.kind === 'comparison' ? el('p', {class:'watch-warning',role:'status'}, 'This comparison needs another source. Its remaining evidence is kept below; select material in Library and add it here.') : null,
       selectionTray(),
-      selectedEvidence.size ? el('button', { class: 'btn', onclick: async () => { await changeDesk({ action: 'add', entries: [...selectedEvidence.values()].map(hitEntry) }); selectedEvidence.clear(); updateSelection(); } }, `Add ${selectedEvidence.size} selected items to this collection`) : null,
+      selectedEvidence.size ? uiButton({label:`Add ${selectedEvidence.size} selected items to this collection`, onClick:async () => { await changeDesk({ action: 'add', entries: [...selectedEvidence.values()].map(hitEntry) }); selectedEvidence.clear(); updateSelection(); }}) : null,
       ...c.entries.map((entry, index) => deskEntry(entry, index, data)));
     if (!c.entries.length) kept.append(el('div', { class: 'experience-empty' }, 'Find a page or passage in Library, select it, then add it here. You can also keep a personal note below.'));
     kept.append(noteComposer(c.id));
     const side = el('aside', { class: 'desk-context' }, orientationPanel(c, data.orientationStale),
-      el('section', { class: 'desk-live' }, el('div', { class: 'experience-row' }, el('h2', null, 'Live sources'), el('button', { class: 'btn', onclick: () => openDesk(c.id, true) }, 'Refresh')),
+      el('section', { class: 'desk-live' }, el('div', { class: 'experience-row' }, el('h2', null, 'Live sources'), uiButton({label:'Refresh', onClick:() => openDesk(c.id, true)})),
         el('p', { class: 'experience-muted' }, 'Current reading from sources you chose for this collection.'),
         ...data.unavailablePortals.map(id => el('p', { class: 'error' }, `${id} was removed from your room. Reconnect a source in Edit collection.`)),
         ...data.live.map(portal => el('section', { class: 'desk-live-source' }, el('h3', null, portal.title), portal.error ? el('p', { class: 'error' }, portal.error) : null,
@@ -127,8 +129,8 @@
       el('div', { class: 'experience-row' }, el('span', { class: 'experience-kicker' }, c.kind === 'trail' ? `STEP ${index + 1}${entry.completedAt ? entry.completion === 'skipped' ? ' · SKIPPED' : ' · COMPLETED' : ''}` : entry.ref.startsWith('clip:') ? 'KEPT MATERIAL' : 'KEPT PAGE'), selectEvidenceButton(hit)),
       el('h3', null, entry.title), entry.reason ? el('p', null, entry.reason) : null, el('small', { class: 'experience-muted' }, entry.source || entry.url || entry.ref), preview,
       unavailable ? el('p', { class: 'error', role: 'status' }, 'This clip was removed. Its membership remains so you can see what is missing.') : null,
-      el('div', { class: 'experience-row' }, el('button', { class: 'btn', disabled: unavailable, onclick: () => openLibraryHit(hit) }, 'Read →'),
-        c.kind === 'trail' ? el('button', { class: 'btn', onclick: () => changeDesk({ action: 'complete', refs: [entry.ref], completed: !entry.completedAt }) }, entry.completedAt ? 'Undo completion' : 'Finish step') : null,
+      el('div', { class: 'experience-row' }, uiButton({label:'Read →', disabled:unavailable, onClick:() => openLibraryHit(hit)}),
+        c.kind === 'trail' ? uiButton({label:entry.completedAt ? 'Undo completion' : 'Finish step', onClick:() => changeDesk({ action: 'complete', refs: [entry.ref], completed: !entry.completedAt })}) : null,
         c.kind === 'trail' && !entry.completedAt ? el('button', {class:'link-btn',onclick:()=>changeDesk({action:'complete',refs:[entry.ref],completed:true,skipped:true})},'Skip step') : null,
         el('button', { class: 'btn sm', disabled: index === 0, 'aria-label': `Move ${entry.title} earlier`, onclick: () => moveDeskEntry(index, -1) }, '↑'),
         el('button', { class: 'btn sm', disabled: index === c.entries.length - 1, 'aria-label': `Move ${entry.title} later`, onclick: () => moveDeskEntry(index, 1) }, '↓'),
@@ -152,7 +154,7 @@
         el('p', { class: 'agent-writing' }, c.orientation.text), el('small', { class: 'experience-muted' }, `Agent-written · ${new Date(c.orientation.createdAt).toLocaleString()}`),
         el('div', { class: 'orientation-citations' }, c.orientation.refs.map(ref => { const entry = c.entries.find(e => e.ref === ref); return entry ? el('button', { class: 'link-btn', onclick: () => openLibraryHit(entryHit(entry)) }, entry.title) : el('span', { class: 'error' }, 'Removed evidence'); })))
         : el('p', null, 'Ask your agent for an introduction grounded in the material you kept.'),
-      el('button', { class: 'btn', disabled: !c.entries.length, onclick: () => askCollectionAgent(c) }, c.orientation ? 'Update with your agent' : 'Ask your agent'));
+      uiButton({label:c.orientation ? 'Update with your agent' : 'Ask your agent', disabled:!c.entries.length, onClick:() => askCollectionAgent(c)}));
   }
   /** @param {Collection} c */
   async function askCollectionAgent(c) {
@@ -172,7 +174,7 @@
   /** @param {string} id */
   function noteComposer(id) {
     const note = el('textarea', { 'aria-label': 'Personal note', placeholder: 'What are you noticing? Keep a personal note…', maxlength: 16000, required: true });
-    const button = el('button', { class: 'btn', type: 'submit' }, 'Keep personal note');
+    const button = uiButton({label:'Keep personal note', type:'submit'});
     const form = el('form', { class: 'desk-note' }, el('h3', null, 'Your own thinking'), note, button);
     form.addEventListener('submit', async e => {
       e.preventDefault(); button.disabled = true;
@@ -190,7 +192,7 @@
     const purpose = el('textarea', { maxlength: 1000, 'aria-label': 'Collection purpose' }, c.purpose);
     const boxes = collectionSources.map(source => { const input = el('input', { type: 'checkbox', value: source.portalId, checked: c.livePortals.includes(source.portalId) }); return { input, node: el('label', null, input, source.title) }; });
     const form = el('form', { class: 'desk-editor' }, el('h2', null, 'Edit collection'), title, purpose, el('fieldset', null, el('legend', null, 'Live sources (up to 8)'), ...boxes.map(b => b.node)),
-      el('div', { class: 'experience-row' }, el('button', { class: 'btn primary', type: 'submit' }, 'Save collection'), el('button', { class: 'btn', type: 'button', onclick: () => currentDesk && showDesk(currentDesk) }, 'Cancel'),
+      el('div', { class: 'experience-row' }, uiButton({label:'Save collection', emphasis:'primary', type:'submit'}), uiButton({label:'Cancel', type:'button', onClick:() => currentDesk && showDesk(currentDesk)}),
         el('button', { class: 'link-btn', type: 'button', onclick: async () => { try { await callTool('update_collection', { action: 'delete', id: c.id }); showCollections(); } catch (error) { toast(errorText(error)); } } }, 'Delete collection')));
     form.addEventListener('submit', e => { e.preventDefault(); changeDesk({ action: 'edit', title: title.value, purpose: purpose.value, livePortals: boxes.filter(b => b.input.checked).map(b => b.input.value) }); });
     $('experiences').replaceChildren(form);

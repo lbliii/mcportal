@@ -1,0 +1,11 @@
+/* Shared compact controls. Emphasis changes color, never control geometry. */
+.btn { min-height: var(--mp-control-height); border: 1px solid var(--mp-border-control); background: var(--mp-surface-canvas); border-radius: var(--mp-radius-control); padding: var(--mp-control-padding-block) var(--mp-control-padding-inline); font-size: var(--mp-type-12); font-weight: var(--mp-weight-medium); cursor: pointer; }
+.btn:hover { background: var(--mp-surface-hover); }
+.btn[aria-pressed="true"] { border-color: var(--mp-border-selected); color: var(--mp-action-primary); box-shadow:inset 0 -2px currentColor; }
+.btn.primary { background: var(--mp-action-primary); border-color: var(--mp-action-primary); color: var(--mp-action-on-primary); }
+.btn.danger { color: var(--mp-status-error); border-color: currentColor; }
+.btn:disabled { opacity: .45; cursor: default; }
+.btn > svg { vertical-align: middle; }
+.btn.sm { min-height:var(--mp-control-minimum); padding:var(--mp-space-2) var(--mp-space-6); }
+.btn.quiet { border-color:transparent; background:none; }
+.btn[aria-busy=true] { cursor:progress; }

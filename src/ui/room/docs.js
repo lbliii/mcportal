@@ -230,10 +230,10 @@
     $('reader').style.removeProperty('--mp-reader-width');
     const toolbar = el('div', { class: 'reader-top', role: 'group', 'aria-label': 'Reader controls' },
       roomBackButton(closeReader, withBack ? 'Back to your room' : 'Open your room'),
-      url ? iconButton('external', 'Open the original', () => openLink(url), 'ib') : null,
+      url ? iconButton('external', 'Open the original', () => openLink(url), {size:'default'}) : null,
       title ? saveButton({ url, title }, 'reader', 'ib save') : null,
       title && url ? reblogButton(reblog ?? { key: `url:${url}`, url, title, item: { id: url, url, title, meta: [] }, count: 0, canReblog: true }, 'ib reblog') : null,
-      title && (DEV || hostCapabilities.serverTools) ? iconButton('chat', 'Send to a new chat', () => sendToNewChat(null), 'ib') : null);
+      title && (DEV || hostCapabilities.serverTools) ? iconButton('chat', 'Send to a new chat', () => sendToNewChat(null), {size:'default'}) : null);
     trackReaderToolbar(toolbar);
     return toolbar;
   }

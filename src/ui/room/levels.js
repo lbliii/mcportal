@@ -39,8 +39,8 @@
   // ------------------------------------------------------------ portal level
   /** A visible destination in contextual navigation. @param {() => unknown} back @param {string} [label] */
   function roomBackButton(back, label = 'Back to your room') {
-    const button = iconButton('back', label, back, 'btn room-back');
-    button.append(el('span', null, 'Room'));
+    const button = uiButton({label:'Room', icon:'back', className:'room-back', onClick:back});
+    button.setAttribute('aria-label', label);
     return button;
   }
   // One portal filling the frame. It's drawn inside the grid, so the reader opens over it

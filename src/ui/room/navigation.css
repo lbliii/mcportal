@@ -40,10 +40,7 @@
   [data-layout=paperback] .layout-preview { padding:0 5px; gap:7px; }
   [data-layout=shelves] .layout-preview { grid-template-rows:1fr 1fr; }
   [data-layout=river] .layout-preview { grid-template-columns:1fr; padding:0 18px; }
-  .settings-field { display:flex; align-items:center; justify-content:space-between; gap:var(--mp-space-12); font-size:var(--mp-type-13); }
-  .settings-field + .settings-field { margin-top:var(--mp-space-16); }
-  .settings-field select { min-width:0; max-width:60%; font:inherit; padding:var(--mp-control-padding-block) var(--mp-control-padding-inline); border:1px solid var(--mp-border-control); border-radius:var(--mp-radius-control); color:var(--mp-text-primary); background:var(--mp-surface-input); }
-  .settings-hint,.account-settings p { color:var(--mp-text-secondary); font-size:var(--mp-type-12); line-height:var(--mp-line-body); }
+  .account-settings > p { color:var(--mp-text-secondary); font-size:var(--mp-type-12); line-height:var(--mp-line-body); }
   .account-settings input { max-width:100%; }
   .settings-panel .who-actions { margin-top:var(--mp-space-12); }
   .recall-search details > summary { cursor:pointer; padding:var(--mp-space-8) 0; width:fit-content; }
@@ -63,3 +60,5 @@
     .continue-reading { flex-basis:100%; }
     .settings-panel { width:100%; border-left:0; }
   }
+
+  #readingSettings { display:grid; gap:var(--mp-panel-section-gap); }

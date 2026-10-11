@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
-import { buildDesign, checkTokenUsage, compileTokens } from '../scripts/design.ts';
+import { buildDesign, checkTokenUsage, compileTokens, checkComponentBoundaries, checkLegacyControls, validateComponents } from '../scripts/design.ts';
 import { BRAND, PALETTES } from '../src/design/generated.ts';
 import { page } from '../src/page.ts';
+import { roomHtml, UI_INCLUDES } from '../src/mcp.ts';
 
 test('committed design outputs are deterministic and current', async()=>{
  const first=await buildDesign();assert.deepEqual(first,await buildDesign());
@@ -37,4 +38,26 @@ test('token usage rejects undefined static references, including references with
  assert.doesNotThrow(()=>checkTokenUsage(source));
  assert.throws(()=>checkTokenUsage({...source,'typo.css':'.button { height:var(--mp-control-heigth, 28px); }'}),/typo.css:1: undefined --mp-control-heigth/);
  assert.doesNotThrow(()=>checkTokenUsage({'runtime.js':"node.style.setProperty('--mp-runtime-size', '24px')",'control.css':'.button { height:var(--mp-runtime-size); }'}));
+});
+
+test('component modules ship unchanged in the room and declare complete supported contracts',async()=>{
+ const registry=JSON.parse(await readFile(new URL('../design/components.json',import.meta.url),'utf8'));
+ validateComponents(registry);
+ const html=await roomHtml();
+ for(const file of registry.scripts) {
+   assert.ok(UI_INCLUDES.includes(file), `${file} in the production include list`);
+   assert.ok(html.includes((await readFile(new URL(`../src/ui/${file}`,import.meta.url),'utf8')).trim()),`${file} ships unchanged`);
+ }
+ assert.throws(()=>validateComponents({...registry,components:{button:{status:'stable',factory:'uiButton'}}}),/Incomplete component/);
+ assert.throws(()=>validateComponents({...registry,components:{...registry.components,button:{...registry.components.button,variants:['primary','primary']}}}),/Invalid component options/);
+});
+
+test('component boundary and legacy-control checks prevent new product coupling and raw action drift',()=>{
+ assert.throws(()=>checkComponentBoundaries({'button.js':'function save() { callTool("save"); }'}),/product identifier callTool/);
+ assert.throws(()=>checkComponentBoundaries({'button.js':'function save() { return state.saved; }'}),/product identifier state/);
+ assert.doesNotThrow(()=>checkComponentBoundaries({'button.js':'function toggle(options) { return options.state; }'}));
+ assert.throws(()=>checkLegacyControls({'room/new.js':"el('button', {class:'btn'}, 'Save')"},{}),/raw buttons exceed/);
+ assert.throws(()=>checkLegacyControls({'room.html':'<button>Save</button>'},{}),/raw buttons exceed/);
+ assert.doesNotThrow(()=>checkLegacyControls({'room/new.js':"uiButton({label:'Save'})"},{}));
+ assert.doesNotThrow(()=>checkLegacyControls({'room/old.js':"el('button', null, 'Story title')"},{'room/old.js':{maximum:1,reason:'Specialized content-opening target.'}}));
 });

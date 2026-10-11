@@ -10,7 +10,6 @@
   /*include:room/room.css*/
   /*include:room/experiences.css*/
   /*include:room/navigation.css*/
-  /*include:room/tooltips.css*/
   /*include:space.css*/
   /*include:design/primitives.css*/
 </style>
@@ -61,9 +60,7 @@
   </section>
   <section class="settings-section">
     <h3>Reading</h3>
-    <label class="settings-field" id="openInField" hidden>Open stories<select class="field" id="openIn"><option value="card">In this room</option><option value="chat">In the conversation</option></select></label>
-    <label class="settings-field">Show source details<input type="checkbox" id="showSources"></label>
-    <p class="settings-hint">Show where each source’s data comes from.</p>
+    <div id="readingSettings"></div>
   </section>
   <section class="settings-section"><h3>Account</h3><div class="account-settings" id="whoMenu"></div></section>
 </dialog>
@@ -115,33 +112,18 @@
   // MCPortal icon set: 24px grid, 1.75px round strokes, 3px house corners, drawn in currentColor.
   // The icon set and its stroke come from scripts/brand.ts, so they match the Line mark.
   /*include:brand/icons.js*/
-  /** An icon from the generated set, drawn in currentColor. @param {string} name */
-  function icon(name) {
-    const NS = 'http://www.w3.org/2000/svg';
-    const svg = document.createElementNS(NS, 'svg');
-    svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('aria-hidden', 'true');
-    svg.setAttribute('stroke-width', String(ICON_STROKE));
-    const { d, dot, state } = /** @type {Record<string, { d: string, dot?: number[], state?: true }>} */ (ICONS)[name] ?? { d: '' };
-    const path = document.createElementNS(NS, 'path'); path.setAttribute('d', d);
-    svg.append(path);
-    if (dot) {
-      const circle = document.createElementNS(NS, 'circle');
-      circle.setAttribute('cx', String(dot[0])); circle.setAttribute('cy', String(dot[1])); circle.setAttribute('r', String(dot[2]));
-      circle.setAttribute('fill', 'currentColor'); circle.setAttribute('stroke', 'none');
-      if (state) circle.setAttribute('class', 'icon-state');   // shown only while its button is pressed
-      svg.append(circle);
-    }
-    return svg;
-  }
-  /** @param {string} name @param {string} label @param {(e: MouseEvent) => void} onclick */
-  function iconButton(name, label, onclick, cls = 'ib sm') {
-    return el('button', { class: cls, 'data-tooltip': '', 'aria-label': label, onclick }, icon(name));
-  }
+  /*include:design/contracts.js*/
+  /*include:design/dom.js*/
+  /*include:design/components/icon.js*/
+  /*include:design/components/button.js*/
+  /*include:design/components/field.js*/
+  /*include:design/components/overlays.js*/
+  /*include:design/patterns.js*/
+  /*include:design/components/tooltips.js*/
   for (const node of $$('[data-icon]')) node.replaceChildren(icon(node.dataset.icon ?? ''));
 
   /*include:room/bridge.js*/
   /*include:room/dom.js*/
-  /*include:room/tooltips.js*/
   /*include:room/experiences.js*/
   /*include:room/recall.js*/
   /*include:room/collections.js*/

@@ -1,0 +1,102 @@
+{
+  "room.html": {
+    "maximum": 23,
+    "reason": "Static navigation and specialized layout choices keep their shared CSS contract; migrate when the shell is next changed."
+  },
+  "room/add.js": {
+    "maximum": 5,
+    "reason": "Existing product controls and content-opening actions; shared CSS applies. Use typed factories for new ordinary actions and migrate these when changing this flow."
+  },
+  "room/bridge.js": {
+    "maximum": 1,
+    "reason": "Existing product controls and content-opening actions; shared CSS applies. Use typed factories for new ordinary actions and migrate these when changing this flow."
+  },
+  "room/catchup.js": {
+    "maximum": 8,
+    "reason": "Existing product controls and content-opening actions; shared CSS applies. Use typed factories for new ordinary actions and migrate these when changing this flow."
+  },
+  "room/collections.js": {
+    "maximum": 13,
+    "reason": "Desk editing and evidence selection remain product-specific; collection creation and cards now use shared patterns."
+  },
+  "room/compare.js": {
+    "maximum": 9,
+    "reason": "Existing product controls and content-opening actions; shared CSS applies. Use typed factories for new ordinary actions and migrate these when changing this flow."
+  },
+  "room/docs.js": {
+    "maximum": 6,
+    "reason": "Existing product controls and content-opening actions; shared CSS applies. Use typed factories for new ordinary actions and migrate these when changing this flow."
+  },
+  "room/experiences.js": {
+    "maximum": 1,
+    "reason": "Existing product controls and content-opening actions; shared CSS applies. Use typed factories for new ordinary actions and migrate these when changing this flow."
+  },
+  "room/handoff.js": {
+    "maximum": 3,
+    "reason": "Existing product controls and content-opening actions; shared CSS applies. Use typed factories for new ordinary actions and migrate these when changing this flow."
+  },
+  "room/highlights.js": {
+    "maximum": 1,
+    "reason": "Existing product controls and content-opening actions; shared CSS applies. Use typed factories for new ordinary actions and migrate these when changing this flow."
+  },
+  "room/items.js": {
+    "maximum": 7,
+    "reason": "Content-opening controls and discussion counts retain their reading-layout semantics."
+  },
+  "room/layouts.js": {
+    "maximum": 6,
+    "reason": "Existing product controls and content-opening actions; shared CSS applies. Use typed factories for new ordinary actions and migrate these when changing this flow."
+  },
+  "room/levels.js": {
+    "maximum": 1,
+    "reason": "Existing product controls and content-opening actions; shared CSS applies. Use typed factories for new ordinary actions and migrate these when changing this flow."
+  },
+  "room/passage.js": {
+    "maximum": 8,
+    "reason": "Existing product controls and content-opening actions; shared CSS applies. Use typed factories for new ordinary actions and migrate these when changing this flow."
+  },
+  "room/reader-tools.js": {
+    "maximum": 7,
+    "reason": "Existing product controls and content-opening actions; shared CSS applies. Use typed factories for new ordinary actions and migrate these when changing this flow."
+  },
+  "room/reader.js": {
+    "maximum": 2,
+    "reason": "Existing product controls and content-opening actions; shared CSS applies. Use typed factories for new ordinary actions and migrate these when changing this flow."
+  },
+  "room/reading.js": {
+    "maximum": 2,
+    "reason": "Existing product controls and content-opening actions; shared CSS applies. Use typed factories for new ordinary actions and migrate these when changing this flow."
+  },
+  "room/reblog.js": {
+    "maximum": 3,
+    "reason": "Existing product controls and content-opening actions; shared CSS applies. Use typed factories for new ordinary actions and migrate these when changing this flow."
+  },
+  "room/recall.js": {
+    "maximum": 3,
+    "reason": "Existing product controls and content-opening actions; shared CSS applies. Use typed factories for new ordinary actions and migrate these when changing this flow."
+  },
+  "room/river.js": {
+    "maximum": 7,
+    "reason": "Existing product controls and content-opening actions; shared CSS applies. Use typed factories for new ordinary actions and migrate these when changing this flow."
+  },
+  "room/room.js": {
+    "maximum": 9,
+    "reason": "Portal headings, empty source states and welcome packs retain their layouts; save actions now use the metadata primitive."
+  },
+  "room/shop.js": {
+    "maximum": 6,
+    "reason": "Existing product controls and content-opening actions; shared CSS applies. Use typed factories for new ordinary actions and migrate these when changing this flow."
+  },
+  "room/social.js": {
+    "maximum": 22,
+    "reason": "Existing product controls and content-opening actions; shared CSS applies. Use typed factories for new ordinary actions and migrate these when changing this flow."
+  },
+  "room/views.js": {
+    "maximum": 1,
+    "reason": "Existing product controls and content-opening actions; shared CSS applies. Use typed factories for new ordinary actions and migrate these when changing this flow."
+  },
+  "room/watches.js": {
+    "maximum": 2,
+    "reason": "Existing product controls and content-opening actions; shared CSS applies. Use typed factories for new ordinary actions and migrate these when changing this flow."
+  }
+}

@@ -52,6 +52,18 @@ async function assemble(page: string, name: string): Promise<Assembled> {
   return { name: fileURLToPath(new URL(name, UI)), text: text.join('\n'), origin };
 }
 
+/** Independently check the shipped components and their live catalogue without room globals. */
+async function assembleCatalogue(): Promise<Assembled> {
+  const registry = JSON.parse(await readFile(new URL('../design/components.json', import.meta.url), 'utf8')) as {scripts:string[]};
+  const text:string[] = [], origin:Assembled['origin'] = [];
+  for (const file of ['brand/icons.js', ...registry.scripts, 'design/catalogue.js']) {
+    for (const [i,line] of (await readFile(uiPath(file),'utf8')).split('\n').entries()) {
+      text.push(line); origin.push({file:`src/ui/${file}`,line:i+1});
+    }
+  }
+  return {name:uiPath('catalogue.assembled.js'),text:text.join('\n'),origin};
+}
+
 /** The pages' declarations: element ids, host-provided globals (src/ui/ui.d.ts). */
 const DECLARATIONS = uiPath('ui.d.ts');
 
@@ -82,15 +94,16 @@ export interface UiProblem {
  * The most JSDoc casts (`/** @type {X} *\/ (expr)`) the UI may hold. Each is a place the
  * types take our word for it, so this only goes down: lower it when you remove some.
  */
-export const MAX_UI_CASTS = 48;
+export const MAX_UI_CASTS = 47;
 
-const UI_SCRIPT_FILES = ['room.html', 'admin.html', 'art.js', 'space-inks.js', 'space-format.js', 'design/theme.js', 'design/palettes.js', 'brand/icons.js'];
+const UI_SCRIPT_FILES = ['room.html', 'admin.html', 'art.js', 'space-inks.js', 'space-format.js', 'brand/icons.js'];
 
 /** Every JSDoc cast in the UI's scripts. */
 export async function uiCasts(): Promise<UiProblem[]> {
   const room = (await readdir(uiPath('room'))).filter((f) => f.endsWith('.js')).map((f) => `room/${f}`);
+  const design = (await readdir(uiPath('design'), {recursive:true})).filter(f => f.endsWith('.js')).map(f => `design/${f}`);
   const casts: UiProblem[] = [];
-  for (const file of [...UI_SCRIPT_FILES, ...room]) {
+  for (const file of [...UI_SCRIPT_FILES, ...room, ...design]) {
     for (const [i, line] of (await readFile(uiPath(file), 'utf8')).split('\n').entries()) {
       for (const _ of line.matchAll(/\/\*\* @type \{[^}]*\} \*\/ \(/g)) casts.push({ file: `src/ui/${file}`, line: i + 1, message: 'cast' });
     }
@@ -108,7 +121,7 @@ export async function checkUi(): Promise<UiProblem[]> {
 
 /** Type errors under `options`, mapped back to the files they came from. */
 export async function diagnose(options: ts.CompilerOptions): Promise<UiProblem[]> {
-  const pages = [await assemble('room.html', 'room.assembled.js'), await assemble('admin.html', 'admin.assembled.js')];
+  const pages = [await assemble('room.html', 'room.assembled.js'), await assemble('admin.html', 'admin.assembled.js'), await assembleCatalogue()];
   const virtual = new Map<string, string>(pages.map((p) => [p.name, p.text]));
   const host = ts.createCompilerHost(options);
   const getSourceFile = host.getSourceFile.bind(host);

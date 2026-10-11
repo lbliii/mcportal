@@ -56,9 +56,9 @@
   function itemActions(item, portal, when = true, reblog = true) {
     const { out, byline } = compactMeta(item, when);
     if (item.person) return { out: [...out, ...personActions(item, portal)], byline };   // a suggested person: no link to open, save or reblog
-    if (item.url) out.push(el('button', { class: 'mi go', 'data-tooltip': '', 'aria-label': 'Open the original', onclick: () => openLink(item.url ?? '') }, icon('external')));   // checked just before
+    if (item.url) out.push(uiMetadataAction({label:'Open the original', icon:'external', onClick:()=>openLink(item.url ?? '')}));   // checked just before
     out.push(saveButton(item, portal.source));
-    if (portal.source === 'saved' && item.url) out.push(el('button', { class: 'mi go', 'data-tooltip': '', 'aria-label': 'Share to your space', onclick: () => openComposer(item) }, icon('share')));
+    if (portal.source === 'saved' && item.url) out.push(uiMetadataAction({label:'Share to your space', icon:'share', onClick:()=>openComposer(item)}));
     if (reblog && portal.source !== 'saved') { const button = reblogButton(reblogTarget(item, portal, item.share)); if (button) out.push(button); }
     return { out, byline };
   }
@@ -124,7 +124,7 @@
       const main = el('button', { class: 'item-main', type: 'button', title: byline, onclick: (/** @type {MouseEvent} */ e) => openFrom(e, item, portal) },
         patchAvatar(item.person?.cover || item.share?.cover), item.image && item.image.kind === 'thumb' ? el('span', { class: 'item-row' }, thumbBox(item, portal), el('span', { class: 'item-text' }, text)) : text);
       return el('div', { class: 'item', onclick: openOnClick(item, portal) }, from ? itemFrom(portal, color) : null, main,
-        out.length ? el('div', { class: 'item-meta' }, out) : null, why ? itemWhy(why) : null);
+        out.length ? uiMetadata({className:'item-meta'}, out) : null, why ? itemWhy(why) : null);
     },
 
     /** The front page's first story: its picture across the top, a larger title, a longer summary. */
@@ -135,7 +135,7 @@
         itemTitle(item), item.share?.description ? el('span', { class: 'item-summary' }, item.share.description) : null,
         item.summary ? el('span', { class: 'item-summary' }, item.summary) : null);
       return el('div', { class: 'item lead', style: `--mp-source-color:${color}`, onclick: openOnClick(item, portal) }, itemFrom(portal, color), main,
-        out.length ? el('div', { class: 'item-meta' }, out) : null, why ? itemWhy(why) : null);
+        out.length ? uiMetadata({className:'item-meta'}, out) : null, why ? itemWhy(why) : null);
     },
 
     /**
@@ -169,7 +169,7 @@
         main,
         removed ? el('p', { class: 'story-removed' }, removed) : null,
         trail.map((n) => el('p', { class: 'story-note' }, handleButton(n.by, 'story-note-by'), n.note)),
-        out.length ? el('div', { class: 'item-meta' }, out) : null, why ? itemWhy(why) : null);
+        out.length ? uiMetadata({className:'item-meta'}, out) : null, why ? itemWhy(why) : null);
     },
 
     /** A card in a shelf. In a media shelf every card gets a picture area, so the row stays even. */
@@ -183,7 +183,7 @@
       const main = el('button', { class: 'card-main', type: 'button', title: byline, onclick: (/** @type {MouseEvent} */ e) => openFrom(e, item, portal) },
         patchAvatar(item.person?.cover || item.share?.cover), media ? [thumbBox(item.image && item.image.kind === 'thumb' ? item : { ...item, image: undefined }, portal), el('span', { class: 'card-body' }, content)] : content);
       return el('div', { class: media ? 'card media' : 'card', style: `--mp-source-color:${color}`, onclick: openOnClick(item, portal) }, main,
-        meta.length ? el('div', { class: 'item-meta' }, meta) : null);
+        meta.length ? uiMetadata({className:'item-meta'}, meta) : null);
     },
   };
 
@@ -195,5 +195,5 @@
       picture, el('span', { class: 'collection-copy' }, patchAvatar(item.person?.cover || item.share?.cover), itemTitle(item),
         item.summary ? el('span', { class: 'item-summary' }, item.summary) : null));
     return el('article', { class: `item designed ${form}-item`, style: `--mp-source-color:${color}`, onclick: openOnClick(item, portal) }, main,
-      out.length ? el('div', { class: 'item-meta' }, out) : null);
+      out.length ? uiMetadata({className:'item-meta'}, out) : null);
   }

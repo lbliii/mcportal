@@ -26,7 +26,7 @@
       fetchRecall();
     };
     const search = el('form', { class: 'recall-search', onsubmit: (/** @type {SubmitEvent} */ e) => { e.preventDefault(); submit(); } },
-      el('div', { class: 'experience-row' }, query, el('button', { class: 'btn primary', type: 'submit' }, 'Search'), el('button', { id: 'btnCollections', class: 'btn', type: 'button', onclick: () => showCollections() }, 'Collections')),
+      el('div', { class: 'experience-row' }, query, uiButton({label:'Search', emphasis:'primary', type:'submit'}), uiButton({label:'Collections', id:'btnCollections', type:'button', onClick:() => showCollections()})),
       el('details', { open: Boolean(recallQuery.kind || recallQuery.site || recallQuery.tag || recallQuery.status) }, el('summary', null, 'Filters'), el('div', { class: 'recall-filters' }, kind, site, tag, status)));
     $('experiences').replaceChildren(search,
       el('p', { id: 'recallCount', class: 'experience-muted', role: 'status' }),
@@ -50,7 +50,7 @@
     } catch (error) {
       if (generation !== recallGeneration || experience !== 'recall') return;
       $('recallCount').textContent = `Could not search: ${errorText(error)}`;
-      $('recallResults').replaceChildren(el('button', { class: 'btn', onclick: () => fetchRecall() }, 'Try again'));
+      $('recallResults').replaceChildren(uiFeedback({kind:'error', message:'Search is unavailable. Try again when the connection returns.', action:uiButton({label:'Try again', onClick:()=>fetchRecall()})}));
     } finally { if (generation === recallGeneration && experience === 'recall') $('recallResults').setAttribute('aria-busy', 'false'); }
   }
 
@@ -72,10 +72,10 @@
       hit.excerpt ? el('p', { class: hit.clipKind === 'quote' ? 'recall-quote' : 'recall-excerpt' }, hit.excerpt) : null,
       hit.matched.length ? el('small', { class: 'experience-muted' }, `Matched: ${hit.matched.join(', ')}`) : null,
       el('button', { class: 'link-btn', onclick: () => openLibraryHit(hit) }, hit.clipId ? 'Read →' : 'Resume reading →'))));
-    if (!recallResult.hits.length) $('recallResults').append(el('div', { class: 'experience-empty' }, el('h2', null, recallResult.query ? 'No matching material' : 'Nothing here yet'), el('p', null, 'Try words from the title, a saved note or a kept passage, or change your filters. Saving a link does not retain its page text.')));
+    if (!recallResult.hits.length) $('recallResults').append(uiFeedback({kind:'empty', title:recallResult.query ? 'No matching material' : 'Nothing here yet', message:'Try words from the title, a saved note or a kept passage, or change your filters. Saving a link does not retain its page text.'}));
     if (recallResult.nextOffset !== null) {
       const next = recallResult.nextOffset;
-      $('recallResults').append(el('button', { class: 'btn', onclick: () => fetchRecall(next, true) }, 'Show more'));
+      $('recallResults').append(uiButton({label:'Show more', onClick:() => fetchRecall(next, true)}));
     }
     drawRecallPreview();
   }
@@ -85,8 +85,8 @@
     if (!hit) return;
     box.replaceChildren(...present([el('h2', null, hit.title), el('p', { class: 'experience-muted' }, hit.source),
       el('div', { class: 'recall-preview-body' }, hit.excerpt || 'Open this page to read it at its source.'),
-      el('button', { class: 'btn primary', onclick: () => openLibraryHit(hit) }, hit.clipId ? 'Read' : 'Open in reader'),
-      hit.url && hit.locator ? el('button', { class: 'btn', onclick: () => openLibraryHit(hit, true) }, 'Return to passage') : null,
+      uiButton({label:hit.clipId ? 'Read' : 'Open in reader', emphasis:'primary', onClick:() => openLibraryHit(hit)}),
+      hit.url && hit.locator ? uiButton({label:'Return to passage', onClick:() => openLibraryHit(hit, true)}) : null,
       hit.url ? el('button', { class: 'link-btn', onclick: () => openLink(hit.url || '') }, 'Open original') : null]));
     if (!hit.clipId) return;
     const body = $first('.recall-preview-body', box);

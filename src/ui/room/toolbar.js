@@ -1,7 +1,8 @@
-  // Preferences keep the existing profile contract; the drawer only changes their home.
-  $('showSources').addEventListener('change', () => {
-    root.classList.toggle('show-sources', $('showSources').checked);
-  });
+  // Shared controls own labels, hints and target sizes; this file owns preferences.
+  const openStories = uiSettingsRow(el('select', {id:'openIn'}, el('option', {value:'card'}, 'In this room'), el('option', {value:'chat'}, 'In the conversation')), {label:'Open stories', id:'openInField'});
+  openStories.element.hidden = true;
+  const sourceDetails = uiToggle({id:'showSources', label:'Show source details', hint:'Show where each source’s data comes from.', onChange:checked=>root.classList.toggle('show-sources', checked)});
+  $('readingSettings').replaceChildren(openStories.element, sourceDetails.element);
   let settingsBusy = false;
   /** @param {Pick<Partial<Profile>, 'layout' | 'openIn'>} change */
   async function saveSettings(change) {
@@ -35,41 +36,15 @@
   }
   $('openIn').addEventListener('change', () => saveSettings({ openIn: $('openIn').value === 'chat' ? 'chat' : 'card' }));
 
-  /** @param {boolean} open */
-  function showSettings(open) {
-    const panel = $('settingsPanel');
-    if (!open) { if (panel.open) panel.close(); return; }
-    closeNavigationMenus();
-    drawWhoMenu();
-    $('showSources').checked = root.classList.contains('show-sources');
-    root.classList.add('settings-open');
-    $('btnSettings').setAttribute('aria-expanded', 'true');
-    if (!panel.open) panel.showModal();
-  }
-  $('btnSettings').addEventListener('click', () => showSettings(true));
-  $('btnCloseSettings').addEventListener('click', () => showSettings(false));
-  $('settingsPanel').addEventListener('close', () => {
-    root.classList.remove('settings-open');
-    $('btnSettings').setAttribute('aria-expanded', 'false');
+  const navigationMenus = [uiMenu($('moreMenu'), $('btnMore')), uiMenu($('roomOptions'), $('btnRoomOptions'))];
+  function closeNavigationMenus() { navigationMenus.forEach(menu=>menu.close()); }
+  const settingsDialog = uiDialog($('settingsPanel'), {
+    trigger:$('btnSettings'), closeButton:$('btnCloseSettings'),
+    onOpen:()=>{ closeNavigationMenus(); drawWhoMenu(); sourceDetails.control.checked=root.classList.contains('show-sources'); root.classList.add('settings-open'); },
+    onClose:()=>root.classList.remove('settings-open'),
   });
-
-  /** Popovers share native Escape, focus return and outside-click dismissal. */
-  function closeNavigationMenus() {
-    for (const menu of [$('moreMenu'), $('roomOptions')]) if (menu.matches(':popover-open')) menu.hidePopover();
-  }
-  /** @param {HTMLElement} menu @param {HTMLButtonElement} button */
-  function navigationMenu(menu, button) {
-    menu.addEventListener('beforetoggle', event => {
-      if (event.newState !== 'open') return;
-      const anchor = button.getBoundingClientRect();
-      menu.style.left = `${Math.max(12, Math.min(anchor.left, window.innerWidth - 272))}px`;
-      menu.style.top = `${anchor.bottom + 4}px`;
-    });
-    menu.addEventListener('toggle', () => button.setAttribute('aria-expanded', String(menu.matches(':popover-open'))));
-    menu.addEventListener('click', event => { if (event.target instanceof Element && event.target.closest('button') && menu.matches(':popover-open')) menu.hidePopover(); });
-  }
-  navigationMenu($('moreMenu'), $('btnMore'));
-  navigationMenu($('roomOptions'), $('btnRoomOptions'));
+  /** @param {boolean} open */
+  function showSettings(open) { if (open) settingsDialog.open(); else settingsDialog.close(); }
 
   /** @param {Identity} identity */
   function drawIdentity(identity) {
@@ -91,7 +66,7 @@
         el('p', null, 'Saved on this computer. Nothing is synced or shared.'),
         identity.signInFailure ? el('p', { class: 'error', role: 'alert' }, identity.signInFailure.message) : null,
         identity.canSignIn
-          ? [el('button', { class: 'btn primary', type: 'button', onclick: () => signIn() }, 'Sign in to sync')]
+          ? [uiButton({label:'Sign in to sync', emphasis:'primary', type:'button', onClick:() => signIn()})]
           : null);
       return;
     }
@@ -103,10 +78,10 @@
       linked && identity.offline ? el('p', { class: 'muted' }, `Offline: this is your portal as last synced${identity.syncedAt ? ` (${ago(identity.syncedAt)})` : ''}. Feeds still load; changes wait until you're back online.`) : null,
       el('div', { class: 'who-actions' },
         identity.handle
-          ? el('button', { class: 'btn', type: 'button', onclick: () => { showSettings(false); loadSpace('', false); } }, 'Your space')
-          : el('button', { class: 'btn primary', type: 'button', onclick: drawClaim }, 'Claim a handle'),
-        identity.accountUrl ? el('button', { class: 'btn', type: 'button', onclick: () => openLink(identity.accountUrl ?? '') }, 'Account page') : null,
-        linked ? el('button', { class: 'btn', type: 'button', onclick: confirmSignOut }, 'Sign out') : null));
+          ? uiButton({label:'Your space', type:'button', onClick:() => { showSettings(false); loadSpace('', false); }})
+          : uiButton({label:'Claim a handle', emphasis:'primary', type:'button', onClick:drawClaim}),
+        identity.accountUrl ? uiButton({label:'Account page', type:'button', onClick:() => openLink(identity.accountUrl ?? '')}) : null,
+        linked ? uiButton({label:'Sign out', type:'button', onClick:confirmSignOut}) : null));
   }
 
   /** Start linking this computer; progress shows in the account menu, or in `target` (the welcome screen, where there's no menu). @param {Element} [target] */
@@ -117,11 +92,11 @@
       await openLink(url);
       fill(target,
         el('p', null, 'Finish signing in with GitHub in your browser. This computer\'s portal is added to your account, and this room updates when you\'re done.'),
-        el('button', { class: 'btn', type: 'button', onclick: () => { showSettings(false); loadRoom(); } }, 'I\'ve signed in'));
+        uiButton({label:'I\'ve signed in', type:'button', onClick:() => { showSettings(false); loadRoom(); }}));
       watchSignIn(target);
     } catch (error) {
       fill(target, el('p', { class: 'error', role: 'alert' }, `Couldn't start signing in: ${errorText(error)}`),
-        el('button', { class: 'btn', type: 'button', onclick: () => signIn(target) }, 'Try signing in again'));
+        uiButton({label:'Try signing in again', type:'button', onClick:() => signIn(target)}));
     }
   }
 
@@ -131,39 +106,35 @@
     // The GitHub login as a handle, when it makes one (hyphens aren't allowed).
     const login = identity && identity.mode !== 'ghost' ? (identity.login ?? '').toLowerCase().replace(/-/g, '_').slice(0, 30) : '';
     const input = el('input', { type: 'text', value: /^[a-z0-9_]{2,30}$/.test(login) ? login : '', placeholder: 'yourname', maxlength: '31', autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false', 'aria-label': 'Handle' });
-    const problem = el('p', { class: 'who-error', role: 'alert', hidden: true });
-    const claim = el('button', { class: 'btn primary', type: 'button' }, 'Claim');
+    const handleField = uiField(input, {label:'Handle', hint:'2 to 30 letters, digits or underscores. You can change it later.'});
+    const claim = uiButton({label:'Claim', emphasis:'primary', type:'button'});
     // Being findable is its own choice, asked plainly and off by default (docs/plans/finding-people.md).
     const listed = el('input', { type: 'checkbox' });
     const publicSpace = el('input', { type: 'checkbox' }); publicSpace.checked = true;
     const submit = async () => {
       const handle = input.value.trim().replace(/^@/, '');
-      if (!handle) { input.focus(); return; }
-      claim.disabled = true; input.disabled = true; problem.hidden = true;
+      if (claim.disabled) return;
+      if (!handle) { handleField.setError('Enter a handle.'); input.focus(); return; }
+      uiBusy(claim, true); input.disabled = true; handleField.setError();
       try {
         const { profile } = (await callTool('set_public_profile', { handle, listed: listed.checked, public: publicSpace.checked })).structuredContent;
         if (state.identity && state.identity.mode !== 'ghost') drawIdentity({ ...state.identity, handle: profile.handle });
         toast(`You're @${profile.handle}.`);
         loadSpace('', false);
       } catch (error) {
-        claim.disabled = false; input.disabled = false;
-        problem.textContent = errorText(error);
-        problem.hidden = false;
-        input.focus();
-      }
+        input.disabled = false; handleField.setError(errorText(error)); input.focus();
+      } finally { uiBusy(claim, false); }
     };
     claim.addEventListener('click', submit);
     input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); submit(); } });
     setWhoMenu(
       el('div', { class: 'who-head' }, icon('space'), el('b', null, 'Claim a handle')),
       el('p', null, 'Your handle is how people on MCPortal find you, follow you and see what you share. It makes a public profile and your Space; the rest of your room stays private.'),
-      el('label', { class: 'who-claim' }, el('span', { 'aria-hidden': 'true' }, '@'), input),
-      el('p', { class: 'muted' }, '2 to 30 letters, digits or underscores. You can change it later.'),
+      handleField.element,
       el('label', { class: 'who-list' }, publicSpace, 'Public Space: anyone on the web can read it'),
       el('label', { class: 'who-list' }, listed, 'List me, so people with similar sources can find me'),
-      problem,
       el('div', { class: 'who-actions' },
-        el('button', { class: 'btn', type: 'button', onclick: () => drawWhoMenu() }, 'Back'),
+        uiButton({label:'Back', type:'button', onClick:() => drawWhoMenu()}),
         claim));
     input.focus();
     input.select();
@@ -196,7 +167,7 @@
       if (watch !== signInWatch) return;
       if (Date.now() > until) {
         fill(target, el('p', { class: 'error', role: 'alert' }, 'The sign-in link expired. Start again with a fresh link on this computer.'),
-          el('button', { class: 'btn', type: 'button', onclick: () => signIn(target) }, 'Try signing in again'));
+          uiButton({label:'Try signing in again', type:'button', onClick:() => signIn(target)}));
         return;
       }
       if (await identityChanged()) {
@@ -209,7 +180,7 @@
       if (identity?.mode === 'ghost' && identity.signInFailure) {
         signInWatch++;
         fill(target, el('p', { class: 'error', role: 'alert' }, identity.signInFailure.message),
-          el('button', { class: 'btn', type: 'button', onclick: () => signIn(target) }, 'Try signing in again'));
+          uiButton({label:'Try signing in again', type:'button', onClick:() => signIn(target)}));
         return;
       }
       setTimeout(tick, 3000);
@@ -231,8 +202,8 @@
     setWhoMenu(
       el('p', null, 'Sign this computer out? Your portal is copied here first, so nothing disappears, and MCPortal goes back to ghost mode.'),
       el('div', { class: 'who-actions' },
-        el('button', { class: 'btn', type: 'button', onclick: () => drawWhoMenu() }, 'Cancel'),
-        el('button', { class: 'btn primary', type: 'button', onclick: signOut }, 'Sign out')));
+        uiButton({label:'Cancel', type:'button', onClick:() => drawWhoMenu()}),
+        uiButton({label:'Sign out', emphasis:'primary', type:'button', onClick:signOut})));
   }
 
   async function signOut() {

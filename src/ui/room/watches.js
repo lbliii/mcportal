@@ -6,9 +6,9 @@
   /** @param {string} screen */
   async function openWatches(screen) {
     watchScreen = screen; const generation = ++watchGeneration;
-    enterExperience(screen); $('experiences').replaceChildren(el('p', {role:'status'}, 'Opening your watches…'));
+    enterExperience(screen); $('experiences').replaceChildren(uiFeedback({kind:'loading', message:'Opening your watches…'}));
     try { const {watches} = (await callTool('watch_reading', {action:'list'})).structuredContent; if (generation === watchGeneration && experience === screen) showWatches(watches); }
-    catch (error) { if (generation === watchGeneration && experience === screen) $('experiences').replaceChildren(el('p',{class:'error'},errorText(error))); }
+    catch (error) { if (generation === watchGeneration && experience === screen) $('experiences').replaceChildren(uiFeedback({kind:'error', message:errorText(error), action:uiButton({label:'Try again', onClick:()=>openWatches(screen)})})); }
   }
   /** @param {import('../reading-watches.ts').WatchResult} data */
   function showWatches(data) {
@@ -25,7 +25,7 @@
   /** @param {import('../watches-state.ts').WatchFinding[]} findings */
   function changeInbox(findings) {
     const list=el('div',{class:'change-inbox'},el('h2',null,'Updates'));
-    if (!findings.length) list.append(el('div',{class:'experience-empty'},el('h3',null,'No updates yet'),el('p',null,'Track a page or repository. Updates appear after something changes.')));
+    if (!findings.length) list.append(uiFeedback({kind:'empty', title:'No updates yet', message:'Track a page or repository. Updates appear after something changes.'}));
     for (const f of [...findings].reverse()) {
       const card=el('article',{class:`change-card${f.read?' acknowledged':''}`},el('span',{class:'experience-kicker'},f.kind==='availability'?'SOURCE AVAILABILITY':'SOURCE CHANGE'),el('h3',null,f.title),el('p',{class:'experience-muted'},`Found ${new Date(f.at).toLocaleString()}`));
       if (f.beforeAt && f.afterAt) card.append(el('p',{class:'experience-muted'},`Compared ${new Date(f.beforeAt).toLocaleString()} → ${new Date(f.afterAt).toLocaleString()}`));
@@ -33,8 +33,8 @@
         const details=el('details',null,el('summary',null,'Inspect the text diff'),el('div',{class:'change-diff',tabindex:0,'aria-label':`${f.title} text changes`},f.diff.map(d=>el('p',{class:`diff-${d.kind}`},el('span',{'aria-label':d.kind},d.kind==='added'?'+ ':d.kind==='removed'?'− ':'  '),d.text))));
         card.append(details);
       } else card.append(el('p',null,'The last good baseline is retained. This is an availability problem; it does not mean the source deleted its content.'));
-      const actions=el('div',{class:'experience-row'},f.url?el('button',{class:'btn',onclick:()=>openLink(f.url || '')},'Open original'):null,
-        f.diff?el('button',{class:'btn',onclick:()=>askChangeAgent(f)},'Ask your agent'):null,
+      const actions=el('div',{class:'experience-row'},f.url?uiButton({label:'Open original', onClick:()=>openLink(f.url || '')}):null,
+        f.diff?uiButton({label:'Ask your agent', onClick:()=>askChangeAgent(f)}):null,
         el('button',{class:'link-btn',disabled:f.read,onclick:()=>watchOperation({action:'acknowledge',findingIds:[f.id]})},f.read?'Read':'Mark as read'));
       card.append(actions);list.append(card);
     }
@@ -51,7 +51,7 @@
       for (const s of state.profile?.saved || []) if (s.event && !known.has(s.event.id)) known.set(s.event.id,s.event);
       const events=[...known.values()].filter(e=>!eventIsPast(e) || past.checked && state.saved.has(e.url)).sort((a,b)=>a.startsAt.localeCompare(b.startsAt));
       list.replaceChildren(...events.map(e=>eventCard(e)));
-      if (!events.length) list.append(el('div',{class:'experience-empty'},el('h3',null,'Something to look forward to'),el('p',null,'Follow a public venue calendar, or find an artist and confirm the match. Events appear after a successful check.')));
+      if (!events.length) list.append(uiFeedback({kind:'empty', title:'Something to look forward to', message:'Follow a public venue calendar, or find an artist and confirm the match. Events appear after a successful check.'}));
     };
     past.addEventListener('change',draw);draw();
     section.append(el('label',{class:'experience-row'},past,'Include past saved events'),list,el('p',{class:'experience-muted'},'Dates use each event’s explicit timezone. Missing events are not inferred to be cancelled. Check the provider before attending.'));
@@ -62,17 +62,20 @@
     const past=eventIsPast(event), start=new Date(event.startsAt);
     const date=start.toLocaleDateString(undefined,{timeZone:event.timezone,weekday:'short',month:'short',day:'numeric',year:'numeric'}),time=event.allDay?'Time not specified':start.toLocaleTimeString(undefined,{timeZone:event.timezone,hour:'numeric',minute:'2-digit'});
     const item={url:event.url,title:event.title,event};
-    return el('article',{class:'event-card'},el('div',{class:'event-date'},date),el('div',null,el('span',{class:'experience-kicker'},`${past?'PAST · ':''}${event.status.toUpperCase()}`),el('h3',null,event.title),el('p',null,[event.venue,event.city].filter(Boolean).join(' · ')),el('p',{class:'experience-muted'},`${time} · ${event.timezone}`),el('small',{class:'experience-muted'},`From ${event.provider === 'ticketmaster'?'Ticketmaster':'public calendar'} · checked ${new Date(event.updatedAt).toLocaleString()}`),el('div',{class:'experience-row'},el('button',{class:'btn',onclick:()=>openLink(event.url)},'Event details'),saveButton(item,'upcoming'))));
+    return el('article',{class:'event-card'},el('div',{class:'event-date'},date),el('div',null,el('span',{class:'experience-kicker'},`${past?'PAST · ':''}${event.status.toUpperCase()}`),el('h3',null,event.title),el('p',null,[event.venue,event.city].filter(Boolean).join(' · ')),el('p',{class:'experience-muted'},`${time} · ${event.timezone}`),el('small',{class:'experience-muted'},`From ${event.provider === 'ticketmaster'?'Ticketmaster':'public calendar'} · checked ${new Date(event.updatedAt).toLocaleString()}`),el('div',{class:'experience-row'},uiButton({label:'Event details', onClick:()=>openLink(event.url)}),saveButton(item,'upcoming'))));
   }
   /** @param {import('../watches-state.ts').Watch} w */
   function watchCard(w) {
     const late=!w.paused && Date.parse(w.nextCheck)<Date.now()-60000;
-    return el('article',{class:'watch-card'},el('span',{class:'experience-kicker'},w.kind),el('h3',null,w.title),el('p',{class:'experience-muted'},w.paused?'Paused':w.lastSuccess?`Last successful check ${new Date(w.lastSuccess).toLocaleString()}`:'Waiting for its first successful check'),
-      w.city?el('p',{class:'experience-muted'},`${w.city}, ${w.country} · ${w.timezone}`):null,
-      late?el('p',{class:'watch-warning'},'A check is overdue. Checks resume while the server is running.'):null,
-      w.error?el('p',{class:'error'},`${w.error} · retry ${new Date(w.nextCheck).toLocaleString()}`):null,
-      w.warning?el('p',{class:'experience-muted'},w.warning):null,
-      el('div',{class:'experience-row'},el('button',{class:'btn',disabled:w.paused,onclick:()=>watchOperation({action:'check',id:w.id})},'Check now'),el('button',{class:'link-btn',onclick:()=>watchOperation({action:'pause',id:w.id,paused:!w.paused})},w.paused?'Resume':'Pause'),el('button',{class:'link-btn',onclick:()=>watchOperation({action:'delete',id:w.id})},'Delete watch')));
+    return uiCard({className:'watch-card', heading:'h3', title:w.title,
+      meta:w.paused?'Paused':w.lastSuccess?`Last successful check ${new Date(w.lastSuccess).toLocaleString()}`:'Waiting for its first successful check',
+      children:[w.city?el('p',{class:'experience-muted'},`${w.city}, ${w.country} · ${w.timezone}`):null,
+        late?uiFeedback({kind:'info', message:'A check is overdue. Checks resume while the server is running.'}):null,
+        w.error?uiFeedback({kind:'error', message:`${w.error} · retry ${new Date(w.nextCheck).toLocaleString()}`}):null,
+        w.warning?uiFeedback({kind:'info', message:w.warning}):null],
+      actions:[uiButton({label:'Check now', disabled:w.paused, onClick:()=>watchOperation({action:'check',id:w.id})}),
+        uiButton({label:w.paused?'Resume':'Pause', emphasis:'quiet', onClick:()=>watchOperation({action:'pause',id:w.id,paused:!w.paused})}),
+        uiButton({label:'Delete watch', emphasis:'quiet', onClick:()=>watchOperation({action:'delete',id:w.id})})]});
   }
   /** @param {boolean} upcoming */
   function watchSetup(upcoming) {
@@ -84,15 +87,15 @@
     const form=el('form',{class:'watch-setup'},el('h2',null,'Follow something'),kind,fields,status);
     let artistId='';
     const city=el('input',{type:'text',placeholder:'City','aria-label':'Event city',maxlength:200}),country=el('input',{type:'text',placeholder:'US','aria-label':'Event country',maxlength:2}),artists=el('div',{class:'artist-candidates'});
-    const submit=el('button',{class:'btn primary',type:'submit'},'Add watch');
+    const submit=uiButton({label:'Add watch', emphasis:'primary', type:'submit'});
     const draw=()=>{
       artistId='';
       if (kind.value==='artist') {
         address.value='';address.placeholder='Artist name';address.setAttribute('aria-label','Artist name');
-        fields.replaceChildren(address,el('button',{class:'btn',type:'button',onclick:async()=>{
+        fields.replaceChildren(address,uiButton({label:'Find artist', type:'button', onClick:async()=>{
           try { const {watches}= (await callTool('watch_reading',{action:'find_artist',query:address.value})).structuredContent; artists.replaceChildren(...(watches.artists || []).map(a=>el('button',{class:'artist-candidate',type:'button',onclick:()=>{artistId=a.id;status.textContent=`Matched ${a.name}${a.genre?' · '+a.genre:''}. Add watch to confirm.`;}},`${a.name}${a.genre?' · '+a.genre:''}`))); if (!watches.artists?.length) status.textContent='No artist match. Try a more specific name.'; }
           catch(error) {status.textContent=errorText(error);}
-        }},'Find artist'),artists,city,country,el('label',null,'Timezone',timezone));
+        }}),artists,city,country,el('label',null,'Timezone',timezone));
         status.textContent=watchData?.artistAvailable?'Choose a returned artist before adding. Events cover this city.':'Artist search needs a Ticketmaster API key on the server. Public calendars are available now.';
       } else {
         address.setAttribute('aria-label','Watch address');address.placeholder=kind.value==='releases'?'owner/repository':kind.value==='calendar'?'https://venue.example/calendar.ics':'https://docs.example/page';

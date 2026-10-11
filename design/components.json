@@ -1,0 +1,18 @@
+{
+  "scripts": ["design/contracts.js", "design/dom.js", "design/components/icon.js", "design/components/button.js", "design/components/field.js", "design/components/overlays.js", "design/patterns.js", "design/components/tooltips.js"],
+  "styles": ["base.css", "components/button.css", "components/icon.css", "components/field.css", "components/overlays.css", "patterns.css", "components/tooltips.css"],
+  "components": {
+    "button": {"status":"stable", "factory":"uiButton", "purpose":"Named text action with stable geometry across emphasis and state.", "variants":["neutral","primary","danger","quiet"], "sizes":["compact","default"], "states":["default","hover","focus","pressed","disabled","busy"], "example":"uiButton({label:'Save', emphasis:'primary', onClick:save})"},
+    "iconButton": {"status":"stable", "factory":"iconButton", "purpose":"Familiar symbol with required accessible name and shared tooltip.", "sizes":["compact","default"], "states":["default","hover","focus","pressed","disabled"], "example":"iconButton('settings', 'Settings', openSettings)"},
+    "field": {"status":"stable", "factory":"uiField", "purpose":"Native field with associated label, hint and validation error.", "states":["default","focus","invalid","disabled"], "example":"uiField(input, {label:'Collection title'}).setError('Enter a title')"},
+    "toggle": {"status":"stable", "factory":"uiToggle", "purpose":"Native checkbox in a labelled settings row.", "states":["unchecked","checked","focus","disabled"], "example":"uiToggle({label:'Show source details', checked:false, onChange:save})"},
+    "dialog": {"status":"stable", "factory":"uiDialog", "purpose":"Named native modal with Escape, contained focus and focus return.", "states":["closed","open"], "example":"uiDialog(panel, {trigger, closeButton})"},
+    "menu": {"status":"stable", "factory":"uiMenu", "purpose":"Native popover with arrows, Home/End, first-letter navigation and dismissal.", "states":["closed","open"], "example":"uiMenu(menu, trigger)"},
+    "tooltip": {"status":"stable", "factory":"data-tooltip", "purpose":"One delegated tooltip: 150ms hover, immediate keyboard, dismissible and hoverable.", "states":["hidden","visible"], "example":"iconButton('plus', 'Add source', addSource)"},
+    "toolbar": {"status":"stable", "factory":"uiToolbar", "purpose":"Wrapping named action group with ordinary Tab navigation.", "example":"uiToolbar({label:'Collection actions'}, save, cancel)"},
+    "settingsRow": {"status":"stable", "factory":"uiSettingsRow", "purpose":"Compact label/control pair, with hints and errors below.", "example":"uiSettingsRow(select, {label:'Open stories'})"},
+    "metadata": {"status":"stable", "factory":"uiMetadata", "purpose":"Wrapping secondary information and compact named actions.", "example":"uiMetadata({className:'item-meta'}, age, saveButton)"},
+    "card": {"status":"stable", "factory":"uiCard", "purpose":"Semantic article with heading, description, metadata and independent actions.", "example":"uiCard({title:'Reading list', description:'Kept reading', actions:[open]})"},
+    "feedback": {"status":"stable", "factory":"uiFeedback", "purpose":"Consistent empty, loading, error, information and success states with optional recovery action.", "variants":["empty","loading","error","info","success"], "example":"uiFeedback({kind:'error', message:'Could not load collections', action:retry})"}
+  }
+}

@@ -185,8 +185,8 @@ test('browser: Recall explains normalized search, match provenance and bookmark 
   assert.match(await page.eval<string>(`document.querySelector('.recall-hit').textContent`), /Matched: Saved title/);
   assert.match(await page.eval<string>(`document.querySelector('#recallCoverage').textContent`), /Original page bodies are not searched/);
   await page.eval(`document.querySelector('[aria-label="Search your library"]').value = 'nonexistent platypus'; document.querySelector('.recall-search').requestSubmit()`);
-  await page.waitFor(`document.querySelector('.experience-empty h2')?.textContent === 'No matching material'`, 'empty search');
-  assert.match(await page.eval<string>(`document.querySelector('.experience-empty').textContent`), /Saving a link does not retain its page text/);
+  await page.waitFor(`document.querySelector('[data-ui=feedback][data-variant=empty] h3')?.textContent === 'No matching material'`, 'empty search');
+  assert.match(await page.eval<string>(`document.querySelector('[data-ui=feedback][data-variant=empty]').textContent`), /Saving a link does not retain its page text/);
   // A newer UI must still render an older hosted result without search metadata.
   await page.eval(`window.recallOriginalFetch = window.fetch; window.fetch = async (...args) => {
     const response = await window.recallOriginalFetch(...args);
@@ -354,6 +354,9 @@ test('browser: the original layouts retain opening, saving and reachable control
         const observed = await page.eval(`JSON.stringify({readerHidden:document.getElementById('reader').hidden,toast:document.getElementById('toast').textContent,buttons:[...document.querySelectorAll('[data-save-url="${ARTICLE}"]')].map(b=>({pressed:b.getAttribute('aria-pressed'),box:b.getBoundingClientRect()}))})`);
         throw new Error(`${layout}: ${error.message}; ${observed}`);
       });
+      // The icon changes optimistically; wait for the store write before testing persistence.
+      const persistedBy = Date.now() + 5000;
+      while ((await profiles.get('default')).saved.some(item => item.url === ARTICLE) && Date.now() < persistedBy) await new Promise(resolve => setTimeout(resolve, 20));
       assert.equal((await profiles.get('default')).saved.some(item => item.url === ARTICLE), false);
       await tool('save_item', { url: ARTICLE, title: 'Hijacking the PS5' });
       await page.goto(`${app.base}/preview`);
@@ -1765,7 +1768,7 @@ test('browser: source previews ignore older replies, edits and mode changes and 
     await page.send('Emulation.setDeviceMetricsOverride', { width: 320, height: 600, deviceScaleFactor: 1, mobile: false });
     await page.eval(`document.documentElement.style.fontSize='200%'`);
     await page.waitFor(`document.querySelector('.cand-title')`, 'long source title');
-    assert.ok(await page.eval(`document.documentElement.scrollWidth <= innerWidth`));
+    assert.ok(await page.eval(`document.documentElement.scrollWidth <= innerWidth`), await page.eval(`JSON.stringify([...document.querySelectorAll('body *')].filter(n=>{const r=n.getBoundingClientRect();return r.width && r.right>innerWidth+1}).map(n=>({tag:n.tagName,id:n.id,class:n.className,width:n.getBoundingClientRect().width,right:n.getBoundingClientRect().right})).slice(0,12))`));
     await page.eval(`document.querySelector('.cand button').focus()`);
     await page.send('Input.dispatchKeyEvent', {type:'rawKeyDown', key:'Escape', code:'Escape'});
     assert.equal(await page.eval(`document.activeElement.id`), 'btnAdd');

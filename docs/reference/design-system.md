@@ -1,6 +1,6 @@
 # Design system
 
-MCPortal has a shared token, theme and control foundation. It is a plain CSS/JavaScript system, not a framework component library. Room layouts, reading experiences and Space compositions still own their local styles; including the token stylesheet does not by itself make those components consistent. The brand itself (marks, wordmark, inks, voice) is in [brand/README.md](../../brand/README.md).
+MCPortal has a modular design system in plain CSS and typed JavaScript, with no runtime framework dependency. The room and development catalogue execute the same components. Generated tokens, component contracts and drift checks make the compact direction enforceable. The brand (marks, wordmark, inks and voice) is in [brand/README.md](../../brand/README.md).
 
 ## Direction
 
@@ -13,19 +13,21 @@ Make the room the starting point, keep its chrome compact, and reveal optional w
 - **Comfortable content:** Reading measure, article typography, cover art and public landing/consent pages have different jobs. Do not halve everything. Bigger controls need a reason (touch, input, consequential public-page action), not just a new component.
 - **Reuse before adding:** Compose the shared primitives, then use semantic roles. Use a primitive scale token for a one-off local spacing choice. Introduce a new semantic token only when several components share the same purpose. SVG coordinates, illustrations and editorial geometry remain local.
 
-### Coverage and gaps
+### Architecture and adoption
 
-| Area | Status and owner |
+Dependencies flow in one direction: **foundations → primitives → patterns → product views**. Components receive labels, values and callbacks; product views own tool calls, persistence and navigation. The independently type-checked catalogue has no room state.
+
+| Layer | Implementation and adoption |
 |---|---|
-| Tokens, palettes, host themes | Centralized, generated and validated; `design/tokens.json` and `src/ui/design/theme.js` |
-| Buttons, icon actions, metadata actions, fields | Shared base geometry and variants in `primitives.css`; some feature forms still apply local styles |
-| Focus, coarse pointers, contrast preferences, reduced motion | Shared rules, plus browser regressions; these checks do not prove accessibility conformance |
-| Navigation, Settings, tooltips | Shared roles, component-specific behavior and styling in `src/ui/room/` |
-| Cards, reading layouts, collections, comparison, watches | Token consumers with local component styles; not a consolidated component library |
-| Spaces and public pages | Shared functional roles with intentional editorial/brand compositions |
-| Inspection and enforcement | Live control catalogue, room fixtures, token-reference/drift checks and browser tests; no exhaustive visual regression or variant coverage |
+| Foundations | `design/tokens.json`, generated palettes, shared base preferences and host theme normalization |
+| Primitives | `src/ui/design/components/`: buttons, icon actions, fields, toggles, dialogs, menus and delegated tooltips |
+| Patterns | `src/ui/design/patterns.js` / `.css`: named action groups, settings rows, metadata, cards and feedback |
+| Product views | `src/ui/room/`: room, reading layouts, account and optional activities; controls compose the layers above |
+| Catalogue | `/controls`: production scripts, actual factory examples, contracts, light/dark, coarse targets and 200% text |
 
-The next consolidation work belongs in feature components: repeated field/row markup, card metadata and empty/loading/error states. Do it when changing those components, and add their real variants to the catalogue rather than introducing another independent size scale.
+Reading settings use the shared row/toggle pattern. Settings and both navigation menus use shared overlay behavior. Ordinary account, Library, collection and watch actions use typed buttons; account and collection creation fields share error associations. Collection and watch cards use the shared article/action structure. Item layouts share metadata composition and save/original/share actions. Library, collections and watches use shared feedback states.
+
+Specialized reading layouts, evidence panes, composers, source pickers and Space editors still have local controls. Their existing raw buttons are bounded by the per-file migration inventory in [`design/legacy-controls.json`](../../design/legacy-controls.json). New ordinary actions use the factories; lower the allowance when migrating existing ones. The inventory is a count guard, not proof that every local override is appropriate. Public pages retain script-free semantic HTML and shared CSS. Editorial geometry and brand art are intentional local compositions.
 
 ## Files
 
@@ -36,12 +38,16 @@ The next consolidation work belongs in feature components: repeated field/row ma
 | `src/ui/design/tokens.css` | Generated CSS custom properties, inlined into the room |
 | `src/ui/design/palettes.js` | Generated light and dark palettes for the theme controller |
 | `src/design/generated.ts` | Generated exports for the web pages and brand script |
-| `src/ui/design/primitives.css` | Shared button/icon/field styles, states, focus, targets and preferences |
+| `design/components.json` | Component purposes, lifecycle, supported options, examples and ordered module lists |
+| `src/ui/design/components/` | Owned CSS/JS modules for each primitive |
+| `src/ui/design/patterns.js` / `.css` | Compositions shared across product flows |
+| `src/ui/design/primitives.css` / `contracts.js` | Generated CSS bundle and typed option contracts; do not edit |
+| `src/ui/design/catalogue.js` | Live examples, independently checked without product state |
 | `scripts/design-controls.ts` | Live catalogue of the shipped primitives at `/controls` in the design preview |
 | `src/ui/design/theme.js` | The theme controller: maps host inputs onto tokens |
 | `src/ui/web-brand.css`, `src/web-brand.ts` | The standalone pages' masthead, card, footer and embedded font |
 
-Run `npm run design` after editing `tokens.json` or `primitives.css`, and commit the generated files. `npm run design:check` and the test suite fail if they drift. The same check rejects undefined static `var(--mp-…)` references in source CSS and inline styles. Runtime properties must have a CSS declaration or a literal `setProperty()` assignment; dynamically constructed names and selector scope still need review. The server runs from a checkout with no build step.
+Run `npm run design` after editing tokens, the component registry, component modules or catalogue examples, and commit the generated files. `npm run design:check` and the test suite fail if they drift. The same check rejects undefined static `var(--mp-…)` references in source CSS and inline styles. Runtime properties must have a CSS declaration or a literal `setProperty()` assignment; dynamically constructed names and selector scope still need review. The server runs from a checkout with no build step.
 
 ### Token format
 
@@ -147,26 +153,45 @@ Contrast checks alone don't establish WCAG conformance.
 
 ## Components
 
-Use these primitives before adding feature-specific styling:
+Use the typed factories for interactive room code. `design/components.json` generates the supported option unions and runtime registry; unsupported variants, unknown icons and empty accessible names fail immediately. Fields keep native input behavior.
 
-| Primitive | Variants and rules |
+| API | Contract |
 |---|---|
-| `.btn` | Neutral, `.primary`, `.danger`; `disabled`, `aria-busy`, `aria-pressed`. Same padding and minimum height for all emphasis variants |
-| `.ib` | 28px target, 16px icon; `.sm` is 24px with a 14px icon. Accessible action name required; room controls use `data-tooltip` / `iconButton()` |
-| `.mi` | Inline metadata action; minimum 24px target and 12px icon. Counts and meaningful state may accompany the symbol |
-| `.field` | Input/select/textarea border, radius and padding. Single-line fields have a 32px minimum. Associate a visible label; a placeholder is an example, not a label |
-| Navigation | Short destination label; `aria-current` plus underline. Icon-only More has a tooltip. Active state does not resize the target |
-| Selection | `aria-pressed` or the appropriate native state plus a mark, underline or changed glyph; never hue alone |
-| Panel/menu | `panel-*` spacing; ordinary menu actions use compact controls. Explanations may grow a row; do not give every menu item a paragraph |
+| `uiButton({label, emphasis, size, ...})` | `neutral` / `primary` / `danger` / `quiet`; `compact` / `default`; optional icon, pressed, disabled, busy, type and click callback |
+| `uiBusy(button, boolean)` | Prevent duplicate submission, preserve the label/geometry and restore the prior disabled state; pair with `finally` |
+| `iconButton(icon, label, onClick, options)` | Required accessible name; shared hint; 24px default or `{size:'default'}` for 28px; 14/16px glyphs |
+| `uiField(control, {label, hint?, hiddenLabel?})` | Returns `element`, original typed `control`, label, hint, error and `setError(message?)`; preserves existing descriptions |
+| `uiToggle({label, checked, onChange, hint?})` | Native checkbox in a compact settings row; keyboard and label-click behavior included |
+| `uiDialog(panel, {trigger, closeButton, onOpen?, onClose?})` | Named native modal, Tab wrapping, Escape, focus return and `open/close/destroy` methods; product owns content |
+| `uiMenu(panel, trigger)` | Named native popover; arrows, Home/End, first-letter navigation, disabled-item skipping, Tab/outside/Escape dismissal and viewport positioning |
+| `uiToolbar({label}, ...children)` | Wrapping named action group; ordinary Tab order (does not claim ARIA toolbar arrow behavior) |
+| `uiSettingsRow(control, {label, hint?})` | Field contract in a compact label/value row; no additional category heading |
+| `uiMetadata(options, ...children)` / `uiMetadataAction(options)` | Wrapping secondary information and named 24px actions with 12px glyphs |
+| `uiCard({title, description?, meta?, actions?, children?})` | Article with a heading and independent actions; never an interactive wrapper containing buttons |
+| `uiFeedback({kind, message, title?, action?})` | `empty` / `loading` / `error` / `info` / `success`; appropriate alert/status roles; recovery action optional |
 
-```html
-<button class="btn" type="button">Save</button>
-<button class="btn primary" type="submit">Save</button>
-<button class="ib" data-icon="settings" data-tooltip aria-label="Settings"></button>
-<label>Source<input class="field" placeholder="example.com"></label>
+Adding a setting means binding a shared control to product state:
+
+```js
+const details = uiToggle({
+  label: 'Show source details',
+  checked: profile.showDetails,
+  onChange: value => savePreference(value),
+});
+container.append(details.element);
 ```
 
-The room hydrates `data-icon` from the generated house icon set. Do not use those attributes on script-free pages expecting an icon to appear; include their actual SVG there.
+The product callback owns asynchronous persistence and any rollback. The component owns label association, target size, keyboard behavior, focus styling and theme roles. Do not add a new component-specific size or tooltip timer.
+
+For script-free pages, use the corresponding `.btn`, `.ib`, `.mi` and `.field` CSS contracts with native markup and real labels. The room hydrates `data-icon` from the generated house icons; script-free pages must include the SVG itself.
+
+### Ownership and lifecycle
+
+The maintainer changing a component owns its contract, catalogue examples and regression checks in the same PR. Introduce shared APIs as `preview`; promote to `stable` once used by a production view and covered for relevant states and interactions. Stable means supported in this codebase, not certified against every host or assistive technology. `deprecated` requires a named replacement and migration guidance; do not remove it while consumers remain.
+
+A new variant must add a registry option, implementation, real catalogue example and meaningful coverage. Adding a new component also requires its module in the registry and production includes. Product components cannot import room state or tool transport into the shared layers. Exceptions to the migration inventory need a concrete product reason; do not raise limits to bypass the factories.
+
+`npm run check` verifies generated output, undefined token references, component boundaries, strict option types, the raw-button allowance and browser behavior. Shared modules and catalogue are independently type-checked; the room is checked against the same sources. Browser checks exercise names, invalid options, field error associations, state geometry, menu navigation, modal focus, tooltips, touch, themes and narrow 200% text. Native host and screen-reader checks remain a release responsibility.
 
 
 | Surface | Contract |

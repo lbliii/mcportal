@@ -326,12 +326,11 @@
   function saveButton(item, source, cls = 'mi save') {
     if (!item.url) return null;
     const on = state.saved.has(item.url);
-    return el('button', {
-      class: cls, 'data-save-url': item.url, 'aria-pressed': String(on),
-      'data-tooltip': on ? 'Remove from Library' : 'Save to Library',
-      'aria-label': on ? 'Remove from saved' : 'Save to Library',
-      onclick: (/** @type {MouseEvent} */ e) => { e.stopPropagation(); toggleSaved(item, source); },
-    }, icon('bookmark'));
+    const button = uiMetadataAction({label:on ? 'Remove from saved' : 'Save to Library', icon:'bookmark', pressed:on,
+      onClick:e=>{e.stopPropagation(); toggleSaved(item, source);}});
+    button.className = cls; button.dataset.saveUrl = item.url;
+    button.dataset.tooltip = on ? 'Remove from Library' : 'Save to Library';
+    return button;
   }
 
   function markSaved() {

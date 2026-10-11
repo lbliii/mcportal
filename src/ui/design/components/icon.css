@@ -1,0 +1,11 @@
+.ib { display: inline-flex; align-items: center; justify-content: center; flex: none; width: var(--mp-control-height); height: var(--mp-control-height); padding: 0; border: 0; border-radius: var(--mp-radius-sm); background: none; color: var(--mp-text-secondary); cursor: pointer; }
+.ib:hover, .ib:focus-visible { background: var(--mp-surface-hover); color: var(--mp-text-primary); }
+.ib[aria-pressed="true"] { color: var(--mp-action-primary); background: var(--mp-surface-selected); box-shadow:inset 0 -2px currentColor; }
+.ib svg, .mi svg, .btn > svg { width: var(--mp-icon-normal); height: var(--mp-icon-normal); fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; }
+.ib.sm { width: var(--mp-control-minimum); height: var(--mp-control-minimum); }
+.ib.sm svg { width: var(--mp-icon-small); height: var(--mp-icon-small); }
+.mi { display: inline-flex; min-width: var(--mp-control-minimum); min-height: var(--mp-control-minimum); align-items: center; gap: var(--mp-space-2); border: 0; padding: 0 var(--mp-space-2); margin: 0; border-radius: var(--mp-radius-xs); background: none; color: inherit; font: inherit; cursor: pointer; }
+.mi:hover, .mi:focus-visible { color: var(--mp-action-primary); background: var(--mp-surface-inset); }
+.mi svg { width: var(--mp-icon-micro); height: var(--mp-icon-micro); }
+.ib:disabled { opacity: .45; cursor: default; }
+.ib:disabled:hover { background: none; color: var(--mp-text-secondary); }

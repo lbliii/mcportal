@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Navigation
+- Formalize a modular design system with typed controls, shared settings and card patterns, accessible menus and dialogs, a production component catalogue, and checks that prevent new control drift. Compact collection/watch cards and associate account and collection errors with their fields.
 - Standardize compact controls and spacing: 24px small actions, 28px standard controls, 32px fields and 44px touch targets. Tighten the global bar and Settings, share button variants, and check for undefined design tokens.
 - Use symbols for Settings, Add source, Close and overflow actions, with fast, keyboard-accessible tooltips across room and reader icon controls. Keep short labels for destinations and actions whose symbols would be ambiguous.
 - Keep Room and Library in one global bar, move Page updates and Events under More, and put layout, reading preferences and account controls in Settings. Collections live in Library; Compare appears with selected items and Catch up stays with the room.

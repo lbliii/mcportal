@@ -48,7 +48,8 @@ declare global {
     btnRoomOptions: HTMLButtonElement;
     roomOptions: HTMLDivElement;
     openIn: HTMLSelectElement;
-    openInField: HTMLLabelElement;
+    openInField: HTMLDivElement;
+    readingSettings: HTMLDivElement;
     showSources: HTMLInputElement;
     btnRefresh: HTMLButtonElement;
     btnExperienceRoom: HTMLButtonElement;

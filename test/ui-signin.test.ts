@@ -79,6 +79,7 @@ async function beginSignIn(entry: string, links = 'supported'): Promise<string> 
     await page.waitFor(`!${FRAME}.getElementById('btnSettings').hidden`, 'the Settings button');
     await page.eval(`${FRAME}.getElementById('btnSettings').click()`);
     target = `${FRAME}.getElementById('whoMenu')`;
+    await page.waitFor(`${target}.querySelector('button')`, 'account identity to populate Settings');
     await page.eval(`${target}.querySelector('button').click()`);
   } else {
     const button = `[...${FRAME}.querySelectorAll('.welcome-actions button')].find((b) => b.textContent==='Sign in to your account')`;

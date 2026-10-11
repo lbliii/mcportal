@@ -1,0 +1,10 @@
+.ui-toolbar, .ui-metadata { display:flex; align-items:center; flex-wrap:wrap; gap:var(--mp-control-gap); min-width:0; }
+.ui-metadata { color:var(--mp-text-secondary); font-size:var(--mp-type-11); }
+.ui-card { display:grid; align-content:start; gap:var(--mp-space-8); min-width:0; padding:var(--mp-panel-padding); border:1px solid var(--mp-border-divider); border-radius:var(--mp-radius-control); background:var(--mp-surface-card); }
+.ui-card :is(h2,h3) { font-size:var(--mp-type-14); font-weight:var(--mp-weight-medium); }
+.ui-card > :is(h2,h3,p), .ui-feedback > :is(h3,p) { margin:0; overflow-wrap:anywhere; }
+.ui-card > p, .ui-feedback { font-size:var(--mp-type-12); line-height:var(--mp-line-body); }
+.ui-feedback { display:grid; justify-items:start; gap:var(--mp-space-8); padding:var(--mp-panel-padding); color:var(--mp-text-secondary); }
+.ui-feedback h3 { font-size:var(--mp-type-14); color:var(--mp-text-primary); }
+.ui-feedback-error { color:var(--mp-status-error); }
+.ui-feedback-error h3 { color:inherit; }
