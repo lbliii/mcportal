@@ -77,6 +77,10 @@ test('browser: hosted release notice can be dismissed and version stays in Setti
     await browser.click('#btnSettings');
     assert.match(await browser.eval<string>(`document.querySelector('#updateSettings').textContent`),/Updates arrive through this hosted connection/);
     assert.equal(await browser.eval(`document.querySelectorAll('#updateSettings input').length`),0);
+    await browser.send('Emulation.setDeviceMetricsOverride',{width:320,height:800,deviceScaleFactor:1,mobile:false});
+    await browser.goto(`${hosted.base}/upgrade`);
+    await browser.waitFor(`document.querySelector('h1')?.textContent==='Upgrade MCPortal'`,'upgrade guide heading');
+    assert.equal(await browser.eval(`document.documentElement.scrollWidth<=window.innerWidth`),true,'guide and terminal commands wrap on narrow screens');
     assert.deepEqual(browser.problems,[]);
   } finally {await browser.close();await hosted.close();}
 });

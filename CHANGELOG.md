@@ -39,7 +39,7 @@
 - `search_library` adds optional `library.search` details with the effective query and coverage explanation. Existing result fields and input arguments remain compatible; older hosted results still render.
 - `import_opml` adds `added`, `alreadyPresent` and `deferred` result fields. A valid import with no working feeds returns its detailed outcome and leaves a new room unconfigured.
 - `open_handoff` may return `{ unavailable: true, handoff }` when the live source fails; its text still includes the fenced retained passage. No live article content is implied.
-- Ship the new successful handoff variant in the next minor release under the compatibility policy; callers must handle unavailable live content before reading article/docs fields.
+- This minor release introduces the new successful handoff variant under the compatibility policy; callers must handle unavailable live content before reading article/docs fields.
 
 ### Installation and upgrades
 - Package hosted and local MCPortal as Agent Plugins 1.0, with native Claude overlays and persistent plugin storage. Validate packaged startup and provide an explicit migration that retains existing rooms and account links.

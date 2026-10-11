@@ -24,8 +24,6 @@ import { FileCollectionStore, type CollectionStore } from '../collections.ts';
 import { FileExperienceStore, type ExperienceStore } from '../experiences.ts';
 import type { SeenStore } from '../seen.ts';
 import type { ToolContext } from '../tools/kit.ts';
-import { versionAtLeast } from '../api/calls.ts';
-import { SERVER_INFO } from '../mcp.ts';
 import { StateClient } from './client.ts';
 import { FileLinkAuth, LinkFile, type LinkRecord } from './link-file.ts';
 import { startSignIn, type PendingSignIn } from './signin.ts';
@@ -89,7 +87,6 @@ export class LocalSession {
   private lastSignInFailure: SignInFailure | undefined;
   /** Said once on the next open_room after signing in (what the merge did). */
   private notice: string | undefined;
-  private nudged = false;
 
   constructor(options: LocalSessionOptions) {
     this.options = { ...options, local: { ...options.local, collections: options.local.collections ?? new FileCollectionStore(options.dataDir), experiences: options.local.experiences ?? new FileExperienceStore(options.dataDir) } };
@@ -117,11 +114,6 @@ export class LocalSession {
     const notice = this.notice;
     this.notice = undefined;
     if (notice) stores.store.addNotice(notice);
-    // Once per process: the hosted server runs a newer MCPortal than this computer.
-    if (!this.nudged && client.serverVersion && !versionAtLeast(SERVER_INFO.version, client.serverVersion)) {
-      this.nudged = true;
-      stores.store.addNotice(`MCPortal ${client.serverVersion} is out (this computer has ${SERVER_INFO.version}). Update to get what's new; this version keeps working until the hosted MCPortal stops supporting it.`);
-    }
     control.health = () => stores.store.health();
     return {
       ...this.options.base,
