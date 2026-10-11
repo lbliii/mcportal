@@ -211,12 +211,8 @@
 
     const lost = portals.filter((p) => p.error);
     if (lost.length) col.append(el('p', { class: 'river-lost' }, 'Signal lost: ', ...lost.flatMap((p, i) => [i ? ', ' : '',
-      el('button', { class: 'link-btn', type: 'button', title: `Retry ${p.title}`, onclick: () => refreshPortal(p.portalId) }, p.title)]), '.'));
+      el('button', { class: 'btn quiet sm', type: 'button', title: `Retry ${p.title}`, onclick: () => refreshPortal(p.portalId) }, p.title)]), '.'));
 
-    const newCount = [...state.portals.values()].reduce((n, p) => n + (p.newCount ?? 0), 0);
-    const date = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
-    col.append(el('header', { class: 'river-head' }, el('h1', null, profile.name),
-      el('p', null, newCount ? `${date} · ${newCount} new` : date)));
     if (riverView.arrived) {
       col.append(el('button', { class: 'river-arrived', type: 'button', onclick: showArrivals },
         `${riverView.arrived} new ${riverView.arrived === 1 ? 'story' : 'stories'} since you started`));
@@ -250,7 +246,7 @@
       if ('fold' in unit) {
         const lead = unit.fold[0];
         if (lead) feed.append(el('div', { class: 'river-fold' }, el('button', {
-          class: 'link-btn', type: 'button',
+          class: 'btn quiet sm', type: 'button',
           onclick: () => { riverView.open.add(unit.key); redrawRiver(); $first(`[data-story="${CSS.escape(unit.key)}"] .item-main`)?.focus(); },
         }, el('span', { class: 'dot', style: `background:${portalColor(lead.portal)}` }), `${unit.fold.length} more from ${lead.portal.title}`)));
       } else feed.append(article(unit.story));
@@ -260,20 +256,20 @@
 
     if (more > 0) {
       const next = () => { riverNextPage(limit, size); $first(`#grid .river-page[data-from="${limit + 1}"]`)?.focus(); };
-      const buttons = el('div', { class: 'river-more' }, el('button', { class: 'link-btn fp-more', type: 'button', onclick: next }, `${Math.min(size, more)} more of ${more}`));
+      const buttons = el('div', { class: 'river-more' }, el('button', { class: 'btn quiet sm fp-more', type: 'button', onclick: next }, `${Math.min(size, more)} more of ${more}`));
       if (!root.classList.contains('fullscreen') && canFullscreen && limit >= RIVER.offerFull * RIVER.page) {
-        buttons.append(el('button', { class: 'link-btn fp-more', type: 'button', onclick: () => toggleFullscreen() }, 'Open the full river'));
+        buttons.append(el('button', { class: 'btn quiet sm fp-more', type: 'button', onclick: () => toggleFullscreen() }, 'Open the full river'));
       }
       col.append(buttons);
     } else if (shown.length) {
       col.append(el('p', { class: 'fp-end river-end' }, fresh.length && !seen.length ? "You're caught up." : "That's everything your portals fetched.",
-        ' ', el('button', { class: 'link-btn', type: 'button', onclick: () => refreshAll() }, 'Refresh')));
+        ' ', el('button', { class: 'btn quiet sm', type: 'button', onclick: () => refreshAll() }, 'Refresh')));
     }
 
     for(const shop of portals.filter(p=>p.source==='watches'))col.append(renderShopPortal(shop));
     const aside = portals.filter((p) => p.source!=='watches' && OFF_RIVER.has(p.source) && !p.error);
     if (aside.length) col.append(el('p', { class: 'river-aside' }, 'Also in your room: ', ...aside.flatMap((p, i) => [i ? ', ' : '',
-      el('button', { class: 'link-btn', type: 'button', onclick: () => openPortal(p.portalId) }, p.title)])));
+      el('button', { class: 'btn quiet sm', type: 'button', onclick: () => openPortal(p.portalId) }, p.title)])));
     primePictures(col);
     loadNearEnd(feed, more, limit, size);
     return [col];
@@ -315,7 +311,7 @@
   function showArrivals() {
     Object.assign(riverView, { frozen: null, arrived: 0 });
     redrawRiver();
-    $first('#grid .river-head')?.scrollIntoView({ block: 'start', behavior: scrollBehavior() });
+    $first('#grid .river-col')?.scrollIntoView({ block: 'start', behavior: scrollBehavior() });
     $first('#grid .story .item-main')?.focus({ preventScroll: true });
   }
 

@@ -33,13 +33,17 @@ test('Shop browser: scope preview → confirm → gallery → save → pause/res
     await page.click('.shop-manage summary');await page.click('.shop-manage button');await page.waitFor(`document.querySelector('.shop-card')`,'resumed follow');
     for(const layout of ['catalogue','editorial','paperback','shelves','river','columns']) {
       await page.send('Emulation.setDeviceMetricsOverride',{width:1280,height:900,deviceScaleFactor:1,mobile:false});
-      await page.click('#btnLayout');await page.click(`[data-layout="${layout}"]`);await page.waitFor(`document.querySelector('[data-layout="${layout}"]').getAttribute('aria-pressed')==='true'`,'layout chosen');await page.waitFor(`!document.querySelector('#btnLayout').disabled`,'layout saved');
+      await page.click('#btnSettings');await page.click(`[data-layout="${layout}"]`);await page.waitFor(`document.querySelector('[data-layout="${layout}"]').getAttribute('aria-pressed')==='true'`,'layout chosen');await page.waitFor(`!document.querySelector('[data-layout="${layout}"]').disabled`,'layout saved');await page.click('#btnCloseSettings');
+      await page.waitFor(`!document.querySelector('#settingsPanel').open && !document.documentElement.classList.contains('settings-open')`,'settings dismissal and its layout margin');
       await page.send('Emulation.setDeviceMetricsOverride',{width:390,height:850,deviceScaleFactor:1,mobile:false});
       await page.eval(`document.documentElement.dataset.theme='dark'`);
       assert.equal(await page.eval(`document.documentElement.scrollWidth<=innerWidth`),true,layout+' fits narrow view');
       assert.equal(await page.eval(`document.querySelector('#grid button button')`),null,layout+' controls stay separate');
     }
     await page.send('Emulation.setDeviceMetricsOverride',{width:1280,height:900,deviceScaleFactor:1,mobile:false});
+    // ResizeObserver hides the narrow column navigation on the next render step.
+    // Its removal moves the refresh target; wait for that state before measuring a click.
+    await page.waitFor(`(()=>{const grid=document.querySelector('#grid'),nav=document.querySelector('.lane-controls');return !nav || nav.hidden===(grid.scrollWidth<=grid.clientWidth+1)})()`,'column navigation settled after resizing');
     state.failed=true;now+=61_000;await page.click('[data-portal="shop"] button[aria-label="Refresh Shop"]');
     await page.waitFor(`document.querySelector('.shop-manage .error')`,'refresh error');assert.ok(await page.eval(`Boolean(document.querySelector('.shop-card'))`),'stale products remain');
     await page.click('.shop-manage summary');await page.click('.shop-manage button:last-child');await page.waitFor(`!document.querySelector('.shop-manage')`,'removed follow');

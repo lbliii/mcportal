@@ -68,7 +68,7 @@
     button.classList.toggle('on', Boolean(mine));
     if (button instanceof HTMLButtonElement) button.disabled = off;
     button.setAttribute('aria-label', name);
-    button.title = off ? name : mine ? 'Reblogged: click for options' : 'Reblog';
+    button.dataset.tooltip = off ? name : mine ? 'Reblog options' : 'Reblog';
     button.replaceChildren(icon(off ? 'reblogOff' : 'reblog'), el('span', { class: 'reblog-label' }, mine ? 'Reblogged' : 'Reblog'),
       ...(count ? [el('span', { class: 'reblog-count' }, String(count))] : []));
   }
@@ -129,7 +129,7 @@
       callTool('get_reading', { url }).then((result) => {
         if (result.structuredContent?.reading || openMenu?.menu !== menu) return;
         menu.prepend(el('div', { class: 'reblog-nudge' }, "You haven't read this yet. ",
-          el('button', { type: 'button', role: 'menuitem', tabindex: '-1', class: 'link-btn', onclick: () => { closeReblogMenu(false); openItem(story, portal); } }, 'Read it first?')));
+          el('button', { type: 'button', role: 'menuitem', tabindex: '-1', class: 'btn quiet sm', onclick: () => { closeReblogMenu(false); openItem(story, portal); } }, 'Read it first?')));
       }).catch(() => {});
     }
   }

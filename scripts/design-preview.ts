@@ -15,6 +15,7 @@ import {accountHome} from '../src/account.ts';
 import {WEB_BRAND_CSS,webHeader,webFooter} from '../src/web-brand.ts';
 import {PAGE_CSP} from '../src/lib/web.ts';
 import {serveSite,DEFAULT_SUPPORT_URL} from '../src/site.ts';
+import {designControls} from './design-controls.ts';
 const ctx={store:new MemoryProfileStore({room:{...defaultProfile(),onboarded:true},frontpage:{...defaultProfile(),onboarded:true,layout:'frontpage'},river:{...defaultProfile(),onboarded:true,layout:'river'}}),editions:new MemoryEditionStore(),fetcher:createFixtureFetcher(),cache:new TtlCache(),userId:'room'};
 const rpc=(name:string,args:Record<string,unknown>,userId:string)=>handleMessage({jsonrpc:'2.0',id:1,method:'tools/call',params:{name,arguments:args}},{...ctx,userId}).then((r)=>(r as {result:{structuredContent:any}}).result);
 const now='2026-09-30T12:00:00Z',url='https://example.com/guide';
@@ -58,6 +59,7 @@ async function fixture(view:string){
 createServer(async(req,res)=>{try{
  const u=new URL(req.url??'/','http://127.0.0.1:8799');res.setHeader('content-type','text/html; charset=utf-8');
  if(u.pathname==='/app'){res.end(await roomHtml());return;}
+ if(u.pathname==='/controls'){res.end(designControls());return;}
  if(u.pathname.startsWith('/admin/api/')){res.setHeader('content-type','application/json');
   if(req.method!=='GET'||u.pathname!=='/admin/api/state'){res.statusCode=405;res.end(JSON.stringify({error:'Admin writes are disabled in the design fixture'}));return;}
   res.end(JSON.stringify({csrf:'fixture',me:{accountId:'fixture',login:'design-review'},invites:[],accounts:[],reports:[],audit:[],usage:{budget:{limits:{perMinute:120,perDay:3000,globalPerDay:60000},global:{used:1840,resetsAt:new Date(Date.now()+6*3600e3).toISOString()},today:[{userId:'github-1',login:'design-review',used:1210},{userId:'github-2',login:null,used:630}]},tools:{since:new Date(Date.now()-3600e3).toISOString(),tools:[{tool:'open_room',calls:212,outcomes:{ok:209,error:3},codes:{upstream_error:3},totalMs:0,maxMs:2210,avgMs:340},{tool:'find_source',calls:41,outcomes:{ok:37,invalid:4},codes:{invalid_argument:4},totalMs:0,maxMs:5120,avgMs:1890},{tool:'get_thumbnails',calls:398,outcomes:{ok:398},codes:{},totalMs:0,maxMs:900,avgMs:120}]}}}));return;}
@@ -82,7 +84,7 @@ createServer(async(req,res)=>{try{
  <label>Theme <select id="mode"><option>light</option><option>dark</option></select></label>
  <label>Display <select id="display"><option>inline</option><option>fullscreen</option></select></label>
  <label>Inputs <select id="inputs"><option>complete</option><option>theme-only</option><option>background-only</option><option>hostile</option><option>none</option></select></label>
- <button id="switch">Theme-only switch</button><button id="reset">Reset inputs</button><button id="run">Run browser checks</button>
+ <button id="switch">Theme-only switch</button><button id="reset">Reset inputs</button><button id="run">Run browser checks</button><a href="/controls">Controls</a>
  <a href="/site">Site</a> <a href="/auth">Consent</a> <a href="/callback-error">Sign-in error</a> <a href="/callback-success">Sign-in success</a> <a href="/invite-preview">Invite</a> <a href="/import-preview">Import</a> <a href="/account-preview">Account</a> <a href="/admin">Admin</a></header><iframe title="MCPortal" src="/app"></iframe><pre id="report" aria-live="polite">Loading fixture…</pre><script>
  const frame=document.querySelector('iframe'), report=document.querySelector('#report'), fields=['view','mode','display','inputs'];let ready=false, current=null;
  const presets={light:{'--color-background-primary':'#FFFFFF','--color-text-primary':'#1B1B1A','--color-text-secondary':'#646460'},dark:{'--color-background-primary':'#161616','--color-text-primary':'#ECECEA','--color-text-secondary':'#A5A59F'}};

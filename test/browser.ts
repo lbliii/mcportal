@@ -155,7 +155,10 @@ export class Page {
       const point = { x: r.x + r.width / 2, y: r.y + r.height / 2 };
       const hit = r.width && r.height ? document.elementFromPoint(point.x, point.y) : null;
       return hit && (hit === n || n.contains(hit)) ? point : null;
-    })()`, `a clickable ${selector}`);
+    })()`, `a clickable ${selector}`).catch(async error=>{
+      const observed=await this.eval(`(()=>{const n=document.querySelector(${JSON.stringify(selector)});const r=n?.getBoundingClientRect();const popover=n?.closest('[popover]');return JSON.stringify({selector:${JSON.stringify(selector)},box:r,display:n&&getComputedStyle(n).display,popoverOpen:popover?.matches(':popover-open'),focus:document.activeElement?.id,scroll:[scrollX,scrollY],viewport:[innerWidth,innerHeight],hit:r&&document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)?.outerHTML.slice(0,240)})})()`);
+      throw new Error(`${error.message}; ${observed}`);
+    });
     await this.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: box.x, y: box.y });
     for (const type of ['mousePressed', 'mouseReleased']) await this.send('Input.dispatchMouseEvent', { type, x: box.x, y: box.y, button: 'left', buttons: type === 'mousePressed' ? 1 : 0, clickCount: 1 });
   }

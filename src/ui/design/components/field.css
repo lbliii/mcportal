@@ -1,0 +1,21 @@
+input:not([type=checkbox], [type=radio], [type=range], [type=hidden]), select { min-height: var(--mp-control-field-height); }
+.field { min-width: 0; max-width: 100%; padding: var(--mp-control-padding-block) var(--mp-control-padding-inline); border: 1px solid var(--mp-border-control); border-radius: var(--mp-radius-control); font: inherit; }
+.ui-field { display:grid; gap:var(--mp-space-4); min-width:0; font-size:var(--mp-type-12); }
+.ui-field-label { color:var(--mp-text-primary); }
+.ui-field-hint, .ui-field-error { margin:0; font-size:var(--mp-type-11); line-height:var(--mp-line-body); }
+.ui-field-hint { color:var(--mp-text-secondary); }
+.ui-field-error { color:var(--mp-status-error); }
+.ui-field [aria-invalid=true] { border-color:var(--mp-status-error); }
+.ui-setting { grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); align-items:center; column-gap:var(--mp-space-8); }
+.ui-setting > :is(.ui-field-hint, .ui-field-error) { grid-column:1 / -1; }
+.ui-toggle { grid-template-columns:minmax(0, 1fr) auto; }
+.ui-toggle > label { min-height:var(--mp-control-minimum); display:flex; align-items:center; }
+.ui-toggle > input { min-width:var(--mp-control-minimum); min-height:var(--mp-control-minimum); margin:0; padding:0; accent-color:var(--mp-action-primary); }
+.ui-sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; border:0; }
+.ui-choice-group { display:flex; flex-wrap:wrap; gap:var(--mp-space-4); min-width:0; width:fit-content; margin:0; padding:var(--mp-space-4); border:1px solid var(--mp-border-control); border-radius:var(--mp-radius-control); }
+.ui-choice-group legend { font-size:var(--mp-type-12); padding:0 var(--mp-space-4); }
+.ui-choice { display:flex; align-items:center; gap:var(--mp-space-4); min-height:var(--mp-control-height); padding:var(--mp-control-padding-block) var(--mp-control-padding-inline); border-radius:var(--mp-radius-sm); font-size:var(--mp-type-12); cursor:pointer; }
+.ui-choice:has(:checked) { background:var(--mp-surface-selected); }
+.ui-choice:has(:disabled) { opacity:.45; cursor:default; }
+.ui-choice input { margin:0; width:var(--mp-icon-small); min-height:0; accent-color:var(--mp-action-primary); }
+.ui-choice:hover:not(:has(:disabled)) { background:var(--mp-surface-hover); }

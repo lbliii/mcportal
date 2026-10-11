@@ -10,7 +10,6 @@
   const comparisonText = new Map();
   /** Explicitly selected passages, separate from fetched page text. @type {Map<string, string>} */
   const comparisonPassages = new Map();
-  $('btnCompare').addEventListener('click', () => showComparison([...selectedEvidence.values()]));
 
   /** @param {LibraryHit[]} hits @param {Collection} [kept] @param {boolean} [stale] */
   function showComparison(hits, kept, stale = false) {
@@ -26,22 +25,17 @@
     question.addEventListener('input', () => { comparisonQuestion = question.value; });
     const interpretation = el('section', { class: 'comparison-interpretation', id: 'comparisonInterpretation' }, el('span', { class: 'experience-kicker' }, 'AGENT INTERPRETATION'), el('h2', null, 'Read the evidence. Then ask a question.'),
       kept?.orientation ? el('div', null, stale ? el('p', {class: 'watch-warning'}, 'This kept interpretation cites evidence that has changed or is unavailable. Ask your agent to revisit it.') : null, el('p', { class: 'agent-writing' }, kept.orientation.text), el('p', { class: 'experience-muted' }, `Agent-written ${new Date(kept.orientation.createdAt).toLocaleString()}`),
-        el('div', { class: 'orientation-citations' }, kept.orientation.refs.map(ref => { const hit = hits.find(h => h.ref === ref); return hit ? el('button', { class: 'link-btn', onclick: () => openLibraryHit(hit) }, hit.title) : el('span', { class: 'error' }, 'Removed evidence'); })))
+        el('div', { class: 'orientation-citations' }, kept.orientation.refs.map(ref => { const hit = hits.find(h => h.ref === ref); return hit ? el('button', { class: 'btn quiet sm', onclick: () => openLibraryHit(hit) }, hit.title) : el('span', { class: 'error' }, 'Removed evidence'); })))
         : el('p', { class: 'experience-muted' }, 'Agreements, differences and open questions will appear only when your agent supplies an interpretation. You can read and keep passages now.'),
       el('button', { class: 'btn', onclick: () => askComparisonAgent() }, 'Ask your agent'));
     const panels = hits.map((hit, index) => comparisonSource(hit, index, generation));
-    const tabs = el('div', { class: 'comparison-tabs', role: 'tablist', 'aria-label': 'Comparison sources' }, hits.map((hit, index) => el('button', {
-      type: 'button', role: 'tab', 'aria-selected': String(index === 0), 'aria-controls': `comparisonSource${index}`, id: `comparisonTab${index}`, onclick: () => {
-        panels.forEach((panel, i) => panel.classList.toggle('compact-active', i === index));
-        for (const tab of $$('[role=tab]', tabs)) tab.setAttribute('aria-selected', String(tab.id === `comparisonTab${index}`));
-      },
-    }, hit.title)));
-    panels[0].classList.add('compact-active');
+    const tabs = uiTabs({id:'comparison',label:'Comparison sources',panelClassName:'comparison-sources',overviewAbove:700,items:hits.map((hit,index)=>({label:hit.title,panel:panels[index]}))});
+    tabs.panels.style.setProperty('--comparison-count',String(hits.length));
     $('experiences').replaceChildren(el('header', { class: 'experience-heading' }, el('span', { class: 'experience-kicker' }, 'SOURCES SIDE BY SIDE'), el('h1', null, kept?.title || 'Comparison View'),
       el('p', null, 'Keep the evidence in front of you. Let the differences become visible.'), question,
       el('div', { class: 'experience-row' }, el('span', { class: 'experience-muted' }, `${hits.length} sources · independent reading positions`),
-        el('button', { class: 'btn primary', onclick: () => keepComparison() }, kept ? 'Update kept comparison' : 'Keep comparison'), el('button', { class: 'link-btn', onclick: () => showRecall() }, 'Back to Recall'))),
-      tabs, el('div', { class: 'comparison-sources', style: `--comparison-count:${hits.length}` }, panels),
+        el('button', { class: 'btn primary', onclick: () => keepComparison() }, kept ? 'Update kept comparison' : 'Keep comparison'), el('button', { class: 'btn quiet sm', onclick: () => showRecall() }, 'Back to Library'))),
+      tabs.element,
       el('section', { class: 'comparison-evidence' }, el('h2', null, 'Passages you kept'), el('div', { id: 'comparisonPassages' })), interpretation);
     drawComparisonPassages();
   }
@@ -49,7 +43,7 @@
   function comparisonSource(hit, index, generation) {
     const body = el('div', { class: 'comparison-source-body', tabindex: 0, 'aria-label': `${hit.title} reading pane` }, 'Opening source…');
     const status = el('small', { class: 'experience-muted' }, hit.source);
-    const panel = el('article', { class: 'comparison-source', id: `comparisonSource${index}`, role: 'tabpanel', 'aria-labelledby': `comparisonTab${index}` },
+    const panel = el('article', { class: 'comparison-source', id: `comparisonSource${index}` },
       el('header', null, el('span', { class: 'experience-kicker' }, `SOURCE ${index + 1}`), el('h2', null, hit.title), status), body,
       el('div', { class: 'experience-row' }, el('button', { class: 'btn', onclick: () => openLibraryHit(hit) }, 'Open in reader'),
         el('button', { class: 'btn', onclick: () => {
@@ -90,7 +84,7 @@
   }
   function drawComparisonPassages() {
     $('comparisonPassages').replaceChildren(...[...comparisonPassages].map(([ref, text]) => el('article', { class: 'comparison-passage' }, el('small', { class: 'experience-kicker' }, comparisonHits.find(h => h.ref === ref)?.title || ref), el('blockquote', null, text),
-      el('button', { class: 'link-btn', onclick: () => { comparisonPassages.delete(ref); drawComparisonPassages(); } }, 'Remove passage'))));
+      el('button', { class: 'btn quiet sm', onclick: () => { comparisonPassages.delete(ref); drawComparisonPassages(); } }, 'Remove passage'))));
     if (!comparisonPassages.size) $('comparisonPassages').append(el('p', { class: 'experience-muted' }, 'Select text in a source and choose “Keep selected passage”. One passage per source, up to 2,000 characters.'));
   }
   function comparisonEntries() {
@@ -127,5 +121,5 @@
     if (experience !== 'compare' || comparisonHits.map(h => h.ref).join('|') !== result.sources.map(h => h.ref).join('|')) { showComparison(result.sources); for (const h of result.sources) if (h.excerpt && !h.clipId) comparisonPassages.set(h.ref,h.excerpt); drawComparisonPassages(); }
     comparisonQuestion = result.question; comparisonOrientation = result.orientation;
     const question = $first('input', $('experiences')); if (question instanceof HTMLInputElement) question.value = result.question;
-    $('comparisonInterpretation').replaceChildren(el('span', {class:'experience-kicker'}, 'AGENT INTERPRETATION'), el('h2',null,'Agreements, differences and open questions'), el('p',{class:'agent-writing'},result.orientation.text), el('small',{class:'experience-muted'},`Agent-written ${new Date(result.orientation.createdAt).toLocaleString()}`), el('div',{class:'orientation-citations'},result.orientation.refs.map(ref => { const hit = comparisonHits.find(h => h.ref === ref); return hit ? el('button',{class:'link-btn',onclick:()=>openLibraryHit(hit)},hit.title) : el('span',{class:'error'},'Unavailable evidence'); })));
+    $('comparisonInterpretation').replaceChildren(el('span', {class:'experience-kicker'}, 'AGENT INTERPRETATION'), el('h2',null,'Agreements, differences and open questions'), el('p',{class:'agent-writing'},result.orientation.text), el('small',{class:'experience-muted'},`Agent-written ${new Date(result.orientation.createdAt).toLocaleString()}`), el('div',{class:'orientation-citations'},result.orientation.refs.map(ref => { const hit = comparisonHits.find(h => h.ref === ref); return hit ? el('button',{class:'btn quiet sm',onclick:()=>openLibraryHit(hit)},hit.title) : el('span',{class:'error'},'Unavailable evidence'); })));
   }

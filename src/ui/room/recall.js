@@ -10,7 +10,7 @@
   function showRecall(provided) {
     enterExperience('recall');
     if (provided) { recallQuery = { query: provided.query }; recallResult = provided; recallPreview = provided.hits[0] || null; }
-    const query = el('input', { type: 'search', placeholder: 'Find an explanation, a passage, a page…', 'aria-label': 'Search your library', maxlength: 300, value: recallQuery.query || '' });
+    const query = el('input', { type: 'search', placeholder: 'Search your library', 'aria-label': 'Search your library', maxlength: 300, value: recallQuery.query || '' });
     const site = el('input', { type: 'text', placeholder: 'Site or source', 'aria-label': 'Filter by site or source', value: recallQuery.site || '', maxlength: 200 });
     const tag = el('input', { type: 'text', placeholder: 'Tag', 'aria-label': 'Filter by tag', value: recallQuery.tag || '', maxlength: 60 });
     const kind = el('select', { 'aria-label': 'Filter by kind' }, ['', 'saved', 'reading', 'quote', 'note', 'exchange', 'table', 'image', 'link'].map(k => el('option', { value: k }, k ? k[0].toUpperCase() + k.slice(1) : 'All material')));
@@ -26,12 +26,11 @@
       fetchRecall();
     };
     const search = el('form', { class: 'recall-search', onsubmit: (/** @type {SubmitEvent} */ e) => { e.preventDefault(); submit(); } },
-      el('div', { class: 'experience-row' }, query, el('button', { class: 'btn primary', type: 'submit' }, 'Search')),
-      el('div', { class: 'recall-filters' }, kind, site, tag, status));
-    $('experiences').replaceChildren(el('header', { class: 'experience-heading' }, el('span', { class: 'experience-kicker' }, 'YOUR COMMONPLACE BOOK'), el('h1', null, 'Recall Shelf'),
-      el('p', null, 'Find what stayed with you. Saved pages, kept passages and reading, together.')), search,
+      el('div', { class: 'experience-row' }, query, uiButton({label:'Search', emphasis:'primary', type:'submit'}), uiButton({label:'Collections', id:'btnCollections', type:'button', onClick:() => showCollections()})),
+      uiDisclosure({label:'Filters', open:Boolean(recallQuery.kind || recallQuery.site || recallQuery.tag || recallQuery.status)}, el('div', { class: 'recall-filters' }, kind, site, tag, status)));
+    $('experiences').replaceChildren(search,
       el('p', { id: 'recallCount', class: 'experience-muted', role: 'status' }),
-      el('p', { id: 'recallCoverage', class: 'experience-muted' }),
+      uiDisclosure({label:'About this search', className:'search-details'}, el('p', { id: 'recallCoverage', class: 'experience-muted' })),
       selectionTray(),
       el('div', { class: 'recall-body' }, el('div', { id: 'recallResults', class: 'recall-results' }), el('aside', { id: 'recallPreview', class: 'recall-preview', 'aria-label': 'Material preview' })));
     if (recallResult) drawRecallResults();
@@ -41,7 +40,7 @@
   async function fetchRecall(offset = 0, append = false) {
     const generation = ++recallGeneration;
     $('recallResults').setAttribute('aria-busy', 'true');
-    $('recallCount').textContent = 'Searching your kept material…';
+    $('recallCount').textContent = 'Searching your library…';
     try {
       const { library } = (await callTool('search_library', { ...recallQuery, offset, limit: 25 })).structuredContent;
       if (generation !== recallGeneration) return;
@@ -51,8 +50,8 @@
     } catch (error) {
       if (generation !== recallGeneration || experience !== 'recall') return;
       $('recallCount').textContent = `Could not search: ${errorText(error)}`;
-      $('recallResults').replaceChildren(el('button', { class: 'btn', onclick: () => fetchRecall() }, 'Try again'));
-    } finally { if (generation === recallGeneration) $('recallResults').setAttribute('aria-busy', 'false'); }
+      $('recallResults').replaceChildren(uiFeedback({kind:'error', message:'Search is unavailable. Try again when the connection returns.', action:uiButton({label:'Try again', onClick:()=>fetchRecall()})}));
+    } finally { if (generation === recallGeneration && experience === 'recall') $('recallResults').setAttribute('aria-busy', 'false'); }
   }
 
   /** @param {LibraryHit} hit */
@@ -72,11 +71,11 @@
       el('p', { class: 'experience-muted' }, `${hit.source} · ${ago(hit.updatedAt)}`),
       hit.excerpt ? el('p', { class: hit.clipKind === 'quote' ? 'recall-quote' : 'recall-excerpt' }, hit.excerpt) : null,
       hit.matched.length ? el('small', { class: 'experience-muted' }, `Matched: ${hit.matched.join(', ')}`) : null,
-      el('button', { class: 'link-btn', onclick: () => openLibraryHit(hit) }, hit.clipId ? 'Read kept material →' : 'Resume reading →'))));
-    if (!recallResult.hits.length) $('recallResults').append(el('div', { class: 'experience-empty' }, el('h2', null, recallResult.query ? 'No matching material' : 'Nothing here yet'), el('p', null, 'Try words from the title, a saved note or a kept passage, or change your filters. Saving a link does not retain its page text.')));
+      el('button', { class: 'btn quiet sm', onclick: () => openLibraryHit(hit) }, hit.clipId ? 'Read →' : 'Resume reading →'))));
+    if (!recallResult.hits.length) $('recallResults').append(uiFeedback({kind:'empty', title:recallResult.query ? 'No matching material' : 'Nothing here yet', message:'Try words from the title, a saved note or a kept passage, or change your filters. Saving a link does not retain its page text.'}));
     if (recallResult.nextOffset !== null) {
       const next = recallResult.nextOffset;
-      $('recallResults').append(el('button', { class: 'btn', onclick: () => fetchRecall(next, true) }, 'Show more material'));
+      $('recallResults').append(uiButton({label:'Show more', onClick:() => fetchRecall(next, true)}));
     }
     drawRecallPreview();
   }
@@ -84,11 +83,11 @@
     const generation = ++previewGeneration, hit = recallPreview;
     const box = $('recallPreview'); box.hidden = !hit;
     if (!hit) return;
-    box.replaceChildren(...present([el('span', { class: 'experience-kicker' }, 'RETURN TO THE IDEA'), el('h2', null, hit.title), el('p', { class: 'experience-muted' }, hit.source),
+    box.replaceChildren(...present([el('h2', null, hit.title), el('p', { class: 'experience-muted' }, hit.source),
       el('div', { class: 'recall-preview-body' }, hit.excerpt || 'Open this page to read it at its source.'),
-      el('button', { class: 'btn primary', onclick: () => openLibraryHit(hit) }, hit.clipId ? 'Read kept material' : 'Open in reader'),
-      hit.url && hit.locator ? el('button', { class: 'btn', onclick: () => openLibraryHit(hit, true) }, 'Return to passage') : null,
-      hit.url ? el('button', { class: 'link-btn', onclick: () => openLink(hit.url || '') }, 'Open original') : null]));
+      uiButton({label:hit.clipId ? 'Read' : 'Open in reader', emphasis:'primary', onClick:() => openLibraryHit(hit)}),
+      hit.url && hit.locator ? uiButton({label:'Return to passage', onClick:() => openLibraryHit(hit, true)}) : null,
+      hit.url ? el('button', { class: 'btn quiet sm', onclick: () => openLink(hit.url || '') }, 'Open original') : null]));
     if (!hit.clipId) return;
     const body = $first('.recall-preview-body', box);
     try {

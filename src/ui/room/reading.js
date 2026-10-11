@@ -22,7 +22,7 @@
     let strip = $first('.continue-reading');
     if (!strip) {
       strip = el('section', { class: 'continue-reading', 'aria-label': 'Continue reading', hidden: true });
-      $('grid').before(strip);
+      $('status').after(strip);
     }
     strip.setAttribute('aria-busy', 'true');
     try {
@@ -30,22 +30,14 @@
       const { reading } = (await callTool('list_reading', { unfinished: true, limit: 4 })).structuredContent;
       if (generation !== continueGeneration) return;
       const items = reading.filter((r) => isHttpUrl(r.url));
-      strip.replaceChildren(el('div', { class: 'continue-head' },
-        el('h2', null, 'Continue reading'), el('span', { class: 'continue-count' }, `${items.length} unfinished`)),
-        el('ul', null, items.map((r) => {
+      strip.replaceChildren(...items.slice(0, 1).map((r) => {
           const progress = Math.max(0, Math.min(100, Math.round((r.progress ?? 0) * 100)));
-          const source = new URL(r.url).hostname.replace(/^www\./, '');
           const title = r.title || r.url;
-          return el('li', null,
-            el('button', { class: 'continue-item', type: 'button', title, onclick: () => continueReading(r) },
-              el('span', { class: 'continue-source' }, source),
+          return el('button', { class: 'continue-item', type: 'button', title, onclick: () => continueReading(r) },
+              el('span', { class: 'continue-label' }, 'Continue reading'),
               el('span', { class: 'continue-title' }, title),
-              el('span', { class: 'continue-meta' },
-                el('span', { class: 'continue-percent' }, `${progress}% read`),
-                el('span', null, `Opened ${ago(r.lastOpenedAt)}`)),
-              el('span', { class: 'continue-progress', 'aria-hidden': 'true' },
-                el('span', { style: `width:${progress}%` }))));
-        })));
+              el('span', { class: 'continue-percent' }, `${progress}% read`));
+        }));
       strip.hidden = !items.length;
     } catch { if (generation === continueGeneration) strip.hidden = true; }   // older servers may not have reading history
     finally { if (generation === continueGeneration) strip.setAttribute('aria-busy', 'false'); }

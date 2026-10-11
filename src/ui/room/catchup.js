@@ -32,8 +32,8 @@
         $('experiences').append(el('article', { class: 'catchup-story' }, el('span', { class: 'experience-kicker' }, `${story.source} · STORY ${session.cursor + 1}`), el('h2', null, story.item.title),
           story.item.summary ? el('p', null, story.item.summary) : null, el('p', { class: 'experience-muted' }, story.item.meta.join(' · ')),
           el('div', { class: 'experience-row' }, el('button', { class: 'btn primary', onclick: () => openCapturedStory(story) }, 'Read this story'),
-            saveButton(story.item, story.source, 'ib save'), el('button', { class: 'btn', onclick: () => advanceCatchup('finish') }, 'Next story'), el('button', { class: 'link-btn', onclick: () => advanceCatchup('skip') }, 'Skip'))),
-          el('button', { class: 'link-btn catchup-finish', onclick: () => advanceCatchup('end') }, 'Finish this catch-up now'));
+            saveButton(story.item, story.source, 'ib save'), el('button', { class: 'btn', onclick: () => advanceCatchup('finish') }, 'Next story'), el('button', { class: 'btn quiet sm', onclick: () => advanceCatchup('skip') }, 'Skip'))),
+          el('button', { class: 'btn quiet sm catchup-finish', onclick: () => advanceCatchup('end') }, 'Finish this catch-up now'));
       }
     }
     if (!session || session.finishedAt) $('experiences').append(catchupStartForm());

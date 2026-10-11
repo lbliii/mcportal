@@ -10,7 +10,7 @@ MCPortal is an MCP server with an [MCP Apps](https://modelcontextprotocol.io/ext
 
 ## What you can do
 
-- **Build a room by talking.** Start from starter packs, then add any site, feed, channel, subreddit or repo by asking. Rearrange it in plain words: "put GitHub on the left", "make the blog wider", "show it as a river". Choose Columns, Shelves, River, Catalogue, Editorial or Paperback; your layout stays with your room.
+- **Build a room by talking.** Start from starter packs, then add any site, feed, channel, subreddit or repo by asking. Rearrange it in plain words: "put GitHub on the left", "make the blog wider", "show it as a river". Choose a room layout in Settings: Columns, List, Magazine, Covers, Shelves or Timeline. Your choice stays with your room.
 - **Read the docs you work with.** Point it at a GitHub repo, a docs site or an `llms.txt`, and the docs open as a book in the chat. Your agent reads the same page and answers from it.
 - **Read, save and clip.** Articles open in a reader view with figures, captions, code and tables. Continue where you left off, keep a passage, or hand it to a new chat. Save links, and clip quotes, notes, tables and images from the conversation to find again in any chat.
 - **Ask what's new.** Your agent picks what's worth reading across everything you follow, and says why.
@@ -41,10 +41,10 @@ The latest reading features are listed below. The [changelog](CHANGELOG.md) trac
 
 | Feature | What to try | Guide |
 |---|---|---|
-| **Recall Shelf** | "Find what I saved or clipped about databases." Search saved links, clip text and reading history together. | [Organize reading](docs/how-to/organize-reading.md#find-something-again) |
-| **Desks, comparisons and trails** | Keep related sources and notes together, compare two or three sources, or work through an ordered reading path. Collections stay private. | [Organize reading](docs/how-to/organize-reading.md) |
+| **Library** | "Find what I saved or clipped about databases." Search saved links, clip text and reading history together. | [Organize reading](docs/how-to/organize-reading.md#find-something-again) |
+| **Collections, comparisons and trails** | Keep related sources and notes together, compare two or three sources, or work through an ordered reading path. Collections stay private. | [Organize reading](docs/how-to/organize-reading.md) |
 | **Finite catch-up** | Choose a bounded set of unseen stories and resume it later. New arrivals wait for another session. | [Catch up](docs/how-to/organize-reading.md#finish-a-bounded-catch-up) |
-| **Changes and Upcoming** | Follow changes to a page or repo's releases, or dated events from a public calendar or verified artist. | [Watch reading and events](docs/how-to/watch-reading.md) |
+| **Page updates and Events** | Follow changes to a page or repo's releases, or dated events from a public calendar or verified artist. | [Watch reading and events](docs/how-to/watch-reading.md) |
 | **Shop** | Preview a supported Shopify store, confirm a collection or sales-only follow, and check arrivals, price drops and saved-product restocks on demand. | [Follow stores](docs/how-to/follow-stores.md) |
 | **Automatic Space sections** | Preview eligible sources and people you follow, then choose which lists signed-in visitors can see. | [Customize your Space](docs/how-to/customize-space.md#show-sources-and-people) |
 

@@ -93,7 +93,7 @@
         try { await callTool('unwatch', { id: watch.id, ...(paused === undefined ? {} : { paused }) }); await refreshPortal(portal.portalId); }
         catch(error) { toast(errorText(error)); }
       };
-      const manage = el('details', { class: 'shop-manage' }, el('summary', null, `${watch.displayName}${watch.paused ? ' · paused' : ''}`),
+      const manage = uiDisclosure({label:`${watch.displayName}${watch.paused ? ' · paused' : ''}`, className:'shop-manage'},
         el('p', null, watch.origin, ` · ${watch.collection ? 'collection: ' + watch.collection : 'whole public catalogue'}${watch.salesOnly ? ' · sales only' : ''}`),
         el('p', { class: watch.error ? 'error' : 'shop-checked' }, `${status}${watch.partial ? ' · partial catalogue' : ''}`),
         el('button', { class: 'btn', type: 'button', onclick: () => change(!watch.paused) }, watch.paused ? 'Resume' : 'Pause'),
@@ -103,6 +103,6 @@
     const visible = full ? portal.items : portal.items.slice(0, 6);
     if(visible.length) wrap.append(el('ul', { class: 'shop-grid' }, visible.map(item => el('li', null, watchNew(shopCard(item), item, portal)))));
     else if(watches.length) wrap.append(el('p', { class: 'empty' }, 'No products in the current scope. Check the store controls above for paused follows or refresh errors.'));
-    if(visible.length < portal.items.length) wrap.append(el('button', { class: 'link-btn portal-more', type: 'button', onclick: () => openPortal(portal.portalId) }, `View all ${portal.items.length} retrieved products`));
+    if(visible.length < portal.items.length) wrap.append(el('button', { class: 'btn quiet sm portal-more', type: 'button', onclick: () => openPortal(portal.portalId) }, `View all ${portal.items.length} retrieved products`));
     primePictures(wrap); return wrap;
   }

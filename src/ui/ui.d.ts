@@ -22,6 +22,7 @@ declare global {
 
   /** Every element of room.html that the script looks up by id, with its element type. */
   interface RoomElements {
+    controlTooltip: HTMLDivElement;
     docsContents: HTMLElement;
     readerFind: HTMLDivElement;
     readerComfort: HTMLDivElement;
@@ -39,11 +40,18 @@ declare global {
     btnAdd: HTMLButtonElement;
     btnExpand: HTMLButtonElement;
     btnImportOpml: HTMLButtonElement;
-    btnLayout: HTMLButtonElement;
-    btnOpenIn: HTMLButtonElement;
+    btnSettings: HTMLButtonElement;
+    btnCloseSettings: HTMLButtonElement;
+    settingsPanel: HTMLDialogElement;
+    btnMore: HTMLButtonElement;
+    moreMenu: HTMLDivElement;
+    btnRoomOptions: HTMLButtonElement;
+    roomOptions: HTMLDivElement;
+    openIn: HTMLSelectElement;
+    openInField: HTMLDivElement;
+    readingSettings: HTMLDivElement;
+    showSources: HTMLInputElement;
     btnRefresh: HTMLButtonElement;
-    btnSources: HTMLButtonElement;
-    btnWho: HTMLButtonElement;
     btnExperienceRoom: HTMLButtonElement;
     btnRecall: HTMLButtonElement;
     btnCollections: HTMLButtonElement;

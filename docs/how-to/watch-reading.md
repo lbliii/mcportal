@@ -1,6 +1,6 @@
 # Watch reading and events
 
-Use **Changes** for page edits and repository releases, and **Upcoming** for dated public-calendar and artist events. Reading watches are currently on `main` under [Unreleased](../../CHANGELOG.md#unreleased); hosted and plugin installs need a release and deployment that includes them.
+Open **More → Page updates** for page edits and repository releases, or **More → Events** for dated public-calendar and artist events. Reading watches are currently on `main` under [Unreleased](../../CHANGELOG.md#unreleased); hosted and plugin installs need a release and deployment that includes them.
 
 ## Watch a page or repository
 
@@ -14,7 +14,7 @@ watch this documentation page for changes: https://example.com/docs/migrations
 watch releases from astral-sh/uv
 ```
 
-Your agent uses `watch_reading` with kind `page` or `releases`. The first successful check establishes a baseline. Open **Changes** to see later findings, their observation dates, bounded text differences and any availability problems. You can ask your agent to open a finding and explain it from its evidence.
+Your agent uses `watch_reading` with kind `page` or `releases`. The first successful check establishes a baseline. Open **Page updates** to see later findings, their observation dates, bounded text differences and any availability problems. You can ask your agent to open a finding and explain it from its evidence.
 
 A failed request keeps the last successful baseline. Acknowledging a finding changes its unread state; it does not change the source or mark an article read.
 
@@ -25,11 +25,11 @@ Page checks cover the first 24,000 characters of readable text. Release checks c
 Give your agent a public iCalendar URL and, for floating times, a timezone:
 
 ```text
-follow this public calendar for Upcoming: https://example.com/events.ics
+follow this public calendar for Events: https://example.com/events.ics
 use America/New_York for times without a timezone
 ```
 
-Upcoming sorts events by date. UTC, named timezones and date-only events are supported. Recurring events and ambiguous daylight-saving times are visibly omitted. Coverage messages explain what was left out.
+Events sorts events by date. UTC, named timezones and date-only events are supported. Recurring events and ambiguous daylight-saving times are visibly omitted. Coverage messages explain what was left out.
 
 Save an event to keep its link and dated metadata. Reschedules and cancellation updates from the watched source update saved event metadata; past events stay saved. An event disappearing from a provider's results does not prove it was cancelled.
 

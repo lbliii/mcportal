@@ -106,8 +106,8 @@
    * @param {HTMLElement[]} heads @param {ParentNode} body
    */
   function readerOutline(heads, body) {
-    const outline = el('details', { class: 'reader-outline' });
-    outline.append(el('summary', null, 'On this page'), el('nav', { 'aria-label': 'On this page' }, heads.slice(0, 60).map((h) => el('a', {
+    const outline = uiDisclosure({label:'On this page',className:'reader-outline'});
+    outline.append(el('nav', { 'aria-label': 'On this page' }, heads.slice(0, 60).map((h) => el('a', {
       class: h.tagName === 'H2' ? null : 'nested', href: `#${h.dataset.anchor}`,
       onclick: (/** @type {MouseEvent} */ e) => { e.preventDefault(); outline.open = false; focusReaderAnchor(body, h.dataset.anchor || ''); },
     }, h.textContent))));
@@ -134,7 +134,7 @@
     /** @type {HTMLElement | null} */
     let body = null;
     const scope = () => /** @type {HTMLElement} */ (body);   // links are clicked only after body is built below
-    body = el('div', { class: 'body' });
+    body = el('div', { class: 'body ui-document' });
     /** @type {Array<{ node: HTMLOListElement | HTMLUListElement, last: HTMLLIElement | null, id: string | undefined, itemId: string | undefined, ordered: boolean }>} */
     const lists = [];
     /** Get the authored list's semantic container; malformed depth jumps clamp to a real parent.

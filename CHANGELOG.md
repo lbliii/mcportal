@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Navigation
+- Audit 36 design-system families; replace underlined interface actions with quiet buttons, add accessible comparison tabs, shared pills/disclosures/trays/drawer placement, and document content/navigation/paging patterns. Expose implementation gaps in the catalogue and validate the coverage inventory.
+- Formalize a modular design system with typed controls, shared settings and card patterns, accessible menus and dialogs, a production component catalogue, and checks that prevent new control drift. Compact collection/watch cards and associate account and collection errors with their fields.
+- Standardize compact controls and spacing: 24px small actions, 28px standard controls, 32px fields and 44px touch targets. Tighten the global bar and Settings, share button variants, and check for undefined design tokens.
+- Use symbols for Settings, Add source, Close and overflow actions, with fast, keyboard-accessible tooltips across room and reader icon controls. Keep short labels for destinations and actions whose symbols would be ambiguous.
+- Keep Room and Library in one global bar, move Page updates and Events under More, and put layout, reading preferences and account controls in Settings. Collections live in Library; Compare appears with selected items and Catch up stays with the room.
+- Remove the redundant room-name label, use plain action labels, and reveal search filters and optional tracking forms on request. New profiles use “Your portal room” instead of the fixed “morning” name.
+- Keep only the most recent unfinished article in a compact Continue reading action. Source-specific display options appear when that source is open.
+
 ### Recall Shelf
 - Find saved material with conversational search prefixes or quoted titles, and keep identifiers and versions distinct from longer lookalikes. Results explain the matching fields, effective search words and indexed coverage; saved links do not imply retained page text.
 - Add a reproducible 40-query synthetic retrieval benchmark across file, Postgres and linked storage, with separate development/validation splits and source/passage checks.

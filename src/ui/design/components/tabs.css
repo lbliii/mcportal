@@ -1,0 +1,7 @@
+.ui-tabs, .ui-tabpanels { min-width:0; }
+.ui-tablist { display:flex; gap:var(--mp-space-4); max-width:100%; overflow:auto; padding:var(--mp-space-4); border-bottom:1px solid var(--mp-border-divider); margin-bottom:var(--mp-space-12); }
+.ui-tablist > button { flex:0 0 auto; max-width:100%; min-height:var(--mp-control-height); padding:var(--mp-control-padding-block) var(--mp-control-padding-inline); border:1px solid transparent; border-radius:var(--mp-radius-control); background:none; color:var(--mp-text-secondary); font-size:var(--mp-type-12); overflow-wrap:anywhere; }
+.ui-tablist > button:hover:not(:disabled) { background:var(--mp-surface-hover); }
+.ui-tablist > button[aria-selected=true] { color:var(--mp-text-primary); background:var(--mp-surface-selected); box-shadow:inset 0 -2px currentColor; }
+.ui-tablist > button:disabled { opacity:.45; }
+@media(forced-colors:active) { .ui-tablist > button[aria-selected=true] { outline:2px solid Highlight; outline-offset:-3px; } }

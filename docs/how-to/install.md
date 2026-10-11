@@ -151,14 +151,14 @@ A local MCPortal starts in ghost mode: no account, everything in `~/.mcportal`, 
 Sign in to keep the same room on every device and to share and follow. Any of these starts it:
 
 - Say "sign in to MCPortal".
-- In the room, click **Ghost mode**, then **Sign in to sync and share**.
-- On the welcome screen, click **Already have a portal? Sign in to bring it here**.
+- In the room, open **Settings → Account**, then **Sign in to sync**.
+- On the welcome screen, click **Sign in to your account**.
 
 You sign in with GitHub in your browser. Open the link on the same computer: the sign-in finishes on a one-time local listener there. This computer's room is added to your hosted account, and nothing is removed.
 
 After that, MCPortal still runs and fetches feeds on your computer, but your room, clips and shares live in your account. Each signed-in computer is listed on your account page, where you can revoke it.
 
-To sign out, say "sign out of MCPortal" or click **Sign out** in the room's account menu. MCPortal copies your room back to this computer first, then returns to ghost mode.
+To sign out, say "sign out of MCPortal" or click **Sign out** under **Settings → Account**. MCPortal copies your room back to this computer first, then returns to ghost mode.
 
 By default a local MCPortal signs in to the public hosted service. To use another, set `MCPORTAL_HOSTED_URL` to its address. See [Configuration](../reference/configuration.md).
 

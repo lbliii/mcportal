@@ -28,7 +28,7 @@
         const visible = displayMode === 'fullscreen' ? portal.items : portal.items.slice(0, INLINE_ITEMS);
         const items = portalItems(portal, () => el('ul', { class: 'items' }, visible.map((item) => el('li', null, watchNew(renderItem(item, portal, 'row'), item, portal)))));
         if (items) wrap.append(items);
-        if (!portal.error && visible.length < portal.items.length) wrap.append(el('button', { class: 'link-btn portal-more', type: 'button', onclick: () => openPortal(portalId) }, `${portal.items.length - visible.length} more in ${portal.title}`));
+        if (!portal.error && visible.length < portal.items.length) wrap.append(el('button', { class: 'btn quiet sm portal-more', type: 'button', onclick: () => openPortal(portalId) }, `${portal.items.length - visible.length} more in ${portal.title}`));
         wrap.append(portalFoot(portal, true));
         primePictures(wrap);
         return wrap;
@@ -92,7 +92,7 @@
           const rest = portal.items.filter((item) => !shown.has(frontKey(portalId, item.id)));
           if (!rest.length) return el('div', { class: 'empty' }, 'Everything here is in the picks above.');
           const list = el('ul', { class: 'items' });
-          const more = el('button', { class: 'link-btn fp-more', type: 'button' });
+          const more = el('button', { class: 'btn quiet sm fp-more', type: 'button' });
           let count = 0;
           const page = () => {
             const next = rest.slice(count, count + (count ? FRONT.page : FRONT.first));
@@ -143,10 +143,7 @@
 
   /** Source sections keep the user's portal order and their refresh, reader and save controls. @param {Profile} profile */
   function drawDesignedRoom(profile) {
-    return [el('header', { class: 'collection-head' },
-      el('div', { class: 'fp-kicker' }, new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })),
-      el('h1', null, profile.name)),
-    ...profile.columns.flatMap((col) => col.panels).map((spec) => renderPortal(spec.id))];
+    return profile.columns.flatMap((col) => col.panels).map((spec) => renderPortal(spec.id));
   }
 
   /** @param {string} portalId @param {'catalogue' | 'editorial' | 'paperback'} form */
@@ -162,7 +159,7 @@
       return el('li', null, watchNew(node, item, portal));
     })));
     if (items) wrap.append(items);
-    if (!portal.error && visible.length < portal.items.length) wrap.append(el('button', { class: 'link-btn portal-more', type: 'button', onclick: () => openPortal(portalId) }, `${portal.items.length - visible.length} more in ${portal.title}`));
+    if (!portal.error && visible.length < portal.items.length) wrap.append(el('button', { class: 'btn quiet sm portal-more', type: 'button', onclick: () => openPortal(portalId) }, `${portal.items.length - visible.length} more in ${portal.title}`));
     wrap.append(portalFoot(portal, true));
     primePictures(wrap);
     return wrap;
@@ -202,7 +199,7 @@
       el('div', { class: 'fp-kicker' }, fresh ? `${date} · ${fresh} new` : date),
       el('h1', { class: 'fp-title' }, edition ? edition.title : 'The front page'),
       edition && edition.intro ? el('p', { class: 'fp-intro' }, edition.intro) : null,
-      edition || DEV ? null : el('button', { class: 'link-btn fp-ask', type: 'button', onclick: askForHighlights }, 'Ask your agent to pick the highlights'));
+      edition || DEV ? null : el('button', { class: 'btn quiet sm fp-ask', type: 'button', onclick: askForHighlights }, 'Ask your agent to pick the highlights'));
   }
 
   async function askForHighlights() {
@@ -257,12 +254,9 @@
     drawLaneControls();
     if (layout === ROOM_LAYOUTS.frontpage) frontEnd();
     for (const b of $$('[data-layout]')) b.setAttribute('aria-pressed', String(b.dataset.layout === p.layout));
-    const label = $first(`[data-layout="${p.layout}"] b`)?.textContent ?? 'Columns';
-    $('btnLayout').textContent = `Layout: ${label}`;
-    $('btnLayout').setAttribute('aria-label', `Choose room layout. Current layout: ${label}`);
     // A lab's layout is offered while the server has the lab on, and kept for whoever chose it.
     for (const lab of LAB_LAYOUTS) $first(`[data-layout="${lab}"]`)?.toggleAttribute('hidden', !(state.labs.includes(lab) || p.layout === lab));
-    $('btnOpenIn').setAttribute('aria-pressed', String(p.openIn === 'chat'));
+    $('openIn').value = p.openIn;
   }
 
   /** Visible lane navigation. Scroll and resize update the current column and end controls. */
@@ -347,7 +341,6 @@
       el('span', { class: 'dot', style: `background:${portalColor(portal)}` }),
       el('button', { class: 'portal-title', type: 'button', title: `Open ${portal.title}`, onclick: () => openPortal(portal.portalId) }, portal.title),
       el('span', { class: 'portal-count' }, portalCount(portal)),
-      portalViewSelector(portal),
     ];
   }
 

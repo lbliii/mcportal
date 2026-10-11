@@ -42,7 +42,7 @@
     select.addEventListener('change', show); show();
     const canAsk = Boolean(hostCapabilities.updateModelContext);
     const canWrite = Boolean(DEV || hostCapabilities.serverTools);
-    return el('details', { class: 'passage-picker' }, el('summary', null, 'Choose passage'),
+    return uiDisclosure({label:'Choose passage', className:'passage-picker'},
       el('div', { class: 'passage-picker-panel' }, el('p', null, body.dataset.passageUrl ?? ''), select, preview,
         el('p', null, `Only this passage is used (up to ${PASSAGE_CHARS.toLocaleString()} characters).`),
         canAsk ? el('button', { class: 'btn', onclick: () => { const p = chosen(); if (p) askAboutPassage(p); } }, 'Ask about this') : null,

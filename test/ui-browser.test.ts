@@ -121,7 +121,10 @@ after(async () => {
 async function openRoom(): Promise<void> {
   page.problems.length = 0;
   await page.goto(`${app.base}/preview`);
-  await page.waitFor(`document.querySelectorAll('[data-portal]').length === 5 && !document.querySelector('.skeleton')`, 'the room to draw its five portals');
+  await page.waitFor(`document.querySelectorAll('[data-portal]').length === 5 && !document.querySelector('.skeleton')`, 'the room to draw its five portals').catch(async error=>{
+    const observed=await page.eval(`JSON.stringify({portals:[...document.querySelectorAll('[data-portal]')].map(n=>n.getAttribute('data-portal')),skeletons:document.querySelectorAll('.skeleton').length,status:document.querySelector('#status')?.textContent,roomClass:document.querySelector('#grid')?.className,error:document.querySelector('#toast')?.textContent})`);
+    throw new Error(`${error.message}; ${observed}`);
+  });
   await page.waitFor(`document.querySelector('.continue-reading')?.getAttribute('aria-busy') === 'false'`, 'recent reading to finish loading before pointer coordinates are measured');
 }
 
@@ -162,13 +165,13 @@ test('browser: Recall opens retained pages and returns with query, filters and f
   await page.waitFor(`document.querySelector('.recall-hit')`, 'Recall results');
   await page.eval(`document.querySelector('[aria-label="Search your library"]').value = 'Hijacking'; document.querySelector('[aria-label="Filter by kind"]').value = 'saved'; document.querySelector('.recall-search').requestSubmit()`);
   await page.waitFor(`document.querySelector('#recallCount').textContent.includes('1 match for')`, 'the filtered result');
-  await page.click('.recall-hit .link-btn');
+  await page.click('.recall-hit .btn.quiet:not(.ui-chip)');
   await page.waitFor(`!document.querySelector('#reader').hidden && document.querySelector('#reader .body')`, 'the recalled page');
   await page.click('#readerControls .reader-top button');
   await page.waitFor(`!document.querySelector('#experiences').hidden`, 'return to Recall');
   assert.equal(await page.eval(`document.querySelector('[aria-label="Search your library"]').value`), 'Hijacking');
   assert.equal(await page.eval(`document.querySelector('[aria-label="Filter by kind"]').value`), 'saved');
-  assert.equal(await page.eval(`document.activeElement.className`), 'link-btn');
+  assert.equal(await page.eval(`document.activeElement.className`), 'btn quiet sm');
   await page.click('#btnExperienceRoom');
   await page.waitFor(`!document.querySelector('#grid').hidden`, 'return to the room');
   assert.deepEqual(page.problems, []);
@@ -185,8 +188,8 @@ test('browser: Recall explains normalized search, match provenance and bookmark 
   assert.match(await page.eval<string>(`document.querySelector('.recall-hit').textContent`), /Matched: Saved title/);
   assert.match(await page.eval<string>(`document.querySelector('#recallCoverage').textContent`), /Original page bodies are not searched/);
   await page.eval(`document.querySelector('[aria-label="Search your library"]').value = 'nonexistent platypus'; document.querySelector('.recall-search').requestSubmit()`);
-  await page.waitFor(`document.querySelector('.experience-empty h2')?.textContent === 'No matching material'`, 'empty search');
-  assert.match(await page.eval<string>(`document.querySelector('.experience-empty').textContent`), /Saving a link does not retain its page text/);
+  await page.waitFor(`document.querySelector('[data-ui=feedback][data-variant=empty] h3')?.textContent === 'No matching material'`, 'empty search');
+  assert.match(await page.eval<string>(`document.querySelector('[data-ui=feedback][data-variant=empty]').textContent`), /Saving a link does not retain its page text/);
   // A newer UI must still render an older hosted result without search metadata.
   await page.eval(`window.recallOriginalFetch = window.fetch; window.fetch = async (...args) => {
     const response = await window.recallOriginalFetch(...args);
@@ -210,7 +213,7 @@ test('browser: selected Recall material creates a desk, supports a trail and com
   await page.waitFor(`document.querySelectorAll('.recall-hit').length === 2`, 'both kept sources');
   await page.eval(`document.querySelectorAll('[data-select-ref]').forEach(button => button.click())`);
   await page.click('.selection-tray .btn');
-  await page.eval(`document.querySelector('[aria-label="New desk title"]').value = 'Understanding deployment'; document.querySelector('[aria-label="New desk purpose"]').value = 'Evidence and an introduction'; document.querySelector('.collection-create').requestSubmit()`);
+  await page.eval(`document.querySelector('[aria-label="Collection title"]').value = 'Understanding deployment'; document.querySelector('[aria-label="Collection purpose"]').value = 'Evidence and an introduction'; document.querySelector('.collection-create').requestSubmit()`);
   await page.waitFor(`document.querySelectorAll('.desk-entry').length === 2`, 'the new desk to keep its sources');
   assert.equal(await page.eval(`document.querySelector('.experience-heading h1').textContent`), 'Understanding deployment');
   await page.eval(`[...document.querySelectorAll('.experience-heading button')].find(b => b.textContent === 'Read as a trail').click()`);
@@ -225,24 +228,33 @@ test('browser: selected Recall material creates a desk, supports a trail and com
   try {
     assert.equal(await page.eval(`document.documentElement.scrollWidth <= window.innerWidth`), true, 'no narrow-screen page overflow');
     await page.click('#comparisonTab1');
-    assert.equal(await page.eval(`document.querySelector('#comparisonSource1').classList.contains('compact-active')`), true);
+    assert.equal(await page.eval(`document.querySelector('#comparisonSource1').classList.contains('ui-tab-active')`), true);
     await page.click('#comparisonSource1 .experience-row button');
     await page.waitFor(`!document.querySelector('#reader').hidden && document.querySelector('#reader .body')`, 'the compared source in the reader');
     await page.click('#readerControls .reader-top button');
     await page.waitFor(`!document.querySelector('#experiences').hidden`, 'comparison continuity');
-    assert.equal(await page.eval(`document.querySelector('#comparisonSource1').classList.contains('compact-active')`), true);
+    assert.equal(await page.eval(`document.querySelector('#comparisonSource1').classList.contains('ui-tab-active')`), true);
   } finally { await page.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false }); }
   assert.deepEqual(page.problems, []);
 });
 
 test('browser: per-portal cards persist through refresh and a new room view without changing its source', { skip }, async () => {
   await openRoom();
-  await page.eval(`const select = document.querySelector('[data-portal="hn-top"] .portal-view-select'); select.value = 'cards'; select.dispatchEvent(new Event('change'))`);
+  assert.equal(await page.eval(`document.querySelector('#grid .portal-view-select')`), null, 'source preferences stay inside the source');
+  await page.click('[data-portal="hn-top"] .portal-title');
+  await page.waitFor(`document.querySelector('.level .portal-view-select')`, 'source display options');
+  await page.eval(`const select = document.querySelector('.level .portal-view-select'); select.value = 'cards'; select.dispatchEvent(new Event('change'))`);
+  await page.waitFor(`document.querySelector('.level .portal-view-cards .card')`, 'the expanded portal card view');
+  await page.click('.level .room-back');
   await page.waitFor(`document.querySelector('[data-portal="hn-top"] .portal-view-cards .card')`, 'the portal card view');
   assert.equal((await profiles.get('default')).columns[0]!.panels[0]!.view, 'cards');
   await openRoom();
-  assert.equal(await page.eval(`document.querySelector('[data-portal="hn-top"] .portal-view-select').value`), 'cards');
-  await page.eval(`const select = document.querySelector('[data-portal="hn-top"] .portal-view-select'); select.value = 'default'; select.dispatchEvent(new Event('change'))`);
+  await page.click('[data-portal="hn-top"] .portal-title');
+  await page.waitFor(`document.querySelector('.level .portal-view-select')`, 'source display options after reopening');
+  assert.equal(await page.eval(`document.querySelector('.level .portal-view-select').value`), 'cards');
+  await page.eval(`const select = document.querySelector('.level .portal-view-select'); select.value = 'default'; select.dispatchEvent(new Event('change'))`);
+  await page.waitFor(`document.querySelector('.level .items .item')`, 'the expanded default view');
+  await page.click('.level .room-back');
   await page.waitFor(`document.querySelector('[data-portal="hn-top"] .items .item')`, 'the default source view');
   assert.deepEqual(page.problems, []);
 });
@@ -265,10 +277,12 @@ test('browser: river is visible without labs and the toolbar saves the choice', 
 
 /** Choose through the same named, keyboard-accessible popover as a person using the room. */
 async function chooseLayout(layout: string): Promise<void> {
-  await page.waitFor(`!document.getElementById('btnLayout').disabled`, 'layout settings to finish saving');
-  await page.click('#btnLayout');
+  await page.click('#btnSettings');
+  await page.waitFor(`!document.querySelector('[data-layout="${layout}"]').disabled`, 'layout settings to finish saving');
   await page.click(`[data-layout="${layout}"]`);
-  await page.waitFor(`!document.getElementById('btnLayout').disabled`, 'the layout preference to save');
+  await page.waitFor(`!document.querySelector('[data-layout="${layout}"]').disabled`, 'the layout preference to save');
+  assert.equal(await page.eval(`document.getElementById('settingsPanel').open`), true, 'previews stay open after choosing a layout');
+  await page.click('#btnCloseSettings');
 }
 
 test('browser: all three designs reopen, adapt to narrow themes, and keep the reader and save controls', { skip }, async () => {
@@ -278,8 +292,8 @@ test('browser: all three designs reopen, adapt to narrow themes, and keep the re
       await chooseLayout(layout);
       await page.waitFor(`document.querySelector('#grid.${layout} .designed')`, `${layout} to draw`);
       assert.equal((await profiles.get('default')).layout, layout);
-      assert.equal(await page.eval(`document.activeElement.id`), 'btnLayout');
-      assert.equal(await page.eval(`document.querySelector('#layoutMenu').matches(':popover-open')`), false);
+      assert.equal(await page.eval(`document.activeElement.id`), 'btnSettings');
+      assert.equal(await page.eval(`document.querySelector('#settingsPanel').open`), false);
       await page.goto(`${app.base}/preview`);
       await page.waitFor(`document.querySelector('#grid.${layout} .designed') && !document.querySelector('.skeleton')`, `${layout} to reopen`);
       assert.deepEqual(await page.eval(`[...document.querySelectorAll('[data-portal]')].map(n => n.dataset.portal)`), ['hn-top', 'gh-mcp', 'simonw', 'saved', 'docs']);
@@ -343,6 +357,9 @@ test('browser: the original layouts retain opening, saving and reachable control
         const observed = await page.eval(`JSON.stringify({readerHidden:document.getElementById('reader').hidden,toast:document.getElementById('toast').textContent,buttons:[...document.querySelectorAll('[data-save-url="${ARTICLE}"]')].map(b=>({pressed:b.getAttribute('aria-pressed'),box:b.getBoundingClientRect()}))})`);
         throw new Error(`${layout}: ${error.message}; ${observed}`);
       });
+      // The icon changes optimistically; wait for the store write before testing persistence.
+      const persistedBy = Date.now() + 5000;
+      while ((await profiles.get('default')).saved.some(item => item.url === ARTICLE) && Date.now() < persistedBy) await new Promise(resolve => setTimeout(resolve, 20));
       assert.equal((await profiles.get('default')).saved.some(item => item.url === ARTICLE), false);
       await tool('save_item', { url: ARTICLE, title: 'Hijacking the PS5' });
       await page.goto(`${app.base}/preview`);
@@ -368,11 +385,11 @@ test('browser: a rejected layout preference restores the previous room and keeps
     await openRoom();
     await chooseLayout('paperback');
     assert.equal(await page.eval(`document.querySelector('#grid').classList.contains('paperback')`), false);
-    assert.equal(await page.eval(`document.getElementById('btnLayout').textContent`), 'Layout: Columns');
+    assert.equal(await page.eval(`document.querySelector('[data-layout="columns"]').getAttribute('aria-pressed')`), 'true');
     assert.equal((await profiles.get('default')).layout, 'columns');
     assert.match(await page.eval<string>(`document.getElementById('toast').textContent`), /Couldn't save: Fixture save refused/);
-    assert.equal(await page.eval(`document.activeElement.id`), 'btnLayout');
-    await page.click('#btnLayout');
+    assert.equal(await page.eval(`document.activeElement.id`), 'btnSettings');
+    await page.click('#btnSettings');
     assert.equal(await page.eval(`document.querySelector('[data-layout="paperback"]').disabled`), false);
     assert.deepEqual(page.problems, []);
   } finally {
@@ -582,8 +599,8 @@ test('browser: Continue reading survives a fresh view, opens docs at its saved p
   await openRoom();
   await page.waitFor(`document.querySelector('.continue-item')`, 'recent unfinished reading');
   assert.match(await page.eval<string>(`document.querySelector('.continue-reading').textContent`), /Deploy.*35%/s);
-  assert.equal(await page.eval<string>(`document.querySelector('.continue-source').textContent`), 'docs.example.com');
-  assert.equal(await page.eval<string>(`document.querySelector('.continue-progress > span').style.width`), '35%');
+  assert.equal(await page.eval(`document.querySelectorAll('.continue-item').length`), 1, 'only the most recent unfinished item occupies the room toolbar');
+  assert.equal(await page.eval(`document.querySelector('.room-toolbar').contains(document.querySelector('.continue-item'))`), true);
   assert.doesNotMatch(await page.eval<string>(`document.querySelector('.continue-reading').textContent`), /First steps|PS5/);
   await page.click('.continue-item');
   await page.waitFor(`document.querySelector('.docs-page .mark-read:not([disabled])') && document.getElementById('toast').textContent.includes('where you left off')`, 'the docs page to resume');
@@ -842,7 +859,7 @@ test('browser: the river merges the room into one stream: picks, new, a divider,
     assert.equal(await units(), 12);
     assert.equal(await page.eval(`document.querySelector('.river-fold').textContent`), '9 more from Saved');
     assert.equal(await page.eval(`document.querySelectorAll('.river-feed [data-story^="saved"]').length`), 3, 'three of the run, then the fold');
-    await page.click('.river-fold .link-btn');
+    await page.click('.river-fold .btn.quiet');
     assert.equal(await page.eval(`document.querySelectorAll('.river-feed [data-story^="saved"]').length`), 12);
     assert.equal(await page.eval(`document.activeElement.closest('article')?.dataset.story`), `saved\nhttps://example.com/saved-3`, 'focus moves to the first revealed story');
     assert.equal(await page.eval(`document.querySelector('.river-end').firstChild.textContent`), "That's everything your portals fetched.");
@@ -871,7 +888,7 @@ test('browser: river pages end on a separator that takes focus, and a refresh wa
     await page.click('.river-more .fp-more');
     assert.equal(await page.eval(`document.activeElement.dataset.from`), '11', 'focus goes to the new page');
     assert.match(await page.eval<string>(`document.activeElement.textContent`), /^Stories 11 to 1\d$/);
-    await page.click('.river-fold .link-btn');
+    await page.click('.river-fold .btn.quiet');
     await page.click('.river-more .fp-more');
     assert.equal(await page.eval(`document.activeElement.dataset.from`), '21');
     assert.equal(await page.eval(`document.activeElement.textContent`), 'Stories 21 to 30');
@@ -879,6 +896,7 @@ test('browser: river pages end on a separator that takes focus, and a refresh wa
     // Something arrives; refreshing doesn't move a single story, it waits behind a button.
     const before = await stories();
     await tool('save_item', { url: 'https://example.com/arrived', title: 'Arrived' });
+    await page.click('#btnRoomOptions');
     await page.click('#btnRefresh');
     const arrived = await page.waitFor<string>(`document.querySelector('.river-arrived')?.textContent`, 'the arrivals button');
     assert.equal(arrived, '1 new story since you started');
@@ -889,6 +907,7 @@ test('browser: river pages end on a separator that takes focus, and a refresh wa
     // Fullscreen pages are twenty, and the next loads itself as the end nears. The river
     // shows what it showed (thirty units) when the mode changes.
     await page.eval(`document.documentElement.classList.add('fullscreen')`);
+    await page.click('#btnRoomOptions');
     await page.click('#btnRefresh');
     assert.equal(await page.eval(`document.querySelectorAll('.river-feed > article, .river-feed > .river-fold').length`), 30);
     const units = () => page.eval<number>(`document.querySelectorAll('.river-feed > article, .river-feed > .river-fold').length`);
@@ -1233,7 +1252,7 @@ test('browser: a local first run offers signing in from the welcome screen, and 
   try {
     page.problems.length = 0;
     await page.goto(`${ghost.base}/preview`);
-    const signIn = `[...document.querySelectorAll('.welcome-actions button')].find((b) => b.textContent.startsWith('Already have a portal?'))`;
+    const signIn = `[...document.querySelectorAll('.welcome-actions button')].find((b) => b.textContent==='Sign in to your account')`;
     await page.waitFor(signIn, 'the sign-in option on the welcome screen');
     await page.eval(`${signIn}.click()`);
     const report = await page.waitFor<string>(`(() => { const n = document.querySelector('.welcome-actions + .building'); return n && !n.hidden && /signing in/i.test(n.textContent) && n.textContent; })()`, 'the sign-in report under the actions');
@@ -1272,8 +1291,8 @@ test('browser: finite catch-up resumes a captured set, ends explicitly and prese
 });
 
 test('browser: Changes keeps dated evidence and Upcoming renders real calendar dates, saves events and supports narrow screens', { skip }, async () => {
-  await openRoom(); await page.click('#btnChanges');
-  await page.waitFor(`document.querySelector('.watch-setup')`, 'watch setup');
+  await openRoom(); await page.click('#btnMore'); await page.click('#btnChanges');
+  await page.waitFor(`document.querySelector('.watch-setup')`, 'watch setup'); await page.click('.watch-add > summary');
   await page.eval(`document.querySelector('[aria-label="Watch title"]').value='Persistence notes'; document.querySelector('[aria-label="Watch address"]').value='${DOCS}/watch.md'; document.querySelector('.watch-setup').requestSubmit()`);
   await page.waitFor(`document.querySelector('.watch-card h3')?.textContent==='Persistence notes'`, 'kept watch');
   const watch=(await experiences.get('default')).state.watches.find(w=>w.title==='Persistence notes')!;
@@ -1283,7 +1302,7 @@ test('browser: Changes keeps dated evidence and Upcoming renders real calendar d
   await page.click('.watch-card .btn');await page.waitFor(`document.querySelector('.change-card details')`,'actual change evidence');
   await page.click('.change-card summary');
   assert.match(await page.eval<string>(`document.querySelector('.change-diff').textContent`),/file.*database|database.*file/s);
-  await page.click('#btnUpcoming');await page.waitFor(`document.querySelector('.watch-setup')`,'calendar setup');
+  await page.click('#btnMore'); await page.click('#btnUpcoming');await page.waitFor(`document.querySelector('.watch-setup')`,'calendar setup');await page.click('.watch-add > summary');
   await page.eval(`document.querySelector('[aria-label="Watch title"]').value='Town Hall'; document.querySelector('[aria-label="Watch address"]').value='${CALENDAR}'; document.querySelector('.watch-setup').requestSubmit()`);
   await page.waitFor(`document.querySelector('.watch-card h3')?.textContent==='Town Hall'`, 'calendar watch');
   await page.click('.watch-card .btn');await page.waitFor(`document.querySelector('.event-card')`, 'dated event');
@@ -1327,7 +1346,7 @@ test('browser: kept passage follows moved text, declines duplicates and changed 
       await page.waitFor(`document.querySelector('.recall-hit')?.textContent.includes('Durable locator example')`,'the retained quote');
       await page.click('.recall-hit .recall-title');
       await page.waitFor(`document.querySelector('#recallPreview .btn')`,'the quote preview');
-      await page.eval(`[...document.querySelectorAll('#recallPreview button')].find(b=>b.textContent==='Read kept material').click()`);
+      await page.eval(`[...document.querySelectorAll('#recallPreview button')].find(b=>b.textContent==='Read').click()`);
       await page.waitFor(`document.querySelector('#reader .body')?.textContent.includes(${JSON.stringify(quote)})`,'the original retained quote');
       assert.equal(await page.eval(`document.querySelector('#readerControls button')?.getAttribute('aria-label')`),'Back to your reading experience');
       assert.equal(await page.eval(`document.querySelector('#reader .row button')?.getAttribute('aria-label')`),null,'sharing keeps its own accessible name');
@@ -1356,7 +1375,11 @@ test('browser: quote, gallery and release presentations use retained content and
     await page.waitFor(`document.querySelector('[data-portal="kept-clips"] .portal-view-quotes .clip-quote')`,'a quote with its full retained text');
     assert.equal(await page.eval(`document.querySelectorAll('[data-portal="kept-clips"] .portal-clip-card').length`),1);
     await page.waitFor(`document.querySelector('[data-portal="releases"] .release-entry h3')?.textContent==='v1.2.3'`,'a versioned release entry');
-    await page.eval(`const s=document.querySelector('[data-portal="kept-clips"] .portal-view-select');s.value='gallery';s.dispatchEvent(new Event('change'))`);
+    await page.click('[data-portal="kept-clips"] .portal-title');
+    await page.waitFor(`document.querySelector('.level .portal-view-select')`, 'clip display options');
+    await page.eval(`const s=document.querySelector('.level .portal-view-select');s.value='gallery';s.dispatchEvent(new Event('change'))`);
+    await page.waitFor(`document.querySelector('.level .portal-view-gallery img')`, 'gallery in the open source');
+    await page.click('.level .room-back');
     await page.waitFor(`document.querySelector('[data-portal="kept-clips"] .portal-view-gallery img')?.getAttribute('alt')==='A visual note'`,'the kept visual with accessible title');
     await page.send('Emulation.setDeviceMetricsOverride',{width:320,height:800,deviceScaleFactor:1,mobile:false});
     assert.equal(await page.eval(`document.documentElement.scrollWidth<=window.innerWidth`),true,'portal views fit the narrow room');
@@ -1370,7 +1393,9 @@ test('browser: a comparison with a removed source remains accessible for repair'
   const {collection}=await tool('update_collection',{action:'create',kind:'comparison',title:'Repairable comparison',entries:[{ref:`url:${DOCS}/install.md`,title:'Install'},{ref:`url:${DOCS}/deploy.md`,title:'Deploy'}]});
   try {
     await tool('update_collection',{action:'remove',id:collection.id,refs:[`url:${DOCS}/deploy.md`]});
-    await openRoom();await page.click('#btnCollections');
+    await openRoom();await page.click('#btnRecall');
+    await page.waitFor(`document.querySelector('#recallResults')?.getAttribute('aria-busy')==='false'`, 'Library results');
+    await page.click('#btnCollections');
     await page.waitFor(`[...document.querySelectorAll('.collection-card')].some(c=>c.textContent.includes('Repairable comparison'))`,'the kept comparison');
     await page.eval(`[...document.querySelectorAll('.collection-card')].find(c=>c.textContent.includes('Repairable comparison')).querySelector('button').click()`);
     await page.waitFor(`document.querySelector('.desk-kept .watch-warning')?.textContent.includes('needs another source')`,'an actionable incomplete comparison');
@@ -1379,36 +1404,100 @@ test('browser: a comparison with a removed source remains accessible for repair'
 });
 
 
-test('browser: reading navigation uses labelled custom icons and fits all destinations at 320px', {skip}, async()=>{
+test('browser: icon hints support hover, keyboard dismissal, modal bounds and direct touch actions', { skip }, async () => {
+  await profiles.put('default', room());
+  await openRoom();
+  const visible = `document.getElementById('controlTooltip').matches(':popover-open')`;
+  const move = async (selector: string) => {
+    const point = await page.eval<{x:number,y:number}>(`(() => { const r = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect(); return {x:r.x+r.width/2,y:r.y+r.height/2}; })()`);
+    await page.send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...point });
+  };
+  const escape = async () => {
+    await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+    await page.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+  };
+  for (const id of ['btnSettings', 'btnAdd', 'btnMore', 'btnCloseSettings']) {
+    assert.equal(await page.eval(`document.getElementById('${id}').textContent.trim()`), '');
+    assert.ok(await page.eval(`document.querySelector('#${id} svg') && document.getElementById('${id}').getAttribute('aria-label')`));
+  }
+  await move('#btnSettings');
+  await page.waitFor(visible, 'fast settings hint', 800);
+  assert.equal(await page.eval(`document.getElementById('controlTooltip').textContent`), 'Settings');
+  assert.equal(await page.eval(`document.getElementById('btnSettings').getAttribute('aria-describedby')`), 'controlTooltip');
+  assert.equal(await page.eval(`document.getElementById('btnSettings').hasAttribute('title')`), false, 'no competing native hint');
+  await move('#controlTooltip');
+  await new Promise(resolve => setTimeout(resolve, 220));
+  assert.equal(await page.eval(visible), true, 'the hint remains hoverable');
+  await escape();
+  assert.equal(await page.eval(visible), false);
+  assert.equal(await page.eval(`document.getElementById('btnSettings').hasAttribute('aria-describedby')`), false);
+
+  await page.send('Emulation.setDeviceMetricsOverride', { width: 320, height: 640, deviceScaleFactor: 1, mobile: false });
+  await page.click('#btnSettings');
+  await page.waitFor(`document.getElementById('settingsPanel').open`, 'settings dialog');
+  // Tab from the close button, then Shift+Tab back, exercising actual keyboard focus.
+  for (const modifiers of [0, 8]) {
+    await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9, modifiers });
+    await page.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9, modifiers });
+  }
+  await page.waitFor(`${visible} && document.getElementById('controlTooltip').textContent === 'Close settings'`, 'keyboard hint in the dialog');
+  assert.equal(await page.eval(`document.activeElement.id`), 'btnCloseSettings');
+  assert.ok(await page.eval(`(() => { const n = document.getElementById('controlTooltip'), r = n.getBoundingClientRect(); return n.closest('dialog')?.open && r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight; })()`));
+  await escape();
+  assert.equal(await page.eval(`document.getElementById('settingsPanel').open`), true, 'first Escape only dismisses the hint');
+  assert.equal(await page.eval(`document.activeElement.id`), 'btnCloseSettings');
+  await escape();
+  assert.equal(await page.eval(`document.getElementById('settingsPanel').open`), false);
+
+  await page.send('Emulation.setTouchEmulationEnabled', { enabled: true });
+  try {
+    const point = await page.eval<{x:number,y:number}>(`(() => { const r = document.getElementById('btnAdd').getBoundingClientRect(); return {x:r.x+r.width/2,y:r.y+r.height/2}; })()`);
+    await page.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ ...point, radiusX: 1, radiusY: 1, force: 1, id: 1 }] });
+    await page.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await page.waitFor(`!document.getElementById('addSheet').hidden`, 'one tap opens Add source');
+    assert.equal(await page.eval(visible), false, 'touch does not leave a hover hint open');
+    assert.ok(await page.eval(`document.getElementById('btnAdd').getBoundingClientRect().height >= 44`));
+  } finally {
+    await page.send('Emulation.setTouchEmulationEnabled', { enabled: false });
+    await page.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+  }
+  assert.deepEqual(page.problems, []);
+});
+
+test('browser: navigation keeps primary labels at 320px and discloses optional activities and settings', {skip}, async()=>{
   const profile=room();profile.saved.push({url:`${DOCS}/install.md`,title:'Install Example Docs',savedAt:new Date().toISOString()});
   await profiles.put('default',profile);
   await openRoom();
-  const buttons=await page.eval<Array<{label:string;title:string;path:string;hidden:boolean}>>(`[...document.querySelectorAll('.experience-nav button')].map(b=>({label:b.getAttribute('aria-label'),title:b.title,path:b.querySelector('svg path')?.getAttribute('d'),hidden:getComputedStyle(b.querySelector('.experience-nav-label')).display==='none'}))`);
-  assert.deepEqual(buttons.map(b=>b.label),['Room','Recall','Topic desks','Compare','Catch-up','Changes','Upcoming']);
-  assert.ok(buttons.every(b=>b.title===b.label && b.path && !b.hidden));
-  await page.send('Emulation.setDeviceMetricsOverride',{width:320,height:800,deviceScaleFactor:1,mobile:false});
-  try {
-    const geometry=await page.eval<{fits:boolean;labelsHidden:boolean;targets:boolean}>(`(()=>{const nav=document.querySelector('.experience-nav'),buttons=[...nav.querySelectorAll('button')];return {fits:nav.scrollWidth<=nav.clientWidth && document.documentElement.scrollWidth<=innerWidth,labelsHidden:buttons.every(b=>getComputedStyle(b.querySelector('.experience-nav-label')).display==='none'),targets:buttons.every(b=>b.getBoundingClientRect().width>=44 && b.getBoundingClientRect().height>=44)}})()`);
-    assert.deepEqual(geometry,{fits:true,labelsHidden:true,targets:true});
-    await page.click('#btnRecall');await page.waitFor(`document.querySelector('.recall-hit')`,'Recall through its icon');
-    assert.equal(await page.eval(`document.querySelector('#btnRecall').getAttribute('aria-current')`),'page');
-    assert.equal(await page.eval(`getComputedStyle(document.querySelector('#btnRecall')).backgroundColor`),'rgba(0, 0, 0, 0)');
-    assert.equal(await page.eval(`getComputedStyle(document.querySelector('#btnRecall'),'::before').width`),'24px');
-    assert.equal(await page.eval(`document.querySelector('#btnRecall').matches(':focus-visible')`),false,'pointer selection has no keyboard focus ring');
-    await page.send('Emulation.setFocusEmulationEnabled',{enabled:true});
-    await page.eval(`document.querySelector('#btnChanges').focus()`);
-    assert.equal(await page.eval(`document.activeElement.id`),'btnChanges');await page.send('Input.dispatchKeyEvent',{type:'keyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13,text:'\r',unmodifiedText:'\r'});await page.send('Input.dispatchKeyEvent',{type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
-    await page.waitFor(`document.querySelector('.experience-heading h1')?.textContent==='Changes'`,'keyboard navigation through a compact icon');
-    assert.equal(await page.eval(`document.querySelector('#btnChanges').getAttribute('aria-current')`),'page');
-    assert.equal(await page.eval(`document.querySelector('#btnChanges').matches(':focus-visible')`),true,'keyboard navigation retains its focus ring');
-    assert.deepEqual(page.problems,[]);
-  } finally {await page.send('Emulation.setDeviceMetricsOverride',{width:1280,height:900,deviceScaleFactor:1,mobile:false});}
-  // Selection changes must update the accessible count without replacing the icon.
+  assert.deepEqual(await page.eval(`[...document.querySelectorAll('.experience-nav button')].map(b=>b.getAttribute('aria-label') || b.textContent.trim())`), ['Room','Library','More']);
+  assert.equal(await page.eval(`document.getElementById('roomName').hidden`), true, 'no redundant room heading');
+  assert.equal(await page.eval(`document.querySelector('#btnCompare')`), null, 'Compare is contextual');
+  for (const width of [320, 640, 1024]) {
+    await page.send('Emulation.setDeviceMetricsOverride',{width,height:800,deviceScaleFactor:1,mobile:false});
+    assert.equal(await page.eval(`document.documentElement.scrollWidth <= innerWidth`), true, `navigation fits ${width}px`);
+    assert.equal(await page.eval(`[...document.querySelectorAll('.experience-nav-label')].every(b=>getComputedStyle(b).display!=='none')`), true);
+    await page.click('#btnSettings');
+    await page.waitFor(`document.getElementById('settingsPanel').open`, 'Settings open');
+    assert.equal(await page.eval(`document.activeElement.id`), 'btnCloseSettings');
+    assert.equal(await page.eval(`document.querySelector('#settingsPanel').scrollWidth <= document.querySelector('#settingsPanel').clientWidth`), true);
+    await page.send('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
+    await page.send('Input.dispatchKeyEvent',{type:'keyUp',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
+    await page.waitFor(`!document.getElementById('settingsPanel').open`, 'Escape closes Settings');
+    assert.equal(await page.eval(`document.activeElement.id`),'btnSettings');
+  }
+  await page.click('#btnMore');
+  await page.click('#btnChanges');
+  await page.waitFor(`document.querySelector('.experience-heading h1')?.textContent==='Page updates'`, 'optional activity');
+  assert.equal(await page.eval(`document.querySelector('#btnMore').getAttribute('aria-current')`),'page');
+  assert.equal(await page.eval(`document.querySelector('#moreMenu').matches(':popover-open')`),false);
+  assert.equal(await page.eval(`document.querySelector('.watch-add').open`),false,'tracking setup is opt-in');
   await page.click('#btnRecall');await page.waitFor(`document.querySelectorAll('[data-select-ref]').length>=2`,'selectable evidence');
+  assert.equal(await page.eval(`document.querySelector('#btnRecall').getAttribute('aria-current')`),'page');
+  assert.equal(await page.eval(`document.querySelector('.recall-search details').open`),false);
   await page.eval(`[...document.querySelectorAll('[data-select-ref]')].slice(0,2).forEach(b=>b.click())`);
   assert.equal(await page.eval(`document.querySelector('#btnCompare').getAttribute('aria-label')`),'Compare (2)');
-  assert.equal(await page.eval(`document.querySelector('#btnCompare').dataset.count`),'2');
-  assert.equal(await page.eval(`Boolean(document.querySelector('#btnCompare svg path'))`),true);
+  assert.equal(await page.eval(`document.querySelector('#btnCompare').disabled`),false);
+  assert.deepEqual(page.problems,[]);
+  await page.send('Emulation.setDeviceMetricsOverride',{width:1280,height:900,deviceScaleFactor:1,mobile:false});
 });
 
 test('browser: Space links: the room offers a follow of whoever brought you, says who joined through yours, and your space copies its link', { skip }, async () => {
@@ -1448,7 +1537,7 @@ test('browser: Space links: the room offers a follow of whoever brought you, say
     await page.eval(`document.querySelector('#intros .btn.follow').click()`);
     await page.waitFor(`document.querySelector('#intros .btn.follow').getAttribute('aria-pressed') === 'true'`, 'the follow');
     assert.deepEqual(await page.eval(`window.__calls.at(-1)`), { name: 'relationship', args: { handle: 'ana', action: 'follow' } });
-    await page.eval(`document.querySelector('#intros .link-btn').click()`);
+    await page.eval(`document.querySelector('#intros .btn.quiet').click()`);
     assert.equal(await page.eval(`document.querySelectorAll('#intros .intro').length`), 1, 'Not now puts that one away');
 
     // Opening something hides the strip; the room brings it back.
@@ -1682,7 +1771,7 @@ test('browser: source previews ignore older replies, edits and mode changes and 
     await page.send('Emulation.setDeviceMetricsOverride', { width: 320, height: 600, deviceScaleFactor: 1, mobile: false });
     await page.eval(`document.documentElement.style.fontSize='200%'`);
     await page.waitFor(`document.querySelector('.cand-title')`, 'long source title');
-    assert.ok(await page.eval(`document.documentElement.scrollWidth <= innerWidth`));
+    assert.ok(await page.eval(`document.documentElement.scrollWidth <= innerWidth`), await page.eval(`JSON.stringify([...document.querySelectorAll('body *')].filter(n=>{const r=n.getBoundingClientRect();return r.width && r.right>innerWidth+1}).map(n=>({tag:n.tagName,id:n.id,class:n.className,width:n.getBoundingClientRect().width,right:n.getBoundingClientRect().right})).slice(0,12))`));
     await page.eval(`document.querySelector('.cand button').focus()`);
     await page.send('Input.dispatchKeyEvent', {type:'rawKeyDown', key:'Escape', code:'Escape'});
     assert.equal(await page.eval(`document.activeElement.id`), 'btnAdd');

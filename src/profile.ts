@@ -164,7 +164,7 @@ export class ProfileError extends AppError {
 export function defaultProfile(now = new Date()): Profile {
   return {
     version: 1,
-    name: 'morning',
+    name: 'Your portal room',
     layout: 'columns',
     openIn: 'card',
     saved: [],

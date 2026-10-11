@@ -30,7 +30,7 @@
       if (view === 'quotes' && item.clip?.kind !== 'quote') continue;
       if (view === 'quotes' || (view === 'gallery' && item.clip?.kind === 'image')) {
         const body = el('div', { class: 'portal-clip-body' }, item.summary || item.title);
-        const card = el('article', { class: 'portal-clip-card' }, body, el('button', { class: 'link-btn', onclick: () => openItem(item, portal) }, item.title));
+        const card = el('article', { class: 'portal-clip-card' }, body, el('button', { class: 'btn quiet sm', onclick: () => openItem(item, portal) }, item.title));
         wrap.append(watchNew(card, item, portal));
         if (item.clip) callTool('get_clip', { id: item.clip.id }).then(({ structuredContent: { clip } }) => {
           if (!body.isConnected) return;

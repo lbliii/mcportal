@@ -28,13 +28,13 @@
     const src = clip.source || {};
     const from = src.url ? (src.title || new URL(src.url).hostname) : src.kind === 'conversation' ? 'a conversation' : (src.title || '');
     const top = el('div', { class: 'reader-top' },
-      iconButton('back', experienceReturn ? 'Back to your reading experience' : withBack ? 'Back to your room' : 'Open your room', closeReader, 'ib'),
-      src.url && isHttpUrl(src.url) ? iconButton('external', 'Open where it came from', () => openLink(src.url ?? ''), 'ib') : null);  // checked just before
+      iconButton('back', experienceReturn ? 'Back to your reading experience' : withBack ? 'Back to your room' : 'Open your room', closeReader, {size:'default'}),
+      src.url && isHttpUrl(src.url) ? iconButton('external', 'Open where it came from', () => openLink(src.url ?? ''), {size:'default'}) : null);  // checked just before
     return present([top, el('h1', null, clip.title),
       el('div', { class: 'byline' }, [`${clip.kind[0].toUpperCase()}${clip.kind.slice(1)}`, from ? `from ${from}` : '', `clipped ${ago(clip.createdAt)}`].filter(Boolean).join(' · ')),
-      clip.tags.length ? el('div', { class: 'clip-tags' }, clip.tags.map((t) => el('span', null, `#${t}`))) : null,
+      clip.tags.length ? el('div', { class: 'clip-tags' }, clip.tags.map(t=>uiBadge({label:`#${t}`}))) : null,
       clip.note ? el('p', { class: 'clip-note' }, clip.note) : null,
-      el('div', { class: 'body' }, clipBody(clip.data)),
+      el('div', { class: 'body ui-document' }, clipBody(clip.data)),
       el('div', { class: 'row' }, el('button', { class: 'btn', onclick: (/** @type {MouseEvent} */ e) => { /** @type {HTMLElement} */ (/** @type {HTMLElement} */ (e.currentTarget).parentNode).replaceWith(composer({ clipId: clip.id }, clip.title)); } }, icon('share'), ' Share to your space')),  // the button's parent: this row
       el('div', { class: 'prov' }, `Your clip ${clip.id}. Only you can see it until you share it.`)]);
   }
@@ -69,7 +69,7 @@
     const reader = $('reader');
     rememberRoomNavigation();
     $('grid').hidden = true; reader.hidden = false; reader.scrollTop = 0; window.scrollTo(0, 0);
-    renderReader(el('div', { class: 'reader-top' }, iconButton('back', 'Back to your room', closeReader, 'ib')), el('h1', null, item.title), el('div', { class: 'byline' }, 'Stand by…'));
+    renderReader(el('div', { class: 'reader-top' }, iconButton('back', 'Back to your room', closeReader, {size:'default'})), el('h1', null, item.title), el('div', { class: 'byline' }, 'Stand by…'));
     try {
       // Only clip items come here (openItem checks item.clip).
       const clip = (await callTool('get_clip', { id: /** @type {NonNullable<Item['clip']>} */ (item.clip).id })).structuredContent.clip;
@@ -81,7 +81,7 @@
         }, 5000).catch(() => {});
       }
     } catch (error) {
-      renderReader(el('div', { class: 'reader-top' }, iconButton('back', 'Back to your room', closeReader, 'ib')), el('h1', null, item.title),
+      renderReader(el('div', { class: 'reader-top' }, iconButton('back', 'Back to your room', closeReader, {size:'default'})), el('h1', null, item.title),
         el('div', { class: 'error' }, `That clip has vanished into another dimension (${errorText(error)}).`));
     }
   }
@@ -133,7 +133,7 @@
         ready = true;
         draw(); disable(false);
       }).catch((error) => {
-        help.replaceChildren('Couldn’t load your audience preference. ', el('button', { type: 'button', class: 'link-btn',
+        help.replaceChildren('Couldn’t load your audience preference. ', el('button', { type: 'button', class: 'btn quiet sm',
           ...(inMenu ? { role: 'menuitem', tabindex: '-1' } : {}),
           onclick: load }, 'Retry'));
         toast(errorText(error));
@@ -179,7 +179,7 @@
     const reader = $('reader');
     rememberRoomNavigation();
     $('grid').hidden = true; reader.hidden = false; reader.scrollTop = 0; window.scrollTo(0, 0);
-    renderReader(...present([el('div', { class: 'reader-top' }, iconButton('back', 'Back to your room', closeReader, 'ib')),
+    renderReader(...present([el('div', { class: 'reader-top' }, iconButton('back', 'Back to your room', closeReader, {size:'default'})),
       el('h1', null, item.title), el('div', { class: 'byline' }, [item.url, quote ? `reblogging @${quote.by}` : ''].filter(Boolean).join(' · ')),
       quote && quote.note ? el('p', { class: 'story-note' }, el('span', { class: 'story-note-by' }, `@${quote.by}`), quote.note) : null,
       composer(target, item.title, { verb, audience, onDone })]));
@@ -218,7 +218,7 @@
     const travelers = el('input', { type: 'text', value: (space.travelers || []).map((p) => p.handle).join(', '), 'aria-label': 'Fellow travelers', placeholder: 'Up to six listed handles' });
     settings.append(el('label', null, 'Transmitting on', topics), el('label', null, 'Fellow travelers', travelers),
       el('button', { class: 'btn', type: 'button', onclick: () => save({ frequency: topics.value.split(',').map((s) => s.trim()).filter(Boolean), travelers: travelers.value.split(',').map((s) => s.trim()).filter(Boolean) }) }, 'Save words and travelers'));
-    const stamps = el('details', null, el('summary', null, 'Visible stamps'));
+    const stamps = uiDisclosure({label:'Visible stamps'});
     for (const name of spaceInks.stamps) {
       const box = el('input', { type: 'checkbox' }); box.checked = !space.hiddenStamps?.some((s) => s === name);
       box.addEventListener('change', () => {
@@ -228,7 +228,7 @@
       stamps.append(el('label', null, box, name));
     }
     settings.append(stamps);
-    shop.append(el('details', null, el('summary', null, 'Words, travelers and privacy'), settings));
+    shop.append(uiDisclosure({label:'Words, travelers and privacy'}, settings));
     return shop;
   }
 
@@ -296,7 +296,7 @@
       [keys[at], keys[to]] = [keys[to], keys[at]];
       save({ [curationKey]: { ...saved, [pinned ? 'pinned' : 'order']: keys } });
     }
-    const personal = el('details', { class: 'space-curation' }, el('summary', null, 'Personalize this section (optional)'),
+    const personal = uiDisclosure({label:'Personalize this section (optional)', className:'space-curation'},
       el('p', null, 'Pinned entries appear first. Hide entries here without unfollowing them. Other entries update automatically.'),
       candidates.map((entry) => {
         const hidden = saved.hidden.includes(entry.key), pinned = saved.pinned.includes(entry.key);
@@ -357,7 +357,7 @@
         for (const tab of sheet.querySelectorAll('.space-tabs a')) tab.setAttribute('aria-current', String(tab === link));
       });
     }
-    const toolbar = withBack ? el('div', { class: 'reader-top' }, iconButton('back', 'Back to your room', back || closeReader, 'ib')) : null;
+    const toolbar = withBack ? el('div', { class: 'reader-top' }, iconButton('back', 'Back to your room', back || closeReader, {size:'default'})) : null;
     if (toolbar) trackReaderToolbar(toolbar);
     return present([toolbar, space.mine ? printShop(space, withBack, back) : null,
       space.mine ? spaceSectionSettings(space, 'sources', withBack, back) : null,
@@ -479,7 +479,7 @@
     for (const handle of intros.offer) {
       const follow = el('button', { class: 'btn follow', type: 'button', 'aria-pressed': 'false' }, `Follow @${handle}`);
       const row = el('div', { class: 'intro' }, patchAvatar(intros.covers?.[handle]), el('span', null, 'You came in through ', handleButton(handle), "'s Space link."), follow,
-        el('button', { class: 'link-btn', type: 'button', onclick: () => { row.remove(); if (!strip.children.length) strip.remove(); } }, 'Not now'));
+        el('button', { class: 'btn quiet sm', type: 'button', onclick: () => { row.remove(); if (!strip.children.length) strip.remove(); } }, 'Not now'));
       follow.addEventListener('click', async () => {
         follow.disabled = true;
         try {
@@ -581,8 +581,8 @@
     const original = share.original && 'author' in share.original ? share.original : undefined;
     const preview = share.reblogOf ? original : share;
     const top = el('div', { class: 'reader-top' },
-      iconButton('back', withBack ? 'Back to your room' : 'Open your room', closeReader, 'ib'),
-      share.url && isHttpUrl(share.url) ? iconButton('external', 'Open the original', () => openLink(share.url ?? ''), 'ib') : null);  // checked just before
+      iconButton('back', withBack ? 'Back to your room' : 'Open your room', closeReader, {size:'default'}),
+      share.url && isHttpUrl(share.url) ? iconButton('external', 'Open the original', () => openLink(share.url ?? ''), {size:'default'}) : null);  // checked just before
     const clip = original?.clip ?? share.clip;
     const body = clip ? clipBody(clip.data)
       : share.url && isHttpUrl(share.url) ? [el('p', null, el('button', { class: 'btn', onclick: () => openLink(share.url ?? '') }, share.url))] : [];  // checked just before
@@ -601,7 +601,7 @@
       preview?.description ? el('p', { class: 'item-summary' }, preview.description) : null,
       original?.note ? el('p', { class: 'story-note' }, handleButton(original.author.handle, 'story-note-by'), original.note) : null,
       share.note ? el('p', { class: share.reblogOf ? 'story-note' : 'share-note' }, share.reblogOf ? (share.mine ? el('span', { class: 'story-note-by' }, 'You') : handleButton(share.author.handle, 'story-note-by')) : null, share.note) : null,
-      el('div', { class: 'body' }, body),
+      el('div', { class: 'body ui-document' }, body),
       reblog || follow ? el('div', { class: 'share-actions' }, reblog, follow) : null,
       share.mine && !share.reblogOf ? reblogControls(share, rebloggers) : null,
       el('div', { class: 'prov' }, share.hiddenAt ? 'An admin hid this share; only you can see it.' : `Shared on MCPortal. ${share.mine ? '' : 'Written by another user.'}`)]);
@@ -624,7 +624,7 @@
       rule.disabled = false;
     });
     const list = rebloggers.map((r) => {
-      const cut = r.detached ? el('span', { class: 'pm' }, 'removed from this reblog') : el('button', { class: 'link-btn', type: 'button' }, 'Remove my post from this reblog');
+      const cut = r.detached ? el('span', { class: 'pm' }, 'removed from this reblog') : el('button', { class: 'btn quiet sm', type: 'button' }, 'Remove my post from this reblog');
       if (!r.detached) cut.addEventListener('click', async () => {
         if (cut.dataset.sure !== 'yes') { cut.dataset.sure = 'yes'; cut.textContent = "Sure? This can't be undone"; return; }
         try {
@@ -674,17 +674,17 @@
     reader.classList.remove('space');
     rememberRoomNavigation();
     $('grid').hidden = true; reader.hidden = false; reader.scrollTop = 0; window.scrollTo(0, 0);
-    renderReader(el('div', { class: 'reader-top' }, iconButton('back', 'Back', back ? () => back(scroll) : closeReader, 'ib')), el('h1', null, item.title), el('div', { class: 'byline' }, 'Stand by…'));
+    renderReader(el('div', { class: 'reader-top' }, iconButton('back', 'Back', back ? () => back(scroll) : closeReader, {size:'default'})), el('h1', null, item.title), el('div', { class: 'byline' }, 'Stand by…'));
     try {
       // Only shares come here: openItem checks item.share, and space posts always carry one.
       const { share, rebloggers, labs } = (await callTool('get_share', { id: /** @type {NonNullable<ShareRef['share']>} */ (item.share).id })).structuredContent;
       if (labs) state.labs = labs;
       const nodes = shareNodes(share, true, rebloggers);
-      if (back) nodes[0].replaceChildren(iconButton('back', 'Back to the space', () => back(scroll), 'ib'), ...[...nodes[0].children].slice(1));
+      if (back) nodes[0].replaceChildren(iconButton('back', 'Back to the space', () => back(scroll), {size:'default'}), ...[...nodes[0].children].slice(1));
       renderReader(...nodes);
       primePictures(reader);
     } catch (error) {
-      renderReader(el('div', { class: 'reader-top' }, iconButton('back', 'Back to your room', closeReader, 'ib')), el('h1', null, item.title),
+      renderReader(el('div', { class: 'reader-top' }, iconButton('back', 'Back to your room', closeReader, {size:'default'})), el('h1', null, item.title),
         el('div', { class: 'error' }, `That share has vanished into another dimension (${errorText(error)}).`));
     }
   }

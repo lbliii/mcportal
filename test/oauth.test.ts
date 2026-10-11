@@ -133,7 +133,7 @@ test('full flow: register → consent → GitHub → code → token → per-user
     const other = await authorize(app, clientId, challenge, 'gh-code-mallory');
     const otherTokens = JSON.parse((await raw(app.port, { method: 'POST', path: '/oauth/token', ...form({ grant_type: 'authorization_code', code: other.searchParams.get('code')!, client_id: clientId, redirect_uri: CLIENT_REDIRECT, code_verifier: verifier }) })).body);
     const mallory = JSON.parse((await mcp(otherTokens.access_token, getProfile)).body);
-    assert.equal(mallory.result.structuredContent.profile.name, 'morning');
+    assert.equal(mallory.result.structuredContent.profile.name, 'Your portal room');
     const mine = JSON.parse((await mcp(tokens.access_token, getProfile)).body);
     assert.equal(mine.result.structuredContent.profile.name, 'lawrence-room');
 

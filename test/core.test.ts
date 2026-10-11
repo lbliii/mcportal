@@ -136,7 +136,7 @@ test('open_room hydrates every portal and fences third-party text', async () => 
   const result = await call(ctx(), 'open_room');
   assert.equal(result.isError, undefined);
   const { profile, portals } = result.structuredContent;
-  assert.equal(profile.name, 'morning');
+  assert.equal(profile.name, 'Your portal room');
   assert.deepEqual(portals.map((p: any) => p.portalId), ['hn-top', 'gh-mcp', 'simonw']);
   assert.ok(portals.every((p: any) => !p.error && p.items.length > 0));
   const text = result.content[0]!.text;
@@ -199,7 +199,7 @@ test('arrange_room saves layout, openIn and the name, reports them, and keeps po
   assert.equal(before.layout, 'columns');
   const saved = await call(c, 'arrange_room', { layout: 'shelves', openIn: 'chat', name: 'mornings' });
   assert.equal(saved.isError, undefined);
-  assert.match(saved.content[0]!.text, /settings: layout columns → shelves, openIn card → chat, name "morning" → "mornings"/);
+  assert.match(saved.content[0]!.text, /settings: layout columns → shelves, openIn card → chat, name "Your portal room" → "mornings"/);
   assert.doesNotMatch(saved.content[0]!.text, /moved|removed|added/);
   const after = (await call(c, 'open_room')).structuredContent.profile;
   assert.equal(after.layout, 'shelves');
@@ -686,14 +686,14 @@ test('FileProfileStore: round-trips, recovers from corruption, serializes concur
   const dir = await mkdtemp(path.join(tmpdir(), 'mcportal-'));
   try {
     const store = new FileProfileStore(dir);
-    assert.equal((await store.get('lawrence')).name, 'morning');
+    assert.equal((await store.get('lawrence')).name, 'Your portal room');
     const custom = validateProfile({ name: 'work', columns: [{ panels: [{ source: 'hn', config: { feed: 'best' } }] }] });
     await store.put('lawrence', custom);
     assert.equal((await store.get('lawrence')).name, 'work');
 
     // Corrupt file: user gets the default back plus a notice, and the old file is kept.
     await writeFile(path.join(dir, 'lawrence.json'), '{"columns": [');
-    assert.equal((await store.get('lawrence')).name, 'morning');
+    assert.equal((await store.get('lawrence')).name, 'Your portal room');
     assert.match(store.takeNotice('lawrence') ?? '', /restored the default/);
     assert.ok((await readdir(dir)).some((f) => f.startsWith('lawrence.corrupt-')));
     // ...and the agent can save again immediately.
