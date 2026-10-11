@@ -51,21 +51,18 @@
     enterExperience('collections');
     $('experiences').replaceChildren(el('header', { class: 'experience-heading' }, el('button', { class: 'btn quiet sm', onclick: () => showRecall() }, '← Library'), el('h1', null, 'Collections')),
       el('div', { id: 'collectionCreate' }), el('div', { id: 'collectionCards', class: 'collection-cards', 'aria-live': 'polite' }, uiFeedback({kind:'loading', message:'Loading your collections…'})));
-    const title = el('input', { type: 'text', required: true, maxlength: 200, placeholder: 'Agents that remember', 'aria-label': 'Collection title' });
-    const purpose = el('input', { type: 'text', maxlength: 1000, placeholder: 'What are you trying to understand?', 'aria-label': 'Collection purpose' });
+    const title = uiControl('input', { type: 'text', required: true, maxlength: 200, placeholder: 'Agents that remember', 'aria-label': 'Collection title' });
+    const purpose = uiControl('input', { type: 'text', maxlength: 1000, placeholder: 'What are you trying to understand?', 'aria-label': 'Collection purpose' });
     const note = el('p', { class: 'experience-muted', role: 'status' }, fromSelection ? `${selectedEvidence.size} selected items will be kept here.` : 'Add saved links and quotes from Library.');
     const titleField = uiField(title, {label:'Collection title', hiddenLabel:true});
     const purposeField = uiField(purpose, {label:'Collection purpose', hiddenLabel:true});
     const create = uiButton({label:'Create collection', emphasis:'primary', type:'submit'});
     const form = el('form', { class: 'collection-create' }, titleField.element, purposeField.element, create, note);
-    form.addEventListener('submit', async e => {
-      e.preventDefault(); if (create.disabled) return; uiBusy(create, true); titleField.setError();
-      try {
+    uiForm(form,{submit:create,onSubmit:async()=>{
         const { collection } = (await callTool('update_collection', { action: 'create', title: title.value.trim(), purpose: purpose.value.trim(), ...(fromSelection ? { entries: [...selectedEvidence.values()].map(hitEntry) } : {}) })).structuredContent;
         if (!collection) throw new Error('The collection was not created.');
         selectedEvidence.clear(); updateSelection(); openDesk(collection.id);
-      } catch (error) { titleField.setError(errorText(error)); title.focus(); } finally { uiBusy(create, false); }
-    });
+    }});
     $('collectionCreate').append(uiDisclosure({label:'New collection', className:'collection-setup', open:fromSelection}, form));
     try {
       const data = (await callTool('open_collection')).structuredContent;
@@ -98,7 +95,7 @@
     if (!currentDesk) return;
     const id = currentDesk.collection.id;
     try { await callTool('update_collection', { ...change, id }); await openDesk(id); }
-    catch (error) { toast(errorText(error)); }
+    catch (error) { toast(errorText(error), 'error'); }
   }
   /** @param {CollectionData} data */
   function showDesk(data) {
@@ -180,28 +177,26 @@
   }
   /** @param {string} id */
   function noteComposer(id) {
-    const note = el('textarea', { 'aria-label': 'Personal note', placeholder: 'What are you noticing? Keep a personal note…', maxlength: 16000, required: true });
+    const note = uiControl('textarea', { 'aria-label': 'Personal note', placeholder: 'What are you noticing? Keep a personal note…', maxlength: 16000, required: true });
     const button = uiButton({label:'Keep personal note', type:'submit'});
-    const form = el('form', { class: 'desk-note' }, el('h3', null, 'Your own thinking'), note, button);
-    form.addEventListener('submit', async e => {
-      e.preventDefault(); button.disabled = true;
-      try {
+    const form = el('form', { class: 'desk-note' }, el('h3', null, 'Your own thinking'), uiField(note,{label:'Personal note',hiddenLabel:true}).element, button);
+    uiForm(form,{submit:button,onSubmit:async()=>{
         const { clip } = (await callTool('clip', { kind: 'note', content: note.value, title: `Note for ${currentDesk?.collection.title || 'my collection'}`.slice(0,200), source: { kind: 'conversation' } })).structuredContent;
         await callTool('update_collection', { action: 'add', id, entries: [{ ref: `clip:${clip.id}`, title: clip.title }] });
         openDesk(id);
-      } catch (error) { toast(errorText(error)); button.disabled = false; }
-    });
+    }});
     return form;
   }
   /** @param {Collection} c */
   function editDesk(c) {
-    const title = el('input', { type: 'text', value: c.title, maxlength: 200, 'aria-label': 'Collection title', required: true });
-    const purpose = el('textarea', { maxlength: 1000, 'aria-label': 'Collection purpose' }, c.purpose);
-    const boxes = collectionSources.map(source => { const input = el('input', { type: 'checkbox', value: source.portalId, checked: c.livePortals.includes(source.portalId) }); return { input, node: el('label', null, input, source.title) }; });
-    const form = el('form', { class: 'desk-editor' }, el('h2', null, 'Edit collection'), title, purpose, el('fieldset', null, el('legend', null, 'Live sources (up to 8)'), ...boxes.map(b => b.node)),
-      el('div', { class: 'experience-row' }, uiButton({label:'Save collection', emphasis:'primary', type:'submit'}), uiButton({label:'Cancel', type:'button', onClick:() => currentDesk && showDesk(currentDesk)}),
-        el('button', { class: 'btn quiet sm', type: 'button', onclick: async () => { try { await callTool('update_collection', { action: 'delete', id: c.id }); showCollections(); } catch (error) { toast(errorText(error)); } } }, 'Delete collection')));
-    form.addEventListener('submit', e => { e.preventDefault(); changeDesk({ action: 'edit', title: title.value, purpose: purpose.value, livePortals: boxes.filter(b => b.input.checked).map(b => b.input.value) }); });
+    const title = uiControl('input', { type: 'text', value: c.title, maxlength: 200, 'aria-label': 'Collection title', required: true });
+    const purpose = uiControl('textarea', { maxlength: 1000, 'aria-label': 'Collection purpose' }, c.purpose);
+    const boxes = collectionSources.map(source => { const input = uiControl('input', { type: 'checkbox', value: source.portalId, checked: c.livePortals.includes(source.portalId) }); return { input, node: el('label', null, input, source.title) }; });
+    const save=uiButton({label:'Save collection',emphasis:'primary',type:'submit'});
+    const form = el('form', { class: 'desk-editor' }, el('h2', null, 'Edit collection'), uiField(title,{label:'Title'}).element, uiField(purpose,{label:'Purpose (optional)'}).element, el('fieldset', null, el('legend', null, 'Live sources (up to 8)'), ...boxes.map(b => b.node)),
+      el('div', { class: 'experience-row' }, save, uiButton({label:'Cancel', type:'button', onClick:() => currentDesk && showDesk(currentDesk)}),
+        el('button', { class: 'btn quiet sm', type: 'button', onclick: async () => { try { await callTool('update_collection', { action: 'delete', id: c.id }); showCollections(); } catch (error) { toast(errorText(error), 'error'); } } }, 'Delete collection')));
+    uiForm(form,{submit:save,onSubmit:async()=>{const {collection}=(await callTool('update_collection',{action:'edit',id:c.id,title:title.value,purpose:purpose.value,livePortals:boxes.filter(b=>b.input.checked).map(b=>b.input.value)})).structuredContent;if(collection)openDesk(collection.id);}});
     $('experiences').replaceChildren(form);
   }
   /** @param {Item} item @param {PortalResult} portal */

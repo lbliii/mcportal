@@ -10,12 +10,10 @@
   .portal-clip-body small { display:block; margin:var(--mp-space-8) 0 }
   .portal-clip-body img { max-width:100%; max-height:18rem; object-fit:contain }
   .catchup-progress { display:flex; align-items:center; gap:var(--mp-space-16); margin-bottom:var(--mp-space-16); color:var(--mp-text-secondary); font-size:var(--mp-type-13) }
-  .catchup-progress progress { flex:1; accent-color:var(--mp-action-primary); height:8px; min-width:0 }
   .catchup-story,.catchup-end,.catchup-start,.catchup-failures { background:var(--mp-surface-card); border:1px solid var(--mp-border-divider); border-radius:var(--mp-radius-lg); padding:var(--mp-space-24); margin-bottom:var(--mp-space-20); max-width:44rem; overflow-wrap:anywhere }
   .catchup-story h2,.catchup-end h2 { font-family:var(--mp-font-heading); font-size:var(--mp-type-22) }
   .catchup-story p,.catchup-end p { line-height:var(--mp-line-body) }
   .catchup-start h2 { font-size:var(--mp-type-18) }
-  .catchup-start select { padding:var(--mp-space-8); font:inherit; background:var(--mp-surface-input); color:var(--mp-text-primary); border:1px solid var(--mp-border-control); border-radius:var(--mp-radius-control) }
   .catchup-start fieldset { margin:var(--mp-space-16) 0; border:1px solid var(--mp-border-divider) }
   .catchup-start label { display:flex; gap:var(--mp-space-8); margin:var(--mp-space-8) 0 }
   .catchup-finish { display:block; margin:var(--mp-space-16) auto; padding:var(--mp-space-12) }
@@ -26,7 +24,6 @@
   .collection-create { display:flex; gap:var(--mp-space-8); flex-wrap:wrap; margin-bottom:var(--mp-space-24) }
   .collection-create input { flex:1; width:12rem; min-width:0 }
   .collection-create p { width:100% }
-  .collection-create input,.desk-note textarea,.desk-editor input[type=text],.desk-editor textarea,.experience-heading input { padding:var(--mp-space-12); font:inherit; color:var(--mp-text-primary); border:1px solid var(--mp-border-control); background:var(--mp-surface-input); border-radius:var(--mp-radius-control); max-width:100%; box-sizing:border-box }
   .desk-layout { display:grid; grid-template-columns:minmax(0,1.6fr) minmax(0,1fr); gap:var(--mp-space-24) }
   .desk-kept > h2,.desk-context h2,.comparison-evidence h2,.comparison-interpretation h2 { font-size:var(--mp-type-18); font-family:var(--mp-font-heading) }
   .desk-entry { margin-bottom:var(--mp-space-12) }
@@ -63,7 +60,6 @@
   .experience-heading p,.experience-muted { color:var(--mp-text-secondary); font-size:var(--mp-type-13); line-height:var(--mp-line-body) }
   .experience-kicker { font-size:var(--mp-type-11); letter-spacing:.08em; color:var(--mp-text-secondary); text-transform:uppercase }
   .experience-row { display:flex; gap:var(--mp-space-8); align-items:center; flex-wrap:wrap }
-  .recall-search input,.recall-search select { font:inherit; color:var(--mp-text-primary); background:var(--mp-surface-card); border:1px solid var(--mp-border-control); border-radius:var(--mp-radius-control); padding:var(--mp-space-10); min-width:0; max-width:100% }
   .recall-search input[type=search] { flex:1; width:10rem }
   .recall-filters { display:flex; flex-wrap:wrap; gap:var(--mp-space-8); margin-top:var(--mp-space-8) }
   .recall-filters > * { flex:1; width:8rem }
@@ -86,7 +82,9 @@
   .watch-main h2,.watch-sidebar h2 { font-family:var(--mp-font-heading); font-size:var(--mp-type-18) }
   .watch-setup,.change-card,.event-card { background:var(--mp-surface-card); border:1px solid var(--mp-border-divider); border-radius:var(--mp-radius-lg); padding:var(--mp-space-20); margin-bottom:var(--mp-space-16); min-width:0; overflow-wrap:anywhere }
   .change-card h3,.event-card h3 { font-family:var(--mp-font-heading); font-size:var(--mp-type-22); margin:var(--mp-space-8) 0 }
-  .watch-setup select,.watch-setup input { font:inherit; width:100%; box-sizing:border-box; padding:var(--mp-space-10); color:var(--mp-text-primary); background:var(--mp-surface-input); border:1px solid var(--mp-border-control); border-radius:var(--mp-radius-control); margin-bottom:var(--mp-space-12) }
+  .watch-setup .field { width:100%; }
+  .watch-fields { display:grid; gap:var(--mp-space-8); }
+  .watch-setup > .field { margin-bottom:var(--mp-space-8); }
   .watch-setup label { display:block; font-size:var(--mp-type-13); line-height:var(--mp-line-body) }
   .change-card.acknowledged { opacity:.75 }
   .watch-warning { border-left:3px solid var(--mp-action-primary); padding-left:var(--mp-space-12); font-size:var(--mp-type-13) }

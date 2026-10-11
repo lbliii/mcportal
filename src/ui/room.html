@@ -66,7 +66,7 @@
 </dialog>
 <section id="addSheet" class="add-sheet room-only" hidden>
   <div class="add-row" role="group" aria-label="Source type"><button id="addFeed" class="btn" type="button" aria-pressed="true">Feed or site</button><button id="addStore" class="btn" type="button" aria-pressed="false">Shopify store</button></div>
-  <div id="storeScope" class="add-row" hidden><label>Collection handle (optional) <input id="storeCollection" type="text" maxlength="80" placeholder="new-arrivals"></label><label><input id="storeSales" type="checkbox"> Sales only</label></div>
+  <div id="storeScope" class="add-row" hidden><label>Collection handle (optional) <input class="field" id="storeCollection" type="text" maxlength="80" placeholder="new-arrivals"></label><label><input class="field" id="storeSales" type="checkbox"> Sales only</label></div>
   <form class="add-row" id="addForm">
     <input class="field" id="addInput" type="text" autocomplete="off" spellcheck="false" placeholder="theverge.com, r/LocalLLaMA, youtube.com/@channel, owner/repo…" aria-label="Site, feed, subreddit, channel or repo">
     <button class="btn" type="submit">Find sources</button>
@@ -76,17 +76,17 @@
   <ul class="cands" id="addResults"></ul>
 </section>
 <main id="grid" class="grid" aria-label="Your portal room" aria-live="polite">
-  <div class="col" style="flex-grow:1"><div class="portal"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div></div>
+  <div class="col" style="flex-grow:1"><div class="portal"><div class="ui-skeleton" data-ui="skeleton" aria-hidden="true"><div></div><div></div><div></div></div></div></div>
 </main>
 <section id="experiences" class="experiences" hidden></section>
 <section id="welcome" class="welcome" hidden></section>
 <section id="importReport" class="import-report" aria-label="Subscription import results" hidden></section>
-<input type="file" id="opmlFile" accept=".opml,.xml,text/xml,application/xml,text/x-opml" hidden>
+<input type="file" id="opmlFile" aria-label="Import subscriptions from OPML" accept=".opml,.xml,text/xml,application/xml,text/x-opml" hidden>
 <section class="reader-shell" aria-label="Reader">
   <div id="readerControls"></div>
   <article id="reader" class="reader" hidden></article>
 </section>
-<div class="toast" id="toast" role="status"></div>
+<div id="toast"></div>
 
 <script>
 (() => {
@@ -121,6 +121,7 @@
   /*include:design/components/tabs.js*/
   /*include:design/components/disclosure.js*/
   /*include:design/components/pill.js*/
+  /*include:design/components/feedback.js*/
   /*include:design/patterns.js*/
   /*include:design/components/tooltips.js*/
   for (const node of $$('[data-icon]')) node.replaceChildren(icon(node.dataset.icon ?? ''));

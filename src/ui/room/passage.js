@@ -32,7 +32,7 @@
     const blocks = logicalBlocks(body);
     // Copy only authored text, excluding embedded code/media action labels.
     const choices = blocks.map((node, block) => ({ block, text: readerTextRuns(node).map(run => run.map(t => t.textContent).join('')).join('\n').trim().slice(0, PASSAGE_CHARS) })).filter(p => p.text.length >= 3);
-    const select = el('select', { 'aria-label': 'Passage to use' }, choices.map(p => el('option', { value: String(p.block) }, `${p.block + 1}. ${p.text.replace(/\s+/g, ' ').slice(0, 100)}`)));
+    const select = uiControl('select', { 'aria-label': 'Passage to use' }, choices.map(p => el('option', { value: String(p.block) }, `${p.block + 1}. ${p.text.replace(/\s+/g, ' ').slice(0, 100)}`)));
     const preview = el('blockquote', { class: 'passage-preview' });
     const chosen = () => {
       const p = choices.find(p => p.block === Number(select.value));
@@ -210,7 +210,7 @@
         structuredContent: { passage: { url: p.url, title: p.title, heading: p.heading, text: p.text } },
       }, 5000);
     } catch (error) {
-      toast(`Couldn't share the passage with your agent: ${errorText(error)}`);
+      toast(`Couldn't share the passage with your agent: ${errorText(error)}`, 'error');
       return;
     }
     hidePassageBar();
@@ -235,7 +235,7 @@
       }
       toast(data.layoutChanged ? 'Clipped! A Clips portal has materialized in your room.' : 'Clipped!');
     } catch (error) {
-      toast(`Curses! Couldn't clip that: ${errorText(error)}`);
+      toast(`Curses! Couldn't clip that: ${errorText(error)}`, 'error');
     }
   }
 
@@ -243,5 +243,5 @@
   async function copyPassage(p) {
     hidePassageBar();
     try { await navigator.clipboard.writeText(`"${p.text}"\n— ${p.title} (${p.url})`); toast('Copied the quote'); }
-    catch { toast("Couldn't copy; select the text and copy it yourself"); }
+    catch { toast("Couldn't copy; select the text and copy it yourself", 'error'); }
   }

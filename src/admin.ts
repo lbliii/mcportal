@@ -42,6 +42,16 @@ function fail(res: ServerResponse, code: ErrorCode, message: string): void {
 
 const ADMIN_HTML = fileURLToPath(new URL('./ui/admin.html', import.meta.url));
 
+/** The same shared form modules used in the room, under the page's nonce. */
+export async function adminHtml(nonce: string): Promise<string> {
+  const names = ["brand/icons.js", "design/contracts.js", "design/dom.js", "design/components/icon.js", "design/components/button.js", "design/components/field.js", "design/components/feedback.js"];
+  const snippets = new Map(await Promise.all(names.map(async name => [name, await readFile(new URL(`./ui/${name}`, import.meta.url), 'utf8')] as const)));
+  return (await readFile(ADMIN_HTML, 'utf8')).replace(/\/\*include:([\w./-]+)\*\//g, (_, name: string) => {
+    const source=snippets.get(name); if(source===undefined) throw new Error(`Unknown admin include: ${name}`); return source;
+  }).replace('/*MCPORTAL_DESIGN*/', () => DESIGN_CSS + PRIMITIVES_CSS + WEB_BRAND_CSS)
+    .replace('<!--MCPORTAL_WEB_HEADER-->', () => webHeader()).replace('<!--MCPORTAL_WEB_FOOTER-->', () => webFooter()).replaceAll('__NONCE__', nonce);
+}
+
 
 export class AdminPanel {
   private sessions: PageSessions;
@@ -170,7 +180,7 @@ export class AdminPanel {
         return true;
       }
       const nonce = randomBytes(16).toString('base64');
-      const html = (await readFile(ADMIN_HTML, 'utf8')).replace('/*MCPORTAL_DESIGN*/', DESIGN_CSS + PRIMITIVES_CSS + WEB_BRAND_CSS).replace('<!--MCPORTAL_WEB_HEADER-->', webHeader()).replace('<!--MCPORTAL_WEB_FOOTER-->', webFooter()).replaceAll('__NONCE__', nonce);
+      const html = await adminHtml(nonce);
       sendHtml(res, 200, html, {
         'content-security-policy': `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline'; font-src data:; connect-src 'self'; img-src 'self' data:; form-action 'self'; frame-ancestors 'none'; base-uri 'none'`,
       });

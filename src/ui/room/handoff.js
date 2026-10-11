@@ -31,7 +31,7 @@
           if ('unavailable' in data) { toast('The live page is still unavailable. Your retained handoff is here.'); return; }
           if ('article' in data) showArticleCard(data.article, data.saved);
           else showDocsCard(data);
-        } catch(error) { if (generation === readerGeneration) toast(errorText(error)); }
+        } catch(error) { if (generation === readerGeneration) toast(errorText(error), 'error'); }
       } }, 'Retry live page'));
     setStatus('');
   }
@@ -65,7 +65,7 @@
       })).structuredContent;
       showHandoffSent(page.body, prompt);
     } catch (error) {
-      toast(`Curses! Couldn't send that: ${errorText(error)}`);
+      toast(`Curses! Couldn't send that: ${errorText(error)}`, 'error');
     }
   }
 

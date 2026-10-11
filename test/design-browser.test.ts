@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { adminHtml } from '../src/admin.ts';
 import { designControls } from '../scripts/design-controls.ts';
 import { findChrome, Page } from './browser.ts';
 
@@ -143,6 +144,102 @@ test('production overlays support keyboard, disabled items, focus return and dir
     await page.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
     await page.waitFor(`document.querySelector('#demo-menu').matches(':popover-open')`,'touch menu');
     assert.equal(await page.eval(`(()=>{const box=document.querySelector('#demo-menu').getBoundingClientRect();return box.left>=0 && box.right<=innerWidth && box.top>=0 && box.bottom<=innerHeight})()`),true,'menu stays inside narrow viewport');
+    assert.deepEqual(page.problems,[]);
+  } finally {await page.close();}
+});
+
+test('forms associate native errors, preserve drafts on failure and reject duplicate submissions', {skip:!chrome}, async()=>{
+  const page=await Page.open(chrome!);
+  try {
+    await page.goto(`data:text/html,${encodeURIComponent(designControls())}`);
+    await page.click('#demo-form-submit');
+    assert.equal(await page.eval(`document.activeElement.id`),'demo-form-name');
+    assert.equal(await page.eval(`document.querySelector('#demo-form-name').getAttribute('aria-invalid')`),'true');
+    await page.eval(`(()=>{const n=document.querySelector('#demo-form-name');n.value='https://example.com';n.dispatchEvent(new Event('input',{bubbles:true}));})()`);
+    assert.equal(await page.eval(`document.querySelector('#demo-form-name').hasAttribute('aria-invalid')`),false);
+    await page.click('#demo-form-submit');
+    assert.equal(await page.eval(`document.querySelector('#demo-form').getAttribute('aria-busy')`),'true');
+    await page.waitFor(`!document.querySelector('#demo-form .ui-form-error').hidden`,'inline failure');
+    assert.equal(await page.eval(`document.querySelector('#demo-form-name').value`),'https://example.com');
+    assert.equal(await page.eval(`document.querySelector('#demo-form-submit').disabled`),false);
+    await page.eval(`(()=>{const submit=uiButton({label:'Submit',type:'submit'}),form=el('form',null,submit);window.submits=0;uiForm(form,{submit,onSubmit:()=>{window.submits++;return new Promise(resolve=>window.finishSubmit=resolve)}});document.body.append(form);form.requestSubmit();form.dispatchEvent(new Event('submit',{cancelable:true}));window.testForm=form;})()`);
+    assert.equal(await page.eval(`window.submits`),1);
+    await page.eval(`window.finishSubmit()`);
+    await page.waitFor(`!window.testForm.hasAttribute('aria-busy')`,'completed form');
+    assert.equal(await page.eval(`(()=>{const input=uiControl('input'),field=uiField(input,{label:'Handle'}),submit=uiButton({label:'Claim',type:'submit'}),form=el('form',null,field.element,submit);let wrote=false;document.body.append(form);uiForm(form,{submit,validate:()=>{field.setError('Enter a handle.');input.focus();return false;},onSubmit:()=>{wrote=true;}});form.requestSubmit();return !wrote && !input.disabled && document.activeElement===input && input.getAttribute('aria-invalid')==='true';})()`),true,'custom validation focuses the field before controls lock');
+    assert.deepEqual(page.problems,[]);
+  } finally {await page.close();}
+});
+
+test('rich popovers preserve radio keys, allow Tab out, dismiss without stealing outside focus, and fit enlarged narrow layouts', {skip:!chrome}, async()=>{
+  const page=await Page.open(chrome!,{width:360,height:800});
+  try {
+    await page.goto(`data:text/html,${encodeURIComponent(designControls())}`);
+    await page.click('#demo-popover-trigger');
+    await page.waitFor(`document.querySelector('#demo-popover').matches(':popover-open')`,'rich popover');
+    await page.eval(`document.querySelector('#demo-popover input[type=radio]:checked').focus()`);
+    await key(page,'ArrowRight');
+    assert.equal(await page.eval(`document.querySelector('#demo-popover input[type=radio]:checked').value`),'followers');
+    await key(page,'Tab');assert.equal(await page.eval(`document.activeElement.id`),'demo-popover-note');
+    await key(page,'Escape');
+    assert.equal(await page.eval(`document.activeElement.id`),'demo-popover-trigger');
+    await page.click('#demo-popover-trigger');
+    await page.eval(`document.querySelector('#demo-form-name').focus()`);
+    await page.waitFor(`!document.querySelector('#demo-popover').matches(':popover-open')`,'Tab/focus leaves nonmodal content');
+    assert.equal(await page.eval(`document.activeElement.id`),'demo-form-name');
+    await page.eval(`document.documentElement.style.fontSize='200%';document.documentElement.dataset.theme='dark'`);
+    await page.click('#demo-popover-trigger');
+    await page.waitFor(`(()=>{const b=document.querySelector('#demo-popover').getBoundingClientRect();return b.left>=0 && b.right<=document.documentElement.clientWidth && b.top>=0 && b.bottom<=innerHeight})()`,'positioned enlarged popover');
+    assert.equal(await page.eval(`document.querySelector('#demo-popover').scrollWidth <= document.querySelector('#demo-popover').clientWidth`),true);
+    // Content resizing while open repositions the panel, without requiring another click.
+    await page.eval(`document.querySelector('#demo-popover').prepend(el('p',null,'More context. '.repeat(40)))`);
+    await page.waitFor(`document.querySelector('#demo-popover').getBoundingClientRect().bottom<=innerHeight`,'resized popover');
+    await page.send('Emulation.setTouchEmulationEnabled',{enabled:true});
+    assert.equal(await page.eval(`getComputedStyle(document.querySelector('#demo-popover .ui-choice')).minHeight`),'44px');
+    assert.deepEqual(page.problems,[]);
+  } finally {await page.close();}
+});
+
+test('notices queue and deduplicate, keep errors, pause on focus, and progress distinguishes unknown work from zero', {skip:!chrome}, async()=>{
+  const page=await Page.open(chrome!);
+  try {
+    await page.goto(`data:text/html,${encodeURIComponent(designControls())}`);
+    await page.eval(`(()=>{const anchor=uiButton({id:'notice-origin',label:'Origin'});document.body.append(anchor);anchor.focus();const region=el('div',{id:'test-notices'});document.body.append(region);window.notices=uiToasts(region);notices.show('First failure','error');notices.show('First failure','error');notices.show('Second failure','error');notices.show('Third failure','error');notices.show('Queued confirmation','success');})()`);
+    await page.waitFor(`document.querySelector('#test-notices').textContent.includes('Third failure')`,'three notices');
+    assert.equal(await page.eval(`document.activeElement.id`),'notice-origin','arrival never moves focus');
+    assert.equal(await page.eval(`document.querySelectorAll('#test-notices .ui-toast').length`),3);
+    assert.equal(await page.eval(`document.querySelectorAll('#test-notices [role=alert]').length`),3);
+    await page.click('#test-notices button');
+    await page.waitFor(`document.querySelector('#test-notices').textContent.includes('Queued confirmation')`,'FIFO notice');
+    await page.eval(`document.querySelector('#test-notices .ui-toast:last-child button').focus()`);
+    await new Promise(resolve=>setTimeout(resolve,6200));
+    assert.equal(await page.eval(`document.querySelectorAll('#test-notices .ui-toast').length`),3,'focus pauses confirmation; errors have no timer');
+    await page.eval(`document.querySelector('#notice-origin').focus()`);
+    await page.waitFor(`document.querySelectorAll('#test-notices .ui-toast').length===2`,'confirmation expires after focus leaves');
+    assert.equal(await page.eval(`document.querySelectorAll('#test-notices [role=alert]').length`),2);
+    await page.eval(`(()=>{const unknown=uiProgress({label:'Unknown work'}),zero=uiProgress({label:'Known work',value:0,max:10});document.body.append(unknown,zero);})()`);
+    assert.equal(await page.eval(`document.querySelector('progress[aria-label="Unknown work"]').hasAttribute('value')`),false);
+    assert.equal(await page.eval(`document.querySelector('progress[aria-label="Known work"]').value`),0);
+    assert.deepEqual(page.problems,[]);
+  } finally {await page.close();}
+});
+
+test('admin invitations use the shared form lifecycle and keep failed drafts with a reachable inline error', {skip:!chrome}, async()=>{
+  const page=await Page.open(chrome!);
+  try {
+    await page.send('Page.addScriptToEvaluateOnNewDocument',{source:`window.inviteCalls=0;window.fetch=async(url)=>{
+      if(url==='/admin/api/state')return new Response(JSON.stringify({csrf:'fixture',me:{login:'admin',accountId:'a'},invites:[],accounts:[],audit:[],reports:[]}));
+      window.inviteCalls++;return new Promise(resolve=>window.rejectInvite=()=>resolve(new Response(JSON.stringify({error_description:'Fixture invite refused'}),{status:400})));
+    };`});
+    await page.goto(`data:text/html,${encodeURIComponent(await adminHtml('fixture'))}`);
+    await page.waitFor(`document.querySelector('#me').textContent==='signed in as @admin'`,'admin data');
+    await page.eval(`document.querySelector('#inviteLogin').value='someone';document.querySelector('#inviteForm').requestSubmit();document.querySelector('#inviteForm').dispatchEvent(new Event('submit',{cancelable:true}))`);
+    assert.equal(await page.eval(`window.inviteCalls`),1);
+    assert.equal(await page.eval(`document.querySelector('#inviteLogin').disabled`),true);
+    await page.eval(`window.rejectInvite()`);
+    await page.waitFor(`document.querySelector('#inviteForm .ui-form-error').textContent==='Fixture invite refused'`,'persistent inline server error');
+    assert.equal(await page.eval(`document.querySelector('#inviteLogin').value`),'someone');
+    assert.equal(await page.eval(`document.querySelector('#inviteLogin').disabled`),false);
     assert.deepEqual(page.problems,[]);
   } finally {await page.close();}
 });

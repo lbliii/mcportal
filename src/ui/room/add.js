@@ -4,6 +4,7 @@
   let setupBusy = false;
   function invalidateSources() {
     sourceGeneration++;
+    sourceField.setError();
     $('addResults').replaceChildren();
     $('addResults').setAttribute('aria-busy', 'false');
   }
@@ -24,7 +25,7 @@
   async function findSources(query) {
     const generation = beginSourcePreview();
     const hint = $('addHint'), list = $('addResults');
-    hint.textContent = 'Looking…'; list.replaceChildren();
+    hint.replaceChildren(uiProgress({label:'Looking for sources…',message:'Looking for sources…'})); list.replaceChildren();
     try {
       const data = (await callTool('find_source', { query })).structuredContent;
       if (generation !== sourceGeneration) return;
@@ -43,7 +44,7 @@
           add);
       }));
     } catch (error) {
-      if (generation === sourceGeneration) hint.textContent = `Couldn't look that up: ${errorText(error)}. Check the address and try again.`;
+      if (generation === sourceGeneration) hint.replaceChildren(uiFeedback({kind:'error',message:`Couldn't look that up: ${errorText(error)}. Check the address and try again.`}));
     } finally { if (generation === sourceGeneration) list.setAttribute('aria-busy', 'false'); }
   }
 
@@ -65,7 +66,7 @@
       if (node) node.scrollIntoView({ behavior: scrollBehavior(), block: 'nearest', inline: 'start' });
     } catch (error) {
       button.disabled = false; button.textContent = 'Add';
-      toast(errorText(error).replace(/^Not added: /, ''));
+      toast(errorText(error).replace(/^Not added: /, ''), 'error');
     }
   }
 
@@ -102,7 +103,7 @@
     const report = $('importReport');
     report.hidden = false;
     report.setAttribute('aria-busy', 'true');
-    const status = el('p', { role: 'status' }, 'Importing subscriptions…');
+    const status=uiFeedback({kind:'loading',message:'Importing subscriptions…'});
     report.append(status);
     $('btnImportOpml').disabled = true;
     try {
@@ -114,30 +115,33 @@
       const reload = el('button', { class: 'btn', onclick: async () => {
         reload.disabled = true;
         try { renderRoom((await callTool('open_room')).structuredContent); toast('Room refreshed'); }
-        catch(error) { toast(`Room refresh failed: ${errorText(error)}`); }
+        catch(error) { toast(`Room refresh failed: ${errorText(error)}`, 'error'); }
         finally { reload.disabled = false; }
       } }, 'Refresh room');
       report.append(reload);
     } catch (error) {
-      status.textContent = `Import could not finish: ${errorText(error)}. Retry is safe: existing subscriptions are kept.`;
+      status.replaceWith(uiFeedback({kind:'error',message:`Import could not finish: ${errorText(error)}. Retry is safe: existing subscriptions are kept.`}));
       report.append(el('button', { class: 'btn', onclick: () => runOpml(xml) }, 'Retry import'));
     } finally { setupBusy = false; $('btnImportOpml').disabled = false; report.setAttribute('aria-busy', 'false'); }
   }
   $('opmlFile').addEventListener('change', async () => {
     const file = $('opmlFile').files?.[0];
     if (!file) return;
-    if (file.size > 1_000_000) { toast('That file is over 1 MB'); return; }
+    if (file.size > 1_000_000) { toast('That file is over 1 MB', 'error'); return; }
     try { await runOpml(await file.text()); }
-    catch(error) { toast(`Could not read that file: ${errorText(error)}`); }
+    catch(error) { toast(`Could not read that file: ${errorText(error)}`, 'error'); }
   });
   $('btnImportOpml').addEventListener('click', () => pickOpml());
 
   $('btnAdd').addEventListener('click', () => toggleAdd());
-  $('addForm').addEventListener('submit', (e) => {
-    e.preventDefault();
+  const sourceField=uiField($('addInput'),{label:'Site, feed, subreddit, channel or repo',hiddenLabel:true});
+  $('addForm').prepend(sourceField.element);
+  // Search permits replacement requests; sourceGeneration owns cancellation.
+  $('addForm').addEventListener('submit',async event=>{
+    event.preventDefault();
     const q = $('addInput').value.trim();
-    if (!q) { invalidateSources(); $('addHint').textContent = 'Enter a site or feed address.'; $('addInput').focus(); return; }
-    if (q) $('addStore').getAttribute('aria-pressed') === 'true' ? previewStore(q) : findSources(q);
+    if (!q) { invalidateSources(); sourceField.setError('Enter a site or feed address.'); $('addInput').focus(); return; }
+    await ($('addStore').getAttribute('aria-pressed') === 'true' ? previewStore(q) : findSources(q));
   });
   $('addInput').addEventListener('input', () => { invalidateSources(); $('addHint').textContent = 'Find sources to preview this address.'; });
   $('addSheet').addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); toggleAdd(false); } });

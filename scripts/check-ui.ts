@@ -95,7 +95,7 @@ export interface UiProblem {
  * The most JSDoc casts (`/** @type {X} *\/ (expr)`) the UI may hold. Each is a place the
  * types take our word for it, so this only goes down: lower it when you remove some.
  */
-export const MAX_UI_CASTS = 47;
+export const MAX_UI_CASTS = 45;
 
 const UI_SCRIPT_FILES = ['room.html', 'admin.html', 'art.js', 'space-inks.js', 'space-format.js', 'brand/icons.js'];
 

@@ -25,15 +25,15 @@ Dependencies flow in one direction: **foundations → primitives → patterns �
 | Product views | `src/ui/room/`: room, reading layouts, account and optional activities; controls compose the layers above |
 | Catalogue | `/controls`: production scripts, actual factory examples, contracts, light/dark, coarse targets and 200% text |
 
-Reading settings use the shared row/toggle pattern. Settings and both navigation menus use shared overlay behavior. Ordinary account, Library, collection and watch actions use typed buttons; account and collection creation fields share error associations. Collection and watch cards use the shared article/action structure. Item layouts share metadata composition and save/original/share actions. Library, collections and watches use shared feedback states.
+Reading settings use the shared row/toggle pattern. Settings and both navigation menus use shared overlay behavior. Ordinary account, Library, collection and watch actions use typed buttons; native room controls share uiControl, and mutation forms share validation, progress and error behavior. Collection and watch cards use the shared article/action structure. Item layouts share metadata composition and save/original/share actions. Library, collections and watches use shared feedback states.
 
-Specialized reading layouts, evidence panes, composers, source pickers and Space editors still have local controls. Their existing raw buttons are bounded by the per-file migration inventory in [`design/legacy-controls.json`](../../design/legacy-controls.json). New ordinary actions use the factories; lower the allowance when migrating existing ones. The inventory is a count guard, not proof that every local override is appropriate. Public pages retain script-free semantic HTML and shared CSS. Editorial geometry and brand art are intentional local compositions.
+Specialized reading layouts, evidence panes, source pickers and Space editors still own their composition. All dynamic room input, select and textarea creation goes through uiControl; mutation forms use uiForm. Admin invitations use the same modules. Search keeps its request-generation and cancellation behavior, including replacement source searches while an older request is pending. Their existing raw buttons are bounded by the per-file migration inventory in [`design/legacy-controls.json`](../../design/legacy-controls.json). New ordinary actions use the factories; lower the allowance when migrating existing ones. The inventory is a count guard, not proof that every local override is appropriate. Public pages retain script-free semantic HTML and shared CSS. Editorial geometry and brand art are intentional local compositions.
 
 ### Coverage and adversarial review
 
 [`design/inventory.json`](../../design/inventory.json) is the coverage inventory, rendered directly in the live catalogue. Every family records its definition, variants, states, keyboard behavior, implementation evidence and follow-up. The build rejects incomplete entries, missing source files and registered components absent from the inventory. Inventory prose is included only in the catalogue, not the production room.
 
-The October 2026 pass covers **36 families: 22 shared, 10 local, 4 reserved**. “Shared” identifies a reusable implementation, not complete migration of every caller. “Local” identifies a defined product composition with remaining adoption work. “Reserved” identifies a possible future need, not a component that exists today.
+The October 2026 pass covers **38 families: 28 shared, 6 local, 4 reserved**. “Shared” identifies a reusable implementation, not complete migration of every caller. “Local” identifies a defined product composition with remaining adoption work. “Reserved” identifies a possible future need, not a component that exists today.
 
 | Finding | Resolution |
 |---|---|
@@ -52,7 +52,7 @@ The October 2026 pass covers **36 families: 22 shared, 10 local, 4 reserved**. �
 | Perform an action | `uiButton`; quiet for low emphasis, never an underlined pseudo-link |
 | Open a destination | `uiNavLink` in application navigation; an ordinary underlined anchor in prose |
 | Switch local panels | `uiTabs`; global Room/Library navigation is not a tablist |
-| Choose one preference | Native radio group or select; `.ui-choice-group` demonstrates a segmented group; layout previews remain product-owned |
+| Choose one preference | `uiChoiceGroup` or native select; layout previews remain product-owned |
 | Report status/tag | `uiBadge`; no focus stop or click handler |
 | Toggle a selection/filter | `uiChip`; stable name, `aria-pressed`, visible checkmark |
 | Reveal optional content | `uiDisclosure`; independent by default, common `name` for exclusive accordion sections |
@@ -63,9 +63,9 @@ The October 2026 pass covers **36 families: 22 shared, 10 local, 4 reserved**. �
 
 These semantics follow the [WAI-ARIA tabs](https://www.w3.org/WAI/ARIA/apg/patterns/tabs/), [button](https://www.w3.org/WAI/ARIA/apg/patterns/button/) and [disclosure](https://www.w3.org/WAI/ARIA/apg/patterns/disclosure/) patterns. The choice to avoid underlined interface actions is MCPortal's visual policy, not a claim that links are prohibited in applications.
 
-#### Remaining adoption work
+#### Remaining gaps
 
-Prioritize local **forms and rich popovers** next: source candidates, composer validation, account listing fields, reader panels and reblog flows have product behavior that should be reconciled before extraction. Toast timing/queuing and skeleton/progress behavior remain local. Reading forms, avatars/media, lane pagination and editorial layouts intentionally compose shared controls without becoming a generic widget framework.
+Forms, rich popovers and toast/progress lifecycles now have shared implementations and production consumers. Product search owns timing/cancellation; inline reader panels retain their selection lifecycle. Reading forms, avatars/media, lane pagination and editorial layouts intentionally compose shared controls without becoming generic widgets.
 
 No reusable command palette, combobox, tree, editable data grid, custom calendar or slider is claimed. Native fields cover today's needs. Introduce a composite only with a real product use, complete interaction contract, live example and behavioral regression tests. Vertical/closable tabs, removable chips and nonmodal drawers likewise require a new supported variant rather than an ad hoc class.
 
@@ -81,7 +81,7 @@ For every new component or variant, review: default/hover/focus/active; selected
 | `src/ui/design/palettes.js` | Generated light and dark palettes for the theme controller |
 | `src/design/generated.ts` | Generated exports for the web pages and brand script |
 | `design/components.json` | Component purposes, lifecycle, supported options, examples and ordered module lists |
-| `design/inventory.json` | Coverage, definitions, variants, states, keyboard behavior, evidence and remaining work for 36 families |
+| `design/inventory.json` | Coverage, definitions, variants, states, keyboard behavior, evidence and remaining work for 38 families |
 | `src/ui/design/components/` | Owned CSS/JS modules for each primitive |
 | `src/ui/design/patterns.js` / `.css` | Compositions shared across product flows |
 | `src/ui/design/primitives.css` / `contracts.js` | Generated CSS bundle and typed option contracts; do not edit |
@@ -124,6 +124,7 @@ Some geometry stays local on purpose: SVG coordinates, photo overlays, display t
 | Tooltip | `delay` 150ms, `dismiss-delay` 120ms, `offset` 4, `inset` 8 px |
 | Icon | `small` 14, `normal` 16 px; `micro` 12 only for metadata; stroke 1.75 |
 | Motion | `duration-fast` 150 ms, `duration-feedback` 200 ms, `ease-standard` ease-out |
+| Toast | `duration` 6000ms, `max-duration` 20000ms; reading time scales with message length within these limits; errors have no timer |
 | Layers | `layer-sticky` 5, `layer-toast` 10 |
 | Room | `portal-column-width` 18rem, `portal-padding` 10px, `card-width` 13.5rem, `card-height` 9.375rem, `card-media-height` 13.375rem |
 
@@ -203,6 +204,12 @@ Use the typed factories for interactive room code. `design/components.json` gene
 | `uiButton({label, emphasis, size, ...})` | `neutral` / `primary` / `danger` / `quiet`; `compact` / `default`; optional icon, pressed, disabled, busy, type and click callback |
 | `uiBusy(button, boolean)` | Prevent duplicate submission, preserve the label/geometry and restore the prior disabled state; pair with `finally` |
 | `iconButton(icon, label, onClick, options)` | Required accessible name; shared hint; 24px default or `{size:'default'}` for 28px; 14/16px glyphs |
+| `uiControl(tag, attrs, ...children)` | Typed native input/select/textarea with the shared field class; product supplies a label or wraps it in uiField |
+| `uiForm(form, {submit, onSubmit, pendingMessage?, validate?})` | Native validation and optional custom validation before locking, associated field errors, duplicate guard, pending progress, locked controls with original disabled states restored, persistent server error and retained draft; returns run/setError/destroy |
+| `uiChoiceGroup({label, value, choices, name?, onChange?})` | Named native segmented radios; returns element and inputs; arrow and Space behavior stays native |
+| `uiPopover(panel, trigger, options?)` | Named nonmodal rich content, initial focus, normal Tab/radio keys, Escape/outside dismissal, viewport placement and resize/scroll updates; returns open/close/destroy |
+| `uiToasts(region)` | Returns show(message, info/success/error) and destroy; 3 visible, FIFO queue, deduplication, named dismissal; errors persist, confirmations pause on hover/focus/hidden documents |
+| `uiProgress({label, value?, max?, message?})` / `uiSkeleton({lines?})` | Native named progress; omitted value is indeterminate, zero is real zero; static decorative skeleton needs surrounding loading status |
 | `uiField(control, {label, hint?, hiddenLabel?})` | Returns `element`, original typed `control`, label, hint, error and `setError(message?)`; preserves existing descriptions |
 | `uiToggle({label, checked, onChange, hint?})` | Native checkbox in a compact settings row; keyboard and label-click behavior included |
 | `uiDialog(panel, {trigger, closeButton, onOpen?, onClose?})` | Named native modal, Tab wrapping, Escape, focus return and `open/close/destroy` methods; product owns content |
@@ -242,7 +249,7 @@ The maintainer changing a component owns its contract, catalogue examples and re
 
 A new variant must add a registry option, implementation, real catalogue example and meaningful coverage. Adding a new component also requires its module in the registry and production includes. Product components cannot import room state or tool transport into the shared layers. Exceptions to the migration inventory need a concrete product reason; do not raise limits to bypass the factories.
 
-`npm run check` verifies generated output, undefined token references, component boundaries, strict option types, the raw-button allowance and browser behavior. Shared modules and catalogue are independently type-checked; the room is checked against the same sources. Browser checks exercise names, invalid options, field error associations, state geometry, menu navigation, modal focus, tooltips, touch, themes and narrow 200% text. Native host and screen-reader checks remain a release responsibility.
+`npm run check` verifies generated output, undefined token references, component boundaries, strict option types, the raw-button allowance, rejection of raw dynamic native fields/progress and browser behavior. Shared modules and catalogue are independently type-checked; the room is checked against the same sources. Browser checks exercise names, invalid options, field error associations, state geometry, menu navigation, modal focus, tooltips, touch, themes and narrow 200% text. Native host and screen-reader checks remain a release responsibility.
 
 
 | Surface | Contract |
@@ -265,6 +272,14 @@ Shared rules, in `primitives.css`:
 - Room icon hints appear after 150ms of mouse hover or immediately on keyboard focus. They remain hoverable, dismiss with Escape, and stay inside the viewport and active dialog. Touch activates controls directly; essential instructions stay visible in the opened panel.
 - Increased contrast strengthens secondary text and borders. Forced colors use system colors. Reduced motion removes transitions, including scripted scrolling.
 - Layouts wrap. Container queries add to viewport fallbacks rather than replace them.
+
+### Form, overlay and feedback decisions
+
+- Mutation forms keep drafts on failure, put server errors at the form, and associate native constraint messages with the relevant field. Editing clears that field error. Async submission locks controls until resolution and restores their prior disabled states. Native form behavior and associated descriptions follow [WAI form notifications](https://www.w3.org/WAI/tutorials/forms/notifications/).
+- Live search remains interruptible and owns its request generation checks. Instant preference controls own persistence and rollback; these are not submit forms. Script-free account uploads and confirmation pages retain native POST/validation with shared CSS and server-rendered outcomes.
+- Quick reblog is a rich, **nonmodal dialog**, with a visible close control and native audience radios. It is not a menu: arrows change radio selection, Tab can leave, outside interaction dismisses without stealing focus, and Escape returns to the trigger. uiMenu remains for lists of actions. Do not set aria-modal on content that leaves the surrounding page interactive; see [APG dialog guidance](https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/).
+- Ordinary confirmations use polite status; failures use alerts, stay until dismissed, and never steal focus on arrival. Recovery actions remain inline beside the task. Toasts mount in an active modal when emitted there, and return to the page on close. Queueing avoids replacing an unread message. This follows [WAI status-message guidance](https://www.w3.org/WAI/WCAG22/Understanding/status-messages.html).
+- Progress exposes actual value/maximum only when known. Indeterminate work has a readable status and no fabricated percentage. Skeletons are static and aria-hidden, including under reduced motion. Complete and failed tasks replace pending indicators rather than leaving stale busy state.
 
 ## Standalone pages
 

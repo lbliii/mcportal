@@ -26,7 +26,7 @@
     const kind = uiVariant(options.kind, UI_COMPONENTS.feedback.variants, 'feedback kind');
     return el('div', {class:`ui-feedback ui-feedback-${kind}`, 'data-ui':'feedback', 'data-variant':kind,
       role:kind === 'error' ? 'alert' : kind === 'loading' || kind === 'success' ? 'status' : undefined},
-      options.title ? el('h3', null, options.title) : null, el('p', null, options.message), options.action || null);
+      options.title ? el('h3', null, options.title) : null, kind === 'loading' ? uiProgress({label:options.message, message:options.message}) : el('p', null, options.message), options.action || null);
   }
   /** A contextual action tray in document flow. Product code owns visibility and dismissal.
    * @param {{label:string, hidden?:boolean, className?:string}} options @param {...(Child|Child[])} children */

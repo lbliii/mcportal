@@ -51,14 +51,14 @@
 
   <h2>Invite someone</h2>
   <form class="row" id="inviteForm">
-    <input id="inviteLogin" aria-label="GitHub username" placeholder="GitHub username" autocomplete="off" spellcheck="false" required>
+    <input class="field" id="inviteLogin" aria-label="GitHub username" placeholder="GitHub username" autocomplete="off" spellcheck="false" required>
     <button class="primary" type="submit">Invite</button>
     <span class="muted">Their account is created the first time they sign in with GitHub.</span>
   </form>
   <div id="msg" role="status"></div>
   <div class="share" id="share">
     <div class="muted" id="shareTitle"></div>
-    <textarea id="shareText" readonly></textarea>
+    <textarea class="field" id="shareText" aria-labelledby="shareTitle" readonly></textarea>
     <div class="actions"><button class="primary" id="copyShare" type="button">Copy message</button><button id="copyShareLink" type="button">Copy link only</button></div>
   </div>
 
@@ -89,22 +89,13 @@
   let csrf = '';
   let me = { login: '', accountId: '' };
 
-  /**
-   * @param {string} tag
-   * @param {Record<string, string | boolean | null | undefined | EventListener> | null} attrs on… keys take listeners; true is a bare attribute; false/null/undefined are left off
-   * @param {...unknown} children nested arrays are flattened; null/undefined/false are skipped
-   */
-  function el(tag, attrs, ...children) {
-    const node = document.createElement(tag);
-    for (const [k, v] of Object.entries(attrs || {})) {
-      if (v === undefined || v === null || v === false) continue;
-      // The on… keys are only ever given functions, and the others only strings or true.
-      if (k.startsWith('on')) node.addEventListener(k.slice(2), /** @type {EventListener} */ (v));
-      else node.setAttribute(k, v === true ? '' : /** @type {string} */ (v));
-    }
-    for (const c of children.flat()) if (c !== null && c !== undefined && c !== false) node.append(c instanceof Node ? c : document.createTextNode(String(c)));
-    return node;
-  }
+  /*include:brand/icons.js*/
+  /*include:design/contracts.js*/
+  /*include:design/dom.js*/
+  /*include:design/components/icon.js*/
+  /*include:design/components/button.js*/
+  /*include:design/components/field.js*/
+  /*include:design/components/feedback.js*/
   const when = (/** @type {number} */ ms) => new Date(ms).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
   /** @param {string} text @param {boolean} [bad] */
   function say(text, bad) { $('msg').textContent = text; $('msg').className = bad ? 'err' : ''; }
@@ -229,11 +220,12 @@
     } catch (error) { say(error instanceof Error ? error.message : String(error), true); }
   }
 
-  $('inviteForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
+  const inviteButton=$('inviteForm').querySelector('button');
+  if(!inviteButton)throw new Error('Missing invite action');
+  $('inviteForm').prepend(uiField($('inviteLogin'),{label:'GitHub username',hiddenLabel:true}).element);
+  uiForm($('inviteForm'),{submit:inviteButton,pendingMessage:'Creating invite…',onSubmit:async()=>{
     const login = $('inviteLogin').value.trim();
-    if (!login) return;
-    try {
+    if (!login) throw new Error('Enter a GitHub username.');
       /** @type {AdminUpdate} */
       const data = await api('/admin/api/invite', { who: login });
       render(data);
@@ -241,8 +233,7 @@
       const invite = data.invites.find((i) => i.login === login.replace(/^@/, '').toLowerCase());
       say(`Invited @${login.replace(/^@/, '')}. Send them the message below.`);
       if (invite) showShare(invite);
-    } catch (error) { say(error instanceof Error ? error.message : String(error), true); }
-  });
+  }});
 
   (async () => {
     try {

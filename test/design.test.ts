@@ -57,6 +57,7 @@ test('component boundary and legacy-control checks prevent new product coupling 
  assert.throws(()=>checkComponentBoundaries({'button.js':'function save() { return state.saved; }'}),/product identifier state/);
  assert.doesNotThrow(()=>checkComponentBoundaries({'button.js':'function toggle(options) { return options.state; }'}));
  assert.throws(()=>checkLegacyControls({'room/new.js':"el('button', {class:'btn'}, 'Save')"},{}),/raw buttons exceed/);
+ assert.throws(()=>checkLegacyControls({'room/new.js':"el('input', {type:'search'})"},{}),/use shared uiControl/);
  assert.throws(()=>checkLegacyControls({'room.html':'<button>Save</button>'},{}),/raw buttons exceed/);
  assert.doesNotThrow(()=>checkLegacyControls({'room/new.js':"uiButton({label:'Save'})"},{}));
  assert.doesNotThrow(()=>checkLegacyControls({'room/old.js':"el('button', null, 'Story title')"},{'room/old.js':{maximum:1,reason:'Specialized content-opening target.'}}));

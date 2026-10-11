@@ -147,11 +147,15 @@ export class Page {
   /** Click the first element matching `selector`, the way a user would (a real mouse event at its center). */
   async click(selector: string): Promise<void> {
     // Only when the point really hits it (not hidden, covered or in a closed <details>).
-    const box = await this.waitFor<{ x: number; y: number }>(`(() => {
+    const box = await this.waitFor<{ x: number; y: number }>(`(async () => {
       const n = document.querySelector(${JSON.stringify(selector)});
       if (!n) return null;
       n.scrollIntoView({ block: 'center', inline: 'center' });
+      const before=n.getBoundingClientRect();
+      // ResizeObserver and sticky/container layouts may settle on the next frame.
+      await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
       const r = n.getBoundingClientRect();
+      if (['x','y','width','height'].some(key=>Math.abs(before[key]-r[key])>.5)) return null;
       const point = { x: r.x + r.width / 2, y: r.y + r.height / 2 };
       const hit = r.width && r.height ? document.elementFromPoint(point.x, point.y) : null;
       return hit && (hit === n || n.contains(hit)) ? point : null;

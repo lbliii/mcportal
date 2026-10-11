@@ -91,7 +91,7 @@ async function readUpload(req: IncomingMessage): Promise<{ file?: Buffer; csrf?:
 function uploadForm(action: string, csrf?: string): string {
   return `<form method="post" action="${action}" enctype="multipart/form-data">
   ${csrf ? `<input type="hidden" name="csrf" value="${escapeHtml(csrf)}">` : ''}
-  <p><input type="file" name="file" accept=".json,application/json" required></p>
+  <p><label>Account export file<input class="field" type="file" name="file" accept=".json,application/json" required></label></p>
   <p><button class="primary">Import</button></p>
 </form>`;
 }
@@ -171,7 +171,7 @@ ${uploadForm('/account/import', view.csrf)}
 <p>This deletes your room, saved items, clips, public profile, shares and follows, and signs you out everywhere. It can't be undone, so download your data first.</p>
 <form method="post" action="/account/delete">
 ${csrf}
-<p><label>Type <code>delete @${login}</code> to confirm:<input name="confirm" autocomplete="off" spellcheck="false"></label></p>
+<p><label>Type <code>delete @${login}</code> to confirm:<input class="field" name="confirm" autocomplete="off" spellcheck="false"></label></p>
 <p><button class="danger">Delete my account</button></p>
 </form>
 </section>`, { door: 'open', wide: true, style: ACCOUNT_STYLE });

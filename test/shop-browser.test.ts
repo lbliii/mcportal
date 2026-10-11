@@ -15,7 +15,7 @@ test('Shop browser: scope preview → confirm → gallery → save → pause/res
   const app=await startApp({allowUnauthenticated:true},async(url,options)=>url.startsWith(SHOP)?fetcher(url,options):createFixtureFetcher()(url,options),{store,watchStore,now:()=>now,cache:new TtlCache({now:()=>now})});
   const page=await Page.open(chrome!);
   try {
-    await page.goto(app.base+'/preview');await page.waitFor(`document.querySelector('#btnAdd')&&!document.querySelector('#mainBar').hidden && document.querySelector('.continue-reading')?.getAttribute('aria-busy')==='false' && !document.querySelector('.skeleton')`,'room hydration ready before measuring click coordinates');
+    await page.goto(app.base+'/preview');await page.waitFor(`document.querySelector('#btnAdd')&&!document.querySelector('#mainBar').hidden && document.querySelector('.continue-reading')?.getAttribute('aria-busy')==='false' && !document.querySelector('[data-ui=skeleton]')`,'room hydration ready before measuring click coordinates');
     await page.click('#btnAdd');await page.click('#addStore');
     await page.eval(`document.querySelector('#addInput').value=${JSON.stringify(SHOP)};document.querySelector('#storeCollection').value='clothing';document.querySelector('#addForm').requestSubmit()`);
     await page.waitFor(`document.querySelector('.shop-preview > .btn')`,'store preview');
@@ -25,8 +25,10 @@ test('Shop browser: scope preview → confirm → gallery → save → pause/res
     assert.equal((await watchStore.list('default'))[0]?.scope.collection,'clothing');
     assert.equal(await page.eval(`document.querySelector('#grid button button')`),null);
     assert.match(await page.eval<string>(`document.querySelector('.shop-card').textContent`),/120.00 USD/);
+    await page.waitFor(`document.querySelector('#toast [role=status]')?.textContent.includes('Store followed')`,'follow confirmation');
+    await page.click('#toast button');
     await page.click('[data-portal="shop"] .shop-save');await page.waitFor(`document.querySelector('[data-portal="shop"] .shop-save[aria-pressed="true"]')`,'saved product');
-    await page.waitFor(`document.querySelector('#toast').textContent.startsWith('Saved!')`,'save response settled');
+    await page.waitFor(`[...document.querySelectorAll('#toast [role=status]')].some(n=>n.textContent.startsWith('Saved!'))`,'save response settled');
     assert.equal((await store.get('default')).saved[0]?.url,SHOP+'/products/product-1');
     await page.click('.shop-manage summary');await page.click('.shop-manage button');await page.waitFor(`document.querySelector('.shop-manage summary').textContent.includes('paused')`,'paused follow');
     assert.equal(await page.eval(`document.querySelectorAll('.shop-card').length`),0);

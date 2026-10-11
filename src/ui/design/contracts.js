@@ -3,6 +3,7 @@
 /** @typedef {"compact"|"default"} UIButtonSize */
 /** @typedef {"compact"|"default"} UIIconButtonSize */
 /** @typedef {"empty"|"loading"|"error"|"info"|"success"} UIFeedbackKind */
+/** @typedef {"info"|"success"|"error"} UIToastKind */
 /** @typedef {"neutral"|"accent"|"success"|"warning"|"error"} UIBadgeTone */
 /** @typedef {"modal"|"drawer"} UIDialogVariant */
 const UI_COMPONENTS = {
@@ -237,5 +238,50 @@ const UI_COMPONENTS = {
       "documentation"
     ],
     "example": "el('div',{class:'body ui-document'},blockNodes(page.blocks))"
+  },
+  "form": {
+    "status": "stable",
+    "factory": "uiForm",
+    "purpose": "Native validation, associated field errors, guarded async submission and persistent inline server errors.",
+    "example": "uiForm(form,{submit:save,onSubmit:persist})"
+  },
+  "choiceGroup": {
+    "status": "stable",
+    "factory": "uiChoiceGroup",
+    "purpose": "Named segmented native radios with native arrow keys, stable targets and visible selection.",
+    "example": "uiChoiceGroup({label:'Audience',value:'everyone',choices:[{value:'everyone',label:'Public'}]})"
+  },
+  "popover": {
+    "status": "stable",
+    "factory": "uiPopover",
+    "purpose": "Rich nonmodal popover with ordinary Tab, native form keys, Escape, outside dismissal and viewport positioning.",
+    "example": "uiPopover(panel,trigger)"
+  },
+  "toast": {
+    "status": "stable",
+    "factory": "uiToasts",
+    "purpose": "Three visible dismissible notices and a deduplicated FIFO queue; persistent errors and paused confirmation timers.",
+    "example": "uiToasts(region).show('Saved','success')",
+    "variants": [
+      "info",
+      "success",
+      "error"
+    ]
+  },
+  "progress": {
+    "status": "stable",
+    "factory": "uiProgress",
+    "purpose": "Named native progress; real values or indeterminate work, with readable status.",
+    "example": "uiProgress({label:'Reading progress',value:2,max:10,message:'2 of 10 stories'})",
+    "variants": [
+      "determinate",
+      "indeterminate"
+    ]
+  },
+  "skeleton": {
+    "status": "stable",
+    "factory": "uiSkeleton",
+    "purpose": "Decorative static loading placeholder paired with readable loading status.",
+    "example": "uiSkeleton({lines:3})"
   }
 };

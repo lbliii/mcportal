@@ -7,7 +7,7 @@
   }
   /** @param {PortalResult} portal */
   function portalViewSelector(portal) {
-    const select = el('select', { class: 'portal-view-select', 'aria-label': `Presentation for ${portal.title}`, title: 'Choose how this portal presents its material' }, supportedPortalViews(portal).map(view => el('option', { value: view }, view === 'default' ? 'View' : view[0].toUpperCase() + view.slice(1))));
+    const select = uiControl('select', { class: 'portal-view-select', 'aria-label': `Presentation for ${portal.title}`, title: 'Choose how this portal presents its material' }, supportedPortalViews(portal).map(view => el('option', { value: view }, view === 'default' ? 'View' : view[0].toUpperCase() + view.slice(1))));
     select.value = portalViewPreference(portal.portalId);
     select.addEventListener('change', async () => {
       select.disabled = true;
@@ -16,7 +16,7 @@
         state.profile = profile;
         redrawPortal(portal.portalId);
         if (profile.layout === 'river') toast('River uses one list. This view applies when the portal is shown separately.');
-      } catch (error) { select.value = portalViewPreference(portal.portalId); toast(errorText(error)); }
+      } catch (error) { select.value = portalViewPreference(portal.portalId); toast(errorText(error), 'error'); }
       finally { select.disabled = false; }
     });
     return select;

@@ -161,7 +161,7 @@ test('reader UI: every code example copies exact text and clipboard denial selec
   await page.eval(`navigator.clipboard.writeText = async () => { throw new Error('clipboard denied'); }`);
   await page.click('.body .code .copy');
   await page.waitFor(`getSelection().rangeCount && getSelection().getRangeAt(0).toString() === ${JSON.stringify(text)}`, 'the full source range to be selected after clipboard rejection');
-  assert.match(await page.eval<string>(`document.getElementById('toast').textContent`), /Text selected/);
+  await page.waitFor(`[...document.querySelectorAll('#toast [role=status]')].some(n=>n.textContent.includes('Text selected'))`, 'clipboard fallback notice');
   await page.eval(`document.querySelector('.table-wrap').focus()`);
   assert.equal(await page.eval(`document.activeElement.getAttribute('aria-label')`), 'Scrollable table');
   assert.ok(await page.eval<boolean>(`[...document.querySelectorAll('th')].every(n => n.scope === 'col')`));
