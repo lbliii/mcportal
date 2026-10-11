@@ -33,7 +33,7 @@ test('Shop browser: scope preview → confirm → gallery → save → pause/res
     await page.click('.shop-manage summary');await page.click('.shop-manage button');await page.waitFor(`document.querySelector('.shop-card')`,'resumed follow');
     for(const layout of ['catalogue','editorial','paperback','shelves','river','columns']) {
       await page.send('Emulation.setDeviceMetricsOverride',{width:1280,height:900,deviceScaleFactor:1,mobile:false});
-      await page.click('#btnLayout');await page.click(`[data-layout="${layout}"]`);await page.waitFor(`document.querySelector('[data-layout="${layout}"]').getAttribute('aria-pressed')==='true'`,'layout chosen');await page.waitFor(`!document.querySelector('#btnLayout').disabled`,'layout saved');
+      await page.click('#btnSettings');await page.click(`[data-layout="${layout}"]`);await page.waitFor(`document.querySelector('[data-layout="${layout}"]').getAttribute('aria-pressed')==='true'`,'layout chosen');await page.waitFor(`!document.querySelector('[data-layout="${layout}"]').disabled`,'layout saved');await page.click('#btnCloseSettings');
       await page.send('Emulation.setDeviceMetricsOverride',{width:390,height:850,deviceScaleFactor:1,mobile:false});
       await page.eval(`document.documentElement.dataset.theme='dark'`);
       assert.equal(await page.eval(`document.documentElement.scrollWidth<=innerWidth`),true,layout+' fits narrow view');

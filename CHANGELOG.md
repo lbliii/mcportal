@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Navigation
+- Keep Room and Library in one global bar, move Page updates and Events under More, and put layout, reading preferences and account controls in Settings. Collections live in Library; Compare appears with selected items and Catch up stays with the room.
+- Remove the redundant room-name label, use plain action labels, and reveal search filters and optional tracking forms on request. New profiles use “Your portal room” instead of the fixed “morning” name.
+- Keep only the most recent unfinished article in a compact Continue reading action. Source-specific display options appear when that source is open.
+
 ### Recall Shelf
 - Find saved material with conversational search prefixes or quoted titles, and keep identifiers and versions distinct from longer lookalikes. Results explain the matching fields, effective search words and indexed coverage; saved links do not imply retained page text.
 - Add a reproducible 40-query synthetic retrieval benchmark across file, Postgres and linked storage, with separate development/validation splits and source/passage checks.

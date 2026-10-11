@@ -143,10 +143,7 @@
 
   /** Source sections keep the user's portal order and their refresh, reader and save controls. @param {Profile} profile */
   function drawDesignedRoom(profile) {
-    return [el('header', { class: 'collection-head' },
-      el('div', { class: 'fp-kicker' }, new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })),
-      el('h1', null, profile.name)),
-    ...profile.columns.flatMap((col) => col.panels).map((spec) => renderPortal(spec.id))];
+    return profile.columns.flatMap((col) => col.panels).map((spec) => renderPortal(spec.id));
   }
 
   /** @param {string} portalId @param {'catalogue' | 'editorial' | 'paperback'} form */
@@ -257,12 +254,9 @@
     drawLaneControls();
     if (layout === ROOM_LAYOUTS.frontpage) frontEnd();
     for (const b of $$('[data-layout]')) b.setAttribute('aria-pressed', String(b.dataset.layout === p.layout));
-    const label = $first(`[data-layout="${p.layout}"] b`)?.textContent ?? 'Columns';
-    $('btnLayout').textContent = `Layout: ${label}`;
-    $('btnLayout').setAttribute('aria-label', `Choose room layout. Current layout: ${label}`);
     // A lab's layout is offered while the server has the lab on, and kept for whoever chose it.
     for (const lab of LAB_LAYOUTS) $first(`[data-layout="${lab}"]`)?.toggleAttribute('hidden', !(state.labs.includes(lab) || p.layout === lab));
-    $('btnOpenIn').setAttribute('aria-pressed', String(p.openIn === 'chat'));
+    $('openIn').value = p.openIn;
   }
 
   /** Visible lane navigation. Scroll and resize update the current column and end controls. */
@@ -347,7 +341,6 @@
       el('span', { class: 'dot', style: `background:${portalColor(portal)}` }),
       el('button', { class: 'portal-title', type: 'button', title: `Open ${portal.title}`, onclick: () => openPortal(portal.portalId) }, portal.title),
       el('span', { class: 'portal-count' }, portalCount(portal)),
-      portalViewSelector(portal),
     ];
   }
 

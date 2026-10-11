@@ -16,16 +16,16 @@
     if (experience !== 'changes' && experience !== 'upcoming') watchScreen = data.watches.some(w => w.kind === 'page' || w.kind === 'releases') ? 'changes' : 'upcoming';
     enterExperience(watchScreen);
     const upcoming = watchScreen === 'upcoming', watches = data.watches.filter(w => upcoming ? w.kind === 'calendar' || w.kind === 'artist' : w.kind === 'page' || w.kind === 'releases');
-    const title = upcoming ? 'Upcoming' : 'Changes';
-    const heading = el('header',{class:'experience-heading'}, el('span',{class:'experience-kicker'},upcoming?'DATES TO LOOK FORWARD TO':'WHAT MOVED SINCE YOU LAST LOOKED'),el('h1',null,title),el('p',null,upcoming?'Your watched artists and calendars, arranged by date.':'A quiet inbox for the pages and releases you choose to follow.'));
+    const title = upcoming ? 'Events' : 'Page updates';
+    const heading = el('header',{class:'experience-heading'}, el('h1',null,title),el('p',null,upcoming?'Your watched artists and calendars, arranged by date.':'A quiet inbox for the pages and releases you choose to follow.'));
     const content = el('div',{class:'watch-layout'},el('section',{class:'watch-main'},upcoming ? upcomingEvents(watches) : changeInbox(data.inbox.filter(f => watches.some(w=>w.id===f.watchId)))),
-      el('aside',{class:'watch-sidebar'},el('h2',null,'Your watches'),...watches.map(watchCard),el('p',{class:'experience-muted'},data.worker),watchSetup(upcoming)));
+      el('aside',{class:'watch-sidebar'},...watches.map(watchCard),el('details',{class:'watch-add'},el('summary',null,upcoming?'Follow an artist or calendar':'Track a page or repository'),watchSetup(upcoming)),el('details',null,el('summary',null,'About checks'),el('p',{class:'experience-muted'},data.worker))));
     $('experiences').replaceChildren(heading,content);
   }
   /** @param {import('../watches-state.ts').WatchFinding[]} findings */
   function changeInbox(findings) {
-    const list=el('div',{class:'change-inbox'},el('h2',null,'Retained changes'));
-    if (!findings.length) list.append(el('div',{class:'experience-empty'},el('h3',null,'Let the changes come to you'),el('p',null,'Choose a page or repository. The first successful check establishes its baseline; later checks retain actual differences.')));
+    const list=el('div',{class:'change-inbox'},el('h2',null,'Updates'));
+    if (!findings.length) list.append(el('div',{class:'experience-empty'},el('h3',null,'No updates yet'),el('p',null,'Track a page or repository. Updates appear after something changes.')));
     for (const f of [...findings].reverse()) {
       const card=el('article',{class:`change-card${f.read?' acknowledged':''}`},el('span',{class:'experience-kicker'},f.kind==='availability'?'SOURCE AVAILABILITY':'SOURCE CHANGE'),el('h3',null,f.title),el('p',{class:'experience-muted'},`Found ${new Date(f.at).toLocaleString()}`));
       if (f.beforeAt && f.afterAt) card.append(el('p',{class:'experience-muted'},`Compared ${new Date(f.beforeAt).toLocaleString()} → ${new Date(f.afterAt).toLocaleString()}`));
@@ -35,10 +35,10 @@
       } else card.append(el('p',null,'The last good baseline is retained. This is an availability problem; it does not mean the source deleted its content.'));
       const actions=el('div',{class:'experience-row'},f.url?el('button',{class:'btn',onclick:()=>openLink(f.url || '')},'Open original'):null,
         f.diff?el('button',{class:'btn',onclick:()=>askChangeAgent(f)},'Ask your agent'):null,
-        el('button',{class:'link-btn',disabled:f.read,onclick:()=>watchOperation({action:'acknowledge',findingIds:[f.id]})},f.read?'Acknowledged':'Acknowledge'));
+        el('button',{class:'link-btn',disabled:f.read,onclick:()=>watchOperation({action:'acknowledge',findingIds:[f.id]})},f.read?'Read':'Mark as read'));
       card.append(actions);list.append(card);
     }
-    list.append(el('p',{class:'experience-muted'},'Retained for 30 days, up to 40 findings. Page baselines and diff displays are bounded.'));
+    list.append(el('details',null,el('summary',null,'About saved updates'),el('p',{class:'experience-muted'},'Updates are kept for 30 days, up to 40 at a time. Long pages and changes may be shortened.')));
     return list;
   }
   /** @param {import('../watches-state.ts').Watch[]} watches */

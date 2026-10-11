@@ -48,7 +48,7 @@
   /** @param {string} [iso] */
   function setUpdated(iso) {
     const t = new Date(iso || Date.now());
-    setStatus(t.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }));
+    setStatus('');
     $('status').title = `Updated ${t.toLocaleString()}`;
   }
   /** @type {ReturnType<typeof setTimeout> | undefined} */

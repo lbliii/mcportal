@@ -9,14 +9,16 @@
     if (stopReading) stopReading();
     readerGeneration++;
     if (!experience) rememberRoomNavigation();
+    closeNavigationMenus();
     experience = name;
+    $('experiences').setAttribute('aria-label', ({ recall: 'Library', collections: 'Collections', desk: 'Collection', compare: 'Compare', changes: 'Page updates', upcoming: 'Events', catchup: 'Catch up' })[name] || 'Reading');
     root.classList.add('experience-view');
     root.classList.remove('article-view', 'welcome-view');
     $('grid').hidden = true; $('welcome').hidden = true; $('reader').hidden = true; $('experiences').hidden = false;
-    $('roomName').textContent = state.profile?.name || 'your reading';
+    const destination = ['recall', 'collections', 'desk', 'compare'].includes(name) ? 'btnRecall' : name === 'catchup' ? 'btnExperienceRoom' : 'btnMore';
     for (const button of $$('.experience-nav button')) {
       button.removeAttribute('aria-current');
-      if (button.id === (name === 'recall' ? 'btnRecall' : name === 'compare' ? 'btnCompare' : name === 'catchup' ? 'btnCatchup' : name === 'changes' ? 'btnChanges' : name === 'upcoming' ? 'btnUpcoming' : name === 'desk' || name === 'collections' ? 'btnCollections' : '')) button.setAttribute('aria-current', 'page');
+      if (button.id === destination) button.setAttribute('aria-current', 'page');
     }
     setStatus('');
   }
@@ -87,7 +89,7 @@
       const index = texts.findIndex(text => { const end = start + text.length; const contains = offset >= start && offset <= end; start = end + 1; return contains; });
       if (blocks[index]) { blocks[index].scrollIntoView({ block: 'start' }); toast('Returned to your kept passage'); return true; }
     }
-    body.before(el('p', { class: 'handoff-note', role: 'status' }, 'The original passage could not be located in this version. Your retained quote is still available in Recall.'));
+    body.before(el('p', { class: 'handoff-note', role: 'status' }, 'The original passage could not be located in this version. Your retained quote is still available in Library.'));
     return true;
   }
 

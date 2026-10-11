@@ -15,7 +15,7 @@
   function toggleAdd(open = $('addSheet').hidden) {
     const returnFocus = $('addSheet').contains(document.activeElement);
     $('addSheet').hidden = !open;
-    $('btnAdd').setAttribute('aria-pressed', String(open));
+    $('btnAdd').setAttribute('aria-expanded', String(open));
     if (open) $('addInput').focus();
     else { invalidateSources(); if (returnFocus) $('btnAdd').focus(); }
   }
@@ -29,8 +29,8 @@
       const data = (await callTool('find_source', { query })).structuredContent;
       if (generation !== sourceGeneration) return;
       hint.textContent = data.candidates.length
-        ? (data.candidates.length === 1 ? 'A signal! Open this door?' : `${data.candidates.length} signals from the void! Pick one.`)
-        : (data.hint || "Nothing but static. No feed lurks behind that door; try the site's home page or another address.");
+        ? (data.candidates.length === 1 ? 'Source found. Add it to your portal?' : `${data.candidates.length} sources found. Choose one to add.`)
+        : (data.hint || "No feed found. Try the site's home page or another address.");
       list.replaceChildren(...data.candidates.map((c) => {
         const sub = c.source === 'rss' ? c.config.url : c.source === 'docs' ? docsSourceLabel(c.config) : c.source === 'github' ? `GitHub · ${c.config.mode === 'releases' ? c.config.repo : c.config.query}` : `Hacker News · ${c.config.feed}`;
         const add = el('button', { class: 'btn', onclick: () => addCandidate(c, add) }, 'Add');
@@ -43,7 +43,7 @@
           add);
       }));
     } catch (error) {
-      if (generation === sourceGeneration) hint.textContent = `Couldn't look that up: ${errorText(error)}. Check the address and scan again.`;
+      if (generation === sourceGeneration) hint.textContent = `Couldn't look that up: ${errorText(error)}. Check the address and try again.`;
     } finally { if (generation === sourceGeneration) list.setAttribute('aria-busy', 'false'); }
   }
 
@@ -60,7 +60,7 @@
       state.portals.set(data.portal.portalId, data.portal);
       drawLayout();
       if (generation === sourceGeneration) { toggleAdd(false); $('addInput').value = ''; }
-      toast(`It's alive! ${data.portal.title} has joined your room.`);
+      toast(`${data.portal.title} added.`);
       const node = $first(`[data-portal="${CSS.escape(data.portalId)}"]`);
       if (node) node.scrollIntoView({ behavior: scrollBehavior(), block: 'nearest', inline: 'start' });
     } catch (error) {
@@ -136,8 +136,8 @@
   $('addForm').addEventListener('submit', (e) => {
     e.preventDefault();
     const q = $('addInput').value.trim();
-    if (!q) { invalidateSources(); $('addHint').textContent = 'Enter a site or feed address to scan.'; $('addInput').focus(); return; }
+    if (!q) { invalidateSources(); $('addHint').textContent = 'Enter a site or feed address.'; $('addInput').focus(); return; }
     if (q) $('addStore').getAttribute('aria-pressed') === 'true' ? previewStore(q) : findSources(q);
   });
-  $('addInput').addEventListener('input', () => { invalidateSources(); $('addHint').textContent = 'Scan to preview this address.'; });
+  $('addInput').addEventListener('input', () => { invalidateSources(); $('addHint').textContent = 'Find sources to preview this address.'; });
   $('addSheet').addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); toggleAdd(false); } });

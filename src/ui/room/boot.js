@@ -20,7 +20,7 @@
     } catch (error) {
       console.warn('[mcportal] ui/initialize failed', error);
     }
-    $('btnOpenIn').hidden = !hostCapabilities.message;
+    $('openInField').hidden = !hostCapabilities.message;
     $('btnExpand').hidden = !canFullscreen;
     hostNotify('ui/notifications/initialized', {});
     // If the host opened us without running the tool (e.g. a restored view), fetch the

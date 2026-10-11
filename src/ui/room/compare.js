@@ -10,7 +10,6 @@
   const comparisonText = new Map();
   /** Explicitly selected passages, separate from fetched page text. @type {Map<string, string>} */
   const comparisonPassages = new Map();
-  $('btnCompare').addEventListener('click', () => showComparison([...selectedEvidence.values()]));
 
   /** @param {LibraryHit[]} hits @param {Collection} [kept] @param {boolean} [stale] */
   function showComparison(hits, kept, stale = false) {
@@ -40,7 +39,7 @@
     $('experiences').replaceChildren(el('header', { class: 'experience-heading' }, el('span', { class: 'experience-kicker' }, 'SOURCES SIDE BY SIDE'), el('h1', null, kept?.title || 'Comparison View'),
       el('p', null, 'Keep the evidence in front of you. Let the differences become visible.'), question,
       el('div', { class: 'experience-row' }, el('span', { class: 'experience-muted' }, `${hits.length} sources · independent reading positions`),
-        el('button', { class: 'btn primary', onclick: () => keepComparison() }, kept ? 'Update kept comparison' : 'Keep comparison'), el('button', { class: 'link-btn', onclick: () => showRecall() }, 'Back to Recall'))),
+        el('button', { class: 'btn primary', onclick: () => keepComparison() }, kept ? 'Update kept comparison' : 'Keep comparison'), el('button', { class: 'link-btn', onclick: () => showRecall() }, 'Back to Library'))),
       tabs, el('div', { class: 'comparison-sources', style: `--comparison-count:${hits.length}` }, panels),
       el('section', { class: 'comparison-evidence' }, el('h2', null, 'Passages you kept'), el('div', { id: 'comparisonPassages' })), interpretation);
     drawComparisonPassages();

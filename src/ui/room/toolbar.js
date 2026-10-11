@@ -1,23 +1,20 @@
-  // room/toolbar.js: toolbar controls
-  // ------------------------------------------------------------ toolbar
-  $('btnSources').addEventListener('click', () => {
-    const on = !root.classList.contains('show-sources');
-    root.classList.toggle('show-sources', on); $('btnSources').setAttribute('aria-pressed', String(on));
+  // Preferences keep the existing profile contract; the drawer only changes their home.
+  $('showSources').addEventListener('change', () => {
+    root.classList.toggle('show-sources', $('showSources').checked);
   });
-  // Layout and open-in are saved to the profile, so the next open_room keeps them.
   let settingsBusy = false;
   /** @param {Pick<Partial<Profile>, 'layout' | 'openIn'>} change */
   async function saveSettings(change) {
     if (!state.profile || settingsBusy) return;
     settingsBusy = true;
-    const controls = [...$$('[data-layout]'), $('btnLayout'), $('btnOpenIn')];
+    const focused = document.activeElement;
+    const controls = [...$$('[data-layout]'), $('openIn')];
     controls.forEach((b) => b.setAttribute('disabled', ''));
-    $('btnLayout').setAttribute('aria-busy', 'true');
+    $('layoutMenu').setAttribute('aria-busy', 'true');
     const before = state.profile;
     state.profile = { ...before, ...change };
     drawLayout();
     try {
-      // Only the setting that changed: arrange_room can't touch anything it isn't given.
       const result = await callTool('arrange_room', change);
       state.profile = result.structuredContent.profile;
     } catch (error) {
@@ -26,56 +23,58 @@
     } finally {
       settingsBusy = false;
       controls.forEach((b) => b.removeAttribute('disabled'));
-      $('btnLayout').removeAttribute('aria-busy');
-      if (change.layout) $('btnLayout').focus({ preventScroll: true });
+      $('layoutMenu').removeAttribute('aria-busy');
+      if ($('settingsPanel').open && focused instanceof HTMLElement && (document.activeElement === document.body || document.activeElement === focused)) focused.focus({ preventScroll: true });
     }
   }
-  $('layoutMenu').addEventListener('beforetoggle', (event) => {
-    if (event.newState !== 'open') return;
-    const anchor = $('btnLayout').getBoundingClientRect();
-    const width = Math.min(300, window.innerWidth - 24);
-    $('layoutMenu').style.left = `${Math.max(12, Math.min(anchor.left, window.innerWidth - width - 12))}px`;
-  });
-  $('layoutMenu').addEventListener('toggle', () => {
-    $('btnLayout').setAttribute('aria-expanded', String($('layoutMenu').matches(':popover-open')));
-  });
-  for (const b of $$('[data-layout]')) {
-    b.addEventListener('click', () => {
-      const layout = layoutNamed(b.dataset.layout);
-      $('layoutMenu').hidePopover();
-      $('btnLayout').focus({ preventScroll: true });
+  for (const button of $$('[data-layout]')) {
+    button.addEventListener('click', () => {
+      const layout = layoutNamed(button.dataset.layout);
       if (layout && state.profile && state.profile.layout !== layout) saveSettings({ layout });
     });
   }
-  $('btnOpenIn').addEventListener('click', () => {
-    if (state.profile) saveSettings({ openIn: state.profile.openIn === 'chat' ? 'card' : 'chat' });
+  $('openIn').addEventListener('change', () => saveSettings({ openIn: $('openIn').value === 'chat' ? 'chat' : 'card' }));
+
+  /** @param {boolean} open */
+  function showSettings(open) {
+    const panel = $('settingsPanel');
+    if (!open) { if (panel.open) panel.close(); return; }
+    closeNavigationMenus();
+    drawWhoMenu();
+    $('showSources').checked = root.classList.contains('show-sources');
+    root.classList.add('settings-open');
+    $('btnSettings').setAttribute('aria-expanded', 'true');
+    if (!panel.open) panel.showModal();
+  }
+  $('btnSettings').addEventListener('click', () => showSettings(true));
+  $('btnCloseSettings').addEventListener('click', () => showSettings(false));
+  $('settingsPanel').addEventListener('close', () => {
+    root.classList.remove('settings-open');
+    $('btnSettings').setAttribute('aria-expanded', 'false');
   });
-  // Who the room belongs to: your handle when signed in, ghost mode when not. The chip opens
-  // a small menu: what the mode means, and signing in (ghost) or your space, account page and
-  // signing out (signed in).
+
+  /** Popovers share native Escape, focus return and outside-click dismissal. */
+  function closeNavigationMenus() {
+    for (const menu of [$('moreMenu'), $('roomOptions')]) if (menu.matches(':popover-open')) menu.hidePopover();
+  }
+  /** @param {HTMLElement} menu @param {HTMLButtonElement} button */
+  function navigationMenu(menu, button) {
+    menu.addEventListener('beforetoggle', event => {
+      if (event.newState !== 'open') return;
+      const anchor = button.getBoundingClientRect();
+      menu.style.left = `${Math.max(12, Math.min(anchor.left, window.innerWidth - 272))}px`;
+      menu.style.top = `${anchor.bottom + 4}px`;
+    });
+    menu.addEventListener('toggle', () => button.setAttribute('aria-expanded', String(menu.matches(':popover-open'))));
+    menu.addEventListener('click', event => { if (event.target instanceof Element && event.target.closest('button') && menu.matches(':popover-open')) menu.hidePopover(); });
+  }
+  navigationMenu($('moreMenu'), $('btnMore'));
+  navigationMenu($('roomOptions'), $('btnRoomOptions'));
+
   /** @param {Identity} identity */
   function drawIdentity(identity) {
     state.identity = identity;
-    const who = $('btnWho');
-    const ghost = identity.mode === 'ghost';
-    const name = ghost ? 'Ghost mode' : identity.handle ? `@${identity.handle}` : (identity.login ?? 'Signed in');
-    const offline = identity.mode === 'linked' && Boolean(identity.offline);
-    const title = ghost ? 'Ghost mode: not signed in' : offline ? `Signed in as ${name}, offline: showing your portal as last synced` : `Signed in as ${name}`;
-    who.classList.toggle('ghost', ghost);
-    who.classList.toggle('offline', offline);
-    who.title = title;
-    who.setAttribute('aria-label', `${title}. Account menu`);
-    who.setAttribute('aria-expanded', 'false');
-    who.replaceChildren(ghost ? icon('ghost') : icon('space'), el('span', { class: 'who-name' }, name));
-    who.hidden = false;
-    $('whoMenu').hidden = true;
-  }
-
-  /** @param {boolean} open */
-  function showWhoMenu(open) {
-    $('whoMenu').hidden = !open;
-    $('btnWho').setAttribute('aria-expanded', String(open));
-    if (open) drawWhoMenu();
+    if ($('settingsPanel').open) drawWhoMenu();
   }
 
   /** @param {Element} target @param {...(Child | Child[])} children */
@@ -88,12 +87,11 @@
     if (!identity) return;
     if (identity.mode === 'ghost') {
       setWhoMenu(
-        el('div', { class: 'who-head' }, icon('ghost'), el('b', null, 'Ghost mode')),
-        el('p', null, 'No account: your portal lives on this computer, and nothing is synced or shared.'),
+        el('div', { class: 'who-head' }, icon('ghost'), el('b', null, 'Local only')),
+        el('p', null, 'Saved on this computer. Nothing is synced or shared.'),
         identity.signInFailure ? el('p', { class: 'error', role: 'alert' }, identity.signInFailure.message) : null,
         identity.canSignIn
-          ? [el('p', { class: 'muted' }, 'Sign in to keep the same portal on every device, and to share and follow. This computer\'s portal comes with you.'),
-            el('button', { class: 'btn primary', type: 'button', onclick: () => signIn() }, 'Sign in to sync and share')]
+          ? [el('button', { class: 'btn primary', type: 'button', onclick: () => signIn() }, 'Sign in to sync')]
           : null);
       return;
     }
@@ -105,7 +103,7 @@
       linked && identity.offline ? el('p', { class: 'muted' }, `Offline: this is your portal as last synced${identity.syncedAt ? ` (${ago(identity.syncedAt)})` : ''}. Feeds still load; changes wait until you're back online.`) : null,
       el('div', { class: 'who-actions' },
         identity.handle
-          ? el('button', { class: 'btn', type: 'button', onclick: () => { showWhoMenu(false); loadSpace('', false); } }, 'Your space')
+          ? el('button', { class: 'btn', type: 'button', onclick: () => { showSettings(false); loadSpace('', false); } }, 'Your space')
           : el('button', { class: 'btn primary', type: 'button', onclick: drawClaim }, 'Claim a handle'),
         identity.accountUrl ? el('button', { class: 'btn', type: 'button', onclick: () => openLink(identity.accountUrl ?? '') }, 'Account page') : null,
         linked ? el('button', { class: 'btn', type: 'button', onclick: confirmSignOut }, 'Sign out') : null));
@@ -119,7 +117,7 @@
       await openLink(url);
       fill(target,
         el('p', null, 'Finish signing in with GitHub in your browser. This computer\'s portal is added to your account, and this room updates when you\'re done.'),
-        el('button', { class: 'btn', type: 'button', onclick: () => { showWhoMenu(false); loadRoom(); } }, 'I\'ve signed in'));
+        el('button', { class: 'btn', type: 'button', onclick: () => { showSettings(false); loadRoom(); } }, 'I\'ve signed in'));
       watchSignIn(target);
     } catch (error) {
       fill(target, el('p', { class: 'error', role: 'alert' }, `Couldn't start signing in: ${errorText(error)}`),
@@ -241,25 +239,18 @@
     setWhoMenu(el('p', null, 'Copying your portal to this computer…'));
     try {
       await callTool('unlink_account');
-      showWhoMenu(false);
-      toast('Signed out. Your portal is on this computer, in ghost mode.');
+      showSettings(false);
+      toast('Signed out. Your portal is saved on this computer.');
       loadRoom();
     } catch (error) {
       setWhoMenu(el('p', { class: 'error' }, `Still signed in: ${errorText(error)}`));
     }
   }
 
-  $('btnWho').addEventListener('click', () => showWhoMenu($('whoMenu').hidden));
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('whoMenu').hidden) { showWhoMenu(false); $('btnWho').focus(); } });
-  // The click's path, not its target: a button that redraws the menu is gone from it by now.
-  document.addEventListener('click', (e) => {
-    const path = e.composedPath();
-    if (!$('whoMenu').hidden && !path.includes($('whoMenu')) && !path.includes($('btnWho'))) showWhoMenu(false);
-  });
   /** Refresh every portal the room can fetch itself (pinned ones are the agent's). */
   async function refreshAll() {
     if (!state.profile) return loadRoom();
-    setStatus('Scanning the ether for fresh dispatches…');
+    setStatus('Refreshing sources…');
     await Promise.all([...state.portals.values()].filter((p) => !p.pin).map((p) => refreshPortal(p.portalId)));
     setUpdated();
   }

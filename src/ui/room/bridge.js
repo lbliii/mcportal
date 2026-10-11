@@ -210,7 +210,7 @@
     root.classList.toggle('framed', mode === 'fullscreen' || Boolean(DEV));
     const full = mode === 'fullscreen';
     $('btnExpand').replaceChildren(icon(full ? 'collapse' : 'expand'));
-    $('btnExpand').title = full ? 'Exit fullscreen' : 'Fullscreen: step all the way through';
+    $('btnExpand').title = full ? 'Exit fullscreen' : 'Fullscreen';
     $('btnExpand').setAttribute('aria-label', $('btnExpand').title);
     if (changed && state.profile?.layout === 'river') redrawRiver();   // its page size and loading differ by mode
     else if (changed && state.profile) {

@@ -1,25 +1,25 @@
 # Organize your reading
 
-Use Recall to find something again, a Topic Desk to collect evidence, a comparison to read sources together, or a trail to work through them in order. These features are currently on `main` under [Unreleased](../../CHANGELOG.md#unreleased); hosted and plugin installs need a release and deployment that includes them.
+Use Library to find something again, a collection to keep evidence, a comparison to read sources together, or a trail to work through them in order. These features are currently on `main` under [Unreleased](../../CHANGELOG.md#unreleased); hosted and plugin installs need a release and deployment that includes them.
 
 ## Find something again
 
-Open **Recall** in the room's reading tabs, or ask:
+Open **Library** in the top navigation, or ask:
 
 ```text
 find what I saved or clipped about databases
 ```
 
-Recall Shelf searches saved links, retained clip text and reading history together. Narrow results by kind, site, tag or reading status. Searching uses the material you've kept; it does not fetch the full text of every bookmarked page. Opening a link fetches it again when needed.
+Library searches saved links, retained clip text and reading history together. Open **Filters** to narrow results by kind, site, tag or reading status. Searching uses the material you've kept; it does not fetch the full text of every bookmarked page. Opening a link fetches it again when needed.
 
 Open a result to read it, or select results to bring together. A kept passage reopens at its exact text when that text still has a unique match. If a page changed or the passage is ambiguous, MCPortal says so.
 
-## Make a Topic Desk
+## Make a collection
 
-1. Select material in Recall, then choose **Create a desk**. You can also open **Topic desks** and create an empty one.
-2. Give the desk a title and a question or purpose. Choose **Create desk**.
-3. Use **Find more material**, select results, return to the desk and add the selected items.
-4. Use **Edit desk** to choose live portals to read beside your kept evidence. Their **Keep** buttons add individual stories to the desk.
+1. Select material in Library, then choose **Create collection**. You can also open **Library → Collections → New collection** to create an empty one.
+2. Give the collection a title and a question or purpose. Choose **Create collection**.
+3. Use **Find more material**, select results, return to the collection and add the selected items.
+4. Use **Edit collection** to choose live portals to read beside your kept evidence. Their **Keep** buttons add individual stories to the collection.
 5. Write a note under **Your own thinking**, then choose **Keep personal note**. The note is also a clip.
 
 Or ask your agent:
@@ -28,13 +28,13 @@ Or ask your agent:
 make a private desk called Database choices from the links and clips I just selected
 ```
 
-**Ask your agent** requests an orientation based on the desk's evidence. It is labeled as agent writing and cites the entries it uses. MCPortal does not generate it in the background. Missing clips or sources remain visible so you can repair the collection.
+**Ask your agent** requests an orientation based on the collection's evidence. It is labeled as agent writing and cites the entries it uses. MCPortal does not generate it in the background. Missing clips or sources remain visible so you can repair the collection.
 
-Removing an entry or deleting a collection keeps the original saved link, clip and subscription. Desks remain private, including when you have a public Space.
+Removing an entry or deleting a collection keeps the original saved link, clip and subscription. Collections remain private, including when you have a public Space.
 
 ## Compare two or three sources
 
-Select two or three results in Recall, then choose **Compare 2–3 sources**. Sources open in separate panes, or source tabs on a narrow screen. Keep useful passages as you read.
+Select two or three results in Library, then choose **Compare**. Sources open in separate panes, or source tabs on a narrow screen. Keep useful passages as you read.
 
 For an interpretation, ask a specific question:
 
@@ -46,19 +46,19 @@ Your agent supplies the interpretation with citations to those sources. Source p
 
 ## Read a trail
 
-Open a desk and choose **Read as a trail**. Move entries earlier or later with the arrow controls. For each step, read the source, then choose **Finish step** or **Skip step**. **Undo completion** restores a step. **View as desk** changes the presentation without losing the entries or their progress.
+Open a collection and choose **Read as a trail**. Move entries earlier or later with the arrow controls. For each step, read the source, then choose **Finish step** or **Skip step**. **Undo completion** restores a step. **View as collection** changes the presentation without losing the entries or their progress.
 
 Finishing a trail step records progress in that trail. To mark the article itself read, use **Mark as read** in the reader.
 
 ## Finish a bounded catch-up
 
-Open **Catch-up** in the room's reading tabs. Choose the portals and how many unseen stories to capture, up to 30, then start the session. Read or skip each story and explicitly finish or end the session.
+Choose **Catch up** beside **Add source** in the room. Choose the portals and how many unseen stories to capture, up to 30, then start the session. Read or skip each story and explicitly finish or end the session.
 
 The captured set and your place survive refresh and restart, and sync across linked devices. New arrivals wait for another session. Finishing or ending marks only captured stories in existing portals as seen; it does not mark their articles read. Failed sources are shown, rather than silently treated as empty.
 
 ## Choose how a portal looks
 
-Ask for a portal presentation separately from the room's overall layout:
+Open a source by selecting its title, then choose its presentation from **View**. Change the overall room layout in **Settings → Room layout**. You can also ask:
 
 ```text
 show Hacker News as a list and my GitHub releases as a changelog

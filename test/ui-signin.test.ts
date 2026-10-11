@@ -76,12 +76,12 @@ async function beginSignIn(entry: string, links = 'supported'): Promise<string> 
   await page.goto(`${base}/?links=${links}`);
   let target: string;
   if (entry === 'menu') {
-    await page.waitFor(`!${FRAME}.getElementById('btnWho').hidden`, 'the Ghost mode menu');
-    await page.eval(`${FRAME}.getElementById('btnWho').click()`);
+    await page.waitFor(`!${FRAME}.getElementById('btnSettings').hidden`, 'the Settings button');
+    await page.eval(`${FRAME}.getElementById('btnSettings').click()`);
     target = `${FRAME}.getElementById('whoMenu')`;
     await page.eval(`${target}.querySelector('button').click()`);
   } else {
-    const button = `[...${FRAME}.querySelectorAll('.welcome-actions button')].find((b) => b.textContent.startsWith('Already have a portal?'))`;
+    const button = `[...${FRAME}.querySelectorAll('.welcome-actions button')].find((b) => b.textContent==='Sign in to your account')`;
     await page.waitFor(button, 'welcome sign-in');
     await page.eval(`${button}.click()`);
     target = `${FRAME}.querySelector('.welcome-actions + .building')`;

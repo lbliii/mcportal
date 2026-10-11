@@ -15,7 +15,7 @@
     setStatus('');
     /** @type {Set<string>} */
     const chosen = new Set();
-    const build = el('button', { class: 'btn primary', disabled: true, onclick: () => buildRoom([...chosen]) }, 'Summon my portals!');
+    const build = el('button', { class: 'btn primary', disabled: true, onclick: () => buildRoom([...chosen]) }, 'Create my portal room');
     const cards = packs.map((p) => el('button', {
       class: 'pack', 'aria-pressed': 'false', title: p.sources.join(' · '),
       onclick: (/** @type {MouseEvent} */ e) => {
@@ -24,7 +24,7 @@
         card.setAttribute('aria-pressed', String(chosen.has(p.id)));
         for (const c of cards) if (c.getAttribute('aria-pressed') !== 'true') c.disabled = chosen.size >= maxPacks;
         build.disabled = !chosen.size;
-        build.textContent = chosen.size ? `Summon my portals! (${chosen.size})` : 'Summon my portals!';
+        build.textContent = chosen.size ? `Create my portal room (${chosen.size})` : 'Create my portal room';
       },
     }, el('span', { class: 'tick', 'aria-hidden': 'true' }, icon('check')),
       el('span', { class: 'pl' }, p.label), el('span', { class: 'pb' }, p.blurb), el('span', { class: 'ps' }, p.sources.join(' · '))));
@@ -34,30 +34,30 @@
       if (!text) { describe.focus(); return; }
       try {
         await hostRequest('ui/message', { role: 'user', content: [{ type: 'text', text: `Set up my MCPortal around what I'm into: ${text}` }] }, 10000);
-        toast('Your summons has been sent! Your agent will build your room in the chat.');
-      } catch { toast('The chat is beyond our reach. Tell your agent there instead.'); }
+        toast('Your agent will set up your room in the chat.');
+      } catch { toast('Could not reach the chat. Send your interests to your agent there.'); }
     };
     describe.addEventListener('keydown', (e) => { if (e.key === 'Enter') askAgent(); });
     const signInFailure = data.identity.mode === 'ghost' ? data.identity.signInFailure : undefined;
     const signingIn = el('div', { class: 'building', hidden: !signInFailure }, signInFailure ? el('p', { class: 'error', role: 'alert' }, signInFailure.message) : null);   // the account menu is hidden here, so sign-in reports under the actions
     $('welcome').replaceChildren(...present([
       /** @type {Element} */ ($('brandBadge').content.firstElementChild).cloneNode(true),   // the template holds the badge
-      el('h1', null, rebuilding ? 'Start over' : 'Choose your destiny!'),
+      el('h1', null, rebuilding ? 'Start over' : 'What do you like to read?'),
       el('p', { class: 'lede' }, rebuilding
-        ? `Pick up to ${maxPacks} packs to rebuild your room. This replaces your current layout; your saved items stay.`
-        : `Pick up to ${maxPacks} things you're into. MCPortal opens a door to sources that work, and you can change anything later.`),
+        ? `Pick up to ${maxPacks} interests. This replaces your sources and layout; your saved items stay.`
+        : `Pick up to ${maxPacks} interests. You can change your sources later.`),
       el('div', { class: 'packs' }, cards),
       el('div', { class: 'welcome-actions' }, build,
         rebuilding
           ? el('button', { class: 'link-btn', onclick: () => { loading = null; loadRoom(); } }, 'Cancel')
-          : el('button', { class: 'link-btn', onclick: () => buildRoom([]) }, 'Skip. Show me what lurks inside.'),
-        rebuilding ? null : el('button', { class: 'link-btn', onclick: () => pickOpml() }, 'Fleeing another reader? Smuggle your subscriptions in (OPML)'),
+          : el('button', { class: 'link-btn', onclick: () => buildRoom([]) }, 'Try a sample room'),
+        rebuilding ? null : el('button', { class: 'link-btn', onclick: () => pickOpml() }, 'Import subscriptions (OPML)'),
         !rebuilding && data.identity?.mode === 'ghost' && data.identity.canSignIn
-          ? el('button', { class: 'link-btn', onclick: () => { signingIn.hidden = false; signIn(signingIn); } }, 'Already have a portal? Sign in to bring it here')
+          ? el('button', { class: 'link-btn', onclick: () => { signingIn.hidden = false; signIn(signingIn); } }, 'Sign in to your account')
           : null),
       signingIn,
       DEV ? null : el('div', { class: 'ask' },
-        el('p', { class: 'lede' }, 'Into something stranger? Describe it and your agent will hunt down the sources.'),
+        el('p', { class: 'lede' }, 'Describe an interest to find more sources.'),
         el('div', { class: 'add-row' }, describe, el('button', { class: 'btn', onclick: askAgent }, 'Ask your agent'))),
     ]));
     $('welcome').hidden = false;
@@ -67,7 +67,7 @@
   async function buildRoom(packIds) {
     if (setupBusy) { toast('Please wait for the current setup to finish.'); return; }
     setupBusy = true;
-    const note = el('div', { class: 'building', role: 'status' }, packIds.length ? 'Forging your room in the star-furnace…' : 'Cracking open a sample room…');
+    const note = el('div', { class: 'building', role: 'status' }, packIds.length ? 'Creating your room…' : 'Opening a sample room…');
     $('welcome').append(note);
     const buttons = [...$('welcome').querySelectorAll('button')].map(button => ({ button, disabled: button.disabled }));
     for (const { button } of buttons) button.disabled = true;
@@ -75,7 +75,7 @@
     try {
       const built = (await callTool('build_room', { packs: packIds })).structuredContent;
       builtRoom = true;
-      note.textContent = 'Receiving transmissions…';
+      note.textContent = 'Loading your sources…';
       const result = await callTool('open_room');
       renderRoom(result.structuredContent);
       if (!DEV && packIds.length) {
@@ -104,7 +104,8 @@
     for (const portal of data.portals) portalLoadedAt.set(portal.portalId, Date.now());
     state.edition = data.edition; state.lead = data.lead; state.labs = data.labs ?? [];
     state.alsoShared = new Map((data.alsoShared ?? []).map((a) => [storyKey(a.url), a]));   // "also shared by", keyed as the river keys stories
-    $('roomName').textContent = data.profile.name;
+    $('roomName').textContent = data.profile.name === 'morning' ? 'Your portal room' : data.profile.name;
+    $('grid').setAttribute('aria-label', $('roomName').textContent || 'Your portal room');
     drawIdentity(data.identity);
     drawLayout();
     refreshContinueReading();
@@ -327,8 +328,8 @@
     const on = state.saved.has(item.url);
     return el('button', {
       class: cls, 'data-save-url': item.url, 'aria-pressed': String(on),
-      title: on ? 'Saved (click to remove)' : 'Save to your room',
-      'aria-label': on ? 'Remove from saved' : 'Save to your room',
+      title: on ? 'Saved (click to remove)' : 'Save to Library',
+      'aria-label': on ? 'Remove from saved' : 'Save to Library',
       onclick: (/** @type {MouseEvent} */ e) => { e.stopPropagation(); toggleSaved(item, source); },
     }, icon('bookmark'));
   }
@@ -337,8 +338,8 @@
     for (const b of $$('[data-save-url]')) {
       const on = state.saved.has((b.dataset.saveUrl ?? ''));   // selected by data-save-url
       b.setAttribute('aria-pressed', String(on));
-      b.title = on ? 'Saved (click to remove)' : 'Save to your room';
-      b.setAttribute('aria-label', on ? 'Remove from saved' : 'Save to your room');
+      b.title = on ? 'Saved (click to remove)' : 'Save to Library';
+      b.setAttribute('aria-label', on ? 'Remove from saved' : 'Save to Library');
     }
   }
 
