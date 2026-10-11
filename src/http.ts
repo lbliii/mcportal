@@ -27,8 +27,8 @@ import type { TtlCache } from './lib/cache.ts';
 import { isLoopbackHost } from './lib/ip.ts';
 import { errorCode, errorMessage, errorStack, isAppError } from './lib/errors.ts';
 import { safeEqual } from './lib/ids.ts';
-import { createLogger, requestId, type Logger } from './lib/log.ts';
-import { ToolMetrics } from './lib/metrics.ts';
+import { actorLogFields, loggerFromEnv, observedClientVersion, requestId, userAgentLogFields, type Logger, type LogFields } from './lib/log.ts';
+import { ACTIVITY_INTERVAL_MS, ToolMetrics } from './lib/metrics.ts';
 import { readBody, sendHtml } from './lib/web.ts';
 import { page } from './page.ts';
 import { handleMessage, RPC, rpcError, SERVER_INFO, roomHtml, type JsonRpcResponse } from './mcp.ts';
@@ -219,7 +219,8 @@ function hostnameOf(hostHeader: string | undefined): string | undefined {
 }
 
 export function createApp(config: AppConfig, deps: AppDeps): Server {
-  const log = deps.log ?? createLogger();
+  const log = deps.log ?? loggerFromEnv();
+  const requestActors = new WeakMap<IncomingMessage, LogFields>();
   // Normally passed in by server.ts; otherwise accounts.json next to the other data, bootstrapped from the env.
   const accounts = deps.accounts ?? new Accounts(fileAuthPersistence(config.dataDir, 'accounts.json'), bootstrapFromEnv(process.env, config.allowedGithubUsers), deps.now);
   const oauth = config.github
@@ -254,7 +255,7 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
   // Retention on a schedule: what's kept only for a while goes even on a quiet server.
   const stopHousekeeping = startHousekeeping(retentionTasks({ handoffs, editions, experiences, social, accounts, oauth }), log);
   const context = (userId: string, reqLog: Logger): ToolContext => ({
-    log: reqLog,
+    log: reqLog.child(actorLogFields(userId, accounts.actor(userId))),
     store: deps.store, watchStore, reading, handoffs, seen, editions, clips, collections, experiences, publicProfiles, social, fetcher: deps.fetcher, cache: deps.cache, userId, watches, budget, metrics, actor: accounts.actor(userId),
     labs: deps.labs,
     accountUrl: account?.url,
@@ -272,12 +273,14 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
   async function authenticate(req: IncomingMessage): Promise<string | undefined> {
     const header = req.headers.authorization ?? '';
     const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
+    let userId: string | undefined;
     if (token) {
-      if (config.staticToken && safeEqual(token, config.staticToken)) return config.staticUser;
-      if (oauth) return oauth.authenticate(token);
-      return undefined;
+      userId = config.staticToken && safeEqual(token, config.staticToken) ? config.staticUser : await oauth?.authenticate(token);
+    } else if (config.allowUnauthenticated) {
+      userId = config.staticUser;
     }
-    return config.allowUnauthenticated ? config.staticUser : undefined;
+    if (userId) requestActors.set(req, actorLogFields(userId, accounts.actor(userId)));
+    return userId;
   }
 
   function unauthorized(res: ServerResponse): void {
@@ -315,7 +318,7 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
     if (!versionAtLeast(String(req.headers[CLIENT_HEADER] ?? ''), MIN_CLIENT_VERSION)) {
       return json(426, { error: 'upgrade_required', error_description: `Update MCPortal to ${MIN_CLIENT_VERSION} or later to keep using your linked portal.`, minClientVersion: MIN_CLIENT_VERSION });
     }
-    const ctx = context(userId, reqLog);
+    const ctx = context(userId, reqLog.child({ host: 'mcportal', clientVersion: observedClientVersion(req.headers[CLIENT_HEADER]) }));
 
     if (url.pathname !== API_PATH) {
       // Whole exports and imports: one gate decision and one charge each, like export_data and import_portal.
@@ -431,7 +434,7 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
 
   const server = createServer((req, res) => {
     const id = requestId();
-    const reqLog = log.child({ req: id });
+    const reqLog = log.child({ req: id, ...userAgentLogFields(req.headers['user-agent']) });
     const started = Date.now();
     res.setHeader('x-request-id', id);
     if (new URL(config.publicUrl).protocol === 'https:') res.setHeader('strict-transport-security', 'max-age=31536000');
@@ -441,7 +444,12 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
     } catch {
       return sendError(res, 400, 'bad_request', 'Bad request');
     }
-    res.on('finish', () => reqLog.debug('http.request', { method: req.method, path: loggablePath(url.pathname), status: res.statusCode, ms: Date.now() - started }));
+    res.on('finish', () => {
+      const ms = Date.now() - started;
+      // Routine discovery 401s/404s stay quiet; slow requests and server failures remain visible.
+      const level = res.statusCode >= 500 ? 'error' : ms >= 5_000 ? 'warn' : 'debug';
+      reqLog.child(requestActors.get(req) ?? {})[level]('http.request', { method: req.method, path: loggablePath(url.pathname), status: res.statusCode, ms });
+    });
     route(req, res, url, reqLog).catch((error) => {
       reqLog.error('http.crashed', { method: req.method, path: loggablePath(url.pathname), error: errorStack(error) });
       send(res, 500, JSON.stringify(rpcError(null, RPC.internal, `Internal error (reference ${id})`)));
@@ -453,6 +461,9 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
   const stopWatches = startWatchWorker(experiences, owner => context(owner, log), log, undefined, async () => !(await deps.session?.isLinked()));
   server.on('close', stopWatches);
   server.on('close', stopHousekeeping);
+  const activityTimer = setInterval(() => metrics.flushActivity(log), ACTIVITY_INTERVAL_MS);
+  activityTimer.unref();
+  server.on('close', () => { clearInterval(activityTimer); metrics.flushActivity(log); });
   server.requestTimeout = 300_000;   // room for an export upload on a slow connection; headersTimeout still guards slow-drip requests
   server.headersTimeout = 20_000;
   return server;

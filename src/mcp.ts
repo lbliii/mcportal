@@ -9,7 +9,7 @@ import { authorize, localActor } from './access.ts';
 import { SERVER_ICONS } from './brand-icons.ts';
 import { budgetMessage } from './lib/budget.ts';
 import { errorStack, isAppError } from './lib/errors.ts';
-import { requestId, silentLogger, userRef } from './lib/log.ts';
+import { actorLogFields, clientLogFields, outcomeLevel, requestId, silentLogger } from './lib/log.ts';
 import { schemaProblem } from './lib/schema.ts';
 import { clean } from './lib/text.ts';
 import { findTool, toolAction, toolCost, TOOLS } from './tools/index.ts';
@@ -30,19 +30,6 @@ function field(value: unknown, key: string): unknown {
 function observedVersion(value: unknown): string {
   if (value === undefined) return 'missing';
   return typeof value === 'string' && (SUPPORTED_PROTOCOL_VERSIONS.includes(value) || value === '2026-07-28') ? value : 'other';
-}
-
-/** Exact aliases only; self-reported host identity never controls access or behavior. */
-function observedHost(clientInfo: unknown): string {
-  const name = field(clientInfo, 'name');
-  if (typeof name !== 'string' || name.length > 64) return 'unknown';
-  switch (name.toLowerCase()) {
-    case 'claude': case 'claude-ai': case 'claude-desktop': case 'claude desktop': return 'claude';
-    case 'claude-code': case 'claude code': return 'claude_code';
-    case 'chatgpt': case 'openai-chatgpt': return 'chatgpt';
-    case 'codex': case 'codex-mcp-client': return 'codex';
-    default: return 'unknown';
-  }
 }
 
 const INSTRUCTIONS = [
@@ -133,15 +120,20 @@ const REACH_TOOLS = new Set(['unlink_account', 'set_public_profile', 'remove_pub
 async function callTool(params: Record<string, unknown>, ctx: ToolContext): Promise<CallToolResult | undefined> {
   const name = String(params.name ?? '');
   const tool = findTool(name);
-  if (!tool) return undefined;
-  const log = (ctx.log ?? silentLogger).child({ tool: name, user: userRef(ctx.userId) });
+  const actor = actorLogFields(ctx.userId, ctx.actor);
+  const log = (ctx.log ?? silentLogger).child({ tool: tool ? name : 'unknown', ...actor });
+  if (!tool) {
+    log.warn('tool.call', { outcome: 'invalid', code: 'not_found', ms: 0 });
+    ctx.metrics?.record('unknown', 'invalid', 0, 'not_found', actor.traffic);
+    return undefined;
+  }
   const started = Date.now();
   const done = (result: CallToolResult, outcome: string): CallToolResult => {
     const error = result.structuredContent?.error as { code?: string } | undefined;
     const code = result.isError ? error?.code : undefined;
     const ms = Date.now() - started;
-    log.info('tool.call', { outcome, code, ms });
-    ctx.metrics?.record(name, outcome, ms, code);
+    log[outcomeLevel(outcome, code)]('tool.call', { outcome, code, ms });
+    ctx.metrics?.record(name, outcome, ms, code, actor.traffic);
     return result;
   };
 
@@ -192,10 +184,13 @@ export async function handleMessage(message: unknown, ctx: ToolContext): Promise
     case 'initialize': {
       const requested = String(params.protocolVersion ?? '');
       const protocolVersion = SUPPORTED_PROTOCOL_VERSIONS.includes(requested) ? requested : SUPPORTED_PROTOCOL_VERSIONS[0];
-      ctx.log?.info('protocol.initialize', {
+      const actor = actorLogFields(ctx.userId, ctx.actor);
+      const client = clientLogFields(params.clientInfo);
+      ctx.metrics?.recordConnection(client.host, actor.traffic);
+      ctx.log?.debug('protocol.initialize', {
         requestedVersion: observedVersion(params.protocolVersion),
         selectedVersion: protocolVersion,
-        host: observedHost(params.clientInfo),
+        ...client, ...actor,
       });
       return reply(req.id, {
         protocolVersion,
@@ -250,9 +245,10 @@ export async function handleMessage(message: unknown, ctx: ToolContext): Promise
     default:
       if (req.method === 'server/discover') {
         const meta = field(params, '_meta');
-        ctx.log?.info('protocol.discovery_probe', {
+        ctx.log?.debug('protocol.discovery_probe', {
           requestedVersion: observedVersion(field(meta, 'io.modelcontextprotocol/protocolVersion')),
-          host: observedHost(field(meta, 'io.modelcontextprotocol/clientInfo')),
+          ...clientLogFields(field(meta, 'io.modelcontextprotocol/clientInfo')),
+          ...actorLogFields(ctx.userId, ctx.actor),
         });
       }
       return rpcError(req.id, RPC.methodNotFound, `Method not found: ${req.method}`);

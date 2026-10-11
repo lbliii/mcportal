@@ -110,6 +110,8 @@ Logs go to stderr ([`src/lib/log.ts`](../../src/lib/log.ts)), as text or JSON (`
 |---|---|
 | Tool name, outcome, error code, duration | Tokens, OAuth codes or callback URLs |
 | A request id tying one request's lines together | User ids (only a keyed hash, below) |
+| Internal/user/local traffic classification, known client family and validated numeric release version | Arbitrary client names, version build metadata or device identifiers |
+| Package version, deployment id, environment and commit (when available) | Request bodies, authorization headers or URL query strings |
 | HTTP method, status and path, with long path segments replaced by `:token` | IP addresses |
 | Error stacks for crashes | Room contents, what was read, or third-party text |
 

@@ -15,7 +15,7 @@
 import { authorize, localActor } from '../access.ts';
 import { budgetMessage } from '../lib/budget.ts';
 import { ERROR_CODES, errorStack, isAppError, type ErrorCode } from '../lib/errors.ts';
-import { requestId, silentLogger, userRef } from '../lib/log.ts';
+import { actorLogFields, outcomeLevel, requestId, silentLogger } from '../lib/log.ts';
 import { schemaProblem, type JsonSchema } from '../lib/schema.ts';
 import { clean } from '../lib/text.ts';
 import type { ToolContext, ToolErrorInfo } from '../tools/kit.ts';
@@ -60,13 +60,14 @@ async function runCall(call: unknown, ctx: ToolContext, methods: Record<string, 
   if (typeof id !== 'string' && typeof id !== 'number') return failure(null, 'invalid_argument', 'Each call needs an id (a string or number)');
   if (typeof name !== 'string' || !Object.hasOwn(methods, name)) return failure(id, 'not_found', `Unknown method ${clean(String(name), 60)}`);
   const method = methods[name]!;
-  const log = (ctx.log ?? silentLogger).child({ api: name, user: userRef(ctx.userId) });
+  const actor = actorLogFields(ctx.userId, ctx.actor);
+  const log = (ctx.log ?? silentLogger).child({ api: name, ...actor });
   const started = Date.now();
   const done = (result: ApiResult, outcome: string): ApiResult => {
     const code = 'error' in result ? result.error.code : undefined;
     const ms = Date.now() - started;
-    log.info('api.call', { outcome, code, ms });
-    ctx.metrics?.record(`api:${name}`, outcome, ms, code);
+    log[outcomeLevel(outcome, code)]('api.call', { outcome, code, ms });
+    ctx.metrics?.record(`api:${name}`, outcome, ms, code, actor.traffic);
     return result;
   };
 
