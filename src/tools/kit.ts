@@ -123,6 +123,8 @@ export interface ToolDef {
   title: string;
   description: string;
   inputSchema: Record<string, unknown>;
+  /** The shape of structuredContent, for hosts that draw results themselves. A declared schema must hold for every success. */
+  outputSchema?: Record<string, unknown>;
   annotations: ToolAnnotations;
   _meta?: Record<string, unknown>;
   /** What the tool does, for the access gate: read your data, change it, or cause outbound fetches. */

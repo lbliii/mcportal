@@ -20,6 +20,7 @@ The loop everything serves: open your room, catch up, read something worthwhile,
 ## Later
 
 - Built-in views of your own reading: what you read and save, by topic and source.
+- Plates: places in the room where the agent can illustrate (charts, timelines, diagrams), data shaped for hosts that draw their own answers, and kept plates that MCPortal redraws with fresh data. [Exploration](plates.md).
 - Link cards for sites without feeds, such as TikTok through oEmbed.
 - Shared rooms for groups.
 - Postgres row-level security as a third access layer.

@@ -98,6 +98,7 @@
       else if (data && data.preview && data.preview.select) { gotInitialResult = true; showStorePreview(data.preview); }
       else if (data && data.confirmed && data.profile && data.portal) { gotInitialResult = true; callTool('open_room').then(result => renderRoom(result.structuredContent)).catch(error => showAppError('Could not load your room', error)); }
       else if (data && data.site && Array.isArray(data.site.sections)) { gotInitialResult = true; showDocsCard(data); }
+      else if (data && data.plate && data.plate.spec) { gotInitialResult = true; showPlateCard(data.plate); }
       else if (data && data.comparison) { gotInitialResult = true; showComparisonResult(data.comparison); }
       else if (data && data.watches) { gotInitialResult = true; showWatches(data.watches); }
       else if (data && data.library && Array.isArray(data.library.hits)) { gotInitialResult = true; showRecall(data.library); }

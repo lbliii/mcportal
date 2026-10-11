@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Plates lab
+- Add a `plates` lab (off by default) to test agent illustrations. `show_plate` validates a small spec (series, timeline, steps or matrix), resolves its evidence refs and draws it as a labeled, temporary card in the room; its text result is the whole plate in words. `get_lens` returns weekly reading activity with an `outputSchema` and no room UI, plus a ready plate spec. See [the exploration](docs/plans/plates.md).
+
 ### Recall Shelf
 - Find saved material with conversational search prefixes or quoted titles, and keep identifiers and versions distinct from longer lookalikes. Results explain the matching fields, effective search words and indexed coverage; saved links do not imply retained page text.
 - Add a reproducible 40-query synthetic retrieval benchmark across file, Postgres and linked storage, with separate development/validation splits and source/passage checks.
