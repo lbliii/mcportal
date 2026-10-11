@@ -5,6 +5,8 @@
 ### Design system
 - Tighten optional screens with shared compact headings, responsive panes and Library result rows. Keep checkbox glyphs small inside touch-friendly labels, disclose Space customization, and use named reader icons and keyboard-accessible Space tabs. Add density, narrow-layout and shared-pattern drift checks.
 
+## v0.12.0 — 2026-10-11
+
 ### Updates
 - **Upgrading:** hosted users receive this release on deployment and should open a new room card. Local users update their existing plugin or checkout once, then can use the new notices. Follow the [upgrade guide](https://mcportal.lol/upgrade) to preserve data, remove duplicate connections and verify the running version. The minimum supported linked client remains **0.10.0**; this release adds no database migration.
 - Add durable optional/required update status, daily cached checks, explicit ghost-mode checks, version-specific dismissal and always-available Settings actions. Failed checks keep the room usable and preserve the last confirmed update.
