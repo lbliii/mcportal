@@ -81,7 +81,8 @@ test('pills, native accordions, quiet actions and document links keep distinct i
   assert.notEqual(await page.eval(`getComputedStyle([...document.querySelectorAll('button')].find(n=>n.textContent==='Quiet')).backgroundColor`),'rgba(0, 0, 0, 0)','quiet has visible hover feedback');
   await page.click('#demo-drawer-trigger');
   await page.waitFor(`document.querySelector('#demo-drawer').open`,'drawer');
-  assert.equal(await page.eval(`document.querySelector('#demo-drawer').getBoundingClientRect().right===innerWidth`),true);
+  const edge=await page.eval<{right:number,viewport:number}>(`({right:document.querySelector('#demo-drawer').getBoundingClientRect().right,viewport:document.documentElement.clientWidth})`);
+  assert.equal(edge.right,edge.viewport,'drawer meets the layout viewport edge, excluding a classic scrollbar');
   await page.eval(`document.querySelector('#demo-drawer input').focus()`);await key(page,'Escape');
   await page.waitFor(`!document.querySelector('#demo-drawer').open && document.activeElement.id==='demo-drawer-trigger'`,'drawer focus return');
   assert.deepEqual(page.problems,[]);
