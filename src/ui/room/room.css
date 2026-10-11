@@ -80,10 +80,10 @@
   .lane-page[aria-current="page"] { background: var(--mp-surface-selected); color: var(--mp-text-link); font-weight: var(--mp-weight-strong); border-bottom: 3px solid currentColor; }
   :root:has(#reader:not([hidden])) .lane-controls, :root:has(#grid.portal-level) .lane-controls { display: none; }
   .continue-reading { flex:1; min-width:0; max-width:480px; }
-  .continue-item { display:flex; align-items:center; gap:var(--mp-space-8); width:100%; min-width:0; text-align:left; background:none; border:0; border-radius:var(--mp-radius-control); padding:var(--mp-space-8) 0; cursor:pointer; }
+  .continue-item { display:flex; flex-wrap:wrap; align-items:center; gap:var(--mp-space-8); width:100%; min-width:0; text-align:left; background:none; border:0; border-radius:var(--mp-radius-control); padding:var(--mp-space-8) 0; cursor:pointer; }
   .continue-item:hover { color:var(--mp-text-link); }
-  .continue-label,.continue-percent { flex-shrink:0; font-size:var(--mp-type-12); color:var(--mp-text-secondary); }
-  .continue-title { overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-size:var(--mp-type-13); }
+  .continue-label,.continue-percent { min-width:0; overflow-wrap:anywhere; font-size:var(--mp-type-12); color:var(--mp-text-secondary); }
+  .continue-title { flex:1 1 6ch; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-size:var(--mp-type-13); }
   .continue-percent { font-variant-numeric:tabular-nums; }
   :root:has(#reader:not([hidden])) .continue-reading, :root:has(#grid.portal-level) .continue-reading, :root.welcome-view .continue-reading { display: none; }
   .item { display: block; width: 100%; text-align: left; border: 0; background: none; padding: var(--mp-space-6) var(--mp-space-8); border-radius: var(--mp-radius-sm); cursor: pointer; }

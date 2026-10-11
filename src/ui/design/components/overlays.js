@@ -69,6 +69,7 @@
     panel.addEventListener('keydown',event=>{
       const choices=items(), index=choices.findIndex(button=>button === document.activeElement);
       if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); trigger.focus({preventScroll:true}); }
+      else if (event.key === 'Tab') close();
       else if (['ArrowDown','ArrowUp','Home','End'].includes(event.key)) {
         event.preventDefault(); const next=event.key==='Home'?0:event.key==='End'?choices.length-1:(index+(event.key==='ArrowDown'?1:-1)+choices.length)%choices.length;
         choices[next]?.focus();
@@ -78,12 +79,7 @@
       }
     },{signal:events.signal});
     panel.addEventListener('click',event=>{if (event.target instanceof Element && event.target.closest('button:not(:disabled)')) close();},{signal:events.signal});
-    panel.addEventListener('focusout',event=>{
-      // activeElement is briefly body between native focusout/focusin events.
-      // Reading it in a microtask can dismiss the menu before an item receives its click.
-      const next=event.relatedTarget;
-      if (next instanceof Node && (panel.contains(next) || next===trigger)) return;
-      close();
-    },{signal:events.signal});
+    // Native popovers dismiss on outside clicks. Closing on focusout races native
+    // focus transitions and scrolling; Tab and Escape are handled explicitly above.
     return {close,destroy:()=>{close();events.abort();}};
   }
