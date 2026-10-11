@@ -1,16 +1,17 @@
 {
   "totals": {
-    "local": 5805,
-    "linked": 7742,
-    "hosted-new": 7058,
-    "hosted-active": 7679,
-    "hosted-labs": 7679
+    "local": 5920,
+    "linked": 7857,
+    "hosted-new": 7173,
+    "hosted-active": 7794,
+    "hosted-labs": 7794
   },
   "tools": {
     "account_settings": 61,
     "add_portal": 136,
     "arrange_room": 463,
     "build_room": 145,
+    "check_updates": 115,
     "clip": 423,
     "delete_clip": 49,
     "export_data": 97,

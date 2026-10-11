@@ -60,3 +60,9 @@
   }
 
   #readingSettings { display:grid; gap:var(--mp-panel-section-gap); }
+
+/* Release notices stay compact and never cover the reading surface. */
+.update-notice { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:var(--mp-space-8); padding:var(--mp-space-6) var(--mp-space-12); border-bottom:1px solid var(--mp-border-divider); background:var(--mp-surface-inset); font-size:var(--mp-type-12); }
+.update-notice > span { flex:1 1 16rem; }
+#updateSettings p { margin:var(--mp-space-6) 0; }
+#updateSettings .who-actions { flex-wrap:wrap; }

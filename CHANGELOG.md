@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Updates
+- **Upgrading:** hosted users receive this release on deployment and should open a new room card. Local users update their existing plugin or checkout once, then can use the new notices. Follow the [upgrade guide](https://mcportal.lol/upgrade) to preserve data, remove duplicate connections and verify the running version. The minimum supported linked client remains **0.10.0**; this release adds no database migration.
+- Add durable optional/required update status, daily cached checks, explicit ghost-mode checks, version-specific dismissal and always-available Settings actions. Failed checks keep the room usable and preserve the last confirmed update.
+- Add agent-visible `check_updates` and app-only update preferences. Serve a versioned upgrade guide at `/upgrade` and `/upgrade.md`, covering every install path and preservation/recovery checks.
+- Show concise release highlights with dismissal where host browser storage is available, identify stale room cards by the running UI/server versions, and version the UI resource address so new releases get a fresh host cache entry. Previously issued resource addresses remain readable.
 ### Operations
 - Default production logs to Railway-compatible JSON, keep successful connection handshakes at debug, and emit five-minute connection and call summaries. Add deployment/client metadata and privacy-preserving internal/user attribution; surface tool and linked API failures even when HTTP returns 200.
 

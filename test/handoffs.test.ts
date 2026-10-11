@@ -1,3 +1,4 @@
+import { ROOM_URI } from '../src/tools/kit.ts';
 /**
  * Handoffs (docs/explanation/reading.md, phase 2): the room stores a page under a code with
  * create_handoff; open_handoff, in a new chat, opens it where the user was.
@@ -109,7 +110,7 @@ test('handoff: create_handoff is app-only; open_handoff is the model\'s and open
   assert.deepEqual(tools.find((t) => t.name === 'create_handoff')?._meta?.ui?.visibility, ['app']);
   const open = tools.find((t) => t.name === 'open_handoff')!;
   assert.equal(open._meta?.ui?.visibility, undefined);
-  assert.equal(open._meta?.ui?.resourceUri, 'ui://mcportal/room.html');
+  assert.equal(open._meta?.ui?.resourceUri, ROOM_URI);
 });
 
 test('handoff: unavailable article and docs retain fenced evidence and recover on retry', async () => {

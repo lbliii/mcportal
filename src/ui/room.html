@@ -30,6 +30,7 @@
     <button class="ib room-only" id="btnSettings" data-icon="settings" data-tooltip aria-label="Settings" aria-haspopup="dialog" aria-controls="settingsPanel" aria-expanded="false"></button>
   </div>
 </header>
+<div id="updateNotice" class="update-notice room-only" role="status" hidden></div>
 <div class="navigation-menu" id="moreMenu" popover aria-label="More activities">
   <button type="button" id="btnChanges"><span data-icon="changes" aria-hidden="true"></span><span>Page updates<small>Track pages and new releases</small></span></button>
   <button type="button" id="btnUpcoming"><span data-icon="upcoming" aria-hidden="true"></span><span>Events<small>Follow artists and calendars</small></span></button>
@@ -62,6 +63,7 @@
     <h3>Reading</h3>
     <div id="readingSettings"></div>
   </section>
+  <section class="settings-section"><h3>Updates</h3><div id="updateSettings"></div></section>
   <section class="settings-section"><h3>Account</h3><div class="account-settings" id="whoMenu"></div></section>
 </dialog>
 <section id="addSheet" class="add-sheet room-only" hidden>
@@ -91,7 +93,7 @@
 <script>
 (() => {
   'use strict';
-  const APP_INFO = { name: 'mcportal-room', version: '0.1.0' };
+  const APP_INFO = { name: 'mcportal-room', version: '__MCPORTAL_UI_VERSION__' };
   const DEV = window.__MCPORTAL_DEV__ || null;   // set by /preview: talk to /mcp directly
   const root = document.documentElement;
   /*include:design/palettes.js*/
@@ -152,6 +154,7 @@
   /*include:room/reblog.js*/
   /*include:room/add.js*/
   /*include:room/shop.js*/
+  /*include:room/updates.js*/
   /*include:room/toolbar.js*/
   /*include:room/boot.js*/
 })();

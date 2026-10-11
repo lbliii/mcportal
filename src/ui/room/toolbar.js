@@ -41,7 +41,7 @@
   const settingsDialog = uiDialog($('settingsPanel'), {
     variant:'drawer',
     trigger:$('btnSettings'), closeButton:$('btnCloseSettings'),
-    onOpen:()=>{ closeNavigationMenus(); drawWhoMenu(); sourceDetails.control.checked=root.classList.contains('show-sources'); root.classList.add('settings-open'); },
+    onOpen:()=>{ closeNavigationMenus(); drawWhoMenu(); drawUpdateSettings(); void refreshUpdates(false); sourceDetails.control.checked=root.classList.contains('show-sources'); root.classList.add('settings-open'); },
     onClose:()=>root.classList.remove('settings-open'),
   });
   /** @param {boolean} open */

@@ -55,7 +55,7 @@ export const UI_INCLUDES = [
   'room/navigation.css', 'room/experiences.css', 'room/experiences.js', 'room/recall.js', 'room/collections.js', 'room/compare.js', 'room/views.js', 'room/catchup.js', 'room/watches.js',
   'design/contracts.js', 'design/dom.js', 'design/components/icon.js', 'design/components/button.js', 'design/components/field.js', 'design/components/overlays.js', 'design/components/tabs.js', 'design/components/disclosure.js', 'design/components/pill.js', 'design/components/feedback.js', 'design/patterns.js', 'design/components/tooltips.js',
   'design/tokens.css', 'design/primitives.css', 'design/palettes.js', 'design/theme.js', 'space-inks.js', 'space-format.js', 'space.css', 'art.js', 'brand/icons.js', 'brand/mark-line.svg', 'brand/badge.svg', 'brand/wordmark.svg',
-  'room/room.css', 'room/bridge.js', 'room/dom.js', 'room/room.js', 'room/items.js', 'room/layouts.js', 'room/river.js', 'room/levels.js', 'room/seen.js', 'room/reader.js', 'room/reader-tools.js', 'room/reading.js', 'room/passage.js', 'room/handoff.js', 'room/highlights.js', 'room/docs.js', 'room/social.js', 'room/reblog.js', 'room/add.js', 'room/shop.js', 'room/toolbar.js', 'room/boot.js',
+  'room/room.css', 'room/bridge.js', 'room/dom.js', 'room/room.js', 'room/items.js', 'room/layouts.js', 'room/river.js', 'room/levels.js', 'room/seen.js', 'room/reader.js', 'room/reader-tools.js', 'room/reading.js', 'room/passage.js', 'room/handoff.js', 'room/highlights.js', 'room/docs.js', 'room/social.js', 'room/reblog.js', 'room/add.js', 'room/shop.js', 'room/updates.js', 'room/toolbar.js', 'room/boot.js',
 ];
 
 /** JSON that is safe to embed inside a <script> element. */
@@ -80,9 +80,10 @@ export async function roomHtml(options: { dev?: boolean; needsToken?: boolean } 
     if (part === undefined) throw new Error(`room.html includes an unknown file: ${a ?? b}`);
     return part;
   });
-  if (!options.dev) return html;
+  const versioned = html.replace('__MCPORTAL_UI_VERSION__', SERVER_INFO.version);
+  if (!options.dev) return versioned;
   const boot = `<script>window.__MCPORTAL_DEV__=${scriptJson({ needsToken: Boolean(options.needsToken) })};</script>`;
-  return html.replace('<!--MCPORTAL_BOOT-->', () => boot);
+  return versioned.replace('<!--MCPORTAL_BOOT-->', () => boot);
 }
 
 export interface JsonRpcRequest {
@@ -228,11 +229,11 @@ export async function handleMessage(message: unknown, ctx: ToolContext): Promise
     case 'resources/templates/list':
       return reply(req.id, { resourceTemplates: [] });
     case 'resources/read': {
-      if (params.uri !== ROOM_URI) return rpcError(req.id, RPC.invalidParams, `Unknown resource: ${params.uri}`);
+      if (params.uri !== 'ui://mcportal/room.html' && !(typeof params.uri === 'string' && /^ui:\/\/mcportal\/room-v\d{1,6}\.\d{1,6}\.\d{1,6}\.html$/.test(params.uri))) return rpcError(req.id, RPC.invalidParams, `Unknown resource: ${params.uri}`);
       return reply(req.id, {
         contents: [
           {
-            uri: ROOM_URI,
+            uri: params.uri,
             mimeType: MCP_APP_MIME,
             text: await roomHtml(),
             _meta: { ui: ROOM_UI_META },

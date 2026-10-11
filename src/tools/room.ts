@@ -1,3 +1,4 @@
+import { updateStatus, updateMessage } from '../updates.ts';
 /**
  * The room tools: open_room, build_room, arrange_room, remove_portal, refresh_portal, mark_seen.
  * They show the room and change its layout (src/layout.ts arrange: only what a call
@@ -150,7 +151,11 @@ export const ROOM_TOOLS: ToolDef[] = [
       const storedProfile = await ctx.store.get(ctx.userId);
       const profile = currentSavedEvents(storedProfile, storedProfile.saved.some(s => s.event) ? (await ctx.experiences?.get(ctx.userId))?.state : undefined);
       const identity = await identityOf(ctx);
+      const update = await updateStatus(ctx);
+      void ctx.updates?.check(Boolean(ctx.link?.linked), false).catch(() => {});
+      const updateNotice = !update.dismissed && ['update_available', 'update_required'].includes(update.status) ? updateMessage(update) : undefined;
       const notice = ctx.store.takeNotice?.(ctx.userId);
+      const modelNotice = [notice, updateNotice].filter(Boolean).join(' ') || undefined;
       if (!profile.onboarded || args.setup === true) {
         const packs = packSummaries();
         const text = [
@@ -160,7 +165,7 @@ export const ROOM_TOOLS: ToolDef[] = [
           `Starter packs (pick up to ${MAX_PACKS} with build_room): ${packs.map((p) => `${p.id} (${p.label}: ${p.sources.join(', ')})`).join('; ')}.`,
           'For interests no pack covers, build from the closest packs (or none), then use find_source and add_portal for specific sites, channels or feeds.',
         ].join('\n');
-        return ok(notice ? `${notice}\n${text}` : text, { profile, portals: [], notice, onboarding: { packs, maxPacks: MAX_PACKS, rebuilding: profile.onboarded }, identity, generatedAt: new Date().toISOString() } satisfies ToolResults['open_room']);
+        return ok(modelNotice ? `${modelNotice}\n${text}` : text, { profile, portals: [], notice, update, onboarding: { packs, maxPacks: MAX_PACKS, rebuilding: profile.onboarded }, identity, generatedAt: new Date().toISOString() } satisfies ToolResults['open_room']);
       }
       const specs = profile.columns.flatMap((c) => c.panels);
       await ctx.seen?.keepOnly(ctx.userId, specs.map((p) => p.id));
@@ -171,8 +176,8 @@ export const ROOM_TOOLS: ToolDef[] = [
       const intros = ctx.social ? await ctx.social.takeIntros(ctx.userId).catch(() => undefined) : undefined;
       const said = intros && (intros.offer.length || intros.joined.length) ? intros : undefined;
       const alsoShared = await alsoSharedIn(portals, ctx);
-      return ok([summarizePortals(profile, portals, notice, edition), ...(said ? [introLines(said)] : [])].join('\n'),
-        { profile, portals, notice, identity, ...(edition ? { edition } : {}), ...(lead ? { lead } : {}), ...(said ? { intros: said } : {}), ...(alsoShared.length ? { alsoShared } : {}), ...(labsOf(ctx).length ? { labs: [...labsOf(ctx)] } : {}), generatedAt: new Date().toISOString() } satisfies ToolResults['open_room']);
+      return ok([summarizePortals(profile, portals, modelNotice, edition), ...(said ? [introLines(said)] : [])].join('\n'),
+        { profile, portals, notice, identity, update, ...(edition ? { edition } : {}), ...(lead ? { lead } : {}), ...(said ? { intros: said } : {}), ...(alsoShared.length ? { alsoShared } : {}), ...(labsOf(ctx).length ? { labs: [...labsOf(ctx)] } : {}), generatedAt: new Date().toISOString() } satisfies ToolResults['open_room']);
     },
   },
   {

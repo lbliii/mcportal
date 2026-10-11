@@ -11,6 +11,7 @@ import type { Watches } from '../store-watches.ts';
  *   - Signing out copies the account's portal back to the local files (also additive),
  *     revokes this computer's sign-in, and deletes link.json, so nothing disappears.
  */
+import { LocalUpdates } from '../updates.ts';
 import { hostedOrigin } from './hosted-url.ts';
 import { AppError, errorCode } from '../lib/errors.ts';
 import { buildExport, describeImport, importExport, parseExport, type ExportFormat } from '../portability.ts';
@@ -79,6 +80,7 @@ export interface LocalSessionOptions {
 
 export class LocalSession {
   readonly link: LinkFile;
+  private updateController: { server: string; updates: LocalUpdates } | undefined;
   private readonly options: LocalSessionOptions;
   private readonly server: string;
   /** The linked stores, kept while the link is the same, so the room cache lasts across calls. */
@@ -102,9 +104,14 @@ export class LocalSession {
   async context(): Promise<ToolContext> {
     const record = await this.link.read();
     const control = this.control(record);
+    const updateServer = record?.server ?? this.server;
+    if (this.updateController?.server !== updateServer) {
+      this.updateController = { server: updateServer, updates: new LocalUpdates({ dataDir: this.options.dataDir, server: updateServer, fetcher: this.options.base.fetcher, ...(this.options.now ? { now: this.options.now } : {}) }) };
+    }
+    const updates = this.updateController.updates;
     if (!record) {
       this.linked = undefined;
-      return { ...this.options.base, ...this.options.local, userId: this.options.localUser, localFiles: true, link: control };
+      return { ...this.options.base, ...this.options.local, userId: this.options.localUser, localFiles: true, updates, link: control };
     }
     const { client, stores } = this.linkedFor(record);
     const notice = this.notice;
@@ -121,6 +128,7 @@ export class LocalSession {
       ...stores,
       userId: record.accountId,
       localFiles: true,
+      updates,
       accountUrl: `${record.server}/account`,
       link: control,
       deliver: (format) => this.download(client, format),

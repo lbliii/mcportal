@@ -22,6 +22,8 @@ declare global {
 
   /** Every element of room.html that the script looks up by id, with its element type. */
   interface RoomElements {
+    updateNotice: HTMLDivElement;
+    updateSettings: HTMLDivElement;
     controlTooltip: HTMLDivElement;
     docsContents: HTMLElement;
     readerFind: HTMLDivElement;
