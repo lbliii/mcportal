@@ -9,6 +9,12 @@
     let keyboard = false;
     let fromFocus = false;
 
+    /** @param {string} name */
+    function duration(name) {
+      const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+      return parseFloat(value) * (value.endsWith('ms') ? 1 : 1000);
+    }
+
     /** @param {EventTarget | null} target */
     function trigger(target) {
       const node = target instanceof Element ? target.closest('[data-tooltip]') : null;
@@ -27,9 +33,12 @@
     function place() {
       if (!active) return;
       const anchor = active.getBoundingClientRect(), box = tip.getBoundingClientRect();
-      tip.style.left = `${Math.max(8, Math.min(anchor.left + (anchor.width - box.width) / 2, innerWidth - box.width - 8))}px`;
-      const below = anchor.bottom + 4;
-      tip.style.top = `${Math.max(8, below + box.height <= innerHeight - 8 ? below : anchor.top - box.height - 4)}px`;
+      const style = getComputedStyle(document.documentElement);
+      const inset = parseFloat(style.getPropertyValue('--mp-tooltip-inset'));
+      const offset = parseFloat(style.getPropertyValue('--mp-tooltip-offset'));
+      tip.style.left = `${Math.max(inset, Math.min(anchor.left + (anchor.width - box.width) / 2, innerWidth - box.width - inset))}px`;
+      const below = anchor.bottom + offset;
+      tip.style.top = `${Math.max(inset, below + box.height <= innerHeight - inset ? below : anchor.top - box.height - offset)}px`;
     }
     /** @param {HTMLElement} node @param {boolean} focused */
     function show(node, focused) {
@@ -45,7 +54,7 @@
         tip.showPopover(); place();
         const ids = (node.getAttribute('aria-describedby') || '').split(/\s+/).filter(Boolean);
         node.setAttribute('aria-describedby', [...new Set([...ids, tip.id])].join(' '));
-      }, focused ? 0 : 150);
+      }, focused ? 0 : duration('--mp-tooltip-delay'));
     }
     document.addEventListener('pointerover', event => {
       if (event.pointerType === 'touch') return;
@@ -60,7 +69,7 @@
       if (fromFocus && active === document.activeElement) return;
       // Keep the hint reachable while crossing the small gap to its surface.
       if (trigger(event.target) === active || event.target instanceof Node && tip.contains(event.target)) {
-        clearTimeout(timer); timer = setTimeout(hide, 120);
+        clearTimeout(timer); timer = setTimeout(hide, duration('--mp-tooltip-dismiss-delay'));
       }
     });
     document.addEventListener('focusin', event => {

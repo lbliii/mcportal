@@ -8,8 +8,12 @@
   --mp-card-height: 9.375rem;
   --mp-card-media-height: 13.375rem;
   --mp-card-width: 13.5rem;
-  --mp-control-height: 26px;
+  --mp-control-field-height: var(--mp-space-32);
+  --mp-control-gap: var(--mp-space-4);
+  --mp-control-height: 28px;
   --mp-control-minimum: 24px;
+  --mp-control-padding-block: var(--mp-space-4);
+  --mp-control-padding-inline: var(--mp-space-8);
   --mp-control-touch: 44px;
   --mp-duration-fast: 150ms;
   --mp-duration-feedback: 200ms;
@@ -21,6 +25,7 @@
   --mp-font-heading: "MCPortal Jost", Jost, Futura, sans-serif;
   --mp-font-mono: ui-monospace, "SF Mono", Menlo, monospace;
   --mp-font-ui: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mp-icon-micro: 12px;
   --mp-icon-normal: 16px;
   --mp-icon-small: 14px;
   --mp-icon-stroke: 1.75;
@@ -29,8 +34,11 @@
   --mp-line-body: 1.6;
   --mp-line-heading: 1.2;
   --mp-line-ui: 1.45;
+  --mp-panel-padding: var(--mp-space-12);
+  --mp-panel-section-gap: var(--mp-space-16);
+  --mp-panel-width: 320px;
   --mp-portal-column-width: 18rem;
-  --mp-portal-padding: 10px;
+  --mp-portal-padding: var(--mp-space-10);
   --mp-radius-card: 10px;
   --mp-radius-control: 8px;
   --mp-radius-lg: 12px;
@@ -49,6 +57,12 @@
   --mp-space-40: 40px;
   --mp-space-6: 6px;
   --mp-space-8: 8px;
+  --mp-toolbar-padding-block: var(--mp-space-6);
+  --mp-toolbar-padding-inline: var(--mp-space-12);
+  --mp-tooltip-delay: var(--mp-duration-fast);
+  --mp-tooltip-dismiss-delay: 120ms;
+  --mp-tooltip-inset: var(--mp-space-8);
+  --mp-tooltip-offset: var(--mp-space-4);
   --mp-type-11: 0.6875rem;
   --mp-type-11-5: 0.71875rem;
   --mp-type-12: 0.75rem;

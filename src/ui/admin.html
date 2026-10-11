@@ -17,11 +17,11 @@
   h2 { font-size: var(--mp-type-15); margin: 26px 0 8px; }
   .muted { color: var(--mp-text-secondary); font-size: var(--mp-type-12-5); }
   .spacer { flex: 1; }
-  button { font: inherit; font-size: var(--mp-type-12-5); padding: 4px 10px; border-radius: var(--mp-radius-control); border: 1px solid var(--mp-border-control); background: transparent; color: var(--mp-text-primary); cursor: pointer; }
+  button { font: inherit; font-size: var(--mp-type-12-5); min-height: var(--mp-control-height); padding: var(--mp-control-padding-block) var(--mp-control-padding-inline); border-radius: var(--mp-radius-control); border: 1px solid var(--mp-border-control); background: transparent; color: var(--mp-text-primary); cursor: pointer; }
   button:hover { background: var(--mp-surface-inset); }
   button.primary { background: var(--mp-action-primary); border-color: var(--mp-action-primary); color: var(--mp-action-on-primary); }
   button.danger { color: var(--mp-status-error); }
-  input { font: inherit; padding: 5px 9px; border: 1px solid var(--mp-border-control); border-radius: var(--mp-radius-control); background: transparent; color: var(--mp-text-primary); }
+  input { font: inherit; min-height: var(--mp-control-field-height); padding: var(--mp-control-padding-block) var(--mp-control-padding-inline); border: 1px solid var(--mp-border-control); border-radius: var(--mp-radius-control); background: transparent; color: var(--mp-text-primary); }
   form.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   table { width: 100%; border-collapse: collapse; font-size: var(--mp-type-13); }
   th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--mp-border-control); vertical-align: middle; }

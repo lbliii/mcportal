@@ -61,7 +61,7 @@
   </section>
   <section class="settings-section">
     <h3>Reading</h3>
-    <label class="settings-field" id="openInField" hidden>Open stories<select id="openIn"><option value="card">In this room</option><option value="chat">In the conversation</option></select></label>
+    <label class="settings-field" id="openInField" hidden>Open stories<select class="field" id="openIn"><option value="card">In this room</option><option value="chat">In the conversation</option></select></label>
     <label class="settings-field">Show source details<input type="checkbox" id="showSources"></label>
     <p class="settings-hint">Show where each source’s data comes from.</p>
   </section>
@@ -71,7 +71,7 @@
   <div class="add-row" role="group" aria-label="Source type"><button id="addFeed" class="btn" type="button" aria-pressed="true">Feed or site</button><button id="addStore" class="btn" type="button" aria-pressed="false">Shopify store</button></div>
   <div id="storeScope" class="add-row" hidden><label>Collection handle (optional) <input id="storeCollection" type="text" maxlength="80" placeholder="new-arrivals"></label><label><input id="storeSales" type="checkbox"> Sales only</label></div>
   <form class="add-row" id="addForm">
-    <input id="addInput" type="text" autocomplete="off" spellcheck="false" placeholder="theverge.com, r/LocalLLaMA, youtube.com/@channel, owner/repo…" aria-label="Site, feed, subreddit, channel or repo">
+    <input class="field" id="addInput" type="text" autocomplete="off" spellcheck="false" placeholder="theverge.com, r/LocalLLaMA, youtube.com/@channel, owner/repo…" aria-label="Site, feed, subreddit, channel or repo">
     <button class="btn" type="submit">Find sources</button>
   </form>
   <div class="add-hint"><button class="link-btn" type="button" id="btnImportOpml">Import subscriptions from another reader (OPML)</button></div>

@@ -1,4 +1,4 @@
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, readdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
 type Token = { $type: string; $value: unknown; $description?: string };
@@ -62,7 +62,12 @@ export function compileTokens(input: unknown): { values: Record<string, string>;
     const mode = /^(light|dark)\.(.+)$/.exec(name);
     if (mode) palettes[mode[1]!]![kebab(mode[2]!)] = values[name]!;
     else {
-      common.push(`  --mp-${kebab(name)}: ${values[name]};`);
+      // Keep common aliases live so preference overrides propagate through roles.
+      // Palette/brand exports still need resolved values for contrast calculations.
+      const value = tokens.get(name)!.$value;
+      const alias = typeof value === 'string' && /^\{([^}]+)\}$/.exec(value);
+      const cssValue = alias && !/^(light|dark)\./.test(alias[1]!) ? `var(--mp-${kebab(alias[1]!)})` : values[name];
+      common.push(`  --mp-${kebab(name)}: ${cssValue};`);
       if (name.startsWith('brand.')) brand[name.slice(6)] = values[name]!;
     }
   }
@@ -72,8 +77,33 @@ export function compileTokens(input: unknown): { values: Record<string, string>;
   return { values, palettes, brand, css };
 }
 
+/** Catch misspelled/removed tokens in static CSS references, including inline styles.
+ * Runtime properties must be declared in CSS or setProperty; dynamic names are not checked.
+ * This checks the source inventory, not CSS scope or the visual suitability of a role.
+ */
+export function checkTokenUsage(sources: Record<string, string>): void {
+  const defined = new Set<string>();
+  for (const source of Object.values(sources)) {
+    for (const match of source.matchAll(/(--mp-[\w-]+)\s*:/g)) defined.add(match[1]!);
+    for (const match of source.matchAll(/setProperty\(['"](--mp-[\w-]+)['"]/g)) defined.add(match[1]!);
+  }
+  const errors: string[] = [];
+  for (const [file, source] of Object.entries(sources)) {
+    for (const match of source.matchAll(/var\(\s*(--mp-[\w-]+)\s*[,)]/g)) {
+      if (!defined.has(match[1]!)) errors.push(`${file}:${source.slice(0, match.index).split('\n').length}: undefined ${match[1]}`);
+    }
+  }
+  if (errors.length) throw new Error(errors.join('\n'));
+}
+
+async function sourceStyles(): Promise<Record<string, string>> {
+  const files = (await readdir(new URL('src/', ROOT), { recursive: true })).map(file => file.replaceAll('\\', '/')).filter(file => /\.(css|html|js|ts)$/.test(file) && !['design/generated.ts', 'ui/design/tokens.css'].includes(file));
+  return Object.fromEntries(await Promise.all(files.map(async file => [`src/${file}`, await readFile(new URL(`src/${file}`, ROOT), 'utf8')])));
+}
+
 export async function buildDesign(): Promise<Record<string, string>> {
   const compiled = compileTokens(JSON.parse(await readFile(new URL('design/tokens.json', ROOT), 'utf8')));
+  checkTokenUsage({ ...await sourceStyles(), 'design/tokens.json (compiled)': compiled.css });
   const primitives = await readFile(new URL('src/ui/design/primitives.css', ROOT), 'utf8');
   return {
     'src/ui/design/tokens.css': compiled.css,
