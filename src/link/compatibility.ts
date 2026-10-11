@@ -4,7 +4,7 @@ import { SERVER_INFO } from '../mcp.ts';
 export const COMPATIBILITY_PATH = '/.well-known/mcportal';
 export function compatibilityMetadata(publicUrl: string) {
   return { version: 1, minClientVersion: MIN_CLIENT_VERSION, recommendedVersion: SERVER_INFO.version,
-    upgradeUrl: `${publicUrl}/install.md`, capabilities: ['linked-state-v1'] };
+    upgradeUrl: `${publicUrl}/upgrade.md`, capabilities: ['linked-state-v1'] };
 }
 export type Compatibility = { status: 'current' | 'update_available' | 'update_required'; minClientVersion: string; recommendedVersion: string }
   | { status: 'unavailable' };

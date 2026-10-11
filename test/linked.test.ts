@@ -85,6 +85,15 @@ async function linkedLocal(link: Partial<LinkRecord> & { server: string }, fetch
   return { session, rpc, call, list };
 }
 
+test('linked update checks follow the saved server and remain available without account access', async()=>{
+  const local=await linkedLocal({server:'https://private-mcportal.example'},async()=>{throw Error('account offline');});
+  const result=await local.call('check_updates');
+  assert.equal(result.isError,undefined);
+  assert.equal(result.structuredContent.update.mode,'local');
+  assert.equal(result.structuredContent.update.upgradeUrl,'https://private-mcportal.example/upgrade');
+  assert.equal(result.structuredContent.update.status,'unavailable');
+});
+
 const fixed = (token: string): LinkAuth => ({ token: async () => token, refresh: async () => undefined });
 
 test('linked: Recall searches beyond linked list caps and refuses another account', async () => {

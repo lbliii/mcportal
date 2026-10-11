@@ -37,7 +37,7 @@ git switch --detach origin/main
 npm run release -- publish
 ```
 
-`publish` tags the merge commit `v<version>` and creates the GitHub release `MCPortal v<version>` with that version's changelog section as its notes. `--dry-run` shows what it would tag.
+`publish` reruns the checks and support-policy gate, packages the hosted and local plugins with SHA256SUMS, tags the merge commit `v<version>`, and attaches those artifacts to the GitHub release `MCPortal v<version>`. Its notes come from that version's changelog section. `--dry-run` shows what it would tag.
 
 ## 4. Deploy the same commit
 
@@ -47,9 +47,16 @@ Deploy the tagged commit to the hosted service, not whatever `main` has become s
 
 | Install | How it updates |
 |---|---|
-| Hosted connector | On the next deploy. Nothing to do. |
-| Claude Code or Cowork plugin | A marketplace you add yourself doesn't auto-update by default. Users turn it on in `/plugin` → **Marketplaces** → `mcportal` → **Enable auto-update**, or run `claude plugin update mcportal@mcportal`. The release arrives in their next session. |
-| A clone (Codex, Claude desktop) | `git pull`, then restart the host. |
+| Hosted connector | On deployment. Open a new room card; reconnect if the host still caches the old interface. |
+| Claude Code plugin | Enable auto-update for the MCPortal marketplace, or run `claude plugin update mcportal@mcportal`, then `/reload-plugins` or start a new session. |
+| Other plugin hosts | Update the existing package through the host's plugin manager and follow its reload prompt. Preserve persistent plugin data. |
+| A source checkout (Codex, Claude desktop) | Update the checkout actually named in the MCP launch command to the release tag, preserve data, then restart the connection. |
+
+The [upgrade guide](upgrade.md) gives the full steps. Update the release highlights in `src/updates.ts` before preparing each release and put a link to the public guide in its release notes. Verify the installed version, available-version metadata, guide and packaged manifests agree after deployment.
+
+From the release introducing update notices onward, local installations can check public metadata daily, preserve a known notice while offline, and dismiss optional notices per version. Linked copies default to automatic checks; ghost copies explicitly opt in. Settings always provides version details and a manual check. Checks never install software. Hosted room cards show the running release's highlights.
+
+Copies installed before these notices still need one manual upgrade. Publish the guide in the original distribution channel with the release; publishing new code cannot notify an unchanged old local process. Do not raise the minimum supported client just to advertise an improvement; the [support policy](upgrade-release-policy.md) governs that separately.
 
 ## Compatibility
 

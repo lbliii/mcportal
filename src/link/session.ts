@@ -11,6 +11,7 @@ import type { Watches } from '../store-watches.ts';
  *   - Signing out copies the account's portal back to the local files (also additive),
  *     revokes this computer's sign-in, and deletes link.json, so nothing disappears.
  */
+import { LocalUpdates } from '../updates.ts';
 import { hostedOrigin } from './hosted-url.ts';
 import { AppError, errorCode } from '../lib/errors.ts';
 import { buildExport, describeImport, importExport, parseExport, type ExportFormat } from '../portability.ts';
@@ -23,8 +24,6 @@ import { FileCollectionStore, type CollectionStore } from '../collections.ts';
 import { FileExperienceStore, type ExperienceStore } from '../experiences.ts';
 import type { SeenStore } from '../seen.ts';
 import type { ToolContext } from '../tools/kit.ts';
-import { versionAtLeast } from '../api/calls.ts';
-import { SERVER_INFO } from '../mcp.ts';
 import { StateClient } from './client.ts';
 import { FileLinkAuth, LinkFile, type LinkRecord } from './link-file.ts';
 import { startSignIn, type PendingSignIn } from './signin.ts';
@@ -79,6 +78,7 @@ export interface LocalSessionOptions {
 
 export class LocalSession {
   readonly link: LinkFile;
+  private updateController: { server: string; updates: LocalUpdates } | undefined;
   private readonly options: LocalSessionOptions;
   private readonly server: string;
   /** The linked stores, kept while the link is the same, so the room cache lasts across calls. */
@@ -87,7 +87,6 @@ export class LocalSession {
   private lastSignInFailure: SignInFailure | undefined;
   /** Said once on the next open_room after signing in (what the merge did). */
   private notice: string | undefined;
-  private nudged = false;
 
   constructor(options: LocalSessionOptions) {
     this.options = { ...options, local: { ...options.local, collections: options.local.collections ?? new FileCollectionStore(options.dataDir), experiences: options.local.experiences ?? new FileExperienceStore(options.dataDir) } };
@@ -102,25 +101,26 @@ export class LocalSession {
   async context(): Promise<ToolContext> {
     const record = await this.link.read();
     const control = this.control(record);
+    const updateServer = record?.server ?? this.server;
+    if (this.updateController?.server !== updateServer) {
+      this.updateController = { server: updateServer, updates: new LocalUpdates({ dataDir: this.options.dataDir, server: updateServer, fetcher: this.options.base.fetcher, ...(this.options.now ? { now: this.options.now } : {}) }) };
+    }
+    const updates = this.updateController.updates;
     if (!record) {
       this.linked = undefined;
-      return { ...this.options.base, ...this.options.local, userId: this.options.localUser, localFiles: true, link: control };
+      return { ...this.options.base, ...this.options.local, userId: this.options.localUser, localFiles: true, updates, link: control };
     }
     const { client, stores } = this.linkedFor(record);
     const notice = this.notice;
     this.notice = undefined;
     if (notice) stores.store.addNotice(notice);
-    // Once per process: the hosted server runs a newer MCPortal than this computer.
-    if (!this.nudged && client.serverVersion && !versionAtLeast(SERVER_INFO.version, client.serverVersion)) {
-      this.nudged = true;
-      stores.store.addNotice(`MCPortal ${client.serverVersion} is out (this computer has ${SERVER_INFO.version}). Update to get what's new; this version keeps working until the hosted MCPortal stops supporting it.`);
-    }
     control.health = () => stores.store.health();
     return {
       ...this.options.base,
       ...stores,
       userId: record.accountId,
       localFiles: true,
+      updates,
       accountUrl: `${record.server}/account`,
       link: control,
       deliver: (format) => this.download(client, format),

@@ -11,6 +11,8 @@
     $('grid').hidden = true; $('reader').hidden = true;
     $('roomName').textContent = rebuilding ? 'start over' : 'welcome';
     drawIdentity(data.identity);
+    drawUpdates(data.update);
+    void refreshUpdates(false);
     if (data.notice) toast(data.notice);
     setStatus('');
     /** @type {Set<string>} */
@@ -107,6 +109,8 @@
     $('roomName').textContent = data.profile.name === 'morning' ? 'Your portal room' : data.profile.name;
     $('grid').setAttribute('aria-label', $('roomName').textContent || 'Your portal room');
     drawIdentity(data.identity);
+    drawUpdates(data.update);
+    void refreshUpdates(false);
     drawLayout();
     refreshContinueReading();
     setUpdated(data.generatedAt);

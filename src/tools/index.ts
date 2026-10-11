@@ -3,6 +3,7 @@
  * src/tools/kit.ts is what they share.
  */
 import type { Action } from '../access.ts';
+import { UPDATE_TOOLS } from './updates.ts';
 import { ACCOUNT_TOOLS } from './account.ts';
 import { CLIP_TOOLS } from './clips.ts';
 import { DOCS_TOOLS } from './docs.ts';
@@ -33,6 +34,7 @@ export const TOOLS: readonly ToolDef[] = [
   ...HANDOFF_TOOLS,
   ...CLIP_TOOLS,
   ...ACCOUNT_TOOLS,
+  ...UPDATE_TOOLS,
   ...SOCIAL_TOOLS,
   ...READING_TOOLS,
   ...LIBRARY_TOOLS,

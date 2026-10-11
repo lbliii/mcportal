@@ -76,3 +76,5 @@ Report vulnerabilities as described in [SECURITY.md](SECURITY.md). Please don't 
 ## License
 
 MCPortal is licensed under the GNU Affero General Public License v3.0. See [LICENSE](LICENSE).
+
+Already installed? [Upgrade MCPortal](https://mcportal.lol/upgrade) to get the latest improvements while keeping your room.

@@ -29,6 +29,7 @@ export type PackSummary = { id: string; label: string; blurb: string; sources: s
 
 /** The whole room: open_room (and the first-run welcome, with onboarding). */
 export type RoomResult = {
+  update?: import('../updates.ts').UpdateStatus;
   profile: Profile;
   portals: PortalResult[];
   notice?: string | undefined;
@@ -75,6 +76,8 @@ export type SpaceResult = {
 };
 
 export type ToolResults = {
+  check_updates: { update: import('../updates.ts').UpdateStatus };
+  set_update_preferences: { update: import('../updates.ts').UpdateStatus };
   watch: { preview?: WatchPreview; confirmed?: { id: string; displayName: string; origin: string; scope: StoreScope; paused: boolean }; profile?: Profile; portal?: PortalResult };
   unwatch: { removed: boolean };
   search_library: { library: LibraryResult };
