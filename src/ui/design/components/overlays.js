@@ -60,7 +60,7 @@
         const inset = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--mp-tooltip-inset'));
         panel.style.left = `${Math.max(inset,Math.min(box.left,innerWidth-box.width-inset))}px`;
         panel.style.top = `${Math.max(inset,Math.min(box.top,innerHeight-box.height-inset))}px`;
-        items().at(lastOnOpen ? -1 : 0)?.focus();
+        items().at(lastOnOpen ? -1 : 0)?.focus({preventScroll:true});
       } else if (panel.contains(document.activeElement)) trigger.focus({preventScroll:true});
     }, {signal:events.signal});
     trigger.addEventListener('keydown',event=>{

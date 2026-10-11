@@ -121,7 +121,10 @@ after(async () => {
 async function openRoom(): Promise<void> {
   page.problems.length = 0;
   await page.goto(`${app.base}/preview`);
-  await page.waitFor(`document.querySelectorAll('[data-portal]').length === 5 && !document.querySelector('.skeleton')`, 'the room to draw its five portals');
+  await page.waitFor(`document.querySelectorAll('[data-portal]').length === 5 && !document.querySelector('.skeleton')`, 'the room to draw its five portals').catch(async error=>{
+    const observed=await page.eval(`JSON.stringify({portals:[...document.querySelectorAll('[data-portal]')].map(n=>n.getAttribute('data-portal')),skeletons:document.querySelectorAll('.skeleton').length,status:document.querySelector('#status')?.textContent,roomClass:document.querySelector('#grid')?.className,error:document.querySelector('#toast')?.textContent})`);
+    throw new Error(`${error.message}; ${observed}`);
+  });
   await page.waitFor(`document.querySelector('.continue-reading')?.getAttribute('aria-busy') === 'false'`, 'recent reading to finish loading before pointer coordinates are measured');
 }
 
