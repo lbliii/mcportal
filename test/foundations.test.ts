@@ -146,7 +146,7 @@ test('log: leveled, structured, with child fields; stacks go on their own lines'
   const json = createLogger({ format: 'json', level: 'info', write: (l) => lines.push(l), now }).child({ req: 'r1' });
   json.debug('hidden');
   json.info('tool.call', { tool: 'open_room', ms: 4, skipped: undefined });
-  assert.deepEqual(lines.map((l) => JSON.parse(l)), [{ t: '2026-10-01T00:00:00.000Z', level: 'info', event: 'tool.call', req: 'r1', tool: 'open_room', ms: 4 }]);
+  assert.deepEqual(lines.map((l) => JSON.parse(l)), [{ t: '2026-10-01T00:00:00.000Z', level: 'info', message: 'tool.call', event: 'tool.call', req: 'r1', tool: 'open_room', ms: 4 }]);
 
   const text: string[] = [];
   createLogger({ write: (l) => text.push(l) }).warn('source.failed', { source: 'rss', note: 'two words', error: 'Error: x\n    at y' });

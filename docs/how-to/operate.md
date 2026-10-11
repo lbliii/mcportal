@@ -107,6 +107,27 @@ After rotating, check that the old value fails. MCPortal stores tokens hashed, s
 
 ## Logs
 
-Logs go to stderr, one event per line. Set `MCPORTAL_LOG_FORMAT=json` for a log platform and `MCPORTAL_LOG_LEVEL` to `debug`, `info` (default), `warn` or `error`. Every line from a request carries its request ID. Users appear only as a short hash; tokens, profile contents and third-party text are never logged.
+Logs go to stderr, leaving stdout available for the stdio protocol. Production (`NODE_ENV=production`) and Railway default to single-line JSON with explicit `level`, `message` and `event` fields so Railway can classify them correctly. Local runs default to text. `MCPORTAL_LOG_FORMAT=text|json` overrides this; `MCPORTAL_LOG_LEVEL=debug|info|warn|error` sets the floor (default `info`).
+
+Process logs include the package `version`, `environment`, and Railway `deployment` and `commit` when available. Every request has a `req` id, also returned as `x-request-id`. Authenticated MCP and linked API events include a keyed `user` reference and `traffic`: `internal` for admin accounts or ids explicitly listed in `MCPORTAL_INTERNAL_USERS`, `user` for other account actors, and `local` when no account actor is supplied. A shared static token identifies its configured account, not an individual developer. The user reference changes on restart. This classification only labels logs and never changes authorization.
+
+Known client families and validated release versions appear as `host` and `clientVersion`. These are self-reported diagnostics, not proof of identity. HTTP requests use their own User-Agent; initialization observes MCP clientInfo, and linked calls use the MCPortal version header. The server is stateless, so it does not carry one request's client information into another. Unrecognized values become `unknown` or `other`; raw client strings, credentials, request bodies and URL query strings are not logged.
+
+Successful `protocol.initialize` and discovery observations are debug-only. Every five minutes, the HTTP server emits `protocol.connections` with connection counts by client family and traffic class, and `activity.calls` with per-tool/linked-method counts, errors, average/max latency, and traffic class. Summaries are interval deltas with `windowMs`; `errorRate` is a fraction from 0 to 1. Empty windows emit nothing. Closing the HTTP server flushes pending counts; a process termination can lose the unfinished interval, so individual call logs remain the durable record. These summaries help separate connection churn from actual tool use. `/admin` keeps its existing lifetime counters independently.
+
+`tool.call` and `api.call` log successes at info, expected failures at warn, and crashes/internal failures at error. MCP and linked API failures can arrive inside HTTP 200 responses, so track `outcome`/`code` as well as HTTP 5xx. Failed HTTP responses at 5xx are error-level; requests taking at least five seconds are warn-level. Routine HTTP requests, including discovery 401s, stay at debug. Storage check failures remain visible as `health.storage_failing`.
+
+Useful Railway log filters:
+
+| Question | Filter |
+|---|---|
+| What failed in the app? | `@level:error` scoped to the **mcportal** service |
+| Which tool calls failed? | `@event:tool.call AND -@outcome:ok` |
+| How much is our internal activity? | `@event:activity.calls AND @traffic:internal` |
+| Is the client reconnecting without using tools? | `@event:protocol.connections` compared with `@event:activity.calls` |
+| What happened to one request? | `@req:<request-id>` |
+| Did this start after a deploy? | `@deployment:<deployment-id>` |
+
+Postgres and pgBackRest have their own logging configuration. The app's JSON setting does not change those services. For backup health, monitor actual archive failures, lag, gaps, and completed backup status; do not infer a failed backup from Railway's red coloring of a plain-text `INFO` line. Keep backup diagnostics available and verify recovery separately with the restore drill above.
 
 Housekeeping removes what MCPortal keeps only for a while: expired handoffs and highlights, resolved reports, old audit entries, lapsed invites and unused app registrations. It runs a minute after startup and every six hours after. It logs `housekeeping.done` with what it removed.

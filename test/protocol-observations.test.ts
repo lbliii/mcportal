@@ -2,19 +2,19 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { TtlCache } from '../src/lib/cache.ts';
 import { createFixtureFetcher } from '../src/lib/fixture-fetch.ts';
-import { createLogger, silentLogger } from '../src/lib/log.ts';
+import { createLogger, silentLogger, userRef } from '../src/lib/log.ts';
 import { handleMessage, SUPPORTED_PROTOCOL_VERSIONS } from '../src/mcp.ts';
 import { MemoryProfileStore } from '../src/store.ts';
 import type { ToolContext } from '../src/tools/kit.ts';
 
 function context(lines: string[]): ToolContext {
   return { store: new MemoryProfileStore(), fetcher: createFixtureFetcher(), cache: new TtlCache(), userId: 'private-account',
-    log: createLogger({ format: 'json', write: (line) => lines.push(line) }) };
+    log: createLogger({ format: 'json', level: 'debug', write: (line) => lines.push(line) }) };
 }
 
 function observation(line: string | undefined): Record<string, unknown> {
   assert.ok(line);
-  const { t: _time, level: _level, ...fields } = JSON.parse(line);
+  const { t: _time, level: _level, message: _message, ...fields } = JSON.parse(line);
   return fields;
 }
 
@@ -27,7 +27,7 @@ test('protocol observation: known versions/host aliases are bounded and legacy r
     const response = await handleMessage(message, ctx);
     assert.deepEqual(response, await handleMessage(message, { ...ctx, log: silentLogger }), 'observation never changes the wire reply');
     assert.deepEqual(observation(lines[0]), { event: 'protocol.initialize', requestedVersion: version,
-      selectedVersion: SUPPORTED_PROTOCOL_VERSIONS.includes(version) ? version : '2025-11-25', host });
+      selectedVersion: SUPPORTED_PROTOCOL_VERSIONS.includes(version) ? version : '2025-11-25', host, clientVersion: 'other', user: userRef('private-account'), traffic: 'local' });
     assert.equal(lines.length, 1);
     assert.doesNotMatch(lines[0]!, /private-device-version|private-account/);
   }
@@ -47,7 +47,7 @@ test('protocol observation: unrecognized and malformed client fields never becom
   for (const params of inputs) {
     const lines: string[] = [];
     await handleMessage({ jsonrpc: '2.0', id: 1, method: 'initialize', params }, context(lines));
-    assert.deepEqual(observation(lines[0]), { event: 'protocol.initialize', requestedVersion: params.protocolVersion === undefined ? 'missing' : 'other', selectedVersion: '2025-11-25', host: 'unknown' });
+    assert.deepEqual(observation(lines[0]), { event: 'protocol.initialize', requestedVersion: params.protocolVersion === undefined ? 'missing' : 'other', selectedVersion: '2025-11-25', host: 'unknown', clientVersion: 'unknown', user: userRef('private-account'), traffic: 'local' });
     assert.doesNotMatch(lines.join(''), /secret-token|spoofed|future-version|private-account/);
   }
 });
@@ -65,7 +65,7 @@ test('protocol discovery probes are observed without claiming support or changin
     const response = await handleMessage(message, ctx);
     assert.deepEqual(response, await handleMessage(message, { ...ctx, log: silentLogger }));
     assert.deepEqual(response?.error, { code: -32601, message: 'Method not found: server/discover' });
-    assert.deepEqual(observation(lines[0]), { event: 'protocol.discovery_probe', requestedVersion: meta && !Array.isArray(meta) ? meta['io.modelcontextprotocol/protocolVersion'] === '2026-07-28' ? '2026-07-28' : 'other' : 'missing', host: meta && !Array.isArray(meta) && meta['io.modelcontextprotocol/protocolVersion'] === '2026-07-28' ? 'chatgpt' : 'unknown' });
+    assert.deepEqual(observation(lines[0]), { event: 'protocol.discovery_probe', requestedVersion: meta && !Array.isArray(meta) ? meta['io.modelcontextprotocol/protocolVersion'] === '2026-07-28' ? '2026-07-28' : 'other' : 'missing', host: meta && !Array.isArray(meta) && meta['io.modelcontextprotocol/protocolVersion'] === '2026-07-28' ? 'chatgpt' : 'unknown', clientVersion: meta && !Array.isArray(meta) && meta['io.modelcontextprotocol/protocolVersion'] === '2026-07-28' ? 'other' : 'unknown', user: userRef('private-account'), traffic: 'local' });
     assert.doesNotMatch(lines.join(''), /secret-version|private-machine|private-version/);
   }
   const lines: string[] = [];

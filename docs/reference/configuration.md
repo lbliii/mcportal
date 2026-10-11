@@ -99,7 +99,10 @@ Logs go to stderr; stdout belongs to the stdio transport. What they contain is i
 | Variable | Default | What it does | Where |
 |---|---|---|---|
 | `MCPORTAL_LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error` | both |
-| `MCPORTAL_LOG_FORMAT` | `text` | `json` for a log platform | both |
+| `MCPORTAL_LOG_FORMAT` | `json` in production/Railway, otherwise `text` | Explicit `text` or `json` overrides the default. Production means `NODE_ENV=production` or a Railway environment/deployment ID | both |
+| `MCPORTAL_INTERNAL_USERS` | none | Comma-separated account ids to label `traffic=internal`. Admin accounts are already internal. Logging classification only; grants no access | both |
+
+Production logs include the package `version`, `environment`, and Railway `deployment` and `commit` when supplied by the platform. Request ids, bounded client names/versions and per-process hashed account references let you attribute activity without logging credentials or raw account ids. See the [logging runbook](../how-to/operate.md#logs) for summaries and filters.
 
 ## Labs
 

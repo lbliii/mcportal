@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Operations
+- Default production logs to Railway-compatible JSON, keep successful connection handshakes at debug, and emit five-minute connection and call summaries. Add deployment/client metadata and privacy-preserving internal/user attribution; surface tool and linked API failures even when HTTP returns 200.
+
 ### Navigation
 - Audit 36 design-system families; replace underlined interface actions with quiet buttons, add accessible comparison tabs, shared pills/disclosures/trays/drawer placement, and document content/navigation/paging patterns. Expose implementation gaps in the catalogue and validate the coverage inventory.
 - Formalize a modular design system with typed controls, shared settings and card patterns, accessible menus and dialogs, a production component catalogue, and checks that prevent new control drift. Compact collection/watch cards and associate account and collection errors with their fields.
