@@ -49,7 +49,7 @@
 
   async function showCollections(fromSelection = false) {
     enterExperience('collections');
-    $('experiences').replaceChildren(el('header', { class: 'experience-heading' }, el('button', { class: 'btn quiet sm', onclick: () => showRecall() }, '← Library'), el('h1', null, 'Collections')),
+    $('experiences').replaceChildren(uiScreenHeader({title:'Collections',back:iconButton('back','Back to Library',()=>showRecall())}),
       el('div', { id: 'collectionCreate' }), el('div', { id: 'collectionCards', class: 'collection-cards', 'aria-live': 'polite' }, uiFeedback({kind:'loading', message:'Loading your collections…'})));
     const title = uiControl('input', { type: 'text', required: true, maxlength: 200, placeholder: 'Agents that remember', 'aria-label': 'Collection title' });
     const purpose = uiControl('input', { type: 'text', maxlength: 1000, placeholder: 'What are you trying to understand?', 'aria-label': 'Collection purpose' });
@@ -103,11 +103,10 @@
     const c = data.collection;
     if (c.kind === 'comparison' && c.entries.length >= 2) { showComparison(c.entries.map(entryHit), c, data.orientationStale); return; }
     enterExperience('desk');
-    const heading = el('header', { class: 'experience-heading' }, el('button', { class: 'btn quiet sm', onclick: () => showCollections() }, '← Your collections'), el('div', { class: 'experience-kicker' }, c.kind === 'trail' ? 'READ WITH A DIRECTION' : 'COLLECTION'), el('h1', null, c.title), el('p', null, c.purpose),
-      el('div', { class: 'experience-row' }, el('span', { class: 'experience-muted' }, `${c.entries.length} kept pieces · updated ${ago(c.updatedAt)}`),
-        uiButton({label:'Find more material', onClick:() => showRecall()}),
-        uiButton({label:'Edit collection', onClick:() => editDesk(c)}),
-        uiButton({label:c.kind === 'trail' ? 'View as collection' : 'Read as a trail', onClick:() => changeDesk({ action: 'edit', kind: c.kind === 'trail' ? 'desk' : 'trail' })})));
+    const heading = uiScreenHeader({title:c.title,back:iconButton('back','Back to collections',()=>showCollections()),actions:[
+      uiButton({label:'Find material',onClick:()=>showRecall()}),
+      uiButton({label:'Edit',onClick:()=>editDesk(c)}),
+      uiButton({label:c.kind === 'trail' ? 'View as collection' : 'Read as a trail',onClick:()=>changeDesk({action:'edit',kind:c.kind === 'trail' ? 'desk' : 'trail'})})]});
     const kept = el('section', { class: 'desk-kept' }, el('h2', null, c.kind === 'trail' ? 'Your reading path' : 'Kept for this question'),
       c.kind === 'comparison' ? el('p', {class:'watch-warning',role:'status'}, 'This comparison needs another source. Its remaining evidence is kept below; select material in Library and add it here.') : null,
       selectionTray(),
@@ -123,14 +122,14 @@
           ...portal.items.slice(0, 5).map(item => el('div', { class: 'desk-live-item' }, el('button', { class: 'btn quiet sm', onclick: () => { suspendExperience(); openItem(item, portal); } }, item.title),
             item.url || item.clip ? el('button', { class: 'btn sm', onclick: () => keepDeskItem(item, portal) }, 'Keep') : null)))),
         !data.live.length ? el('p', { class: 'experience-muted' }, 'Choose sources from your room in Edit collection.') : null));
-    $('experiences').replaceChildren(heading, el('div', { class: 'desk-layout' }, kept, side));
+    $('experiences').replaceChildren(heading, ...(c.purpose ? [el('p',{class:'experience-muted'},c.purpose)] : []), uiSplitPane({className:'desk-layout',main:kept,aside:side}));
   }
   /** @param {CollectionEntry} entry @param {number} index @param {CollectionData} data */
   function deskEntry(entry, index, data) {
     const c = data.collection, hit = entryHit(entry), unavailable = data.unavailableRefs.includes(entry.ref);
     const preview = el('div', { class: 'desk-entry-preview' }, entry.excerpt || '');
     const card = el('article', { class: 'desk-entry', 'data-ref': entry.ref },
-      el('div', { class: 'experience-row' }, el('span', { class: 'experience-kicker' }, c.kind === 'trail' ? `STEP ${index + 1}${entry.completedAt ? entry.completion === 'skipped' ? ' · SKIPPED' : ' · COMPLETED' : ''}` : entry.ref.startsWith('clip:') ? 'KEPT MATERIAL' : 'KEPT PAGE'), selectEvidenceButton(hit)),
+      el('div', { class: 'experience-row' }, c.kind === 'trail' ? el('span', { class: 'experience-kicker' }, `STEP ${index + 1}${entry.completedAt ? entry.completion === 'skipped' ? ' · SKIPPED' : ' · COMPLETED' : ''}`) : null, selectEvidenceButton(hit)),
       el('h3', null, entry.title), entry.reason ? el('p', null, entry.reason) : null, el('small', { class: 'experience-muted' }, entry.source || entry.url || entry.ref), preview,
       unavailable ? el('p', { class: 'error', role: 'status' }, 'This clip was removed. Its membership remains so you can see what is missing.') : null,
       el('div', { class: 'experience-row' }, uiButton({label:'Read →', disabled:unavailable, onClick:() => openLibraryHit(hit)}),
@@ -153,7 +152,7 @@
   }
   /** @param {Collection} c @param {boolean} stale */
   function orientationPanel(c, stale) {
-    return el('section', { class: 'desk-orientation' }, el('span', { class: 'experience-kicker' }, 'AGENT ORIENTATION'), el('h2', null, 'A way into the topic'),
+    return el('section', { class: 'desk-orientation' }, el('h2', null, 'Agent orientation'),
       c.orientation ? el('div', null, stale ? el('p', { class: 'error', role: 'status' }, 'Some cited evidence is missing. Ask your agent to update this orientation.') : null,
         el('p', { class: 'agent-writing' }, c.orientation.text), el('small', { class: 'experience-muted' }, `Agent-written · ${new Date(c.orientation.createdAt).toLocaleString()}`),
         el('div', { class: 'orientation-citations' }, c.orientation.refs.map(ref => { const entry = c.entries.find(e => e.ref === ref); return entry ? el('button', { class: 'btn quiet sm', onclick: () => openLibraryHit(entryHit(entry)) }, entry.title) : el('span', { class: 'error' }, 'Removed evidence'); })))

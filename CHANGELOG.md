@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Design system
+- Tighten optional screens with shared compact headings, responsive panes and Library result rows. Keep checkbox glyphs small inside touch-friendly labels, disclose Space customization, and use named reader icons and keyboard-accessible Space tabs. Add density, narrow-layout and shared-pattern drift checks.
+
 ## v0.12.0 — 2026-10-11
 
 ### Updates

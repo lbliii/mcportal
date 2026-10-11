@@ -23,6 +23,9 @@ test('shared controls preserve compact geometry, live aliases, growing text and 
     await page.eval(`document.documentElement.style.removeProperty('--mp-space-12')`);
     await page.send('Emulation.setTouchEmulationEnabled', { enabled: true });
     assert.ok((await heights()).every(height => height >= 44), 'real coarse-pointer preference enlarges every shared control');
+    assert.deepEqual(await page.eval(`(()=>{const box=document.querySelector('[data-ui=toggle]'),r=box.getBoundingClientRect();return [r.width,r.height,box.closest('label').getBoundingClientRect().height>=44]})()`),[14,14,true],'touch enlarges the label target, not the checkbox glyph');
+    await page.click('.ui-toggle label');
+    assert.equal(await page.eval(`document.querySelector('[data-ui=toggle]').checked`),true,'the full label toggles the compact checkbox');
     await page.send('Emulation.setTouchEmulationEnabled', { enabled: false });
     assert.deepEqual(await heights(), [28, 28, 28, 24, 28, 24, 32]);
     await page.send('Emulation.setDeviceMetricsOverride', { width: 320, height: 800, deviceScaleFactor: 1, mobile: false });

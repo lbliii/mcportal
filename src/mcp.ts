@@ -55,7 +55,7 @@ export const UI_INCLUDES = [
   'room/navigation.css', 'room/experiences.css', 'room/experiences.js', 'room/recall.js', 'room/collections.js', 'room/compare.js', 'room/views.js', 'room/catchup.js', 'room/watches.js',
   'design/contracts.js', 'design/dom.js', 'design/components/icon.js', 'design/components/button.js', 'design/components/field.js', 'design/components/overlays.js', 'design/components/tabs.js', 'design/components/disclosure.js', 'design/components/pill.js', 'design/components/feedback.js', 'design/patterns.js', 'design/components/tooltips.js',
   'design/tokens.css', 'design/primitives.css', 'design/palettes.js', 'design/theme.js', 'space-inks.js', 'space-format.js', 'space.css', 'art.js', 'brand/icons.js', 'brand/mark-line.svg', 'brand/badge.svg', 'brand/wordmark.svg',
-  'room/room.css', 'room/bridge.js', 'room/dom.js', 'room/room.js', 'room/items.js', 'room/layouts.js', 'room/river.js', 'room/levels.js', 'room/seen.js', 'room/reader.js', 'room/reader-tools.js', 'room/reading.js', 'room/passage.js', 'room/handoff.js', 'room/highlights.js', 'room/docs.js', 'room/social.js', 'room/reblog.js', 'room/add.js', 'room/shop.js', 'room/updates.js', 'room/toolbar.js', 'room/boot.js',
+  'room/room.css', 'room/bridge.js', 'room/dom.js', 'room/room.js', 'room/items.js', 'room/layouts.js', 'room/river.js', 'room/levels.js', 'room/seen.js', 'room/reader.js', 'room/reader-tools.js', 'room/reading.js', 'room/passage.js', 'room/handoff.js', 'room/highlights.js', 'room/docs.js', 'room/social.js', 'room/space-customization.js', 'room/space-customization.css', 'room/reblog.js', 'room/add.js', 'room/shop.js', 'room/updates.js', 'room/toolbar.js', 'room/boot.js',
 ];
 
 /** JSON that is safe to embed inside a <script> element. */

@@ -46,6 +46,11 @@
     uiFeedback({kind:'loading',message:'Loading your collections…'}),
     uiFeedback({kind:'error',message:'Could not load collections.',action:uiButton({label:'Try again'})}),
     uiFeedback({kind:'success',message:'Collection saved.'}),uiFeedback({kind:'info',message:'Checks run while the server is available.'}));
+  const layoutQuery=uiControl('input',{type:'search','aria-label':'Search layout example',placeholder:'Search your library'});
+  const resultRow=uiResultRow({title:'Small discoveries, collected',meta:'example.com · 2 days ago',excerpt:'A short preview keeps a result easy to scan. The complete source remains available in its reading view.',selected:true,selection:uiChip({label:'Select'}).element,onOpen:()=>{}});
+  section('Task layouts and result rows',uiScreenHeader({title:'Library example',back:iconButton('back','Back to example room',()=>{})}),
+    uiSearchRow(layoutQuery,uiButton({label:'Search'}),uiButton({label:'Collections'})),
+    uiSplitPane({main:resultRow,aside:uiCard({title:'Selected material',description:'Supporting details stack below the results when space is limited.',actions:[uiButton({label:'Open in reader'})]})}));
   const demoTabs=uiTabs({id:'demo',label:'Example sources',items:[
     {label:'Source one',panel:el('div',null,el('p',null,'The first source stays mounted when you switch.'))},
     {label:'Unavailable',disabled:true,panel:el('div',null,'Unavailable source')},

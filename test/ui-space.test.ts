@@ -45,6 +45,8 @@ test('Space browser: preview before enabling, independent visibility, pin/order/
     const sourceToggle = '[aria-label="Show sources I follow on my Space"]';
     const peopleToggle = '[aria-label="Show people I follow on my Space"]';
     await page.waitFor(`document.querySelector(${JSON.stringify(sourceToggle)})`, 'owner settings');
+    assert.equal(await page.eval(`document.getElementById('spaceCustomization').hidden`),true,'owner settings start out of the way');
+    await page.click('.space-customize-toggle');await page.click('#spaceSettingsTab2');
     await page.click(sourceToggle);
     await page.waitFor(`!document.querySelector('.space-section-preview').hidden`, 'the source preview');
     assert.match(await page.eval<string>(`document.querySelector('.space-section-preview').textContent`), /Alpha.*Beta.*Gamma/);

@@ -15,15 +15,14 @@
   function showCatchup(session) {
     catchupSession = session;
     enterExperience('catchup');
-    const head = el('header', { class: 'experience-heading' }, el('span', { class: 'experience-kicker' }, 'A LITTLE READING. A REAL FINISH.'), el('h1', null, 'Catch up, then step away'),
-      el('p', null, 'A small session from your retrieved unseen stories. New arrivals can wait.'));
+    const head = uiScreenHeader({title:'Catch up'});
     $('experiences').replaceChildren(head);
     if (session) {
       const count = session.stories.length;
       $('experiences').append(uiProgress({label:'Catch-up progress',max:Math.max(1,count),value:session.cursor,message:`${session.cursor} of ${count} stories`}),
         el('p', { class: 'experience-muted' }, `Captured ${new Date(session.startedAt).toLocaleString()}. Coverage is limited to the items retrieved from the selected sources.`));
       if (session.failures.length) $('experiences').append(el('section', { class: 'catchup-failures' }, el('h2', null, 'Sources that could not load'), ...session.failures.map(message => el('p', { class: 'error' }, message))));
-      if (session.finishedAt) $('experiences').append(el('section', { class: 'catchup-end' }, el('span', { class: 'experience-kicker' }, 'YOU HAVE REACHED THE END'), el('h2', null, count ? 'A good place to stop.' : 'No unseen stories in this retrieved set.'),
+      if (session.finishedAt) $('experiences').append(el('section', { class: 'catchup-end' }, el('h2', null, count ? 'A good place to stop.' : 'No unseen stories in this retrieved set.'),
         el('p', null, count ? (session.acknowledgedAt ? 'Your captured set is acknowledged. Finishing this session does not mark articles as read.' : 'Your session is finished. Acknowledgment is pending; retry below to update source attention.') : 'Refresh your sources later, or choose different ones for a new session.'),
         !session.acknowledgedAt ? el('button', { class: 'btn', onclick: () => advanceCatchup('end') }, 'Retry acknowledging this session') : null,
         el('button', { class: 'btn', onclick: () => $('btnExperienceRoom').click() }, 'Return to your room')));
@@ -42,9 +41,9 @@
     const count = uiControl('select', { 'aria-label': 'Stories in your catch-up session' }, [3,10,20,30].map(n => el('option', { value: n }, `${n} stories`))); count.value = '10';
     const specs = state.profile?.columns.flatMap(c => c.panels).filter(p => p.source !== 'saved' && p.source !== 'clips' && p.source !== 'upcoming' && p.source !== 'changes') || [];
     const sources = specs.map(p => { const input = uiControl('input', { type: 'checkbox', value: p.id, checked: true }); return { input, label: el('label', null, input, p.title || p.id) }; });
-    const go = el('button', { class: 'btn primary', type: 'submit' }, 'Start a little catch-up');
-    const form = el('form', { class: 'catchup-start' }, el('h2', null, 'Choose a small session'), count,
-      sources.length ? el('fieldset', null, el('legend', null, 'From your sources'), ...sources.map(s => s.label)) : el('p', null, 'Uses the sources in your room.'), go);
+    const go = el('button', { class: 'btn primary', type: 'submit' }, 'Start session');
+    const form = el('form', { class: 'catchup-start' }, count,
+      sources.length ? el('fieldset', null, el('legend', null, 'Sources'), ...sources.map(s => s.label)) : el('p', null, 'Uses the sources in your room.'), go);
     uiForm(form,{submit:go,pendingMessage:'Starting your session…',onSubmit:async()=>{
       const selected = sources.filter(s => s.input.checked).map(s => s.input.value);
       if (sources.length && !selected.length) throw new Error('Choose at least one source.');

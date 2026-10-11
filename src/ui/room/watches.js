@@ -17,14 +17,14 @@
     enterExperience(watchScreen);
     const upcoming = watchScreen === 'upcoming', watches = data.watches.filter(w => upcoming ? w.kind === 'calendar' || w.kind === 'artist' : w.kind === 'page' || w.kind === 'releases');
     const title = upcoming ? 'Events' : 'Page updates';
-    const heading = el('header',{class:'experience-heading'}, el('h1',null,title),el('p',null,upcoming?'Your watched artists and calendars, arranged by date.':'A quiet inbox for the pages and releases you choose to follow.'));
-    const content = el('div',{class:'watch-layout'},el('section',{class:'watch-main'},upcoming ? upcomingEvents(watches) : changeInbox(data.inbox.filter(f => watches.some(w=>w.id===f.watchId)))),
-      el('aside',{class:'watch-sidebar'},...watches.map(watchCard),uiDisclosure({label:upcoming?'Follow an artist or calendar':'Track a page or repository', className:'watch-add'},watchSetup(upcoming)),uiDisclosure({label:'About checks'},el('p',{class:'experience-muted'},data.worker))));
+    const heading = uiScreenHeader({title});
+    const content = uiSplitPane({className:'watch-layout',main:el('section',{class:'watch-main'},upcoming ? upcomingEvents(watches) : changeInbox(data.inbox.filter(f => watches.some(w=>w.id===f.watchId)))),
+      aside:el('aside',{class:'watch-sidebar'},...watches.map(watchCard),uiDisclosure({label:upcoming?'Follow an artist or calendar':'Track a page or repository', className:'watch-add'},watchSetup(upcoming)),uiDisclosure({label:'About checks'},el('p',{class:'experience-muted'},data.worker)))});
     $('experiences').replaceChildren(heading,content);
   }
   /** @param {import('../watches-state.ts').WatchFinding[]} findings */
   function changeInbox(findings) {
-    const list=el('div',{class:'change-inbox'},el('h2',null,'Updates'));
+    const list=el('div',{class:'change-inbox'});
     if (!findings.length) list.append(uiFeedback({kind:'empty', title:'No updates yet', message:'Track a page or repository. Updates appear after something changes.'}));
     for (const f of [...findings].reverse()) {
       const card=el('article',{class:`change-card${f.read?' acknowledged':''}`},el('span',{class:'experience-kicker'},f.kind==='availability'?'SOURCE AVAILABILITY':'SOURCE CHANGE'),el('h3',null,f.title),el('p',{class:'experience-muted'},`Found ${new Date(f.at).toLocaleString()}`));
@@ -43,7 +43,7 @@
   }
   /** @param {import('../watches-state.ts').Watch[]} watches */
   function upcomingEvents(watches) {
-    const section=el('section',null,el('h2',null,'On the horizon'));
+    const section=el('section');
     const past=uiControl('input',{type:'checkbox','aria-label':'Include past saved events'});
     const list=el('div',{class:'upcoming-list'});
     const draw=()=>{
@@ -51,7 +51,7 @@
       for (const s of state.profile?.saved || []) if (s.event && !known.has(s.event.id)) known.set(s.event.id,s.event);
       const events=[...known.values()].filter(e=>!eventIsPast(e) || past.checked && state.saved.has(e.url)).sort((a,b)=>a.startsAt.localeCompare(b.startsAt));
       list.replaceChildren(...events.map(e=>eventCard(e)));
-      if (!events.length) list.append(uiFeedback({kind:'empty', title:'Something to look forward to', message:'Follow a public venue calendar, or find an artist and confirm the match. Events appear after a successful check.'}));
+      if (!events.length) list.append(uiFeedback({kind:'empty', title:'No upcoming events', message:'Follow a public venue calendar, or find an artist and confirm the match. Events appear after a successful check.'}));
     };
     past.addEventListener('change',draw);draw();
     section.append(el('label',{class:'experience-row'},past,'Include past saved events'),list,el('p',{class:'experience-muted'},'Dates use each event’s explicit timezone. Missing events are not inferred to be cancelled. Check the provider before attending.'));
@@ -84,7 +84,7 @@
     const address=uiControl('input',{type:'text',required:true,placeholder:upcoming?'https://venue.example/calendar.ics':'https://docs.example/page','aria-label':'Watch address',maxlength:4096});
     const timezone=uiControl('input',{type:'text',value:Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC','aria-label':'Watch timezone',maxlength:100});
     const fields=el('div',{class:'watch-fields'}),status=el('p',{role:'status',class:'experience-muted'});
-    const form=el('form',{class:'watch-setup'},el('h2',null,'Follow something'),kind,fields,status);
+    const form=el('form',{class:'watch-setup'},kind,fields,status);
     let artistId='';
     const city=uiControl('input',{type:'text',placeholder:'City','aria-label':'Event city',maxlength:200}),country=uiControl('input',{type:'text',placeholder:'US','aria-label':'Event country',maxlength:2}),artists=el('div',{class:'artist-candidates'});
     const addressField=uiField(address,{label:'Address'}),titleField=uiField(title,{label:'Name (optional)'});

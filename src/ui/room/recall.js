@@ -26,13 +26,13 @@
       fetchRecall();
     };
     const search = el('form', { class: 'recall-search', onsubmit: (/** @type {SubmitEvent} */ e) => { e.preventDefault(); submit(); } },
-      el('div', { class: 'experience-row' }, query, uiButton({label:'Search', emphasis:'primary', type:'submit'}), uiButton({label:'Collections', id:'btnCollections', type:'button', onClick:() => showCollections()})),
+      uiSearchRow(query, uiButton({label:'Search', emphasis:'primary', type:'submit'}), uiButton({label:'Collections', id:'btnCollections', type:'button', onClick:() => showCollections()})),
       uiDisclosure({label:'Filters', open:Boolean(recallQuery.kind || recallQuery.site || recallQuery.tag || recallQuery.status)}, el('div', { class: 'recall-filters' }, kind, site, tag, status)));
     $('experiences').replaceChildren(search,
       el('p', { id: 'recallCount', class: 'experience-muted', role: 'status' }),
       uiDisclosure({label:'About this search', className:'search-details'}, el('p', { id: 'recallCoverage', class: 'experience-muted' })),
       selectionTray(),
-      el('div', { class: 'recall-body' }, el('div', { id: 'recallResults', class: 'recall-results' }), el('aside', { id: 'recallPreview', class: 'recall-preview', 'aria-label': 'Material preview' })));
+      uiSplitPane({className:'recall-body',main:el('div', { id: 'recallResults', class: 'recall-results' }),aside:el('aside', { id: 'recallPreview', class: 'recall-preview', 'aria-label': 'Material preview' })}));
     if (recallResult) drawRecallResults();
     else fetchRecall();
   }
@@ -56,7 +56,7 @@
 
   /** @param {LibraryHit} hit */
   function libraryLabel(hit) {
-    return [hit.clipKind || (hit.saved ? 'Saved page' : 'Reading'), hit.reading?.status, hit.origin === 'conversation' ? 'From a conversation' : '', ...hit.tags.map(t => `#${t}`)].filter(Boolean).join(' · ');
+    return [hit.clipKind || '', hit.reading?.status, hit.origin === 'conversation' ? 'From a conversation' : '', ...hit.tags.map(t => `#${t}`)].filter(Boolean).join(' · ');
   }
   function drawRecallResults() {
     if (!recallResult) return;
@@ -64,14 +64,15 @@
     $('recallCoverage').textContent = recallResult.search
       ? `${recallResult.search.query ? `Search words: ${recallResult.search.query}. ` : ''}${recallResult.search.coverage}`
       : 'Searches saved and reading metadata and retained clips. Original page bodies are not searched.';
-    $('recallResults').replaceChildren(...recallResult.hits.map(hit => el('article', { class: `recall-hit${recallPreview?.ref === hit.ref ? ' selected' : ''}`, 'data-ref': hit.ref },
-      selectEvidenceButton(hit),
-      el('div', { class: 'experience-kicker' }, libraryLabel(hit)),
-      el('button', { class: 'recall-title', 'aria-pressed': String(recallPreview?.ref === hit.ref), onclick: () => { recallPreview = hit; drawRecallResults(); $first(`[data-ref="${CSS.escape(hit.ref)}"] .recall-title`, $('recallResults'))?.focus({ preventScroll: true }); } }, hit.title),
-      el('p', { class: 'experience-muted' }, `${hit.source} · ${ago(hit.updatedAt)}`),
-      hit.excerpt ? el('p', { class: hit.clipKind === 'quote' ? 'recall-quote' : 'recall-excerpt' }, hit.excerpt) : null,
-      hit.matched.length ? el('small', { class: 'experience-muted' }, `Matched: ${hit.matched.join(', ')}`) : null,
-      el('button', { class: 'btn quiet sm', onclick: () => openLibraryHit(hit) }, hit.clipId ? 'Read →' : 'Resume reading →'))));
+    $('recallResults').replaceChildren(...recallResult.hits.map(hit => {
+      const row=uiResultRow({className:'recall-hit',title:hit.title,selected:recallPreview?.ref === hit.ref,
+        meta:[hit.source,ago(hit.updatedAt),libraryLabel(hit)].filter(Boolean).join(' · '),excerpt:hit.excerpt,
+        selection:selectEvidenceButton(hit),onOpen:()=>{
+          recallPreview=hit;drawRecallResults();
+          $first(`[data-ref="${CSS.escape(hit.ref)}"] .ui-result-title`,$('recallResults'))?.focus({preventScroll:true});
+        }});
+      row.dataset.ref=hit.ref;return row;
+    }));
     if (!recallResult.hits.length) $('recallResults').append(uiFeedback({kind:'empty', title:recallResult.query ? 'No matching material' : 'Nothing here yet', message:'Try words from the title, a saved note or a kept passage, or change your filters. Saving a link does not retain its page text.'}));
     if (recallResult.nextOffset !== null) {
       const next = recallResult.nextOffset;
@@ -84,6 +85,7 @@
     const box = $('recallPreview'); box.hidden = !hit;
     if (!hit) return;
     box.replaceChildren(...present([el('h2', null, hit.title), el('p', { class: 'experience-muted' }, hit.source),
+      hit.matched.length ? uiMetadata({},`Matched: ${hit.matched.join(', ')}`) : null,
       el('div', { class: 'recall-preview-body' }, hit.excerpt || 'Open this page to read it at its source.'),
       uiButton({label:hit.clipId ? 'Read' : 'Open in reader', emphasis:'primary', onClick:() => openLibraryHit(hit)}),
       hit.url && hit.locator ? uiButton({label:'Return to passage', onClick:() => openLibraryHit(hit, true)}) : null,

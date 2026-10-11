@@ -52,20 +52,22 @@
   function readerTools(top, body, title) {
     applyReaderComfort(body, title);
     top.append(passagePicker(body));
-    const findToggle = el('button', { class: 'btn reader-find-toggle', 'aria-expanded': 'false', 'aria-controls': 'readerFind' }, 'Find');
-    const comfortToggle = el('button', { class: 'btn reader-comfort-toggle', 'aria-expanded': 'false', 'aria-controls': 'readerComfort' }, 'Reading');
+    const findToggle = iconButton('recall','Find in this page',()=>{}, {className:'reader-find-toggle'});
+    findToggle.setAttribute('aria-expanded','false');findToggle.setAttribute('aria-controls','readerFind');
+    const comfortToggle = iconButton('settings','Reading settings',()=>{}, {className:'reader-comfort-toggle'});
+    comfortToggle.setAttribute('aria-expanded','false');comfortToggle.setAttribute('aria-controls','readerComfort');
     const input = uiControl('input', { type: 'search', class: 'reader-find-input', placeholder: 'Find in this page', 'aria-label': 'Find in this page', maxlength: '200', autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false' });
-    const count = el('span', { class: 'reader-find-count', role: 'status', 'aria-live': 'polite', 'aria-atomic': 'true' }, 'Enter text to find');
-    const previous = el('button', { class: 'btn', 'aria-label': 'Previous match', disabled: true }, 'Previous');
-    const next = el('button', { class: 'btn', 'aria-label': 'Next match', disabled: true }, 'Next');
-    const closeFind = el('button', { class: 'btn', 'aria-label': 'Close find' }, 'Close');
+    const count = el('span', { class: 'reader-find-count', role: 'status', 'aria-live': 'polite', 'aria-atomic': 'true' }, '');
+    const previous = iconButton('left','Previous match',()=>{},{disabled:true});
+    const next = iconButton('right','Next match',()=>{},{disabled:true});
+    const closeFind = iconButton('close','Close find',()=>{},{disabled:false});
     const find = el('div', { id: 'readerFind', class: 'reader-panel reader-find', hidden: true, role: 'search', 'aria-label': 'Find in this page' }, input, count, previous, next, closeFind);
     const size = uiControl('select', { 'aria-label': 'Reading text size' },
       el('option', { value: 'standard' }, 'Standard'), el('option', { value: 'large' }, 'Large'), el('option', { value: 'larger' }, 'Larger'));
     const measure = uiControl('select', { 'aria-label': 'Reading line width' }, el('option', { value: 'comfortable' }, 'Comfortable'), el('option', { value: 'focused' }, 'Focused'));
     size.value = readerComfort.size; measure.value = readerComfort.measure;
-    const reset = el('button', { class: 'btn' }, 'Reset');
-    const closeComfort = el('button', { class: 'btn', 'aria-label': 'Close reading settings' }, 'Close');
+    const reset = uiButton({label:'Reset'});
+    const closeComfort = iconButton('close','Close reading settings',()=>{},{disabled:false});
     const comfort = el('div', { id: 'readerComfort', class: 'reader-panel reader-comfort', hidden: true, role: 'group', 'aria-label': 'Reading settings' },
       el('label', null, 'Text size', size), el('label', null, 'Line width', measure), reset, closeComfort,
       el('small', null, 'Applies to articles and docs in this open session.'));
@@ -80,7 +82,7 @@
       matches = []; current = -1; capped = false;
     }
     function updateCount() {
-      count.textContent = !input.value ? 'Enter text to find' : !matches.length ? 'No matches' : `${current + 1} of ${matches.length}${capped ? '+' : ''}`;
+      count.textContent = !input.value ? '' : !matches.length ? 'No matches' : `${current + 1} of ${matches.length}${capped ? '+' : ''}`;
       previous.disabled = next.disabled = !matches.length;
     }
     /** @param {number} direction */
