@@ -10,12 +10,12 @@
   function showRecall(provided) {
     enterExperience('recall');
     if (provided) { recallQuery = { query: provided.query }; recallResult = provided; recallPreview = provided.hits[0] || null; }
-    const query = el('input', { type: 'search', placeholder: 'Search your library', 'aria-label': 'Search your library', maxlength: 300, value: recallQuery.query || '' });
-    const site = el('input', { type: 'text', placeholder: 'Site or source', 'aria-label': 'Filter by site or source', value: recallQuery.site || '', maxlength: 200 });
-    const tag = el('input', { type: 'text', placeholder: 'Tag', 'aria-label': 'Filter by tag', value: recallQuery.tag || '', maxlength: 60 });
-    const kind = el('select', { 'aria-label': 'Filter by kind' }, ['', 'saved', 'reading', 'quote', 'note', 'exchange', 'table', 'image', 'link'].map(k => el('option', { value: k }, k ? k[0].toUpperCase() + k.slice(1) : 'All material')));
+    const query = uiControl('input', { type: 'search', placeholder: 'Search your library', 'aria-label': 'Search your library', maxlength: 300, value: recallQuery.query || '' });
+    const site = uiControl('input', { type: 'text', placeholder: 'Site or source', 'aria-label': 'Filter by site or source', value: recallQuery.site || '', maxlength: 200 });
+    const tag = uiControl('input', { type: 'text', placeholder: 'Tag', 'aria-label': 'Filter by tag', value: recallQuery.tag || '', maxlength: 60 });
+    const kind = uiControl('select', { 'aria-label': 'Filter by kind' }, ['', 'saved', 'reading', 'quote', 'note', 'exchange', 'table', 'image', 'link'].map(k => el('option', { value: k }, k ? k[0].toUpperCase() + k.slice(1) : 'All material')));
     kind.value = recallQuery.kind || '';
-    const status = el('select', { 'aria-label': 'Filter by reading status' }, ['', 'seen', 'opened', 'read'].map(s => el('option', { value: s }, s || 'Any reading status')));
+    const status = uiControl('select', { 'aria-label': 'Filter by reading status' }, ['', 'seen', 'opened', 'read'].map(s => el('option', { value: s }, s || 'Any reading status')));
     status.value = recallQuery.status || '';
     const submit = () => {
       // The selected values come from fixed options; the server validates them again.

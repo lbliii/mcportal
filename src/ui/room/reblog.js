@@ -48,8 +48,8 @@
    */
   function reblogButton(target, cls = 'mi reblog') {
     if (!canPost() || (!target.shareId && !target.url)) return null;
-    const button = el('button', { class: cls, type: 'button', 'data-reblog-key': target.key, 'aria-haspopup': 'menu', 'aria-expanded': 'false',
-      onclick: (/** @type {MouseEvent} */ e) => { e.stopPropagation(); openReblogMenu(button, target); } });
+    const button = el('button', { class: cls, type: 'button', 'data-reblog-key': target.key, 'aria-haspopup': 'dialog', 'aria-expanded': 'false',
+      onclick: (/** @type {MouseEvent} */ e) => { e.preventDefault(); e.stopPropagation(); openReblogMenu(button, target); } });
     reblogTargets.set(button, target);
     drawReblogButton(button, target);
     return button;
@@ -82,58 +82,45 @@
   }
 
   // ------------------------------------------------------------ the menu
-  /** @type {{ menu: HTMLElement, button: HTMLElement } | null} */
+  /** @type {{ menu: HTMLElement, button: HTMLElement, controller:ReturnType<typeof uiPopover> } | null} */
   let openMenu = null;
 
   /** @param {boolean} [focus] give focus back to the button */
   function closeReblogMenu(focus = true) {
     if (!openMenu) return;
-    const { menu, button } = openMenu;
+    const { menu, button, controller } = openMenu;
     openMenu = null;
-    menu.remove();
+    controller.destroy(); menu.remove();
     button.setAttribute('aria-expanded', 'false');
-    if (focus && button.isConnected) button.focus();
+    if (focus && button.isConnected) button.focus({preventScroll:true});
   }
 
   /** @param {HTMLElement} button @param {ReblogTarget} target */
   function openReblogMenu(button, target) {
     if (openMenu) { const same = openMenu.button === button; closeReblogMenu(same); if (same) return; }
     const { mine } = markOf(target);
-    const item = (/** @type {string} */ label, /** @type {() => void} */ act) => el('button', { type: 'button', role: 'menuitem', tabindex: '-1', onclick: () => { closeReblogMenu(false); act(); } }, label);
+    const item = (/** @type {string} */ label, /** @type {() => void} */ act) => uiButton({label, emphasis:'quiet', onClick:() => { closeReblogMenu(); act(); }});
     const go = item('Reblog', () => { if (audience) reblog(target, button, audience.value()); });
-    const audience = mine ? null : audienceSwitch('Reblog', go, true);
-    const menu = el('div', { class: 'reblog-menu', role: 'menu', 'aria-label': `Reblog “${target.title}”` },
+    const audience = mine ? null : audienceSwitch('Reblog', go);
+    const menu = el('div', { class: 'reblog-menu', 'aria-label': `Reblog “${target.title}”` },
       mine ? item('Undo reblog', () => undoReblog(target, button))
         : [el('div', { class: 'reblog-submit-row', role: 'none' }, audience?.node, go), item('Reblog with a note', () => reblogWithNote(target, button, audience?.isReady() ? audience.value() : undefined))]);
-    menu.addEventListener('keydown', (e) => {
-      const items = [...menu.querySelectorAll('[role^="menuitem"]:not(:disabled)')];
-      const at = items.findIndex((i) => i === document.activeElement);
-      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeReblogMenu(); }
-      else if (e.key === 'Tab') closeReblogMenu(false);
-      else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-        e.preventDefault();
-        const next = items[(at + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length];
-        if (next instanceof HTMLElement) next.focus();
-      }
-    });
+    const dismiss=iconButton('close','Close reblog options',()=>closeReblogMenu());
+    menu.prepend(el('div',{class:'ui-popover-close'},dismiss));
     document.body.append(menu);
-    const box = button.getBoundingClientRect();
-    menu.style.top = `${Math.round(box.bottom + window.scrollY + 4)}px`;
-    menu.style.left = `${Math.round(Math.max(8, Math.min(box.right - menu.offsetWidth, document.documentElement.clientWidth - menu.offsetWidth - 8)) + window.scrollX)}px`;
-    openMenu = { menu, button };
-    button.setAttribute('aria-expanded', 'true');
-    $first('[role="menuitem"]:not(:disabled)', menu)?.focus();
+    const controller=uiPopover(menu,button,{bindTrigger:false,onClose:()=>{if(openMenu?.menu===menu)closeReblogMenu(false);}});
+    openMenu = { menu, button, controller };
+    controller.open();
     // Read it first? Only a nudge, never a gate: the reader opens if they take it. Not in the reader itself.
     const { url, item: story, portal } = target;
     if (!mine && url && story && portal && isHttpUrl(url) && $('reader').hidden) {
       callTool('get_reading', { url }).then((result) => {
         if (result.structuredContent?.reading || openMenu?.menu !== menu) return;
         menu.prepend(el('div', { class: 'reblog-nudge' }, "You haven't read this yet. ",
-          el('button', { type: 'button', role: 'menuitem', tabindex: '-1', class: 'btn quiet sm', onclick: () => { closeReblogMenu(false); openItem(story, portal); } }, 'Read it first?')));
+          el('button', { type: 'button', class: 'btn quiet sm', onclick: () => { closeReblogMenu(false); openItem(story, portal); } }, 'Read it first?')));
       }).catch(() => {});
     }
   }
-  document.addEventListener('click', (e) => { if (openMenu && !e.composedPath().includes(openMenu.menu)) closeReblogMenu(false); });
 
   // ------------------------------------------------------------ acting
   /** Keep the source preview even on an existing bookmark, preserving its chosen title. @param {ReblogTarget} target */
@@ -174,7 +161,7 @@
     try {
       const share = await postReblog(target, undefined, audience);
       if (share) reblogged(target, share, button);
-    } catch (error) { toast(`The portal refused: ${errorText(error)}`); }
+    } catch (error) { toast(`The portal refused: ${errorText(error)}`, 'error'); }
     finally { button.removeAttribute('aria-busy'); drawReblogButton(button, target); }
   }
 
@@ -186,9 +173,9 @@
       await callTool('unshare', { id: mine });
       reblogMarks.set(target.key, { mine: null, count: target.shareId ? Math.max(0, count - 1) : count });
       markReblogs(target.key);
-      if (button.isConnected) button.focus();
+      if (button.isConnected) button.focus({preventScroll:true});
       toast('Reblog undone.');
-    } catch (error) { toast(`Couldn't undo it: ${errorText(error)}`); }
+    } catch (error) { toast(`Couldn't undo it: ${errorText(error)}`, 'error'); }
   }
 
   /**

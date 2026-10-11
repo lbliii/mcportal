@@ -187,7 +187,7 @@
   /** @param {string} url */
   function showLinkFallback(url) {
     const fallback = el('div', { class: 'error', role: 'status', style: 'position:fixed;bottom:16px;left:16px;right:16px;z-index:100;padding:12px;background:var(--mp-surface-canvas);border:1px solid var(--mp-border-control);border-radius:var(--mp-radius-card)' }, 'Open this address in your browser: ',
-      el('input', { value: url, readonly: true, 'aria-label': 'Original web address', onclick: (/** @type {MouseEvent} */ e) => /** @type {HTMLInputElement} */ (e.target).select() }),
+      uiControl('input', { value: url, readonly: true, 'aria-label': 'Original web address', onclick: (/** @type {MouseEvent} */ e) => /** @type {HTMLInputElement} */ (e.target).select() }),
       el('button', { class: 'btn', onclick: () => fallback.remove() }, 'Dismiss'));
     document.body.append(fallback);
   }

@@ -155,7 +155,7 @@
       const completed = recorded.then(() => callTool('record_reading', { url, status: 'read', title }));
       readingWrites = completed.catch(() => {});
       try { await completed; refreshContinueReading(); }
-      catch { read = false; button.disabled = false; button.textContent = 'Mark as read'; toast("Couldn't mark it as read"); }
+      catch { read = false; button.disabled = false; button.textContent = 'Mark as read'; toast("Couldn't mark it as read", 'error'); }
     });
     body.after(el('div', { class: 'read-end' }, button));
 

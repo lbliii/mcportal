@@ -57,6 +57,8 @@
   --mp-space-40: 40px;
   --mp-space-6: 6px;
   --mp-space-8: 8px;
+  --mp-toast-duration: 6000ms;
+  --mp-toast-max-duration: 20000ms;
   --mp-toolbar-padding-block: var(--mp-space-6);
   --mp-toolbar-padding-inline: var(--mp-space-12);
   --mp-tooltip-delay: var(--mp-duration-fast);

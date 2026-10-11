@@ -25,8 +25,10 @@ test('Shop browser: scope preview → confirm → gallery → save → pause/res
     assert.equal((await watchStore.list('default'))[0]?.scope.collection,'clothing');
     assert.equal(await page.eval(`document.querySelector('#grid button button')`),null);
     assert.match(await page.eval<string>(`document.querySelector('.shop-card').textContent`),/120.00 USD/);
+    await page.waitFor(`document.querySelector('#toast [role=status]')?.textContent.includes('Store followed')`,'follow confirmation');
+    await page.click('#toast button');
     await page.click('[data-portal="shop"] .shop-save');await page.waitFor(`document.querySelector('[data-portal="shop"] .shop-save[aria-pressed="true"]')`,'saved product');
-    await page.waitFor(`document.querySelector('#toast').textContent.startsWith('Saved!')`,'save response settled');
+    await page.waitFor(`[...document.querySelectorAll('#toast [role=status]')].some(n=>n.textContent.startsWith('Saved!'))`,'save response settled');
     assert.equal((await store.get('default')).saved[0]?.url,SHOP+'/products/product-1');
     await page.click('.shop-manage summary');await page.click('.shop-manage button');await page.waitFor(`document.querySelector('.shop-manage summary').textContent.includes('paused')`,'paused follow');
     assert.equal(await page.eval(`document.querySelectorAll('.shop-card').length`),0);

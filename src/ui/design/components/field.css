@@ -5,7 +5,7 @@ input:not([type=checkbox], [type=radio], [type=range], [type=hidden]), select { 
 .ui-field-hint, .ui-field-error { margin:0; font-size:var(--mp-type-11); line-height:var(--mp-line-body); }
 .ui-field-hint { color:var(--mp-text-secondary); }
 .ui-field-error { color:var(--mp-status-error); }
-.ui-field [aria-invalid=true] { border-color:var(--mp-status-error); }
+.ui-field .field[aria-invalid=true] { border-color:var(--mp-status-error); }
 .ui-setting { grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); align-items:center; column-gap:var(--mp-space-8); }
 .ui-setting > :is(.ui-field-hint, .ui-field-error) { grid-column:1 / -1; }
 .ui-toggle { grid-template-columns:minmax(0, 1fr) auto; }
@@ -19,3 +19,17 @@ input:not([type=checkbox], [type=radio], [type=range], [type=hidden]), select { 
 .ui-choice:has(:disabled) { opacity:.45; cursor:default; }
 .ui-choice input { margin:0; width:var(--mp-icon-small); min-height:0; accent-color:var(--mp-action-primary); }
 .ui-choice:hover:not(:has(:disabled)) { background:var(--mp-surface-hover); }
+/* Product layouts own width and placement. Controls own padding, type and state. */
+input.field:not([type=checkbox], [type=radio], [type=range], [type=hidden]), select.field, textarea.field { box-sizing:border-box; padding:var(--mp-control-padding-block) var(--mp-control-padding-inline); color:var(--mp-text-primary); background:var(--mp-surface-input); border:1px solid var(--mp-border-control); border-radius:var(--mp-radius-control); font:var(--mp-type-12)/var(--mp-line-ui) var(--mp-font-ui); }
+textarea.field { min-height:calc(3 * var(--mp-control-field-height)); resize:vertical; }
+.field:disabled { opacity:.55; cursor:default; }
+.field:read-only:not(select) { background:var(--mp-surface-inset); }
+.field:is([type=checkbox],[type=radio]) { padding:0; accent-color:var(--mp-action-primary); }
+.ui-form-error { flex-basis:100%; grid-column:1 / -1; margin:0; color:var(--mp-status-error); font-size:var(--mp-type-12); overflow-wrap:anywhere; }
+.ui-field { overflow-wrap:anywhere; }
+.ui-choice input.field { width:var(--mp-icon-small); height:var(--mp-icon-small); padding:0; }
+.ui-choice:has(:focus-visible) { outline:2px solid var(--mp-focus-ring); outline-offset:2px; }
+
+.ui-form-pending { flex-basis:100%; grid-column:1 / -1; }
+input.field[type=file] { width:100%; overflow:hidden; }
+input.field[type=file]::file-selector-button { font:inherit; min-height:var(--mp-control-height); margin-right:var(--mp-space-8); padding:var(--mp-control-padding-block) var(--mp-control-padding-inline); border:1px solid var(--mp-border-control); border-radius:var(--mp-radius-control); background:var(--mp-surface-input); color:var(--mp-text-primary); }

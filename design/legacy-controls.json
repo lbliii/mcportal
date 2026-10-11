@@ -68,7 +68,7 @@
     "reason": "Existing product controls and content-opening actions; shared CSS applies. Use typed factories for new ordinary actions and migrate these when changing this flow."
   },
   "room/reblog.js": {
-    "maximum": 3,
+    "maximum": 2,
     "reason": "Existing product controls and content-opening actions; shared CSS applies. Use typed factories for new ordinary actions and migrate these when changing this flow."
   },
   "room/recall.js": {
@@ -88,7 +88,7 @@
     "reason": "Existing product controls and content-opening actions; shared CSS applies. Use typed factories for new ordinary actions and migrate these when changing this flow."
   },
   "room/social.js": {
-    "maximum": 22,
+    "maximum": 21,
     "reason": "Existing product controls and content-opening actions; shared CSS applies. Use typed factories for new ordinary actions and migrate these when changing this flow."
   },
   "room/views.js": {

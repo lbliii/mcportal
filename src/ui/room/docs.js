@@ -61,7 +61,7 @@
     const requestState = docsState;
     /** @type {ReturnType<typeof setTimeout> | undefined} */
     let timer;
-    const search = el('input', { class: 'docs-search', type: 'search', placeholder: site.symbols ? 'Search pages and symbols' : 'Search pages', 'aria-label': `Search ${site.title}` });
+    const search = uiControl('input', { class: 'docs-search', type: 'search', placeholder: site.symbols ? 'Search pages and symbols' : 'Search pages', 'aria-label': `Search ${site.title}` });
     search.addEventListener('input', () => {
       clearTimeout(timer);
       const query = search.value.trim();

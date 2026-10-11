@@ -1,5 +1,5 @@
   // Shared controls own labels, hints and target sizes; this file owns preferences.
-  const openStories = uiSettingsRow(el('select', {id:'openIn'}, el('option', {value:'card'}, 'In this room'), el('option', {value:'chat'}, 'In the conversation')), {label:'Open stories', id:'openInField'});
+  const openStories = uiSettingsRow(uiControl('select', {id:'openIn'}, el('option', {value:'card'}, 'In this room'), el('option', {value:'chat'}, 'In the conversation')), {label:'Open stories', id:'openInField'});
   openStories.element.hidden = true;
   const sourceDetails = uiToggle({id:'showSources', label:'Show source details', hint:'Show where each source’s data comes from.', onChange:checked=>root.classList.toggle('show-sources', checked)});
   $('readingSettings').replaceChildren(openStories.element, sourceDetails.element);
@@ -20,7 +20,7 @@
       state.profile = result.structuredContent.profile;
     } catch (error) {
       state.profile = before; drawLayout();
-      toast(`Couldn't save: ${errorText(error)}`);
+      toast(`Couldn't save: ${errorText(error)}`, 'error');
     } finally {
       settingsBusy = false;
       controls.forEach((b) => b.removeAttribute('disabled'));
@@ -106,29 +106,13 @@
     const identity = state.identity;
     // The GitHub login as a handle, when it makes one (hyphens aren't allowed).
     const login = identity && identity.mode !== 'ghost' ? (identity.login ?? '').toLowerCase().replace(/-/g, '_').slice(0, 30) : '';
-    const input = el('input', { type: 'text', value: /^[a-z0-9_]{2,30}$/.test(login) ? login : '', placeholder: 'yourname', maxlength: '31', autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false', 'aria-label': 'Handle' });
+    const input = uiControl('input', { type: 'text', value: /^[a-z0-9_]{2,30}$/.test(login) ? login : '', placeholder: 'yourname', maxlength: '31', autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false', 'aria-label': 'Handle' });
     const handleField = uiField(input, {label:'Handle', hint:'2 to 30 letters, digits or underscores. You can change it later.'});
-    const claim = uiButton({label:'Claim', emphasis:'primary', type:'button'});
+    const claim = uiButton({label:'Claim', emphasis:'primary', type:'submit'});
     // Being findable is its own choice, asked plainly and off by default (docs/plans/finding-people.md).
-    const listed = el('input', { type: 'checkbox' });
-    const publicSpace = el('input', { type: 'checkbox' }); publicSpace.checked = true;
-    const submit = async () => {
-      const handle = input.value.trim().replace(/^@/, '');
-      if (claim.disabled) return;
-      if (!handle) { handleField.setError('Enter a handle.'); input.focus(); return; }
-      uiBusy(claim, true); input.disabled = true; handleField.setError();
-      try {
-        const { profile } = (await callTool('set_public_profile', { handle, listed: listed.checked, public: publicSpace.checked })).structuredContent;
-        if (state.identity && state.identity.mode !== 'ghost') drawIdentity({ ...state.identity, handle: profile.handle });
-        toast(`You're @${profile.handle}.`);
-        loadSpace('', false);
-      } catch (error) {
-        input.disabled = false; handleField.setError(errorText(error)); input.focus();
-      } finally { uiBusy(claim, false); }
-    };
-    claim.addEventListener('click', submit);
-    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); submit(); } });
-    setWhoMenu(
+    const listed = uiControl('input', { type: 'checkbox' });
+    const publicSpace = uiControl('input', { type: 'checkbox' }); publicSpace.checked = true;
+    const form=el('form',null,
       el('div', { class: 'who-head' }, icon('space'), el('b', null, 'Claim a handle')),
       el('p', null, 'Your handle is how people on MCPortal find you, follow you and see what you share. It makes a public profile and your Space; the rest of your room stays private.'),
       handleField.element,
@@ -137,6 +121,16 @@
       el('div', { class: 'who-actions' },
         uiButton({label:'Back', type:'button', onClick:() => drawWhoMenu()}),
         claim));
+    uiForm(form,{submit:claim,pendingMessage:'Claiming handle…',validate:()=>{
+      const valid=Boolean(input.value.trim().replace(/^@/,''));
+      handleField.setError(valid?'':'Enter a handle.');if(!valid)input.focus();return valid;
+    },onSubmit:async()=>{
+      const handle=input.value.trim().replace(/^@/,'');
+      const {profile}=(await callTool('set_public_profile',{handle,listed:listed.checked,public:publicSpace.checked})).structuredContent;
+      if(state.identity && state.identity.mode!=='ghost')drawIdentity({...state.identity,handle:profile.handle});
+      toast(`You're @${profile.handle}.`,'success');loadSpace('',false);
+    }});
+    setWhoMenu(form);
     input.focus();
     input.select();
   }

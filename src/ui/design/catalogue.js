@@ -64,9 +64,7 @@
   const drawer=el('dialog',{id:'demo-drawer','aria-label':'Example drawer'},uiToolbar({label:'Drawer controls'},el('strong',null,'Settings'),drawerClose),uiToggle({label:'Show source details'}).element);
   uiDialog(drawer,{trigger:drawerTrigger,closeButton:drawerClose,variant:'drawer'});
   catalogue.append(drawerTrigger,drawer);
-  const choiceName='demo-density';
-  section('Segmented choices',el('fieldset',{class:'ui-choice-group'},el('legend',null,'Example view'),['List','Cards'].map((label,index)=>el('label',{class:'ui-choice'},el('input',{type:'radio',name:choiceName,value:label,checked:index===0}),label))),
-    el('p',null,'A mutually exclusive setting uses native radios, not tab semantics. Layout previews are the larger card variant in Settings.'));
+  section('Segmented choices',uiChoiceGroup({label:'Example view',value:'list',choices:[{value:'list',label:'List'},{value:'cards',label:'Cards'}]}).element,el('p',null,'A mutually exclusive setting uses native radios, not tab semantics.'));
   const documentExample=el('div',{class:'ui-document','data-ui':'document'},
     el('h2',null,'A readable document'),el('p',null,'Compact chrome surrounds comfortable reading. ',el('a',{href:'https://www.w3.org/WAI/ARIA/apg/patterns/tabs/'},'Content references remain underlined.')),
     el('h3',null,'Code and evidence'),el('p',null,'Use ',el('code',null,'uiButton()'),' for an action.'),el('pre',null,el('code',null,'const room = await openRoom();')),
@@ -75,6 +73,31 @@
   section('Documents and navigation',el('nav',{'aria-label':'Example contents'},uiNavLink({label:'Overview',href:'#document-example',current:true}),uiNavLink({label:'Installation',href:'#document-example'})),documentExample,
     uiPager({previous:{label:'Overview',onClick:()=>{}},next:{label:'Installation and configuration',onClick:()=>{}}}));
   documentExample.id='document-example';
+  const draft=uiField(uiControl('input',{id:'demo-form-name',required:true,type:'url',placeholder:'https://example.com'}),{label:'Source address',hint:'A public URL.'});
+  const notes=uiField(uiControl('textarea',{rows:2,placeholder:'Optional notes'}),{label:'Notes (optional)'});
+  const submit=uiButton({id:'demo-form-submit',label:'Save source',type:'submit',emphasis:'primary'});
+  const form=el('form',{id:'demo-form',class:'sample-settings'},draft.element,notes.element,submit);
+  uiForm(form,{submit,onSubmit:async()=>{await new Promise(resolve=>setTimeout(resolve,350));throw new Error('Could not save. Your draft is kept; try again.');}});
+  section('Async forms',form,el('div',{class:'samples'},
+    uiField(uiControl('input',{value:'Unavailable',disabled:true}),{label:'Disabled field'}).element,
+    uiField(uiControl('input',{value:'Retained address',readonly:true}),{label:'Read-only field'}).element,
+    uiField(uiControl('input',{type:'file',accept:'.json'}),{label:'Import file'}).element),
+    el('p',null,'Native validation names the field. Failed submissions keep drafts and show a persistent message. Busy actions preserve their label.'));
+  const richTrigger=uiButton({label:'Sharing options',id:'demo-popover-trigger'});
+  const richChoice=uiChoiceGroup({label:'Sharing audience',value:'public',choices:[{value:'public',label:'Public'},{value:'followers',label:'Followers only'}]});
+  const richClose=iconButton('close','Close sharing options',()=>rich.close());
+  const richPanel=el('div',{id:'demo-popover','aria-label':'Sharing options'},el('div',{class:'ui-popover-close'},richClose),richChoice.element,
+    uiField(uiControl('input',{id:'demo-popover-note'}),{label:'Note (optional)'}).element,uiButton({label:'Done',onClick:()=>rich.close()}));
+  const rich=uiPopover(richPanel,richTrigger);
+  section('Rich popovers',richTrigger,richPanel,el('p',null,'Forms use normal Tab and radio arrow keys. Escape and outside interaction dismiss; content stays within the viewport.'));
+  const notices=el('div',{id:'demo-toasts'});document.body.append(notices);const toasts=uiToasts(notices);
+  section('Toasts and progress',uiToolbar({label:'Notification examples'},
+    uiButton({label:'Show confirmation',onClick:()=>toasts.show('Source saved.','success')}),
+    uiButton({label:'Show failure',onClick:()=>toasts.show('Could not save. Retry from the source form.','error')})),
+    uiProgress({label:'Reading session',value:2,max:10,message:'2 of 10 stories'}),
+    uiProgress({label:'Completed session',value:10,max:10,message:'10 of 10 stories'}),
+    uiFeedback({kind:'loading',message:'Looking for sources…'}),uiSkeleton(),
+    el('p',null,'Three notices at most; additional notices queue. Errors remain until dismissed. Confirmations pause while hovered, focused or the document is hidden. Progress never invents a percentage.'));
   section('Component contracts',...Object.entries(UI_COMPONENTS).map(([name, component])=>uiDisclosure({label:`${name} · ${component.status}`,className:'contract'},el('p',null,component.purpose),el('code',null,component.example))));
   section('Coverage inventory',el('p',null,'Shared means reusable production code. Local means a defined product composition with migration work recorded. Reserved means no current product need; do not invent a one-off when it arrives.'),
     ...UI_INVENTORY.map(item=>uiDisclosure({label:`${item.name} · ${item.coverage}`,className:'contract'},el('p',null,item.definition),el('p',null,`Variants: ${item.variants.join(', ')}. States: ${item.states.join(', ')}.`),el('p',null,item.keyboard),el('p',null,item.followUp))));

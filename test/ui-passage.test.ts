@@ -108,7 +108,7 @@ test('passage: "Ask about this" gives the model the passage as fenced context, t
 test('passage: "Clip quote" keeps it as a quote clip with its source', { skip }, async () => {
   const text = await selectParagraph('serverTools,updateModelContext,message');
   await press('Clip quote');
-  await page.waitFor(`${IN_FRAME}.document.getElementById('toast').textContent.startsWith('Clipped')`, 'the clipped toast');
+  await page.waitFor(`[...${IN_FRAME}.document.querySelectorAll('#toast [role=status]')].some(n=>n.textContent.startsWith('Clipped'))`, 'the clipped toast');
   const [clip] = await ctx.clips!.list('reader', { limit: 5 });
   assert.equal(clip?.kind, 'quote');
   assert.equal(clip?.source.url, ARTICLE);

@@ -54,15 +54,15 @@
     top.append(passagePicker(body));
     const findToggle = el('button', { class: 'btn reader-find-toggle', 'aria-expanded': 'false', 'aria-controls': 'readerFind' }, 'Find');
     const comfortToggle = el('button', { class: 'btn reader-comfort-toggle', 'aria-expanded': 'false', 'aria-controls': 'readerComfort' }, 'Reading');
-    const input = el('input', { type: 'search', class: 'reader-find-input', placeholder: 'Find in this page', 'aria-label': 'Find in this page', maxlength: '200', autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false' });
+    const input = uiControl('input', { type: 'search', class: 'reader-find-input', placeholder: 'Find in this page', 'aria-label': 'Find in this page', maxlength: '200', autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false' });
     const count = el('span', { class: 'reader-find-count', role: 'status', 'aria-live': 'polite', 'aria-atomic': 'true' }, 'Enter text to find');
     const previous = el('button', { class: 'btn', 'aria-label': 'Previous match', disabled: true }, 'Previous');
     const next = el('button', { class: 'btn', 'aria-label': 'Next match', disabled: true }, 'Next');
     const closeFind = el('button', { class: 'btn', 'aria-label': 'Close find' }, 'Close');
     const find = el('div', { id: 'readerFind', class: 'reader-panel reader-find', hidden: true, role: 'search', 'aria-label': 'Find in this page' }, input, count, previous, next, closeFind);
-    const size = el('select', { 'aria-label': 'Reading text size' },
+    const size = uiControl('select', { 'aria-label': 'Reading text size' },
       el('option', { value: 'standard' }, 'Standard'), el('option', { value: 'large' }, 'Large'), el('option', { value: 'larger' }, 'Larger'));
-    const measure = el('select', { 'aria-label': 'Reading line width' }, el('option', { value: 'comfortable' }, 'Comfortable'), el('option', { value: 'focused' }, 'Focused'));
+    const measure = uiControl('select', { 'aria-label': 'Reading line width' }, el('option', { value: 'comfortable' }, 'Comfortable'), el('option', { value: 'focused' }, 'Focused'));
     size.value = readerComfort.size; measure.value = readerComfort.measure;
     const reset = el('button', { class: 'btn' }, 'Reset');
     const closeComfort = el('button', { class: 'btn', 'aria-label': 'Close reading settings' }, 'Close');

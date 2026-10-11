@@ -21,13 +21,9 @@
     setStatus('');
     $('status').title = `Updated ${t.toLocaleString()}`;
   }
-  /** @type {ReturnType<typeof setTimeout> | undefined} */
-  let toastTimer;
-  /** A short message at the bottom of the room. @param {string} text */
-  function toast(text) {
-    const t = $('toast'); t.textContent = text; t.classList.add('show');
-    clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
-  }
+  const roomToasts=uiToasts($('toast'));
+  /** @param {string} text @param {UIToastKind} [kind] */
+  function toast(text,kind='info') { roomToasts.show(text,kind); }
 
   /** A thrown value's message, for the user. @param {unknown} error */
   function errorText(error) {

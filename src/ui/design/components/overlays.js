@@ -84,3 +84,47 @@
     // focus transitions and scrolling; Tab and Escape are handled explicitly above.
     return {close,destroy:()=>{close();events.abort();}};
   }
+  let uiPopoverSequence=0;
+  /** Rich, nonmodal content uses ordinary Tab and native radio/input keys, never menu roles.
+   * @param {HTMLElement} panel @param {HTMLElement} trigger
+   * @param {{bindTrigger?:boolean, initialFocus?:HTMLElement, onClose?:()=>void}} [options]
+   */
+  function uiPopover(panel,trigger,options={}) {
+    if(!panel.getAttribute('aria-label') && !panel.getAttribute('aria-labelledby')) throw new Error('Popover needs a name');
+    panel.id ||= `ui-popover-${++uiPopoverSequence}`;
+    panel.classList.add('ui-popover');panel.dataset.ui='popover';panel.setAttribute('popover','auto');panel.setAttribute('role','dialog');panel.tabIndex=-1;
+    trigger.setAttribute('aria-haspopup','dialog');trigger.setAttribute('aria-controls',panel.id);trigger.setAttribute('aria-expanded','false');trigger.setAttribute('popovertarget',panel.id);
+    const events=new AbortController();let frame=0,disposed=false;
+    function position() {
+      if(!panel.matches(':popover-open')) return;
+      if(!trigger.isConnected || !trigger.getClientRects().length) {close(false);return;}
+      const anchor=trigger.getBoundingClientRect(),box=panel.getBoundingClientRect(),style=getComputedStyle(document.documentElement);
+      const inset=parseFloat(style.getPropertyValue('--mp-panel-padding')),gap=parseFloat(style.getPropertyValue('--mp-tooltip-offset'));
+      const width=document.documentElement.clientWidth,height=innerHeight;
+      panel.style.left=`${Math.max(inset,Math.min(anchor.left,width-box.width-inset))}px`;
+      const below=anchor.bottom+gap, above=anchor.top-box.height-gap;
+      panel.style.top=`${Math.max(inset,Math.min(below+box.height<=height-inset?below:above,height-box.height-inset))}px`;
+    }
+    function schedule() {cancelAnimationFrame(frame);frame=requestAnimationFrame(position);}
+    const resize=new ResizeObserver(schedule);resize.observe(panel);resize.observe(trigger);
+    function open() {
+      if(disposed || panel.matches(':popover-open')) return;
+      panel.showPopover();trigger.setAttribute('aria-expanded','true');position();
+      const first=options.initialFocus || panel.querySelector('input:not(:disabled),textarea:not(:disabled),select:not(:disabled),button:not(:disabled)');
+      (first instanceof HTMLElement ? first : panel).focus({preventScroll:true});
+    }
+    function close(restore=true) {
+      if(!panel.matches(':popover-open')) return;
+      if(restore && trigger.isConnected)trigger.focus({preventScroll:true});
+      panel.hidePopover();trigger.setAttribute('aria-expanded','false');
+    }
+    if(options.bindTrigger!==false) trigger.addEventListener('click',event=>{event.preventDefault();panel.matches(':popover-open')?close():open();},{signal:events.signal});
+    panel.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();close();}},{signal:events.signal});
+    panel.addEventListener('toggle',()=>{
+      const isOpen=panel.matches(':popover-open');trigger.setAttribute('aria-expanded',String(isOpen));
+      if(!isOpen && !disposed) options.onClose?.();
+    },{signal:events.signal});
+    document.addEventListener('focusin',event=>{if(event.target instanceof Node && !panel.contains(event.target) && event.target!==trigger)close(false);},{signal:events.signal});
+    window.addEventListener('resize',schedule,{signal:events.signal});document.addEventListener('scroll',schedule,{capture:true,signal:events.signal});
+    return {open,close,destroy:()=>{disposed=true;close(false);events.abort();resize.disconnect();cancelAnimationFrame(frame);trigger.removeAttribute('popovertarget');trigger.removeAttribute('aria-controls');}};
+  }

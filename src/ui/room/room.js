@@ -28,14 +28,14 @@
       },
     }, el('span', { class: 'tick', 'aria-hidden': 'true' }, icon('check')),
       el('span', { class: 'pl' }, p.label), el('span', { class: 'pb' }, p.blurb), el('span', { class: 'ps' }, p.sources.join(' · '))));
-    const describe = el('input', { type: 'text', placeholder: 'woodworking, synthwave, Formula 1, a newsletter I read…', 'aria-label': 'Describe your interests' });
+    const describe = uiControl('input', { type: 'text', placeholder: 'woodworking, synthwave, Formula 1, a newsletter I read…', 'aria-label': 'Describe your interests' });
     const askAgent = async () => {
       const text = describe.value.trim();
       if (!text) { describe.focus(); return; }
       try {
         await hostRequest('ui/message', { role: 'user', content: [{ type: 'text', text: `Set up my MCPortal around what I'm into: ${text}` }] }, 10000);
         toast('Your agent will set up your room in the chat.');
-      } catch { toast('Could not reach the chat. Send your interests to your agent there.'); }
+      } catch { toast('Could not reach the chat. Send your interests to your agent there.', 'error'); }
     };
     describe.addEventListener('keydown', (e) => { if (e.key === 'Enter') askAgent(); });
     const signInFailure = data.identity.mode === 'ghost' ? data.identity.signInFailure : undefined;
@@ -370,7 +370,7 @@
       return true;
     } catch (error) {
       was ? state.saved.add(url) : state.saved.delete(url);
-      toast(`Curses! Couldn't ${remove ? 'remove' : 'save'} that: ${errorText(error)}`);
+      toast(`Curses! Couldn't ${remove ? 'remove' : 'save'} that: ${errorText(error)}`, 'error');
       return false;
     } finally {
       markSaved();
@@ -409,7 +409,7 @@
       state.portals.set(portalId, result.structuredContent.portal);
       portalLoadedAt.set(portalId, Date.now());
     } catch (error) {
-      toast(errorText(error));
+      toast(errorText(error), 'error');
     }
     redrawPortal(portalId);
   }
@@ -424,7 +424,7 @@
       } catch (error) {
         setStatus('');
         if (/** @type {Error & { needsToken?: boolean }} */ (error).needsToken) {   // callTool rejects with Errors; /preview's 401 sets needsToken
-          const input = el('input', { type: 'password', placeholder: 'MCPORTAL_TOKEN', autocomplete: 'off', style: 'flex:1;padding:6px 8px;border:1px solid var(--mp-border-divider);border-radius:7px;background:var(--mp-surface-canvas);color:var(--mp-text-primary)' });
+          const input = uiControl('input', { type: 'password', placeholder: 'MCPORTAL_TOKEN', autocomplete: 'off', 'aria-label':'Server access token',style:'flex:1' });
           const connect = () => {
             devToken = input.value.trim();
             try { sessionStorage.setItem('mcportal-token', devToken); } catch {}

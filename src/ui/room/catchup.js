@@ -5,7 +5,7 @@
   async function openCatchup() {
     const generation = ++catchupGeneration;
     enterExperience('catchup');
-    $('experiences').replaceChildren(el('p', { class: 'experience-muted', role: 'status' }, 'Opening your reading session…'));
+    $('experiences').replaceChildren(uiFeedback({kind:'loading',message:'Opening your reading session…'}));
     try {
       const { session } = (await callTool('catch_up', { action: 'open' })).structuredContent;
       if (generation === catchupGeneration && experience === 'catchup') showCatchup(session);
@@ -20,7 +20,7 @@
     $('experiences').replaceChildren(head);
     if (session) {
       const count = session.stories.length;
-      $('experiences').append(el('div', { class: 'catchup-progress' }, el('progress', { max: Math.max(1,count), value: session.cursor, 'aria-label': 'Catch-up progress' }), el('span', null, `${session.cursor} of ${count} stories`)),
+      $('experiences').append(uiProgress({label:'Catch-up progress',max:Math.max(1,count),value:session.cursor,message:`${session.cursor} of ${count} stories`}),
         el('p', { class: 'experience-muted' }, `Captured ${new Date(session.startedAt).toLocaleString()}. Coverage is limited to the items retrieved from the selected sources.`));
       if (session.failures.length) $('experiences').append(el('section', { class: 'catchup-failures' }, el('h2', null, 'Sources that could not load'), ...session.failures.map(message => el('p', { class: 'error' }, message))));
       if (session.finishedAt) $('experiences').append(el('section', { class: 'catchup-end' }, el('span', { class: 'experience-kicker' }, 'YOU HAVE REACHED THE END'), el('h2', null, count ? 'A good place to stop.' : 'No unseen stories in this retrieved set.'),
@@ -39,23 +39,18 @@
     if (!session || session.finishedAt) $('experiences').append(catchupStartForm());
   }
   function catchupStartForm() {
-    const count = el('select', { 'aria-label': 'Stories in your catch-up session' }, [3,10,20,30].map(n => el('option', { value: n }, `${n} stories`))); count.value = '10';
+    const count = uiControl('select', { 'aria-label': 'Stories in your catch-up session' }, [3,10,20,30].map(n => el('option', { value: n }, `${n} stories`))); count.value = '10';
     const specs = state.profile?.columns.flatMap(c => c.panels).filter(p => p.source !== 'saved' && p.source !== 'clips' && p.source !== 'upcoming' && p.source !== 'changes') || [];
-    const sources = specs.map(p => { const input = el('input', { type: 'checkbox', value: p.id, checked: true }); return { input, label: el('label', null, input, p.title || p.id) }; });
+    const sources = specs.map(p => { const input = uiControl('input', { type: 'checkbox', value: p.id, checked: true }); return { input, label: el('label', null, input, p.title || p.id) }; });
     const go = el('button', { class: 'btn primary', type: 'submit' }, 'Start a little catch-up');
-    const status = el('p', { class: 'experience-muted', role: 'status' });
     const form = el('form', { class: 'catchup-start' }, el('h2', null, 'Choose a small session'), count,
-      sources.length ? el('fieldset', null, el('legend', null, 'From your sources'), ...sources.map(s => s.label)) : el('p', null, 'Uses the sources in your room.'), go, status);
-    form.addEventListener('submit', async e => {
-      e.preventDefault();
+      sources.length ? el('fieldset', null, el('legend', null, 'From your sources'), ...sources.map(s => s.label)) : el('p', null, 'Uses the sources in your room.'), go);
+    uiForm(form,{submit:go,pendingMessage:'Starting your session…',onSubmit:async()=>{
       const selected = sources.filter(s => s.input.checked).map(s => s.input.value);
-      if (sources.length && !selected.length) { status.textContent = 'Choose at least one source.'; return; }
-      go.disabled = true; status.textContent = 'Capturing currently retrieved unseen stories…';
-      try {
-        const { session } = (await callTool('catch_up', { action: 'start', count: Number(count.value), ...(sources.length ? { portalIds: selected } : {}) })).structuredContent;
-        if (experience === 'catchup') showCatchup(session);
-      } catch (error) { status.textContent = errorText(error); go.disabled = false; }
-    });
+      if (sources.length && !selected.length) throw new Error('Choose at least one source.');
+      const { session } = (await callTool('catch_up', { action: 'start', count: Number(count.value), ...(sources.length ? { portalIds: selected } : {}) })).structuredContent;
+      if (experience === 'catchup') showCatchup(session);
+    }});
     return form;
   }
   /** @param {'skip' | 'finish' | 'end'} action */
@@ -66,7 +61,7 @@
     try {
       const { session } = (await callTool('catch_up', { action, sessionId: current.id, index: current.cursor })).structuredContent;
       if (experience === 'catchup') showCatchup(session);
-    } catch (error) { toast(errorText(error)); openCatchup(); }
+    } catch (error) { toast(errorText(error), 'error'); openCatchup(); }
   }
   /** @param {CapturedStory} story */
   function openCapturedStory(story) {

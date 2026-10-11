@@ -100,26 +100,25 @@
   /**
    * One audience control for composers and quick reblogs. Cards without a room load
    * the account's private preference before enabling submission.
-   * @param {string} verb @param {HTMLButtonElement} submit @param {boolean} [inMenu] @param {SharedItem['audience']} [initialAudience]
+   * @param {string} verb @param {HTMLButtonElement} submit @param {SharedItem['audience']} [initialAudience]
    */
-  function audienceSwitch(verb, submit, inMenu = false, initialAudience) {
+  function audienceSwitch(verb, submit, initialAudience) {
     const id = `share-audience-${++audienceSwitchId}`;
     /** @type {SharedItem['audience']} */
     let selected = initialAudience ?? state.profile?.shareAudience ?? 'everyone';
     const help = el('div', { id: `${id}-help`, class: 'audience-help', 'aria-live': 'polite' }, audienceHelp(selected));
     /** @type {SharedItem['audience'][]} */
     const choices = ['everyone', 'followers'];
-    const inputs = choices.map((value) => el('input', { type: 'radio', name: id, value, checked: selected === value,
-      ...(inMenu ? { role: 'menuitemradio', tabindex: '-1', 'aria-checked': String(selected === value) } : {}),
-      onchange: () => { selected = value; draw(); } }));
-    const group = el('div', { class: 'audience-switch', role: 'group', 'aria-label': `${verb} audience`, 'aria-describedby': `${id}-help` },
-      inputs.map((input, i) => el('label', null, input, choices[i] === 'everyone' ? 'Public' : 'Followers only')));
-    const node = el('div', { class: 'share-audience-control', ...(inMenu ? { role: 'none' } : {}) }, group, help);
+    const choice=uiChoiceGroup({label:`${verb} audience`, name:id, value:selected,
+      choices:choices.map(value=>({value,label:value==='everyone'?'Public':'Followers only'})),
+      onChange:value=>{selected=value==='followers'?'followers':'everyone';draw();}});
+    const inputs=choice.inputs, group=choice.element;
+    group.classList.add('audience-switch');group.setAttribute('aria-describedby',`${id}-help`);
+    const node=el('div',{class:'share-audience-control'},group,help);
     let ready = Boolean(state.profile || initialAudience);
     function draw() {
       for (const input of inputs) {
         input.checked = input.value === selected;
-        if (inMenu) input.setAttribute('aria-checked', String(input.checked));
       }
       help.textContent = audienceHelp(selected);
     }
@@ -133,10 +132,7 @@
         ready = true;
         draw(); disable(false);
       }).catch((error) => {
-        help.replaceChildren('Couldn’t load your audience preference. ', el('button', { type: 'button', class: 'btn quiet sm',
-          ...(inMenu ? { role: 'menuitem', tabindex: '-1' } : {}),
-          onclick: load }, 'Retry'));
-        toast(errorText(error));
+        help.replaceChildren(uiFeedback({kind:'error',message:`Couldn’t load your audience preference: ${errorText(error)}`,action:uiButton({label:'Retry',emphasis:'quiet',onClick:load})}));
       });
     }
     if (!state.profile && !initialAudience) load();
@@ -148,24 +144,21 @@
    * @param {{ verb?: string, audience?: SharedItem['audience'] | undefined, onDone?: (share: SharedItem) => void }} [options] the button's word, and what to do once it's posted
    */
   function composer(target, title, { verb = 'Share', audience: initialAudience, onDone } = {}) {
-    const note = el('textarea', { placeholder: 'Add a note (optional): why it\'s worth a look', 'aria-label': `${verb} note (optional)`, maxlength: '500' });
-    const go = el('button', { type: 'button', class: 'btn', style: 'font-weight:600' }, verb);
-    const audience = audienceSwitch(verb, go, false, initialAudience);
-    const box = el('div', { class: 'composer' }, el('div', { class: 'byline', style: 'margin:0 0 6px' }, `${verb} “${title}” to your space`), note,
+    const note = uiControl('textarea', { placeholder: 'Add a note (optional): why it\'s worth a look', 'aria-label': `${verb} note (optional)`, maxlength: '500' });
+    const go=uiButton({label:verb,type:'submit',emphasis:'primary'});
+    const audience = audienceSwitch(verb, go, initialAudience);
+    const box = el('form', { class: 'composer' }, el('div', { class: 'byline', style: 'margin:0 0 6px' }, `${verb} “${title}” to your space`), uiField(note,{label:`${verb} note (optional)`,hiddenLabel:true}).element,
       el('div', { class: 'row' }, audience.node, go));
-    go.addEventListener('click', async () => {
+    uiForm(box,{submit:go,pendingMessage:`${verb==='Reblog'?'Reblogging':'Sharing'}…`,onSubmit:async()=>{
       const selected = audience.value();
       audience.disable(true);
       try {
         const result = await callTool('share', { ...target, note: note.value, audience: selected });
         rememberShareAudience(result.structuredContent.share);
-        box.replaceChildren(el('div', { role: 'status' }, `${verb === 'Reblog' ? 'Reblogged' : 'Shared'} · ${result.structuredContent.share.audience === 'everyone' ? 'Public' : 'Followers only'}. ${audienceHelp(result.structuredContent.share.audience)}`));
+        box.replaceChildren(uiFeedback({kind:'success',message:`${verb === 'Reblog' ? 'Reblogged' : 'Shared'} · ${result.structuredContent.share.audience === 'everyone' ? 'Public' : 'Followers only'}. ${audienceHelp(result.structuredContent.share.audience)}`}));
         onDone?.(result.structuredContent.share);
-      } catch (error) {
-        toast(errorText(error));
-        audience.disable(false);
-      }
-    });
+      } finally { audience.disable(false); }
+    }});
     return box;
   }
 
@@ -193,14 +186,14 @@
     /** @param {Record<string, unknown>} input */
     const save = async (input) => {
       try { await callTool('set_public_profile', input); const updated = (await callTool('open_space', {})).structuredContent.space; showSpace(updated, withBack, back); }
-      catch (error) { toast(errorText(error)); }
+      catch (error) { toast(errorText(error), 'error'); }
     };
     for (const [field, label, values, value] of [
       ['ink', 'Ink', spaceInks.sets.map((s) => s.name), space.cover?.ink],
       ['motif', 'Motif', spaceInks.motifs, space.cover?.motif],
       ['format', 'Format', spaceInks.formats, space.format || 'paperback'],
     ]) {
-      const select = el('select', { 'aria-label': String(label) });
+      const select = uiControl('select', { 'aria-label': String(label) });
       // The three named sets above are arrays; keep their values out of arbitrary markup.
       if (Array.isArray(values)) for (const v of values) { const option = el('option', { value: v }, v.replace(/-/g, ' ')); option.selected = v === value; select.append(option); }
       select.addEventListener('change', () => save({ [String(field)]: select.value }));
@@ -209,18 +202,18 @@
     shop.append(el('button', { class: 'btn', type: 'button', onclick: () => save({ reroll: true }) }, 'Re-roll'),
       el('button', { class: 'btn', type: 'button', disabled: !space.link, onclick: () => copySpaceLink(space.link || '') }, 'Copy link to your space'),
       listingButton(space, withBack, back));
-    const publicBox = el('input', { type: 'checkbox', 'aria-label': 'Public Space' });
+    const publicBox = uiControl('input', { type: 'checkbox', 'aria-label': 'Public Space' });
     publicBox.checked = !space.private;
     publicBox.addEventListener('change', () => save({ public: publicBox.checked }));
     const settings = el('div', { class: 'space-printshop-settings' });
     settings.append(el('label', null, publicBox, 'Public Space: anyone on the web can read it.'), el('p', { class: 'space-privacy-note' }, 'Followers-only posts stay within your followers. Copies, screenshots and feed caches made while public cannot be recalled.'));
-    const topics = el('input', { type: 'text', value: space.frequency?.join(', ') || '', 'aria-label': 'Transmitting on topics', placeholder: 'Up to four topics, separated by commas' });
-    const travelers = el('input', { type: 'text', value: (space.travelers || []).map((p) => p.handle).join(', '), 'aria-label': 'Fellow travelers', placeholder: 'Up to six listed handles' });
+    const topics = uiControl('input', { type: 'text', value: space.frequency?.join(', ') || '', 'aria-label': 'Transmitting on topics', placeholder: 'Up to four topics, separated by commas' });
+    const travelers = uiControl('input', { type: 'text', value: (space.travelers || []).map((p) => p.handle).join(', '), 'aria-label': 'Fellow travelers', placeholder: 'Up to six listed handles' });
     settings.append(el('label', null, 'Transmitting on', topics), el('label', null, 'Fellow travelers', travelers),
       el('button', { class: 'btn', type: 'button', onclick: () => save({ frequency: topics.value.split(',').map((s) => s.trim()).filter(Boolean), travelers: travelers.value.split(',').map((s) => s.trim()).filter(Boolean) }) }, 'Save words and travelers'));
     const stamps = uiDisclosure({label:'Visible stamps'});
     for (const name of spaceInks.stamps) {
-      const box = el('input', { type: 'checkbox' }); box.checked = !space.hiddenStamps?.some((s) => s === name);
+      const box = uiControl('input', { type: 'checkbox' }); box.checked = !space.hiddenStamps?.some((s) => s === name);
       box.addEventListener('change', () => {
         /** @type {Set<string>} */ const hidden = new Set(space.hiddenStamps || []); box.checked ? hidden.delete(name) : hidden.add(name);
         void save({ hiddenStamps: [...hidden] });
@@ -245,7 +238,7 @@
     const enabled = space[setting] === true;
     const visibleCandidates = candidates.filter((entry) => !saved.hidden.includes(entry.key));
     const preview = el('div', { class: 'space-section-preview', hidden: true });
-    const toggle = el('input', { type: 'checkbox', checked: enabled, 'aria-label': label });
+    const toggle = uiControl('input', { type: 'checkbox', checked: enabled, 'aria-label': label });
     const box = el('div', { class: 'space-section-settings' });
     /** @param {Record<string, unknown>} patch */
     async function save(patch) {
@@ -269,7 +262,7 @@
           if (node instanceof HTMLElement && (node.getAttribute('aria-label') === focus || node.getAttribute('aria-label') === alternateFocus)) { node.focus({ preventScroll: true }); break; }
         }
       } catch (error) {
-        toast(errorText(error)); toggle.checked = enabled;
+        toast(errorText(error), 'error'); toggle.checked = enabled;
         box.querySelectorAll('button, input').forEach((node) => node.removeAttribute('disabled'));
       }
     }
@@ -342,7 +335,7 @@
               const src = space.sources[Number(button.dataset.spaceSource)];
               if (src) { await callTool('add_portal', { source: src.source, config: src.config, title: src.title }); button.textContent = 'Added'; }
             }
-          } catch (error) { toast(errorText(error)); button.disabled = false; }
+          } catch (error) { toast(errorText(error), 'error'); button.disabled = false; }
         }
       });
     }
@@ -391,7 +384,7 @@
       asCard ? showSpaceCard(space) : showSpace(space, true, back);
     } catch (error) {
       setStatus('');
-      toast(errorText(error));
+      toast(errorText(error), 'error');
     }
   }
 
@@ -442,7 +435,7 @@
         button.setAttribute('aria-pressed', 'true');
         button.textContent = `Following @${handle}`;
         toast(`Following @${handle}. Their posts will arrive in your Following portal.`);
-      } catch (error) { toast(errorText(error)); button.disabled = false; }
+      } catch (error) { toast(errorText(error), 'error'); button.disabled = false; }
     });
     return button;
   }
@@ -487,7 +480,7 @@
           follow.setAttribute('aria-pressed', 'true');
           follow.textContent = `Following @${handle}`;
           if (result.layoutChanged) void loadRoom();   // the Following portal was just added
-        } catch (error) { toast(errorText(error)); follow.disabled = false; }
+        } catch (error) { toast(errorText(error), 'error'); follow.disabled = false; }
       });
       strip.append(row);
     }
@@ -510,7 +503,7 @@
         space.listed = profile.listed;
         toast(profile.listed ? 'Listed. People with similar sources can find you.' : "Unlisted. Your Space\'s public visibility is unchanged.");
         showSpace(space, withBack, back);
-      } catch (error) { toast(errorText(error)); button.disabled = false; }
+      } catch (error) { toast(errorText(error), 'error'); button.disabled = false; }
     });
     return button;
   }
@@ -534,7 +527,7 @@
         follow.textContent = 'Following';
         toast(`Following @${person.handle}. Their posts will arrive in your Following portal.`);
         if (result.layoutChanged && !$('grid').hidden) void loadRoom();   // the Following portal was just added
-      } catch (error) { toast(errorText(error)); follow.disabled = false; }
+      } catch (error) { toast(errorText(error), 'error'); follow.disabled = false; }
     });
     const pass = el('button', { class: 'mi person-act', type: 'button' }, 'Not for me');
     pass.addEventListener('click', async (/** @type {MouseEvent} */ e) => {
@@ -545,7 +538,7 @@
         portal.items = portal.items.filter((i) => i !== item);
         pass.closest('.item, .card')?.remove();
         toast(`Passed on @${person.handle}. Your agent will know next time it looks for people.`);
-      } catch (error) { toast(errorText(error)); pass.disabled = false; }
+      } catch (error) { toast(errorText(error), 'error'); pass.disabled = false; }
     });
     return [follow, pass];
   }
@@ -613,14 +606,14 @@
    * @param {SharedItem} share @param {Reblogger[]} rebloggers
    */
   function reblogControls(share, rebloggers) {
-    const rule = el('select', { class: 'btn', 'aria-label': 'Who can reblog this post' },
+    const rule = uiControl('select', { class: 'btn', 'aria-label': 'Who can reblog this post' },
       ['anyone', 'followers', 'nobody'].map((r) => el('option', { value: r, selected: (share.reblogs ?? 'anyone') === r }, r === 'anyone' ? 'Anyone' : r === 'followers' ? 'Your followers' : 'Nobody')));
     rule.addEventListener('change', async () => {
       rule.disabled = true;
       try {
         await callTool('share_settings', { id: share.id, reblogs: rule.value });
         toast(rule.value === 'nobody' ? 'Sealed: nobody can reblog it now. Reblogs made before stay.' : 'Saved. Reblogs made before stay.');
-      } catch (error) { toast(errorText(error)); }
+      } catch (error) { toast(errorText(error), 'error'); }
       rule.disabled = false;
     });
     const list = rebloggers.map((r) => {
@@ -630,7 +623,7 @@
         try {
           await callTool('share_settings', { id: share.id, detach: r.reblogId });
           cut.replaceWith(el('span', { class: 'pm' }, 'removed from this reblog'));
-        } catch (error) { toast(errorText(error)); }
+        } catch (error) { toast(errorText(error), 'error'); }
       });
       return el('li', null, patchAvatar(r.cover), handleButton(r.handle), ' · ', cut);
     });

@@ -19,14 +19,14 @@
   /** @param {string} url */
   async function previewStore(url) {
     const generation = beginSourcePreview();
-    $('addHint').textContent = 'Checking the public catalogue…';
+    $('addHint').replaceChildren(uiProgress({label:'Checking the public catalogue…',message:'Checking the public catalogue…'}));
     $('addResults').replaceChildren();
     try {
       const scope = { ...($('storeCollection').value.trim() ? { collection: $('storeCollection').value.trim() } : {}), salesOnly: $('storeSales').checked };
       const result = await callTool('watch', { kind: 'store', url, scope });
       if (generation !== sourceGeneration) return;
       if (result.structuredContent.preview) renderStorePreview(result.structuredContent.preview);
-    } catch(error) { if (generation === sourceGeneration) $('addHint').textContent = errorText(error); }
+    } catch(error) { if (generation === sourceGeneration) $('addHint').replaceChildren(uiFeedback({kind:'error',message:errorText(error)})); }
     finally { if (generation === sourceGeneration) $('addResults').setAttribute('aria-busy', 'false'); }
   }
   /** @param {NonNullable<ToolResults['watch']['preview']>} preview */
@@ -43,7 +43,7 @@
           const room = await callTool('open_room'); renderRoom(room.structuredContent);
           toggleAdd(false); $('addResults').replaceChildren(); toast('Store followed. This first collection is your baseline.');
         }
-      } catch(error) { button.disabled = false; button.textContent = 'Follow this store'; toast(errorText(error)); }
+      } catch(error) { button.disabled = false; button.textContent = 'Follow this store'; toast(errorText(error), 'error'); }
     } }, 'Follow this store');
     $('addResults').replaceChildren(el('li', { class: 'shop-preview' },
       el('div', { class: 'shop-scope' }, preview.origin, el('p', null, 'Future refreshes compare observed products and prices. Large catalogues and variant lists may be partial.')),
@@ -91,7 +91,7 @@
       const status = watch.paused ? 'Paused' : watch.error ? `Refresh failed: ${watch.error}. Showing last observations.` : watch.checkedAt ? `Checked ${new Date(watch.checkedAt).toLocaleString()}` : 'Waiting for a check';
       const change = async (/** @type {boolean | undefined} */ paused) => {
         try { await callTool('unwatch', { id: watch.id, ...(paused === undefined ? {} : { paused }) }); await refreshPortal(portal.portalId); }
-        catch(error) { toast(errorText(error)); }
+        catch(error) { toast(errorText(error), 'error'); }
       };
       const manage = uiDisclosure({label:`${watch.displayName}${watch.paused ? ' · paused' : ''}`, className:'shop-manage'},
         el('p', null, watch.origin, ` · ${watch.collection ? 'collection: ' + watch.collection : 'whole public catalogue'}${watch.salesOnly ? ' · sales only' : ''}`),

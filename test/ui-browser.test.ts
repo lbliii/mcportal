@@ -520,7 +520,7 @@ test('browser: narrow docs keep heading navigation and Contents brings search in
     }
     await page.click('.docs-toggle');
     assert.equal(await page.eval(`document.querySelector('.docs-toggle').getAttribute('aria-expanded')`), 'true');
-    assert.equal(await page.eval(`document.activeElement.className`), 'docs-search');
+    assert.equal(await page.eval(`document.activeElement.classList.contains('docs-search')`), true);
     assert.ok(await page.eval<boolean>(`(() => { const r = document.activeElement.getBoundingClientRect(); return r.top >= 0 && r.bottom < innerHeight; })()`));
     await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape' });
     assert.equal(await page.eval(`document.getElementById('reader').hidden`), false);
@@ -974,7 +974,7 @@ test("browser: in the river, follows' shares and reblogs join their stories with
     return node ? { context: node.querySelector('.story-context')?.textContent ?? null, trail: [...node.querySelectorAll('.story-note')].map((n) => n.textContent), removed: node.querySelector('.story-removed')?.textContent ?? null,
       from: node.querySelector('.item-from').textContent, reblog: b ? { label: b.getAttribute('aria-label'), disabled: b.disabled } : null } : null;
   })()`);
-  const menu = () => page.eval<string[]>(`[...document.querySelectorAll('.reblog-menu > [role="menuitem"], .reblog-submit-row > [role="menuitem"]')].map((n) => n.textContent)`);
+  const menu = () => page.eval<string[]>(`[...document.querySelectorAll('.reblog-menu > button, .reblog-submit-row > button')].map((n) => n.textContent)`);
   try {
     page.problems.length = 0;
     await page.goto(`${app.base}/preview`);
@@ -996,21 +996,23 @@ test("browser: in the river, follows' shares and reblogs join their stories with
     assert.deepEqual(await menu(), ['Reblog', 'Reblog with a note']);
     assert.equal(await page.eval(`document.querySelector('.reblog-menu input:checked').value`), 'everyone', 'quick reblog defaults to Public');
     assert.match(await page.eval<string>(`document.querySelector('.reblog-menu .audience-help').textContent`), /Visible on your Space/);
-    assert.equal(await page.eval(`document.activeElement.textContent`), 'Reblog', 'focus moves into the menu');
+    assert.equal(await page.eval(`document.activeElement.getAttribute('aria-label')`), 'Close reblog options', 'focus moves into the nonmodal dialog');
+    assert.equal(await page.eval(`document.querySelector('.reblog-menu').getAttribute('role')`),'dialog');
+    assert.equal(await page.eval(`document.querySelector('.reblog-menu [role^=menuitem]')`),null);
     await page.waitFor(`document.querySelector('.reblog-nudge')`, 'the read-it-first nudge');
     assert.match(await page.eval<string>(`document.querySelector('.reblog-nudge').textContent`), /You haven't read this yet\. Read it first\?/);
     await page.eval(`document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`);
-    assert.equal(await page.eval(`document.querySelector('.reblog-menu')`), null);
+    await page.waitFor(`!document.querySelector('.reblog-menu')`,'popover removed after dismissal');
     assert.equal(await page.eval(`document.activeElement.classList.contains('reblog')`), true, 'Escape returns focus to the button');
     await page.eval(`${find('A post by cy')}.querySelector('.mi.reblog').click()`);
-    await page.eval(`[...document.querySelectorAll('.reblog-menu [role="menuitem"]')].find((n) => n.textContent === 'Reblog').click()`);
+    await page.eval(`[...document.querySelectorAll('.reblog-menu button')].find((n) => n.textContent === 'Reblog').click()`);
     await page.waitFor(`${find('A post by cy')}.querySelector('.mi.reblog').classList.contains('on')`, 'the reblog to land');
     assert.equal((await read('A post by cy'))?.reblog?.label, 'Undo reblog (4 reblogs)');
     assert.deepEqual(await page.eval(`window.__calls.at(-1)`), { name: 'share', args: { reblogOf: 's_ben', audience: 'everyone' } }, "it reblogs the post behind the story with its visible audience");
-    assert.match(await page.eval<string>(`document.getElementById('toast').textContent`), /Sent through the portal!/);
+    await page.waitFor(`document.getElementById('toast').textContent.includes('Sent through the portal!')`,'reblog notice announced');
     await page.eval(`${find('A post by cy')}.querySelector('.mi.reblog').click()`);
     assert.deepEqual(await menu(), ['Undo reblog']);
-    await page.eval(`document.querySelector('.reblog-menu [role="menuitem"]').click()`);
+    await page.eval(`[...document.querySelectorAll('.reblog-menu button')].find(n=>n.textContent==='Undo reblog').click()`);
     await page.waitFor(`!${find('A post by cy')}.querySelector('.mi.reblog').classList.contains('on')`, 'the undo');
     assert.deepEqual(await page.eval(`window.__calls.at(-1)`), { name: 'unshare', args: { id: 's_mine' } });
     assert.equal((await read('A post by cy'))?.reblog?.label, 'Reblog (3 reblogs)');
@@ -1020,7 +1022,7 @@ test("browser: in the river, follows' shares and reblogs join their stories with
     await page.eval(`[...document.querySelectorAll('.river-feed > article')].find((n) => n.dataset.story.startsWith('gh-mcp')).querySelector('.mi.reblog').click()`);
     await page.eval(`document.querySelector('.reblog-menu input[value="followers"]').click()`);
     assert.equal(await page.eval(`document.querySelector('.reblog-menu input:checked').value`), 'followers');
-    await page.eval(`[...document.querySelectorAll('.reblog-menu [role="menuitem"]')].find((n) => n.textContent === 'Reblog with a note').click()`);
+    await page.eval(`[...document.querySelectorAll('.reblog-menu button')].find((n) => n.textContent === 'Reblog with a note').click()`);
     await page.waitFor(`!document.getElementById('reader').hidden && document.querySelector('#reader .composer')`, 'the composer');
     assert.match(await page.eval<string>(`document.querySelector('#reader .composer').textContent`), new RegExp(`Reblog “${plain.replace(/^New/, '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}” to your space`));
     const saved = (await tool('open_room', {})).profile.saved;
@@ -1033,13 +1035,13 @@ test("browser: in the river, follows' shares and reblogs join their stories with
     assert.equal(await page.eval(`document.querySelector('.composer input:checked').value`), 'followers', 'the menu choice carries into the note composer');
     assert.match(await page.eval<string>(`document.querySelector('.composer .audience-help').textContent`), /Hidden from your public Space/);
     await page.click('.composer .row > button');
-    await page.waitFor(`document.querySelector('.composer [role="status"]')`, 'the followers reblog');
+    await page.waitFor(`document.querySelector('.composer [data-ui=feedback][data-variant=success]')`, 'the followers reblog');
     assert.equal(await page.eval(`window.__calls.at(-1).args.audience`), 'followers');
     assert.match(await page.eval<string>(`document.querySelector('.composer').textContent`), /Reblogged · Followers only/);
     await page.click('#readerControls .reader-top button');
     await page.eval(`${find('A post by cy')}.querySelector('.mi.reblog').click()`);
     assert.equal(await page.eval(`document.querySelector('.reblog-menu input:checked').value`), 'followers', 'future quick reblogs remember the choice');
-    await page.eval(`[...document.querySelectorAll('.reblog-menu [role="menuitem"]')].find((n) => n.textContent === 'Reblog').click()`);
+    await page.eval(`[...document.querySelectorAll('.reblog-menu button')].find((n) => n.textContent === 'Reblog').click()`);
     await page.waitFor(`${find('A post by cy')}.querySelector('.mi.reblog').classList.contains('on')`, 'the followers quick reblog');
     assert.equal(await page.eval(`window.__calls.at(-1).args.audience`), 'followers');
     // No labs at all: the river is offered, and in columns every feed row has a reblog button too.
@@ -1194,7 +1196,7 @@ test('browser: a standalone clip loads the saved audience before sharing, retrie
     await page.click('.composer input[value="everyone"]');
     assert.match(await page.eval<string>(`document.querySelector('.audience-help').textContent`), /Visible on your Space/);
     await page.click('.composer .row > button');
-    await page.waitFor(`document.querySelector('.composer [role="status"]')`, 'the public clip share');
+    await page.waitFor(`document.querySelector('.composer [data-ui=feedback][data-variant=success]')`, 'the public clip share');
     assert.deepEqual(await page.eval(`window.__shares`), [{ clipId: 'c_test', note: '', audience: 'everyone' }]);
     assert.match(await page.eval<string>(`document.querySelector('.composer').textContent`), /Shared · Public/);
     assert.deepEqual(page.problems, []);
@@ -1765,7 +1767,8 @@ test('browser: source previews ignore older replies, edits and mode changes and 
     await page.eval(`new Promise(requestAnimationFrame)`);
     assert.equal(await page.eval(`document.getElementById('addResults').textContent`), '');
     await page.click('#addFeed'); await scan('');
-    assert.match(await page.eval<string>(`document.getElementById('addHint').textContent`), /Enter a site/);
+    assert.match(await page.eval<string>(`document.getElementById('addInput-error').textContent`), /Enter a site/);
+    assert.equal(await page.eval(`document.getElementById('addInput').getAttribute('aria-invalid')`),'true');
     await scan('long'); await page.waitFor(`window.__scans.length===5`, 'long result scan');
     await page.eval(`window.__scans[4]('Long source title '.repeat(50))`);
     await page.send('Emulation.setDeviceMetricsOverride', { width: 320, height: 600, deviceScaleFactor: 1, mobile: false });
@@ -1809,7 +1812,7 @@ test('browser: import reports persist partial success and retry without losing c
     assert.match(await page.eval<string>(`document.getElementById('importReport').textContent`), /1 added; 1 already present; 0 failed/);
     assert.equal(await page.eval(`window.__imports`), 2);
     await page.eval(`[...document.querySelectorAll('#importReport button')].find(b=>b.textContent==='Refresh room').click()`);
-    await page.waitFor(`document.getElementById('toast').textContent==='Room refreshed'`, 'non-writing refresh');
+    await page.waitFor(`[...document.querySelectorAll('#toast [role=status]')].some(n=>n.textContent==='Room refreshed')`, 'non-writing refresh');
     assert.equal(await page.eval(`window.__imports`), 2);
     assert.deepEqual(page.problems, []);
   } finally { await page.send('Page.removeScriptToEvaluateOnNewDocument', { identifier }); }
