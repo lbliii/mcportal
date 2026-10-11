@@ -92,6 +92,8 @@
     control.dataset.ui = 'toggle';
     const field = uiField(control, { label:options.label, ...(options.hint ? {hint:options.hint} : {}), compact:true });
     control.dataset.ui = 'toggle'; field.element.classList.add('ui-toggle');
+    // The label owns the target; the native checkbox keeps a small, stable glyph.
+    field.label.append(control);
     control.addEventListener('change', () => options.onChange?.(control.checked));
     return field;
   }

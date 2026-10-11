@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Tighten optional screens with shared compact headings, responsive panes and Library result rows. Keep checkbox glyphs small inside touch-friendly labels, disclose Space customization, and use named reader icons and keyboard-accessible Space tabs. Add density, narrow-layout and shared-pattern drift checks.
+
 ### Operations
 - Default production logs to Railway-compatible JSON, keep successful connection handshakes at debug, and emit five-minute connection and call summaries. Add deployment/client metadata and privacy-preserving internal/user attribution; surface tool and linked API failures even when HTTP returns 200.
 

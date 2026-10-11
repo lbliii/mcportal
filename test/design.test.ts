@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
-import { buildDesign, checkTokenUsage, compileTokens, checkComponentBoundaries, checkLegacyControls, validateComponents, validateInventory } from '../scripts/design.ts';
+import { buildDesign, checkTokenUsage, checkPatternGeometry, compileTokens, checkComponentBoundaries, checkLegacyControls, validateComponents, validateInventory } from '../scripts/design.ts';
 import { BRAND, PALETTES } from '../src/design/generated.ts';
 import { page } from '../src/page.ts';
 import { roomHtml, UI_INCLUDES } from '../src/mcp.ts';
@@ -73,4 +73,13 @@ test('coverage inventory requires definitions, variants, states, interaction rul
  assert.throws(()=>validateInventory(inventory,registry,new Set()),/Missing inventory source/);
  assert.throws(()=>validateInventory(inventory,{...registry,components:{...registry.components,undocumented:{}}},files),/Component missing from design inventory/);
  assert.equal((await roomHtml()).includes('const UI_INVENTORY'),false,'review documentation does not increase the production room payload');
+});
+
+
+test('shared pattern geometry cannot be inflated by a product override',()=>{
+ for(const css of ['.library .ui-result-title { font-size:22px }','.ui-screen-header h1 { font:32px serif }','@media(max-width:600px) { .ui-split { display:grid; grid-template-columns:1fr 1fr } }','.ui-toggle input { width:44px; height:44px }']) {
+  assert.throws(()=>checkPatternGeometry({'src/ui/room/optional.css':css}),/shared pattern geometry/);
+ }
+ assert.doesNotThrow(()=>checkPatternGeometry({'src/ui/room/optional.css':'.ui-screen-header { margin-bottom:var(--mp-space-8) } .article h1 { font-size:32px }'}));
+ assert.throws(()=>checkLegacyControls({'room/new.js':"el('div',{role:'toolbar'})"},{}),/keyboard contract/);
 });

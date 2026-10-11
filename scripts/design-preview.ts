@@ -15,6 +15,8 @@ import {accountHome} from '../src/account.ts';
 import {PAGE_CSP} from '../src/lib/web.ts';
 import {serveSite,DEFAULT_SUPPORT_URL} from '../src/site.ts';
 import {designControls} from './design-controls.ts';
+import {designExperience,designExperienceTool,experienceViews} from './design-experiences.ts';
+const views=['welcome','room','shelves','frontpage','river','reader','reader-find','docs','clip','share','reblog','mypost','space','space-owner','space-customize','settings',...experienceViews];
 const ctx={store:new MemoryProfileStore({room:{...defaultProfile(),onboarded:true},frontpage:{...defaultProfile(),onboarded:true,layout:'frontpage'},river:{...defaultProfile(),onboarded:true,layout:'river'}}),editions:new MemoryEditionStore(),fetcher:createFixtureFetcher(),cache:new TtlCache(),userId:'room'};
 const rpc=(name:string,args:Record<string,unknown>,userId:string)=>handleMessage({jsonrpc:'2.0',id:1,method:'tools/call',params:{name,arguments:args}},{...ctx,userId}).then((r)=>(r as {result:{structuredContent:any}}).result);
 const now='2026-09-30T12:00:00Z',url='https://example.com/guide';
@@ -36,6 +38,10 @@ const docs={docs:url,site:{title:'Portal handbook',sections:[{title:'Getting sta
 const result=(structuredContent:unknown)=>({content:[],structuredContent});
 const accountPreview=async()=>accountHome({login:'reader',csrf:'preview',handle:'reader',portals:14,saved:22,clips:1,grants:[{grantId:'g1',clientName:'Claude',lastUsedAt:Date.parse(now)},{grantId:'g2',clientName:'MCPortal on Mac',lastUsedAt:Date.parse(now)-2*86_400_000}]});
 async function fixture(view:string){
+ const experience=designExperience(view);if(experience)return result(experience);
+ if(view==='settings')return fixture('room');
+ if(view==='reader-find')return result({article});
+ if(view==='space-owner'||view==='space-customize')return result({space:{...space,mine:true,link:'https://example.com/@reader'}});
  // The front page as the agent leaves it: three picks with reasons, the lab on.
  if(view==='frontpage'){const items=(await rpc('list_new_items',{},'frontpage')).structuredContent.items;await rpc('show_highlights',{title:'Morning edition',intro:'Three worth your coffee.',picks:[items[1],items[4],items[2]].map((c:{ref:string},i:number)=>({ref:c.ref,why:['It answers the question you asked yesterday about agent tooling.','A release you have been waiting on.','Short, and close to what you saved last week.'][i]}))},'frontpage');const r=await rpc('open_room',{},'frontpage');r.structuredContent.labs=['frontpage'];return r;}
  // The river with the same picks.
@@ -66,7 +72,8 @@ createServer(async(req,res)=>{try{
  if(u.pathname==='/rpc'){let text='';for await(const chunk of req){text+=chunk;if(text.length>100000)throw new Error('Large request');}const msg=JSON.parse(text);
   res.setHeader('content-type','application/json');
   const name=msg.params?.name;
-  const canned=name==='list_reading'?result({reading:unfinished}):name==='read_doc_page'?result({page:article,section:'Getting started',provenance:article.provenance}):name==='get_clip'?result({clip}):name==='get_share'?result({share}):name==='open_space'?result({space}):name==='search_docs'?result({hits:[{url,title:article.title}]}):null;
+  const experience=designExperienceTool(name);
+  const canned=experience?result(experience):name==='read_article'?result({article}):name==='list_reading'?result({reading:unfinished}):name==='read_doc_page'?result({page:article,section:'Getting started',provenance:article.provenance}):name==='get_clip'?result({clip}):name==='get_share'?result({share}):name==='open_space'?result({space}):name==='search_docs'?result({hits:[{url,title:article.title}]}):null;
   res.end(JSON.stringify(canned?{jsonrpc:'2.0',id:msg.id,result:canned}:await handleMessage(msg,ctx)));return;
  }
  if(u.pathname==='/auth'){res.setHeader('content-security-policy',PAGE_CSP);res.end(page('Connect to MCPortal',`<h1>Connect to MCPortal?</h1>${handshake('MCPortal on Mac')}<p><strong>MCPortal on Mac</strong> wants to open and change your MCPortal room.</p><p class="muted">After you approve, you'll sign in with GitHub, then be sent back to <code>127.0.0.1:50108</code>. Only continue if you started this from that app.</p><form><button class="primary" type="button">Continue with GitHub</button><button type="button">Cancel</button></form><p class="muted">By continuing, you agree to MCPortal's <a href="/terms">terms</a> and confirm you're at least 13. See the <a href="/privacy">privacy policy</a> for what's kept.</p>`,{door:'open'}));return;}
@@ -79,7 +86,7 @@ createServer(async(req,res)=>{try{
  if(u.pathname==='/site'){await serveSite(res,'/',{publicUrl:'http://127.0.0.1:8799',supportUrl:DEFAULT_SUPPORT_URL,inviteOnly:false});return;}
  if(u.pathname.startsWith('/site/')){const file=u.pathname.slice(6);if(!/^[\w.-]+$/.test(file))throw new Error('Invalid asset');res.setHeader('content-type',file.endsWith('.svg')?'image/svg+xml':file.endsWith('.ttf')?'font/ttf':'image/png');res.end(await readFile(new URL(`../src/site/${file}`,import.meta.url)));return;}
  res.end(`<!doctype html><html><head><meta name="viewport" content="width=device-width"><title>MCPortal design regression host</title><style>body{margin:0;font:14px system-ui;background:#000}header{padding:12px;background:#eee;color:#111}button,select{font:inherit;padding:6px;margin:4px}iframe{display:block;width:100%;height:900px;border:0;background:transparent}pre{margin:0;padding:12px;background:#eee;color:#111;white-space:pre-wrap}</style></head><body><header>
- <label>View <select id="view">${['welcome','room','shelves','frontpage','river','reader','docs','clip','share','reblog','mypost','space'].map(v=>`<option>${v}</option>`).join('')}</select></label>
+ <label>View <select id="view">${views.map(v=>`<option>${v}</option>`).join('')}</select></label>
  <label>Theme <select id="mode"><option>light</option><option>dark</option></select></label>
  <label>Display <select id="display"><option>inline</option><option>fullscreen</option></select></label>
  <label>Inputs <select id="inputs"><option>complete</option><option>theme-only</option><option>background-only</option><option>hostile</option><option>none</option></select></label>
@@ -92,7 +99,12 @@ createServer(async(req,res)=>{try{
  async function load(){ready=false;current=await(await fetch('/fixture?view='+document.querySelector('#view').value)).json();document.body.style.background=document.querySelector('#mode').value==='dark'?'#fff':'#000';frame.src='/app?view='+document.querySelector('#view').value+'&nonce='+Date.now();}
  window.addEventListener('message',async e=>{if(e.source!==frame.contentWindow)return;const m=e.data;
   if(m.method==='ui/initialize')send({id:m.id,result:{protocolVersion:'2026-01-26',hostInfo:{name:'fixture-host',version:'1'},hostCapabilities:{serverTools:{},openLinks:{},message:{},updateModelContext:{}},hostContext:context()}});
-  else if(m.method==='ui/notifications/initialized'){send({method:'ui/notifications/tool-result',params:current});ready=true;report.textContent='Fixture ready';}
+  else if(m.method==='ui/notifications/initialized'){send({method:'ui/notifications/tool-result',params:current});await delay(100);const view=document.querySelector('#view').value;const d=frame.contentDocument;
+   if(view==='space-customize')d.querySelector('.space-customize-toggle')?.click();
+   if(view==='reader-find')d.querySelector('.reader-find-toggle')?.click();
+   if(view==='settings')d.querySelector('#btnSettings')?.click();
+   if(view==='changes'||view==='events')d.querySelector('.watch-add summary')?.click();
+   ready=true;report.textContent='Fixture ready';}
   else if(m.method==='tools/call'){const r=await(await fetch('/rpc',{method:'POST',body:JSON.stringify(m)})).json();send({id:m.id,result:r.result,error:r.error});}
   else if(m.id!==undefined)send({id:m.id,result:{}});
  });
@@ -111,8 +123,13 @@ createServer(async(req,res)=>{try{
    if(n.disabled||n.closest('.art,.thumb,.post img'))continue;let bg=n;while(bg&&w.getComputedStyle(bg).backgroundColor==='rgba(0, 0, 0, 0)')bg=bg.parentElement;
    if(bg&&ratio(s.color,w.getComputedStyle(bg).backgroundColor)<4.49)fail.push('text contrast '+(n.title||n.textContent.slice(0,24)));
   }
+  const scale=parseFloat(w.getComputedStyle(d.documentElement).fontSize)/16;
+  for(const h of d.querySelectorAll('.ui-screen-header h1'))if(visible(h)&&parseFloat(w.getComputedStyle(h).fontSize)>18*scale+.1)fail.push('oversized task heading');
+  for(const c of d.querySelectorAll('input[type=checkbox].field'))if(visible(c)&&c.getBoundingClientRect().width>16*scale+.1)fail.push('oversized checkbox glyph');
+  for(const input of d.querySelectorAll('.ui-search-row input,.watch-setup input:not([type=checkbox])'))if(visible(input)&&input.getBoundingClientRect().width<Math.min(200*scale,w.innerWidth-60))fail.push('squeezed search/setup field');
+  for(const n of d.querySelectorAll('.ui-result-row'))if(visible(n)&&w.innerWidth>=760&&scale===1&&n.getBoundingClientRect().height>140)fail.push('oversized result row');
   // A host window without focus never shows focus rings: say so rather than fail every case.
-  const first=[...d.querySelectorAll('button')].find(visible);if(first&&!document.hasFocus())focusUnchecked=true;else if(first){first.focus();const s=w.getComputedStyle(first);if(s.outlineStyle==='none'||parseFloat(s.outlineWidth)<2)fail.push('missing keyboard focus');}
+  const focusScope=d.querySelector('dialog[open]')||d;const first=[...focusScope.querySelectorAll('button')].find(n=>visible(n)&&!n.disabled);if(first&&!document.hasFocus())focusUnchecked=true;else if(first){first.focus();const s=w.getComputedStyle(first);if(s.outlineStyle==='none'||parseFloat(s.outlineWidth)<2)fail.push('missing keyboard focus');}
   if(d.querySelector('img')&&[...d.querySelectorAll('img')].some(n=>w.getComputedStyle(n).filter!=='none'))fail.push('recoloured image');for(const card of d.querySelectorAll('.card')){const meta=card.querySelector('.item-meta');if(meta&&meta.getBoundingClientRect().bottom>card.getBoundingClientRect().bottom+1)fail.push('clipped card actions');}return [...new Set(fail)];
  }
  // Report-only until room-layouts phase 6: what scrolls on its own inside the inline frame.
@@ -122,9 +139,9 @@ createServer(async(req,res)=>{try{
   if(x||y)out.push((x&&y?'xy ':x?'x ':'y ')+n.tagName.toLowerCase()+(n.className&&typeof n.className==='string'?'.'+n.className.trim().split(/\\s+/).join('.'):''));}
   return [...new Set(out)];}
  document.querySelector('#run').onclick=async()=>{const rows=[];document.querySelector('#run').disabled=true;
-  for(const width of [360,760,1000])for(const view of ['welcome','room','shelves','frontpage','river','reader','docs','clip','share','reblog','mypost','space'])for(const input of ['complete','theme-only','background-only','hostile','none']){
+  for(const width of [360,760,1000])for(const view of ${JSON.stringify(views)})for(const input of ['complete','theme-only','background-only','hostile','none']){
    frame.style.width=width+'px';document.querySelector('#view').value=view;document.querySelector('#inputs').value=input;document.querySelector('#mode').value=width===1000?'dark':'light';document.querySelector('#display').value='inline';await load();
-   for(let i=0;i<100&&!ready;i++)await delay(20);await delay(150);const failures=ready?check():['bridge timeout'];if(ready){frame.contentDocument.documentElement.style.fontSize='200%';failures.push(...check().map(f=>'200% text: '+f));frame.contentDocument.documentElement.style.fontSize='100%';}rows.push({width,view,input,failures,scrolls:ready?scrollers():[]});report.textContent=rows.length+'/135 checked…';
+   for(let i=0;i<100&&!ready;i++)await delay(20);await delay(150);const failures=ready?check():['bridge timeout'];if(ready){frame.contentDocument.documentElement.style.fontSize='200%';failures.push(...check().map(f=>'200% text: '+f));frame.contentDocument.documentElement.style.fontSize='100%';}rows.push({width,view,input,failures,scrolls:ready?scrollers():[]});report.textContent=rows.length+'/${views.length * 15} checked…';
   }
   frame.style.width='100%';window.designResults=rows;const scrolling=rows.filter(r=>r.input==='complete'&&r.scrolls.length).map(r=>({width:r.width,view:r.view,scrolls:r.scrolls}));
   report.textContent=JSON.stringify({passed:rows.filter(r=>!r.failures.length).length,total:rows.length,failures:rows.filter(r=>r.failures.length),...(focusUnchecked?{focus:'not checked: this window lacks focus; click into it and run again'}:{}),innerScrolling:scrolling},null,2);document.querySelector('#run').disabled=false;

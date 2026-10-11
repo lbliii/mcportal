@@ -104,7 +104,9 @@ async function sourceStyles(): Promise<Record<string, string>> {
 
 export async function buildDesign(): Promise<Record<string, string>> {
   const compiled = compileTokens(JSON.parse(await readFile(new URL('design/tokens.json', ROOT), 'utf8')));
-  checkTokenUsage({ ...await sourceStyles(), 'design/tokens.json (compiled)': compiled.css });
+  const sources = await sourceStyles();
+  checkTokenUsage({ ...sources, 'design/tokens.json (compiled)': compiled.css });
+  checkPatternGeometry(sources);
   const registry: ComponentRegistry = JSON.parse(await readFile(new URL('design/components.json', ROOT), 'utf8'));
   validateComponents(registry);
   const inventory: DesignInventory = JSON.parse(await readFile(new URL('design/inventory.json',ROOT),'utf8'));
@@ -177,9 +179,27 @@ export function checkComponentBoundaries(scripts: Record<string, string>): void 
   }
 }
 
+/** Product CSS may place a shared pattern, but its internal density stays in the design module.
+ * This intentionally checks named shared contracts, not arbitrary editorial content styles.
+ * Rendered browser checks catch aliases and inheritance that a source check cannot infer.
+ */
+export function checkPatternGeometry(sources: Record<string,string>): void {
+  const protectedPattern = /\.ui-(?:screen-header|result-row|result-title|search-row|split|toggle)\b/;
+  const geometry = /(?:^|;)\s*(?:font(?:-size|-family|-weight)?|(?:min-|max-)?(?:width|height)|padding(?:-[\w-]+)?|gap|grid-template-columns|flex(?:-basis)?|display)\s*:/;
+  for (const [file,source] of Object.entries(sources)) {
+    if (!file.endsWith('.css') || file.includes('/design/')) continue;
+    const css=source.replace(/\/\*[\s\S]*?\*\//g,'');
+    for (const rule of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      if (protectedPattern.test(rule[1]!) && geometry.test(rule[2]!))
+        throw new Error(`${file}: shared pattern geometry belongs in design/patterns.css or components/field.css: ${rule[1]!.trim()}`);
+    }
+  }
+}
+
 /** Existing product-specific controls are a bounded migration inventory, never a growing parallel library. */
 export function checkLegacyControls(sources: Record<string,string>, exceptions: Record<string,{maximum:number;reason:string}>): void {
   for (const [file, source] of Object.entries(sources)) {
+    if (/role\s*:\s*['"]toolbar['"]/.test(source)) throw new Error(`${file}: use uiToolbar for ordinary grouped actions; a composite toolbar requires a keyboard contract`);
     if (/\blink-btn\b/.test(source)) throw new Error(`${file}: retired link-btn; use quiet buttons for actions and links for destinations`);
     if (file.endsWith('.js') && /\bel\(\s*['"](?:input|select|textarea|progress)['"]/.test(source)) throw new Error(`${file}: use shared uiControl/uiProgress for native controls`);
     const count = [...source.matchAll(file.endsWith('.html') ? /<button\b/g : /\bel\(\s*['"]button['"]/g)].length;

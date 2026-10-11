@@ -13,6 +13,17 @@ Make the room the starting point, keep its chrome compact, and reveal optional w
 - **Comfortable content:** Reading measure, article typography, cover art and public landing/consent pages have different jobs. Do not halve everything. Bigger controls need a reason (touch, input, consequential public-page action), not just a new component.
 - **Reuse before adding:** Compose the shared primitives, then use semantic roles. Use a primitive scale token for a one-off local spacing choice. Introduce a new semantic token only when several components share the same purpose. SVG coordinates, illustrations and editorial geometry remain local.
 
+### Compact task contracts
+
+- `uiScreenHeader`: 18px title, optional named back icon, wrapping action group. Keep task instructions at the field or empty state; omit decorative kickers and slogans.
+- `uiSplitPane`: main and supporting content stack when their available width or text scale requires it. Avoid page-width breakpoints that leave embedded panes too narrow.
+- `uiSearchRow`: search keeps at least 16rem when available; adjacent actions wrap before the input becomes unusable.
+- `uiResultRow`: one title action, independent selection, metadata and at most two excerpt lines. Full content, match explanation and reading actions belong in the preview.
+- Checkbox/radio glyphs stay 14px. The containing label provides the 28px default or 44px coarse-pointer target. Do not enlarge the glyph to the target size.
+- Space appearance and visibility live behind **Customize**. The mounted editor preserves drafts as the preview updates; a failed preview refresh retries the read without repeating the save. The Space's authored title and cover keep their editorial scale.
+
+Product CSS may place these patterns but cannot redefine their internal density. Source checks protect their named classes; browser tests check the resulting layout, including inherited styles.
+
 ### Architecture and adoption
 
 Dependencies flow in one direction: **foundations → primitives → patterns → product views**. Components receive labels, values and callbacks; product views own tool calls, persistence and navigation. The independently type-checked catalogue has no room state.
@@ -21,19 +32,19 @@ Dependencies flow in one direction: **foundations → primitives → patterns �
 |---|---|
 | Foundations | `design/tokens.json`, generated palettes, shared base preferences and host theme normalization |
 | Primitives | `src/ui/design/components/`: buttons, icon actions, fields, toggles, tabs, pills, disclosures, dialogs, menus and delegated tooltips |
-| Patterns | `src/ui/design/patterns.js` / `.css` and `document.css`: action groups, settings rows, metadata, cards, feedback, trays, navigation, paging and reading content |
+| Patterns | `src/ui/design/patterns.js` / `.css` and `document.css`: action groups, settings rows, metadata, cards, feedback, trays, navigation, paging, compact task headings, responsive panes, search rows, result rows and reading content |
 | Product views | `src/ui/room/`: room, reading layouts, account and optional activities; controls compose the layers above |
 | Catalogue | `/controls`: production scripts, actual factory examples, contracts, light/dark, coarse targets and 200% text |
 
 Reading settings use the shared row/toggle pattern. Settings and both navigation menus use shared overlay behavior. Ordinary account, Library, collection and watch actions use typed buttons; native room controls share uiControl, and mutation forms share validation, progress and error behavior. Collection and watch cards use the shared article/action structure. Item layouts share metadata composition and save/original/share actions. Library, collections and watches use shared feedback states.
 
-Specialized reading layouts, evidence panes, source pickers and Space editors still own their composition. All dynamic room input, select and textarea creation goes through uiControl; mutation forms use uiForm. Admin invitations use the same modules. Search keeps its request-generation and cancellation behavior, including replacement source searches while an older request is pending. Their existing raw buttons are bounded by the per-file migration inventory in [`design/legacy-controls.json`](../../design/legacy-controls.json). New ordinary actions use the factories; lower the allowance when migrating existing ones. The inventory is a count guard, not proof that every local override is appropriate. Public pages retain script-free semantic HTML and shared CSS. Editorial geometry and brand art are intentional local compositions.
+Specialized reading layouts, evidence panes, source pickers and Space editors still own their composition. All dynamic room input, select and textarea creation goes through uiControl; mutation forms use uiForm. Space customization has a product coordinator shared by its form and instant preferences, so their writes serialize and a failed preview read cannot repeat a committed mutation. Admin invitations use the same modules. Search keeps its request-generation and cancellation behavior, including replacement source searches while an older request is pending. Their existing raw buttons are bounded by the per-file migration inventory in [`design/legacy-controls.json`](../../design/legacy-controls.json). New ordinary actions use the factories; lower the allowance when migrating existing ones. The inventory is a count guard, not proof that every local override is appropriate. Public pages retain script-free semantic HTML and shared CSS. Editorial geometry and brand art are intentional local compositions.
 
 ### Coverage and adversarial review
 
 [`design/inventory.json`](../../design/inventory.json) is the coverage inventory, rendered directly in the live catalogue. Every family records its definition, variants, states, keyboard behavior, implementation evidence and follow-up. The build rejects incomplete entries, missing source files and registered components absent from the inventory. Inventory prose is included only in the catalogue, not the production room.
 
-The October 2026 pass covers **38 families: 28 shared, 6 local, 4 reserved**. “Shared” identifies a reusable implementation, not complete migration of every caller. “Local” identifies a defined product composition with remaining adoption work. “Reserved” identifies a possible future need, not a component that exists today.
+The October 2026 pass covers **40 families: 30 shared, 6 local, 4 reserved**. “Shared” identifies a reusable implementation, not complete migration of every caller. “Local” identifies a defined product composition with remaining adoption work. “Reserved” identifies a possible future need, not a component that exists today.
 
 | Finding | Resolution |
 |---|---|
@@ -249,7 +260,7 @@ The maintainer changing a component owns its contract, catalogue examples and re
 
 A new variant must add a registry option, implementation, real catalogue example and meaningful coverage. Adding a new component also requires its module in the registry and production includes. Product components cannot import room state or tool transport into the shared layers. Exceptions to the migration inventory need a concrete product reason; do not raise limits to bypass the factories.
 
-`npm run check` verifies generated output, undefined token references, component boundaries, strict option types, the raw-button allowance, rejection of raw dynamic native fields/progress and browser behavior. Shared modules and catalogue are independently type-checked; the room is checked against the same sources. Browser checks exercise names, invalid options, field error associations, state geometry, menu navigation, modal focus, tooltips, touch, themes and narrow 200% text. Native host and screen-reader checks remain a release responsibility.
+`npm run check` verifies generated output, undefined token references, component boundaries, strict option types, the shrinking raw-button allowance, rejection of raw dynamic native fields/progress and toolbar roles without a composite keyboard contract, shared-pattern geometry ownership and browser behavior. Shared modules and catalogue are independently type-checked; the room is checked against the same sources. Browser checks exercise names, invalid options, field error associations, state geometry, menu navigation, modal focus, tooltips, touch, themes and narrow 200% text. Native host and screen-reader checks remain a release responsibility.
 
 
 | Surface | Contract |
@@ -313,7 +324,7 @@ The page CSP allows inline styles and embedded images and fonts only. The local 
 
 1. Run `npm run check` (type checks, generated-file and token-reference checks, and tests).
 2. Run `node scripts/design-preview.ts` and open `http://127.0.0.1:8799`. It binds to loopback, uses in-memory profiles and offline fixtures, and loads the real MCP App resource over JSON-RPC. It also serves the standalone pages: consent, local sign-in results, invites, imports and admin.
-3. Open **Controls** (`/controls`) for the shared variants, theme, touch-target preview and 200% text. Then click **Run browser checks** in the room host. Its current matrix covers the 12 room views at 360px and 760px in light and 1000px in dark, with complete, theme-only, background-only, hostile and absent host inputs, and repeats at 200% text. Standalone pages are linked for manual review; they are not in that matrix. It checks opaque backgrounds, render errors, contrast, visibility, target size, nesting, focus, image filters and `rem` shrinkage.
+3. Open **Controls** (`/controls`) for the shared variants, theme, touch-target preview and 200% text. Then click **Run browser checks** in the room host. Its current matrix covers 23 room and optional-task views, including populated Library, collections, comparisons, catch-up, watches, owner Space and open customization/settings/find panels at 360px and 760px in light and 1000px in dark, with complete, theme-only, background-only, hostile and absent host inputs, and repeats at 200% text. Standalone pages are linked for manual review; they are not in that matrix. It checks opaque backgrounds, render errors, contrast, visibility, target size, nesting, focus, image filters, `rem` shrinkage, compact heading/row density, checkbox glyph size and usable field widths. `test/compact-ui-browser.test.ts` exercises the same optional-task fixtures at 360/760/1000px and 100/200% text, plus real coarse-pointer emulation. These are synthetic host fixtures, not certification of native host apps.
 4. Use **Theme-only switch** and **Reset inputs** to check theme updates. Keyboard through cards and metadata. Screenshots supplement the measurements; they don't replace them.
 
 The preview doesn't prove behavior in a real host, OS high-contrast modes or assistive technology. Check those by hand before a release; see [host compatibility](host-compatibility.md#certifying-a-host).

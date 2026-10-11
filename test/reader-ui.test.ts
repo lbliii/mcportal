@@ -177,6 +177,7 @@ test('reader UI: Escape dismisses passage and outline before leaving, headings s
   assert.equal(await page.eval(`document.getElementById('reader').hidden`), false);
   await page.eval(`(() => { const p = document.querySelector('.body p'); const r = document.createRange(); r.selectNodeContents(p); getSelection().removeAllRanges(); getSelection().addRange(r); })()`);
   await page.waitFor(`document.querySelector('.passage-bar')`, 'selected passage controls');
+  assert.equal(await page.eval(`document.querySelector('.passage-bar').getAttribute('role')`),'group','ordinary actions must not claim composite toolbar keyboard behavior');
   assert.ok(await page.eval<boolean>(`(() => { const r = document.querySelector('.passage-bar').getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth; })()`));
   await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape' });
   assert.equal(await page.eval(`document.querySelector('.passage-bar')`), null);
@@ -260,7 +261,7 @@ test('reader UI: page find matches literal text across formatting without changi
   await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape' });
   assert.equal(await page.eval(`document.querySelectorAll('.reader-find-hit').length`), 0);
   assert.equal(await page.eval(`document.querySelector('.body').textContent`), before);
-  assert.equal(await page.eval(`document.activeElement.className`), 'btn reader-find-toggle');
+  assert.equal(await page.eval(`document.activeElement.classList.contains('reader-find-toggle')`), true);
   assert.equal(await page.eval(`document.getElementById('reader').hidden`), false);
   await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'f', code: 'KeyF', modifiers: 2 });
   assert.equal(await page.eval(`document.getElementById('readerFind').hidden`), false, 'Ctrl+F opens page find within the reader');

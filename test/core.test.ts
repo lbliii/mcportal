@@ -127,7 +127,7 @@ test('room fragments: every src/ui/room file is included, in order, and no inclu
   }
   // The script fragments share one closure; their order is evaluation order.
   const order = [...page.matchAll(/\/\*include:(room\/[\w.-]+\.js)\*\//g)].map((m) => m[1]);
-  assert.deepEqual(order, ['bridge', 'dom', 'experiences', 'recall', 'collections', 'compare', 'catchup', 'watches', 'room', 'items', 'layouts', 'views', 'river', 'levels', 'seen', 'reader', 'reader-tools', 'reading', 'passage', 'handoff', 'highlights', 'docs', 'social', 'reblog', 'add', 'shop', 'toolbar', 'boot'].map((n) => `room/${n}.js`));
+  assert.deepEqual(order, ['bridge', 'dom', 'experiences', 'recall', 'collections', 'compare', 'catchup', 'watches', 'room', 'items', 'layouts', 'views', 'river', 'levels', 'seen', 'reader', 'reader-tools', 'reading', 'passage', 'handoff', 'highlights', 'docs', 'social', 'space-customization', 'reblog', 'add', 'shop', 'toolbar', 'boot'].map((n) => `room/${n}.js`));
 });
 
 // ---------------------------------------------------------------- tools

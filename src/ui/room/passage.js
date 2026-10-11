@@ -165,11 +165,11 @@
     if (!passageBar) {
       const canAsk = Boolean(hostCapabilities.updateModelContext);
       const canClip = Boolean(DEV || hostCapabilities.serverTools);
-      passageBar = el('div', { class: 'passage-bar', role: 'toolbar', 'aria-label': 'Selected passage' },
-        canAsk ? el('button', { class: 'btn', type: 'button', onclick: () => passage && askAboutPassage(passage) }, 'Ask about this') : null,
-        canClip ? el('button', { class: 'btn', type: 'button', onclick: () => passage && clipPassage(passage) }, 'Clip quote') : null,
-        canClip ? el('button', { class: 'btn', type: 'button', onclick: () => { const p = passage; hidePassageBar(); if (p) sendToNewChat(p); } }, 'Send to new chat') : null,
-        canAsk ? null : el('button', { class: 'btn', type: 'button', onclick: () => passage && copyPassage(passage) }, 'Copy quote'));
+      passageBar = uiToolbar({className:'passage-bar',label:'Selected passage'},
+        canAsk ? uiButton({label:'Ask about this',onClick:()=>passage && askAboutPassage(passage)}) : null,
+        canClip ? uiButton({label:'Clip quote',onClick:()=>passage && clipPassage(passage)}) : null,
+        canClip ? uiButton({label:'Send to new chat',onClick:()=>{const p=passage;hidePassageBar();if(p)sendToNewChat(p);}}) : null,
+        canAsk ? null : uiButton({label:'Copy quote',onClick:()=>passage && copyPassage(passage)}));
       // Pressing a button mustn't clear the selection it acts on.
       passageBar.addEventListener('pointerdown', (e) => e.preventDefault());
       passageBar.addEventListener('mousedown', (e) => e.preventDefault());

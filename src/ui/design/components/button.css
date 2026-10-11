@@ -5,7 +5,7 @@
 .btn.primary { background: var(--mp-action-primary); border-color: var(--mp-action-primary); color: var(--mp-action-on-primary); }
 .btn.danger { color: var(--mp-status-error); border-color: currentColor; }
 .btn:disabled { opacity: .45; cursor: default; }
-.btn > svg { vertical-align: middle; }
+.btn > svg { vertical-align:middle; margin-inline-end:var(--mp-space-4); }
 .btn.sm { min-height:var(--mp-control-minimum); padding:var(--mp-space-2) var(--mp-space-6); }
 .btn.quiet { border-color:transparent; background:none; }
 .btn.quiet:hover:not(:disabled) { background:var(--mp-surface-hover); }

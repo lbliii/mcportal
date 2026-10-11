@@ -902,5 +902,58 @@
     ],
     "keyboard": "Native file dialog. A hidden OPML input is triggered by the visible named Import action; no custom keyboard model.",
     "followUp": "Account JSON upload, OPML import and catalogue use the native contract. No custom upload/drop-zone component is claimed."
+  },
+  {
+    "name": "Task layouts",
+    "coverage": "shared",
+    "components": [
+      "screenHeader",
+      "splitPane",
+      "searchRow"
+    ],
+    "sources": [
+      "src/ui/design/patterns.js",
+      "src/ui/room/recall.js",
+      "src/ui/room/watches.js",
+      "src/ui/room/collections.js"
+    ],
+    "definition": "Optional tasks use an 18px heading without a slogan. Search actions wrap before reducing usable input width. Supporting panels stack based on available space, including larger text.",
+    "variants": [
+      "compact heading",
+      "search with actions",
+      "primary and supporting panels"
+    ],
+    "states": [
+      "wide",
+      "stacked",
+      "supporting panel hidden"
+    ],
+    "keyboard": "Ordinary document order, with named back actions. Resizing never replaces controls or loses focus.",
+    "followUp": "Geometry belongs in shared patterns.css. Regression fixtures cover populated optional views, open settings, 200% text and coarse pointers."
+  },
+  {
+    "name": "Result rows",
+    "coverage": "shared",
+    "components": [
+      "resultRow"
+    ],
+    "sources": [
+      "src/ui/design/patterns.js",
+      "src/ui/room/recall.js"
+    ],
+    "definition": "A title opens the preview; separate selection stays independent. Metadata and a two-line excerpt allow scanning without repeating the preview actions.",
+    "variants": [
+      "default",
+      "selected",
+      "with independent selection"
+    ],
+    "states": [
+      "default",
+      "hover",
+      "focus",
+      "selected"
+    ],
+    "keyboard": "Native title and selection buttons; selecting a result retains title focus. Full text and reading actions remain in the preview.",
+    "followUp": "Use for result lists, not editorial articles. Product CSS cannot replace shared row padding or title typography."
   }
 ]

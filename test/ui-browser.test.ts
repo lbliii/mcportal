@@ -165,13 +165,13 @@ test('browser: Recall opens retained pages and returns with query, filters and f
   await page.waitFor(`document.querySelector('.recall-hit')`, 'Recall results');
   await page.eval(`document.querySelector('[aria-label="Search your library"]').value = 'Hijacking'; document.querySelector('[aria-label="Filter by kind"]').value = 'saved'; document.querySelector('.recall-search').requestSubmit()`);
   await page.waitFor(`document.querySelector('#recallCount').textContent.includes('1 match for')`, 'the filtered result');
-  await page.click('.recall-hit .btn.quiet:not(.ui-chip)');
+  await page.click('#recallPreview .btn.primary');
   await page.waitFor(`!document.querySelector('#reader').hidden && document.querySelector('#reader .body')`, 'the recalled page');
   await page.click('#readerControls .reader-top button');
   await page.waitFor(`!document.querySelector('#experiences').hidden`, 'return to Recall');
   assert.equal(await page.eval(`document.querySelector('[aria-label="Search your library"]').value`), 'Hijacking');
   assert.equal(await page.eval(`document.querySelector('[aria-label="Filter by kind"]').value`), 'saved');
-  assert.equal(await page.eval(`document.activeElement.className`), 'btn quiet sm');
+  assert.equal(await page.eval(`document.activeElement.matches('#recallPreview .btn.primary')`), true);
   await page.click('#btnExperienceRoom');
   await page.waitFor(`!document.querySelector('#grid').hidden`, 'return to the room');
   assert.deepEqual(page.problems, []);
@@ -185,7 +185,7 @@ test('browser: Recall explains normalized search, match provenance and bookmark 
   await page.eval(`document.querySelector('[aria-label="Search your library"]').value = 'Find the article about Hijacking'; document.querySelector('[aria-label="Filter by kind"]').value = 'saved'; document.querySelector('.recall-search').requestSubmit()`);
   await page.waitFor(`document.querySelector('#recallCount').textContent.includes('1 match for')`, 'normalized search');
   assert.match(await page.eval<string>(`document.querySelector('#recallCoverage').textContent`), /Search words: hijacking/);
-  assert.match(await page.eval<string>(`document.querySelector('.recall-hit').textContent`), /Matched: Saved title/);
+  assert.match(await page.eval<string>(`document.querySelector('#recallPreview').textContent`), /Matched: Saved title/);
   assert.match(await page.eval<string>(`document.querySelector('#recallCoverage').textContent`), /Original page bodies are not searched/);
   await page.eval(`document.querySelector('[aria-label="Search your library"]').value = 'nonexistent platypus'; document.querySelector('.recall-search').requestSubmit()`);
   await page.waitFor(`document.querySelector('[data-ui=feedback][data-variant=empty] h3')?.textContent === 'No matching material'`, 'empty search');
@@ -215,8 +215,8 @@ test('browser: selected Recall material creates a desk, supports a trail and com
   await page.click('.selection-tray .btn');
   await page.eval(`document.querySelector('[aria-label="Collection title"]').value = 'Understanding deployment'; document.querySelector('[aria-label="Collection purpose"]').value = 'Evidence and an introduction'; document.querySelector('.collection-create').requestSubmit()`);
   await page.waitFor(`document.querySelectorAll('.desk-entry').length === 2`, 'the new desk to keep its sources');
-  assert.equal(await page.eval(`document.querySelector('.experience-heading h1').textContent`), 'Understanding deployment');
-  await page.eval(`[...document.querySelectorAll('.experience-heading button')].find(b => b.textContent === 'Read as a trail').click()`);
+  assert.equal(await page.eval(`document.querySelector('.ui-screen-header h1').textContent`), 'Understanding deployment');
+  await page.eval(`[...document.querySelectorAll('.ui-screen-header button')].find(b => b.textContent === 'Read as a trail').click()`);
   await page.waitFor(`document.querySelector('.desk-entry .experience-kicker').textContent.includes('STEP 1')`, 'the ordered trail');
   await page.eval(`[...document.querySelectorAll('.desk-entry button')].find(b => b.textContent === 'Finish step').click()`);
   await page.waitFor(`document.querySelector('.desk-entry .experience-kicker').textContent.includes('COMPLETED')`, 'explicit step completion');
@@ -1346,7 +1346,7 @@ test('browser: kept passage follows moved text, declines duplicates and changed 
       await profiles.put('default',room());await openRoom();await page.click('#btnRecall');
       await page.eval(`document.querySelector('[aria-label="Search your library"]').value='Durable locator example';document.querySelector('.recall-search').requestSubmit()`);
       await page.waitFor(`document.querySelector('.recall-hit')?.textContent.includes('Durable locator example')`,'the retained quote');
-      await page.click('.recall-hit .recall-title');
+      await page.click('.recall-hit .ui-result-title');
       await page.waitFor(`document.querySelector('#recallPreview .btn')`,'the quote preview');
       await page.eval(`[...document.querySelectorAll('#recallPreview button')].find(b=>b.textContent==='Read').click()`);
       await page.waitFor(`document.querySelector('#reader .body')?.textContent.includes(${JSON.stringify(quote)})`,'the original retained quote');
@@ -1488,7 +1488,7 @@ test('browser: navigation keeps primary labels at 320px and discloses optional a
   }
   await page.click('#btnMore');
   await page.click('#btnChanges');
-  await page.waitFor(`document.querySelector('.experience-heading h1')?.textContent==='Page updates'`, 'optional activity');
+  await page.waitFor(`document.querySelector('.ui-screen-header h1')?.textContent==='Page updates'`, 'optional activity');
   assert.equal(await page.eval(`document.querySelector('#btnMore').getAttribute('aria-current')`),'page');
   assert.equal(await page.eval(`document.querySelector('#moreMenu').matches(':popover-open')`),false);
   assert.equal(await page.eval(`document.querySelector('.watch-add').open`),false,'tracking setup is opt-in');
@@ -1516,8 +1516,8 @@ test('browser: Space links: the room offers a follow of whoever brought you, say
       if (url === '/mcp' && (name === 'relationship' || name === 'open_space' || name === 'set_public_profile')) {
         window.__calls.push({ name, args });
         if (name === 'relationship') return answer({ content: [], structuredContent: { handle: args.handle, layoutChanged: false } });
-        if (name === 'set_public_profile') return answer({ content: [], structuredContent: { profile: { handle: 'reader', ...(args.listed ? { listed: true } : {}), createdAt: now, updatedAt: now } } });
-        return answer({ content: [], structuredContent: { space: { handle: 'reader', mine: true, followers: 0, following: false, posts: [], sources: [], link: 'https://mcportal.example/@reader', createdAt: now, updatedAt: now } } });
+        if (name === 'set_public_profile') {window.__listed=args.listed;return answer({ content: [], structuredContent: { profile: { handle: 'reader', ...(args.listed ? { listed: true } : {}), createdAt: now, updatedAt: now } } });}
+        return answer({ content: [], structuredContent: { space: { handle: 'reader', mine: true, listed:Boolean(window.__listed), followers: 0, following: false, posts: [], sources: [], link: 'https://mcportal.example/@reader', createdAt: now, updatedAt: now } } });
       }
       const res = await real(url, init);
       if (name !== 'open_room') return res;
@@ -1546,12 +1546,13 @@ test('browser: Space links: the room offers a follow of whoever brought you, say
     await page.eval(`document.querySelector('#intros .handle').click()`);
     await page.waitFor(`!document.getElementById('reader').hidden && document.querySelector('#reader .space-head')`, 'a space');
     assert.equal(await page.eval(`getComputedStyle(document.getElementById('intros')).display`), 'none');
-    assert.ok(await page.eval(`document.querySelector('#reader .space-printshop').textContent.includes('Copy link to your space')`), 'your own space offers its link');
+    assert.ok(await page.eval(`document.querySelector('#reader [aria-label="Copy Space link"]')!==null`), 'your own space offers its link');
     // Your space says whether you're findable, and switches it.
-    await page.eval(`[...document.querySelectorAll('#reader .space-printshop .btn')].find((b) => b.textContent === 'Unlisted: list me').click()`);
-    await page.waitFor(`[...document.querySelectorAll('#reader .space-printshop .btn')].some((b) => b.textContent.startsWith('Listed:'))`, 'listed');
-    assert.deepEqual(await page.eval(`window.__calls.at(-1)`), { name: 'set_public_profile', args: { listed: true } });
-    await page.eval(`[...document.querySelectorAll('#reader .space-printshop .btn')].find((b) => b.textContent.includes('Copy link')).click()`);
+    await page.click('.space-customize-toggle');await page.click('#spaceSettingsTab2');await page.click('[aria-label="Include in discovery"]');
+    await page.waitFor(`document.querySelector('.space-owner-status').textContent==='Saved'`, 'listed');
+    assert.deepEqual(await page.eval(`window.__calls.filter(c=>c.name==='set_public_profile').at(-1)`), { name: 'set_public_profile', args: { listed: true } });
+    assert.equal(await page.eval(`window.__calls.at(-1).name`),'open_space','refresh the saved preview');
+    await page.click('[aria-label="Copy Space link"]');
     await page.waitFor(`/mcportal\\.example\\/@reader|Copied your Space link/.test(document.getElementById('toast').textContent)`, 'the link copied or shown');
     await page.eval(`document.querySelector('#readerControls .reader-top button').click()`);
     await page.waitFor(`document.getElementById('reader').hidden`, 'back to the room');
@@ -1693,7 +1694,7 @@ test('browser: docs find searches current content and reading comfort follows pa
     assert.ok(await page.eval<boolean>(`document.documentElement.scrollWidth <= innerWidth`));
     await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape' });
     assert.equal(await page.eval(`document.getElementById('reader').hidden`), false);
-    assert.equal(await page.eval(`document.activeElement.className`), 'btn reader-comfort-toggle');
+    assert.equal(await page.eval(`document.activeElement.classList.contains('reader-comfort-toggle')`), true);
     await page.eval(`[...document.querySelectorAll('.docs-toc a')].find(n => n.textContent === 'Install').click()`);
     await page.waitFor(`document.querySelector('.docs-page h1')?.textContent === 'Install'`, 'the next docs page');
     assert.ok(await page.eval<boolean>(`parseFloat(getComputedStyle(document.querySelector('.body')).fontSize) > ${before}`), 'reading settings follow navigation in the same open view');
@@ -1820,12 +1821,12 @@ test('browser: import reports persist partial success and retry without losing c
 
 test('browser: Recall preview selection keeps keyboard focus and reader return restores the same result', { skip }, async () => {
   await openRoom(); await page.click('#btnRecall');
-  await page.waitFor(`document.querySelectorAll('.recall-title').length>=2`, 'library results');
-  const title = await page.eval<string>(`document.querySelectorAll('.recall-title')[1].textContent`);
-  await page.eval(`document.querySelectorAll('.recall-title')[1].focus()`);
+  await page.waitFor(`document.querySelectorAll('.ui-result-title').length>=2`, 'library results');
+  const title = await page.eval<string>(`document.querySelectorAll('.ui-result-title')[1].textContent`);
+  await page.eval(`document.querySelectorAll('.ui-result-title')[1].focus()`);
   await page.send('Input.dispatchKeyEvent', {type:'rawKeyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
   await page.send('Input.dispatchKeyEvent', {type:'char',text:'\r',key:'Enter'});
   assert.equal(await page.eval(`document.activeElement.textContent`), title);
-  assert.equal(await page.eval(`document.activeElement.className`), 'recall-title');
+  assert.equal(await page.eval(`document.activeElement.classList.contains('ui-result-title')`), true);
   assert.deepEqual(page.problems, []);
 });

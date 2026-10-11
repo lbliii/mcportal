@@ -283,5 +283,29 @@ const UI_COMPONENTS = {
     "factory": "uiSkeleton",
     "purpose": "Decorative static loading placeholder paired with readable loading status.",
     "example": "uiSkeleton({lines:3})"
+  },
+  "screenHeader": {
+    "status": "stable",
+    "factory": "uiScreenHeader",
+    "purpose": "Compact task heading with optional back action and wrapping actions. No permanent slogan or duplicate context label.",
+    "example": "uiScreenHeader({title:'Collections',back:iconButton('back','Back to Library',openLibrary)})"
+  },
+  "splitPane": {
+    "status": "stable",
+    "factory": "uiSplitPane",
+    "purpose": "Primary content and supporting panel stack by available width and text scale. Hidden supporting panels consume no space.",
+    "example": "uiSplitPane({main:results,aside:preview})"
+  },
+  "searchRow": {
+    "status": "stable",
+    "factory": "uiSearchRow",
+    "purpose": "Search retains useful input width; actions wrap before squeezing the field.",
+    "example": "uiSearchRow(query,uiButton({label:'Search',type:'submit'}))"
+  },
+  "resultRow": {
+    "status": "stable",
+    "factory": "uiResultRow",
+    "purpose": "One title action, optional independent selection, one metadata line and a two-line excerpt. Reading actions belong in the preview.",
+    "example": "uiResultRow({title:'A saved page',meta:'example.com',onOpen:openPreview})"
   }
 };

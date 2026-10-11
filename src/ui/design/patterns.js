@@ -2,6 +2,27 @@
   function uiToolbar(options, ...children) {
     return el('div', {class:`ui-toolbar ${options.className || ''}`, role:'group', 'aria-label':uiName(options.label), 'data-ui':'toolbar'}, ...children);
   }
+  /** Compact task heading. Keep instructions by the task, not in a permanent subtitle.
+   * @param {{title:string, back?:HTMLButtonElement, actions?:Child[], className?:string}} options */
+  function uiScreenHeader(options) {
+    return el('header',{class:`ui-screen-header ${options.className || ''}`,'data-ui':'screenHeader'},
+      options.back || null, el('h1',null,uiName(options.title)),
+      options.actions?.length ? uiToolbar({label:`${options.title} actions`},options.actions) : null);
+  }
+  /** A primary region and supporting region stack according to available space and text scale.
+   * @param {{main:HTMLElement, aside:HTMLElement, className?:string}} options */
+  function uiSplitPane(options) {
+    return el('div',{class:`ui-split ${options.className || ''}`,'data-ui':'splitPane'},options.main,options.aside);
+  }
+  /** Search retains useful input width before actions wrap. @param {...(Child|Child[])} children */
+  function uiSearchRow(...children) { return el('div',{class:'ui-search-row','data-ui':'searchRow'},...children); }
+  /** Compact result with one title action, metadata and optional selection; detail belongs in its preview.
+   * @param {{title:string, meta:string, excerpt?:string, selected?:boolean, selection?:HTMLElement, onOpen:()=>void, className?:string}} options */
+  function uiResultRow(options) {
+    return el('article',{class:`ui-result-row ${options.className || ''}`,'data-ui':'resultRow'},
+      el('div',{class:'ui-result-head'},uiButton({label:options.title,emphasis:'quiet',pressed:options.selected,onClick:options.onOpen,className:'ui-result-title'}),options.selection || null),
+      uiMetadata({},options.meta),options.excerpt ? el('p',{class:'ui-result-excerpt'},options.excerpt) : null);
+  }
   /** @template {HTMLInputElement|HTMLSelectElement|HTMLTextAreaElement} T
    * @param {T} control @param {{label:string, hint?:string, id?:string}} options */
   function uiSettingsRow(control, options) { return uiField(control, {...options, compact:true}); }
