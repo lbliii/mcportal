@@ -121,8 +121,8 @@ after(async () => {
 async function openRoom(): Promise<void> {
   page.problems.length = 0;
   await page.goto(`${app.base}/preview`);
-  await page.waitFor(`document.querySelectorAll('[data-portal]').length === 5 && !document.querySelector('.skeleton')`, 'the room to draw its five portals').catch(async error=>{
-    const observed=await page.eval(`JSON.stringify({portals:[...document.querySelectorAll('[data-portal]')].map(n=>n.getAttribute('data-portal')),skeletons:document.querySelectorAll('.skeleton').length,status:document.querySelector('#status')?.textContent,roomClass:document.querySelector('#grid')?.className,error:document.querySelector('#toast')?.textContent})`);
+  await page.waitFor(`document.querySelectorAll('[data-portal]').length === 5 && !document.querySelector('[data-ui=skeleton]')`, 'the room to draw its five portals').catch(async error=>{
+    const observed=await page.eval(`JSON.stringify({portals:[...document.querySelectorAll('[data-portal]')].map(n=>n.getAttribute('data-portal')),skeletons:document.querySelectorAll('[data-ui=skeleton]').length,status:document.querySelector('#status')?.textContent,roomClass:document.querySelector('#grid')?.className,gridText:document.querySelector('#grid')?.textContent.slice(0,600),location:location.href,error:document.querySelector('#toast')?.textContent})`);
     throw new Error(`${error.message}; ${observed}`);
   });
   await page.waitFor(`document.querySelector('.continue-reading')?.getAttribute('aria-busy') === 'false'`, 'recent reading to finish loading before pointer coordinates are measured');
@@ -268,7 +268,7 @@ test('browser: river is visible without labs and the toolbar saves the choice', 
     assert.equal(await page.eval(`document.querySelector('[data-layout="river"]').getAttribute('aria-pressed')`), 'true');
     assert.equal((await profiles.get('default')).layout, 'river');
     await page.goto(`${app.base}/preview`);
-    await page.waitFor(`document.querySelector('#grid.river .river-feed article') && !document.querySelector('.skeleton')`, 'the river to reopen');
+    await page.waitFor(`document.querySelector('#grid.river .river-feed article') && !document.querySelector('[data-ui=skeleton]')`, 'the river to reopen');
     assert.deepEqual(page.problems, []);
   } finally {
     await profiles.put('default', room());
@@ -295,7 +295,7 @@ test('browser: all three designs reopen, adapt to narrow themes, and keep the re
       assert.equal(await page.eval(`document.activeElement.id`), 'btnSettings');
       assert.equal(await page.eval(`document.querySelector('#settingsPanel').open`), false);
       await page.goto(`${app.base}/preview`);
-      await page.waitFor(`document.querySelector('#grid.${layout} .designed') && !document.querySelector('.skeleton')`, `${layout} to reopen`);
+      await page.waitFor(`document.querySelector('#grid.${layout} .designed') && !document.querySelector('[data-ui=skeleton]')`, `${layout} to reopen`);
       assert.deepEqual(await page.eval(`[...document.querySelectorAll('[data-portal]')].map(n => n.dataset.portal)`), ['hn-top', 'gh-mcp', 'simonw', 'saved', 'docs']);
       for (const width of [320, 754, 1280]) for (const theme of ['light', 'dark']) {
         await page.send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
@@ -323,7 +323,7 @@ test('browser: the original layouts retain opening, saving and reachable control
   try {
     for (const layout of ['columns', 'shelves', 'river']) {
       await chooseLayout(layout);
-      await page.waitFor(`document.querySelector('#grid.${layout}') && !document.querySelector('.skeleton')`, `${layout} to draw`);
+      await page.waitFor(`document.querySelector('#grid.${layout}') && !document.querySelector('[data-ui=skeleton]')`, `${layout} to draw`);
       assert.equal((await profiles.get('default')).layout, layout);
       for (const width of [320, 754, 1280]) for (const theme of ['light', 'dark']) {
         await page.send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
@@ -363,7 +363,7 @@ test('browser: the original layouts retain opening, saving and reachable control
       assert.equal((await profiles.get('default')).saved.some(item => item.url === ARTICLE), false);
       await tool('save_item', { url: ARTICLE, title: 'Hijacking the PS5' });
       await page.goto(`${app.base}/preview`);
-      await page.waitFor(`document.querySelector('#grid.${layout} [data-save-url="${ARTICLE}"]') && !document.querySelector('.skeleton')`, 'the chosen layout to reopen');
+      await page.waitFor(`document.querySelector('#grid.${layout} [data-save-url="${ARTICLE}"]') && !document.querySelector('[data-ui=skeleton]')`, 'the chosen layout to reopen');
       assert.deepEqual(page.problems, []);
     }
   } finally {
@@ -793,7 +793,7 @@ test('browser: the front page leads with the picks, pages each portal, and nothi
   try {
     page.problems.length = 0;
     await page.goto(`${app.base}/preview`);
-    await page.waitFor(`document.querySelector('#grid.frontpage .fp-block') && !document.querySelector('.skeleton')`, 'the front page');
+    await page.waitFor(`document.querySelector('#grid.frontpage .fp-block') && !document.querySelector('[data-ui=skeleton]')`, 'the front page');
     assert.equal(await page.eval(`document.querySelector('.fp-title').textContent`), 'Morning edition');
     assert.match(await page.eval<string>(`document.querySelector('.fp-kicker').textContent`), /· 2 new$/);
     assert.equal(await page.eval(`document.querySelector('.item.lead .item-title').textContent`), `New${second.item.title}`, "the agent's first pick leads");
@@ -838,7 +838,7 @@ test('browser: the river merges the room into one stream: picks, new, a divider,
   try {
     page.problems.length = 0;
     await page.goto(`${app.base}/preview`);
-    await page.waitFor(`document.querySelector('#grid.river .river-feed article') && !document.querySelector('.skeleton')`, 'the river');
+    await page.waitFor(`document.querySelector('#grid.river .river-feed article') && !document.querySelector('[data-ui=skeleton]')`, 'the river');
     assert.equal(await page.eval(`document.querySelector('.river-picks .fp-label').textContent`), 'Morning edition');
     assert.deepEqual(await page.eval(`[...document.querySelectorAll('.river-picks .item-title')].map((n) => n.textContent)`), [`New${second.item.title}`], "the agent's pick leads, apart from the stream");
     assert.match(await page.eval<string>(`document.querySelector('.river-picks .item-why').textContent`), /The one you asked about\./);
@@ -883,7 +883,7 @@ test('browser: river pages end on a separator that takes focus, and a refresh wa
   try {
     page.problems.length = 0;
     await page.goto(`${app.base}/preview`);
-    await page.waitFor(`document.querySelector('#grid.river .river-feed article') && !document.querySelector('.skeleton')`, 'the river');
+    await page.waitFor(`document.querySelector('#grid.river .river-feed article') && !document.querySelector('[data-ui=skeleton]')`, 'the river');
     // The feeds' stories, three saved and a fold: page 2 holds the last few.
     await page.click('.river-more .fp-more');
     assert.equal(await page.eval(`document.activeElement.dataset.from`), '11', 'focus goes to the new page');
@@ -978,7 +978,7 @@ test("browser: in the river, follows' shares and reblogs join their stories with
   try {
     page.problems.length = 0;
     await page.goto(`${app.base}/preview`);
-    await page.waitFor(`document.querySelector('#grid.river .river-feed article') && !document.querySelector('.skeleton')`, 'the river');
+    await page.waitFor(`document.querySelector('#grid.river .river-feed article') && !document.querySelector('[data-ui=skeleton]')`, 'the river');
     const shared = await read(hnTitle);
     assert.equal(shared?.context, '@ana shared', "the share joins HN's story");
     assert.deepEqual(shared?.trail, ['@anaRead the comments.']);
@@ -1100,7 +1100,7 @@ test('browser: every handle is a door: @names open their space and come back to 
   try {
     page.problems.length = 0;
     await page.goto(`${app.base}/preview`);
-    await page.waitFor(`document.querySelector('#grid.river .river-feed article') && !document.querySelector('.skeleton')`, 'the river');
+    await page.waitFor(`document.querySelector('#grid.river .river-feed article') && !document.querySelector('[data-ui=skeleton]')`, 'the river');
     assert.deepEqual(await page.eval(`[...${find('A post by cy')}.querySelectorAll('.story-context .handle, .story-note .handle')].map((n) => n.textContent)`), ['@ben', '@cy', '@cy'],
       'the context row and the trail name people as buttons');
 
@@ -1533,7 +1533,7 @@ test('browser: Space links: the room offers a follow of whoever brought you, say
   try {
     page.problems.length = 0;
     await page.goto(`${app.base}/preview`);
-    await page.waitFor(`document.querySelector('#intros') && !document.querySelector('.skeleton')`, 'the intro strip');
+    await page.waitFor(`document.querySelector('#intros') && !document.querySelector('[data-ui=skeleton]')`, 'the intro strip');
     assert.deepEqual(await page.eval(`[...document.querySelectorAll('#intros .intro')].map((n) => n.textContent)`),
       ["You came in through @ana's Space link.Follow @anaNot now", '@ben joined MCPortal through your Space link.']);
     await page.eval(`document.querySelector('#intros .btn.follow').click()`);
@@ -1597,7 +1597,7 @@ test('browser: the People portal: suggested people with the agent\'s reason, Fol
   try {
     page.problems.length = 0;
     await page.goto(`${app.base}/preview`);
-    await page.waitFor(`${people}.length === 2 && !document.querySelector('.skeleton')`, 'the People portal');
+    await page.waitFor(`${people}.length === 2 && !document.querySelector('[data-ui=skeleton]')`, 'the People portal');
     assert.deepEqual(await page.eval(`${people}.map((n) => [n.querySelector('.item-title').textContent, n.querySelector('.item-summary').textContent, [...n.querySelectorAll('.person-act')].map((b) => b.textContent)])`), [
       ['@ana', 'Posts mostly about cat behavior research.', ['Follow', 'Not for me']],
       ['Ben (@ben)', 'Plays World of Warcraft: raid guides and lore.', ['Follow', 'Not for me']]]);
@@ -1655,7 +1655,7 @@ test('browser: the Lobby in the river: a stranger\'s post says "not followed", a
   try {
     page.problems.length = 0;
     await page.goto(`${app.base}/preview`);
-    await page.waitFor(`document.querySelector('#grid.river .river-feed article') && !document.querySelector('.skeleton')`, 'the river');
+    await page.waitFor(`document.querySelector('#grid.river .river-feed article') && !document.querySelector('[data-ui=skeleton]')`, 'the river');
     assert.equal(await context(titles[0]), '@zoe shared · not followed', "the Lobby's share joins HN's story; its sharer wins over also-shared");
     const contexts = await page.eval<string[]>(`[...document.querySelectorAll('.river-feed > article .story-context')].map((n) => n.textContent)`);
     assert.ok(contexts.includes('also shared by @yan'), `another HN story names who else shared it (${contexts.join(' | ')})`);
