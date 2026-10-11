@@ -1,0 +1,39 @@
+/* Reading content keeps its own scale; navigation and actions use compact controls. */
+.ui-document { font-size: var(--mp-reader-font, 1rem); line-height: 1.75; max-width: var(--mp-reader-measure, 72ch); margin-inline: auto; }
+.ui-document p, .ui-document li { font-size: inherit; line-height: inherit; margin: 0 0 var(--mp-space-20); }
+.ui-document h2 { font-size: 1.375em; line-height: 1.3; margin: var(--mp-space-32) 0 var(--mp-space-12); letter-spacing: -0.015em; }
+.ui-document pre { background: var(--mp-surface-canvas); border: 1px solid var(--mp-border-control); border-radius: var(--mp-radius-control); padding: var(--mp-space-16); overflow-x: auto; font: calc(var(--mp-reader-font, 1rem) * .8125)/1.65 var(--mp-font-mono, ui-monospace, "SF Mono", Menlo, monospace); }
+.ui-document blockquote { margin: 0 0 14px; padding-left: 12px; border-left: 3px solid var(--mp-border-divider); color: var(--mp-text-secondary); white-space: pre-wrap; }
+.ui-document h3 { font-size: 1.125em; line-height: 1.35; margin: var(--mp-space-24) 0 var(--mp-space-10); }
+.ui-document h4 { font-size: 1em; line-height: 1.4; margin: var(--mp-space-24) 0 var(--mp-space-8); }
+.ui-document h4.sig { font: var(--mp-weight-strong) var(--mp-type-13)/var(--mp-line-ui) var(--mp-font-mono); padding: var(--mp-space-6) var(--mp-space-10); background: var(--mp-surface-hover); border-radius: var(--mp-radius-sm); overflow-wrap: anywhere; }
+.ui-document ul, .ui-document ol { margin: 0 0 14px; padding-left: 24px; }
+.ui-document li { margin-bottom: 6px; }
+.ui-document li > ul, .ui-document li > ol { margin: 6px 0 0; padding-left: 22px; }
+.ui-document li::marker { color: var(--mp-text-secondary); font-variant-numeric: tabular-nums; }
+.ui-document [data-reader-block] { scroll-margin-top: 16px; }
+.ui-document blockquote p:last-child { margin-bottom: 0; }
+.ui-document figure { margin: 0 0 20px; }
+.ui-document figcaption { color: var(--mp-text-secondary); font-size: var(--mp-type-12-5); line-height: 1.5; margin-top: 6px; }
+.ui-document .listening-links { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.ui-document .listening-links a { padding: 4px 8px; background: var(--mp-surface-hover); border-radius: var(--mp-radius-sm); font-size: var(--mp-type-12-5); }
+.ui-document .reader-media { padding: 10px 12px; border: 1px solid var(--mp-border-divider); border-radius: var(--mp-radius-control); }
+.ui-document code { font: 0.88em/1.4 var(--mp-font-mono, ui-monospace, "SF Mono", Menlo, monospace); background: var(--mp-surface-hover); border-radius: var(--mp-radius-xs); padding: 1px var(--mp-space-4); }
+.ui-document a { color: var(--mp-action-primary); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.ui-document .code { position: relative; margin: 0 0 14px; }
+.ui-document .code pre { margin: 0; }
+.ui-document .code-label { min-width: 0; overflow-wrap: anywhere; }
+.ui-document .code-head { display: flex; align-items: center; gap: var(--mp-space-8); padding: 3px var(--mp-space-4) 3px var(--mp-space-12); border: 1px solid var(--mp-border-divider); border-bottom: 0; border-radius: var(--mp-radius-control) 8px 0 0; font-size: var(--mp-type-11-5); color: var(--mp-text-secondary); background: var(--mp-surface-hover); }
+.ui-document .code-head + pre { border-radius: 0 0 8px 8px; }
+.ui-document .code-head .copy { flex-shrink: 0; margin-left: auto; border: 0; background: none; padding: var(--mp-space-2) var(--mp-space-8); border-radius: var(--mp-radius-sm); cursor: pointer; color: var(--mp-text-secondary); font-size: var(--mp-type-11-5); }
+.ui-document .code-head .copy:hover { background: var(--mp-surface-canvas); color: var(--mp-text-primary); }
+.ui-document .table-wrap { margin: 0 0 16px; }
+.ui-document .callout { margin: 0 0 16px; padding: var(--mp-space-10) 14px; border-radius: var(--mp-radius-control); border-left: 3px solid var(--mp-callout-tone); background: var(--mp-surface-inset); font-size: .90625em; line-height: 1.6; white-space: pre-wrap; }
+.ui-document .callout .callout-label { display: block; font-weight: 650; color: var(--mp-callout-tone); margin-bottom: var(--mp-space-2); white-space: normal; }
+.ui-document .table-wrap table { font-size: .8125em; }
+.ui-document { overflow-wrap: anywhere; }
+.ui-document img { max-width:100%; }
+.ui-document pre code { padding:0; background:none; font:inherit; }
+.ui-document .table-wrap { overflow:auto; max-width:100%; }
+.ui-document table { border-collapse:collapse; min-width:100%; }
+.ui-document :is(th,td) { padding:var(--mp-space-6) var(--mp-space-10); text-align:left; border-bottom:1px solid var(--mp-border-divider); }

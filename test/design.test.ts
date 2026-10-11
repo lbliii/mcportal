@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
-import { buildDesign, checkTokenUsage, compileTokens, checkComponentBoundaries, checkLegacyControls, validateComponents } from '../scripts/design.ts';
+import { buildDesign, checkTokenUsage, compileTokens, checkComponentBoundaries, checkLegacyControls, validateComponents, validateInventory } from '../scripts/design.ts';
 import { BRAND, PALETTES } from '../src/design/generated.ts';
 import { page } from '../src/page.ts';
 import { roomHtml, UI_INCLUDES } from '../src/mcp.ts';
@@ -60,4 +60,16 @@ test('component boundary and legacy-control checks prevent new product coupling 
  assert.throws(()=>checkLegacyControls({'room.html':'<button>Save</button>'},{}),/raw buttons exceed/);
  assert.doesNotThrow(()=>checkLegacyControls({'room/new.js':"uiButton({label:'Save'})"},{}));
  assert.doesNotThrow(()=>checkLegacyControls({'room/old.js':"el('button', null, 'Story title')"},{'room/old.js':{maximum:1,reason:'Specialized content-opening target.'}}));
+ assert.throws(()=>checkLegacyControls({'room/old.js':"el('button', {class:'link-btn'}, 'Catch up')"},{'room/old.js':{maximum:1,reason:'Old action'}}),/retired link-btn/);
+});
+
+test('coverage inventory requires definitions, variants, states, interaction rules and real implementation evidence',async()=>{
+ const registry=JSON.parse(await readFile(new URL('../design/components.json',import.meta.url),'utf8'));
+ const inventory=JSON.parse(await readFile(new URL('../design/inventory.json',import.meta.url),'utf8'));
+ const files=new Set<string>(inventory.flatMap((item:{sources:string[]})=>item.sources));
+ assert.doesNotThrow(()=>validateInventory(inventory,registry,files));
+ assert.throws(()=>validateInventory(inventory.map((item:object,index:number)=>index?item:{...item,keyboard:''}),registry,files),/Incomplete design inventory/);
+ assert.throws(()=>validateInventory(inventory,registry,new Set()),/Missing inventory source/);
+ assert.throws(()=>validateInventory(inventory,{...registry,components:{...registry.components,undocumented:{}}},files),/Component missing from design inventory/);
+ assert.equal((await roomHtml()).includes('const UI_INVENTORY'),false,'review documentation does not increase the production room payload');
 });

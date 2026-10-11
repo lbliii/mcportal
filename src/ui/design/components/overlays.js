@@ -1,9 +1,10 @@
   /** Bind a native modal. The caller owns content and persistence; this owns focus and dismissal.
    * @param {HTMLDialogElement} panel
-   * @param {{trigger:HTMLButtonElement, closeButton:HTMLButtonElement, onOpen?:()=>void, onClose?:()=>void}} options
+   * @param {{trigger:HTMLButtonElement, closeButton:HTMLButtonElement, variant?:UIDialogVariant, onOpen?:()=>void, onClose?:()=>void}} options
    */
   function uiDialog(panel, options) {
     if (!panel.getAttribute('aria-label') && !panel.getAttribute('aria-labelledby')) throw new Error('Dialog needs a name');
+    panel.dataset.variant=uiVariant(options.variant || 'modal',UI_COMPONENTS.dialog.variants,'dialog variant');
     const events = new AbortController();
     /** @type {HTMLElement | null} */ let opener = null;
     panel.classList.add('ui-dialog'); panel.dataset.ui = 'dialog'; options.trigger.setAttribute('aria-haspopup','dialog');

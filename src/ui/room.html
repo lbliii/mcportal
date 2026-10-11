@@ -37,7 +37,7 @@
 <div class="room-toolbar room-only" role="group" aria-label="Room actions">
   <span class="status" id="status" role="status">Opening your portal…</span>
   <div class="spacer"></div>
-  <button class="link-btn" id="btnCatchup" type="button">Catch up</button>
+  <button class="btn quiet sm" id="btnCatchup" type="button">Catch up</button>
   <button class="ib" id="btnAdd" data-icon="plus" data-tooltip aria-label="Add source" aria-expanded="false" aria-controls="addSheet"></button>
   <button class="ib" id="btnRoomOptions" data-icon="more" data-tooltip popovertarget="roomOptions" aria-expanded="false" aria-label="Room options"></button>
 </div>
@@ -71,7 +71,7 @@
     <input class="field" id="addInput" type="text" autocomplete="off" spellcheck="false" placeholder="theverge.com, r/LocalLLaMA, youtube.com/@channel, owner/repo…" aria-label="Site, feed, subreddit, channel or repo">
     <button class="btn" type="submit">Find sources</button>
   </form>
-  <div class="add-hint"><button class="link-btn" type="button" id="btnImportOpml">Import subscriptions from another reader (OPML)</button></div>
+  <div class="add-hint"><button class="btn quiet sm" type="button" id="btnImportOpml">Import subscriptions from another reader (OPML)</button></div>
   <div class="add-hint" id="addHint" role="status" aria-live="polite" aria-atomic="true">Paste a site or feed and MCPortal finds what it can show. Sites with feeds, Reddit, YouTube, Bluesky, Mastodon, GitHub, Substack and more.</div>
   <ul class="cands" id="addResults"></ul>
 </section>
@@ -118,6 +118,9 @@
   /*include:design/components/button.js*/
   /*include:design/components/field.js*/
   /*include:design/components/overlays.js*/
+  /*include:design/components/tabs.js*/
+  /*include:design/components/disclosure.js*/
+  /*include:design/components/pill.js*/
   /*include:design/patterns.js*/
   /*include:design/components/tooltips.js*/
   for (const node of $$('[data-icon]')) node.replaceChildren(icon(node.dataset.icon ?? ''));

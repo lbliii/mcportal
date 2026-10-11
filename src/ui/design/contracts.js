@@ -3,6 +3,8 @@
 /** @typedef {"compact"|"default"} UIButtonSize */
 /** @typedef {"compact"|"default"} UIIconButtonSize */
 /** @typedef {"empty"|"loading"|"error"|"info"|"success"} UIFeedbackKind */
+/** @typedef {"neutral"|"accent"|"success"|"warning"|"error"} UIBadgeTone */
+/** @typedef {"modal"|"drawer"} UIDialogVariant */
 const UI_COMPONENTS = {
   "button": {
     "status": "stable",
@@ -77,7 +79,11 @@ const UI_COMPONENTS = {
       "closed",
       "open"
     ],
-    "example": "uiDialog(panel, {trigger, closeButton})"
+    "example": "uiDialog(panel, {trigger, closeButton})",
+    "variants": [
+      "modal",
+      "drawer"
+    ]
   },
   "menu": {
     "status": "stable",
@@ -135,5 +141,101 @@ const UI_COMPONENTS = {
       "success"
     ],
     "example": "uiFeedback({kind:'error', message:'Could not load collections', action:retry})"
+  },
+  "tabs": {
+    "status": "stable",
+    "factory": "uiTabs",
+    "purpose": "Local panels with manual activation, roving focus and optional wide overview.",
+    "states": [
+      "selected",
+      "unselected",
+      "disabled",
+      "focus",
+      "overview"
+    ],
+    "example": "uiTabs({label:'Sources', items:[{label:'One',panel:first},{label:'Two',panel:second}]})"
+  },
+  "disclosure": {
+    "status": "stable",
+    "factory": "uiDisclosure",
+    "purpose": "Native details with a consistent summary. A shared name creates an exclusive accordion.",
+    "variants": [
+      "independent",
+      "exclusive"
+    ],
+    "states": [
+      "closed",
+      "open",
+      "focus"
+    ],
+    "example": "uiDisclosure({label:'Filters'}, fields)"
+  },
+  "badge": {
+    "status": "stable",
+    "factory": "uiBadge",
+    "purpose": "Passive status or tag pill; no action, focus target or hover tooltip.",
+    "variants": [
+      "neutral",
+      "accent",
+      "success",
+      "warning",
+      "error"
+    ],
+    "example": "uiBadge({label:'New',tone:'accent'})"
+  },
+  "chip": {
+    "status": "stable",
+    "factory": "uiChip",
+    "purpose": "Selectable pill with a stable label, pressed state and reserved checkmark.",
+    "states": [
+      "unselected",
+      "selected",
+      "disabled",
+      "focus"
+    ],
+    "example": "uiChip({label:'Select',onChange:choose}).element"
+  },
+  "tray": {
+    "status": "stable",
+    "factory": "uiTray",
+    "purpose": "Contextual action group in document flow. No modal semantics or focus trap.",
+    "states": [
+      "hidden",
+      "visible"
+    ],
+    "example": "uiTray({label:'Selected material'}, count, compare, clear)"
+  },
+  "navigationLink": {
+    "status": "stable",
+    "factory": "uiNavLink",
+    "purpose": "Underlineless destination row in application navigation, with current-page indication.",
+    "states": [
+      "default",
+      "hover",
+      "focus",
+      "current"
+    ],
+    "example": "uiNavLink({label:'Installation',href:page.url,onClick:open})"
+  },
+  "pager": {
+    "status": "stable",
+    "factory": "uiPager",
+    "purpose": "Previous/next document actions with visible destination titles, wrapping at narrow widths.",
+    "states": [
+      "both",
+      "first",
+      "last"
+    ],
+    "example": "uiPager({next:{label:'Installation',onClick:nextPage}})"
+  },
+  "document": {
+    "status": "stable",
+    "factory": ".ui-document",
+    "purpose": "Comfortable prose, underlined content links, headings, code, tables, quotes and media; separate from compact chrome.",
+    "variants": [
+      "article",
+      "documentation"
+    ],
+    "example": "el('div',{class:'body ui-document'},blockNodes(page.blocks))"
   }
 };

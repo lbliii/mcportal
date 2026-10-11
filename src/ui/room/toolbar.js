@@ -39,6 +39,7 @@
   const navigationMenus = [uiMenu($('moreMenu'), $('btnMore')), uiMenu($('roomOptions'), $('btnRoomOptions'))];
   function closeNavigationMenus() { navigationMenus.forEach(menu=>menu.close()); }
   const settingsDialog = uiDialog($('settingsPanel'), {
+    variant:'drawer',
     trigger:$('btnSettings'), closeButton:$('btnCloseSettings'),
     onOpen:()=>{ closeNavigationMenus(); drawWhoMenu(); sourceDetails.control.checked=root.classList.contains('show-sources'); root.classList.add('settings-open'); },
     onClose:()=>root.classList.remove('settings-open'),

@@ -55,7 +55,8 @@ async function assemble(page: string, name: string): Promise<Assembled> {
 /** Independently check the shipped components and their live catalogue without room globals. */
 async function assembleCatalogue(): Promise<Assembled> {
   const registry = JSON.parse(await readFile(new URL('../design/components.json', import.meta.url), 'utf8')) as {scripts:string[]};
-  const text:string[] = [], origin:Assembled['origin'] = [];
+  const inventory = JSON.parse(await readFile(new URL('../design/inventory.json',import.meta.url),'utf8'));
+  const text:string[] = [`const UI_INVENTORY = ${JSON.stringify(inventory)};`], origin:Assembled['origin'] = [{file:'design/inventory.json',line:1}];
   for (const file of ['brand/icons.js', ...registry.scripts, 'design/catalogue.js']) {
     for (const [i,line] of (await readFile(uiPath(file),'utf8')).split('\n').entries()) {
       text.push(line); origin.push({file:`src/ui/${file}`,line:i+1});

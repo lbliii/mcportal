@@ -45,7 +45,7 @@
   /** The title line: the New mark, a GitHub owner's avatar, the title. @param {Item} item */
   function itemTitle(item) {
     const avatar = item.image && item.image.kind === 'avatar' ? avatarImg(item) : null;
-    return el('span', { class: 'item-title' }, item.new ? el('span', { class: 'new-mark' }, 'New') : null, avatar, item.title);
+    return el('span', { class: 'item-title' }, item.new ? uiBadge({label:'New',tone:'accent',className:'new-mark'}) : null, avatar, item.title);
   }
 
   /**

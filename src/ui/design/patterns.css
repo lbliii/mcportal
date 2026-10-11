@@ -8,3 +8,11 @@
 .ui-feedback h3 { font-size:var(--mp-type-14); color:var(--mp-text-primary); }
 .ui-feedback-error { color:var(--mp-status-error); }
 .ui-feedback-error h3 { color:inherit; }
+.ui-tray { position:sticky; top:0; z-index:var(--mp-layer-sticky); padding:var(--mp-space-8); border:1px solid var(--mp-border-divider); border-radius:var(--mp-radius-control); background:var(--mp-surface-selected); font-size:var(--mp-type-12); }
+.ui-nav-link { display:block; min-height:var(--mp-control-minimum); padding:var(--mp-space-4) var(--mp-space-6); border-radius:var(--mp-radius-sm); font-size:var(--mp-type-12); color:var(--mp-text-secondary); text-decoration:none; overflow-wrap:anywhere; }
+.ui-nav-link:hover { color:var(--mp-text-primary); background:var(--mp-surface-hover); }
+.ui-nav-link[aria-current] { color:var(--mp-text-primary); background:var(--mp-surface-selected); box-shadow:inset 2px 0 currentColor; }
+.ui-pager { display:flex; flex-wrap:wrap; gap:var(--mp-space-8); margin-top:var(--mp-panel-section-gap); }
+.ui-pager > .btn { flex:1 1 8rem; min-width:0; text-align:left; border-color:var(--mp-border-divider); overflow-wrap:anywhere; }
+.ui-pager > .next { text-align:right; margin-left:auto; }
+.ui-pager small { display:block; color:var(--mp-text-secondary); font-size:var(--mp-type-11); }

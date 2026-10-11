@@ -43,9 +43,7 @@
   .account-settings > p { color:var(--mp-text-secondary); font-size:var(--mp-type-12); line-height:var(--mp-line-body); }
   .account-settings input { max-width:100%; }
   .settings-panel .who-actions { margin-top:var(--mp-space-12); }
-  .recall-search details > summary { cursor:pointer; padding:var(--mp-space-8) 0; width:fit-content; }
   .collection-setup { margin-bottom:var(--mp-panel-section-gap); }
-  .collection-setup summary { cursor:pointer; padding:var(--mp-space-8) 0; }
   .collection-setup .collection-create { margin-top:var(--mp-space-12); }
   @media(min-width:800px) {
     .settings-open body > :is(.grid,.experiences,.room-toolbar,.continue-reading,.lane-controls,.add-sheet,.reader-shell) { margin-right:var(--mp-panel-width); }

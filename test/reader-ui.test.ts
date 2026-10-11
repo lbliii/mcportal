@@ -197,7 +197,7 @@ test('reader UI: multi-paragraph list items and nested parent tails retain order
   assert.deepEqual(await page.eval(`Array.from(document.querySelector('.body > ol > li > ul > li').children).map(n => n.dataset.readerBlock)`), ['3', '4']);
   assert.deepEqual(await page.eval(`Array.from(document.querySelector('.body > ol > li:nth-child(2)').children).map(n => n.dataset.readerBlock)`), ['6', '7']);
   assert.deepEqual(await page.eval(`Array.from(document.querySelectorAll('.body [data-reader-block]')).map(n => Number(n.dataset.readerBlock))`), continuationArticle.blocks.map((_, i) => i), 'logical traversal retains source order through semantic groups');
-  assert.equal(await page.eval(`document.querySelector('[data-reader-block="10"]').parentElement.className`), 'body', 'unmatched metadata cannot attach prose to an unrelated item');
+  assert.equal(await page.eval(`document.querySelector('[data-reader-block="10"]').parentElement.classList.contains('body')`), true, 'unmatched metadata cannot attach prose to an unrelated item');
   await page.eval(`(() => { const n = document.querySelector('[data-reader-block="4"]'); const range = document.createRange(); range.selectNodeContents(n); const s = getSelection(); s.removeAllRanges(); s.addRange(range); })()`);
   await page.waitFor(`document.querySelector('.passage-bar')`, 'the nested continuation selection actions');
   await page.click('.passage-bar button:nth-child(3)');
@@ -219,7 +219,7 @@ test('reader UI: media-first items retain list identity without placeholders or 
   assert.deepEqual(await page.eval(`Array.from(document.querySelector('.body > ul > li:nth-child(2)').children).map(n => n.dataset.readerBlock)`), ['9', '10']);
   assert.deepEqual(await page.eval(`Array.from(document.querySelector('.body > ul > li:nth-child(3)').children).map(n => n.dataset.readerBlock)`), ['11'], 'a figure-only item still has its semantic list marker');
   assert.deepEqual(await page.eval(`Array.from(document.querySelectorAll('.body [data-reader-block]')).map(n => Number(n.dataset.readerBlock))`), mediaListArticle.blocks.map((_, i) => i), 'every actual source block keeps its order and identity');
-  assert.equal(await page.eval(`document.querySelector('[data-reader-block="14"]').parentElement.className`), 'body');
+  assert.equal(await page.eval(`document.querySelector('[data-reader-block="14"]').parentElement.classList.contains('body')`), true);
   assert.deepEqual(page.problems, []);
 });
 

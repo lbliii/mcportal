@@ -1,0 +1,9 @@
+.ui-badge { display:inline-block; max-width:100%; border:1px solid var(--mp-border-divider); border-radius:999px; padding:0 var(--mp-space-6); background:var(--mp-surface-inset); color:var(--mp-text-secondary); font-size:var(--mp-type-11); line-height:var(--mp-line-body); font-weight:var(--mp-weight-medium); overflow-wrap:anywhere; vertical-align:baseline; }
+.ui-badge[data-variant=accent] { color:var(--mp-action-on-primary); background:var(--mp-action-primary); border-color:transparent; }
+.ui-badge[data-variant=success] { color:var(--mp-status-success); }
+.ui-badge[data-variant=warning] { color:var(--mp-status-warning); }
+.ui-badge[data-variant=error] { color:var(--mp-status-error); }
+.btn.ui-chip { display:inline-flex; align-items:center; gap:var(--mp-space-4); border:1px solid var(--mp-border-control); border-radius:999px; }
+.ui-chip::before { content:'✓'; visibility:hidden; }
+.ui-chip[aria-pressed=true] { background:var(--mp-surface-selected); box-shadow:none; }
+.ui-chip[aria-pressed=true]::before { visibility:visible; }

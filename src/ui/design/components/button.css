@@ -8,4 +8,6 @@
 .btn > svg { vertical-align: middle; }
 .btn.sm { min-height:var(--mp-control-minimum); padding:var(--mp-space-2) var(--mp-space-6); }
 .btn.quiet { border-color:transparent; background:none; }
+.btn.quiet:hover:not(:disabled) { background:var(--mp-surface-hover); }
+.btn.quiet:active:not(:disabled) { background:var(--mp-surface-pressed); }
 .btn[aria-busy=true] { cursor:progress; }

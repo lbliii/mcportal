@@ -20,14 +20,56 @@ Dependencies flow in one direction: **foundations → primitives → patterns �
 | Layer | Implementation and adoption |
 |---|---|
 | Foundations | `design/tokens.json`, generated palettes, shared base preferences and host theme normalization |
-| Primitives | `src/ui/design/components/`: buttons, icon actions, fields, toggles, dialogs, menus and delegated tooltips |
-| Patterns | `src/ui/design/patterns.js` / `.css`: named action groups, settings rows, metadata, cards and feedback |
+| Primitives | `src/ui/design/components/`: buttons, icon actions, fields, toggles, tabs, pills, disclosures, dialogs, menus and delegated tooltips |
+| Patterns | `src/ui/design/patterns.js` / `.css` and `document.css`: action groups, settings rows, metadata, cards, feedback, trays, navigation, paging and reading content |
 | Product views | `src/ui/room/`: room, reading layouts, account and optional activities; controls compose the layers above |
 | Catalogue | `/controls`: production scripts, actual factory examples, contracts, light/dark, coarse targets and 200% text |
 
 Reading settings use the shared row/toggle pattern. Settings and both navigation menus use shared overlay behavior. Ordinary account, Library, collection and watch actions use typed buttons; account and collection creation fields share error associations. Collection and watch cards use the shared article/action structure. Item layouts share metadata composition and save/original/share actions. Library, collections and watches use shared feedback states.
 
 Specialized reading layouts, evidence panes, composers, source pickers and Space editors still have local controls. Their existing raw buttons are bounded by the per-file migration inventory in [`design/legacy-controls.json`](../../design/legacy-controls.json). New ordinary actions use the factories; lower the allowance when migrating existing ones. The inventory is a count guard, not proof that every local override is appropriate. Public pages retain script-free semantic HTML and shared CSS. Editorial geometry and brand art are intentional local compositions.
+
+### Coverage and adversarial review
+
+[`design/inventory.json`](../../design/inventory.json) is the coverage inventory, rendered directly in the live catalogue. Every family records its definition, variants, states, keyboard behavior, implementation evidence and follow-up. The build rejects incomplete entries, missing source files and registered components absent from the inventory. Inventory prose is included only in the catalogue, not the production room.
+
+The October 2026 pass covers **36 families: 22 shared, 10 local, 4 reserved**. “Shared” identifies a reusable implementation, not complete migration of every caller. “Local” identifies a defined product composition with remaining adoption work. “Reserved” identifies a possible future need, not a component that exists today.
+
+| Finding | Resolution |
+|---|---|
+| Catch up and other actions inherited an underlined `.link-btn` style | Retire that class; use quiet compact buttons. Fix quiet hover/pressed feedback. Reject the retired class in the build. Preserve underlined reading links. |
+| Comparison tabs had click handling but no composite keyboard behavior | Shared tabs with one tab stop, arrows/Home/End, manual activation and named panels. Wide comparisons become named regions; narrowing preserves the focused source. |
+| Pills conflated information and interaction | Passive `uiBadge` and interactive `uiChip` have separate contracts. Chip labels and dimensions stay stable when selected. |
+| Disclosure spacing and markers varied across flows | Shared native details/summary; optional named groups provide exclusive accordions. Reader, docs, Library, collection setup, imports and watch settings use it. |
+| Selection trays and drawers lacked distinct definitions | A tray is an inline action group; a drawer is a modal placement variant. Clearing selected material restores focus. |
+| Document styles, navigation and paging were unregistered | Shared document CSS, destination links and previous/next pager; explicit separation between compact chrome and comfortable content. |
+| A catalogue of implemented components hid absent families | Inventory includes all current families and reserved composites, with source evidence and follow-ups. |
+
+#### Choose by behavior
+
+| Job | Component and rule |
+|---|---|
+| Perform an action | `uiButton`; quiet for low emphasis, never an underlined pseudo-link |
+| Open a destination | `uiNavLink` in application navigation; an ordinary underlined anchor in prose |
+| Switch local panels | `uiTabs`; global Room/Library navigation is not a tablist |
+| Choose one preference | Native radio group or select; `.ui-choice-group` demonstrates a segmented group; layout previews remain product-owned |
+| Report status/tag | `uiBadge`; no focus stop or click handler |
+| Toggle a selection/filter | `uiChip`; stable name, `aria-pressed`, visible checkmark |
+| Reveal optional content | `uiDisclosure`; independent by default, common `name` for exclusive accordion sections |
+| Offer short actions | `uiMenu`; forms and rich content require a different pattern |
+| Contain a modal task | `uiDialog`, `modal` or `drawer`; focus containment and restoration |
+| Offer contextual actions | `uiTray`; stays in document flow and does not trap focus |
+| Read articles/docs | `.ui-document`, with compact navigation and toolbars outside the content |
+
+These semantics follow the [WAI-ARIA tabs](https://www.w3.org/WAI/ARIA/apg/patterns/tabs/), [button](https://www.w3.org/WAI/ARIA/apg/patterns/button/) and [disclosure](https://www.w3.org/WAI/ARIA/apg/patterns/disclosure/) patterns. The choice to avoid underlined interface actions is MCPortal's visual policy, not a claim that links are prohibited in applications.
+
+#### Remaining adoption work
+
+Prioritize local **forms and rich popovers** next: source candidates, composer validation, account listing fields, reader panels and reblog flows have product behavior that should be reconciled before extraction. Toast timing/queuing and skeleton/progress behavior remain local. Reading forms, avatars/media, lane pagination and editorial layouts intentionally compose shared controls without becoming a generic widget framework.
+
+No reusable command palette, combobox, tree, editable data grid, custom calendar or slider is claimed. Native fields cover today's needs. Introduce a composite only with a real product use, complete interaction contract, live example and behavioral regression tests. Vertical/closable tabs, removable chips and nonmodal drawers likewise require a new supported variant rather than an ad hoc class.
+
+For every new component or variant, review: default/hover/focus/active; selected or expanded state; disabled/busy/error states where meaningful; accessible naming; keyboard and touch paths; focus after dismissal/removal; long labels; 320px width and 200% text; light/dark/forced colors/reduced motion; and whether its visible label adds information. This is a review matrix, not a requirement to invent nonsensical states for passive content.
 
 ## Files
 
@@ -39,6 +81,7 @@ Specialized reading layouts, evidence panes, composers, source pickers and Space
 | `src/ui/design/palettes.js` | Generated light and dark palettes for the theme controller |
 | `src/design/generated.ts` | Generated exports for the web pages and brand script |
 | `design/components.json` | Component purposes, lifecycle, supported options, examples and ordered module lists |
+| `design/inventory.json` | Coverage, definitions, variants, states, keyboard behavior, evidence and remaining work for 36 families |
 | `src/ui/design/components/` | Owned CSS/JS modules for each primitive |
 | `src/ui/design/patterns.js` / `.css` | Compositions shared across product flows |
 | `src/ui/design/primitives.css` / `contracts.js` | Generated CSS bundle and typed option contracts; do not edit |
@@ -169,6 +212,14 @@ Use the typed factories for interactive room code. `design/components.json` gene
 | `uiMetadata(options, ...children)` / `uiMetadataAction(options)` | Wrapping secondary information and named 24px actions with 12px glyphs |
 | `uiCard({title, description?, meta?, actions?, children?})` | Article with a heading and independent actions; never an interactive wrapper containing buttons |
 | `uiFeedback({kind, message, title?, action?})` | `empty` / `loading` / `error` / `info` / `success`; appropriate alert/status roles; recovery action optional |
+| `uiTabs({label, items, overviewAbove?})` | Returns element/list/panels, select and destroy; items provide label/panel/disabled. Horizontal manual tabs become named regions above an optional component width. Disconnect with destroy when explicitly disposing a mounted instance. |
+| `uiDisclosure({label, open?, name?, meta?}, ...children)` | Native details; common name for exclusive sections; a decorative chevron and optional metadata |
+| `uiBadge({label, tone?})` | Passive pill: neutral, accent, success, warning or error; no interaction |
+| `uiChip({label, selected?, disabled?, onChange?})` | Returns element/setSelected; stable label and geometry with an announced pressed state |
+| `uiTray({label, hidden?}, ...children)` | Named sticky action group in normal flow; caller owns visibility and focus after removal |
+| `uiNavLink({label, href, current?, onClick?})` | Real destination anchor; current-page state, compact target and no prose underline |
+| `uiPager({previous?, next?})` | Named document navigation; each destination has label/onClick; absent ends omitted |
+| `.ui-document` | Shared article/docs typography, code, tables, quotations, media and underlined content references |
 
 Adding a setting means binding a shared control to product state:
 
@@ -210,7 +261,7 @@ Shared rules, in `primitives.css`:
 
 - Controls are at least 24px, 44px on coarse pointers.
 - Focus is a 2px outline with a 2px offset. Selection never relies on hue alone.
-- Essential actions remain discoverable without hover; optional secondary actions may appear on hover/focus with a direct touch path. Navigation uses real links; link-like controls respond to Enter and Space.
+- Essential actions remain discoverable without hover; optional secondary actions may appear on hover/focus with a direct touch path. Destination links use Enter; action buttons use Enter and Space.
 - Room icon hints appear after 150ms of mouse hover or immediately on keyboard focus. They remain hoverable, dismiss with Escape, and stay inside the viewport and active dialog. Touch activates controls directly; essential instructions stay visible in the opened panel.
 - Increased contrast strengthens secondary text and borders. Forced colors use system colors. Reduced motion removes transitions, including scripted scrolling.
 - Layouts wrap. Container queries add to viewport fallbacks rather than replace them.

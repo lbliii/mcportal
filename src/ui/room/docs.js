@@ -37,12 +37,13 @@
   /** @param {DocsSite} site */
   function docsTocNodes(site) {
     // Closed by default: markCurrentPage opens the section of the page being read.
-    return site.sections.map((section, i) => el('details', { open: site.sections.length === 1 ? true : null },
-      el('summary', null, section.title, el('span', { class: 'n' }, String(section.pages.length))),
-      el('ul', null, section.pages.map((p) => el('li', null, el('a', {
-        class: p.index ? 'idx' : null, href: p.url, 'data-url': p.url, title: p.description || p.title,
-        onclick: (/** @type {MouseEvent} */ e) => { e.preventDefault(); if (p.index) openDocs({ docs: p.url }, { parent: docsState }); else loadDocsPage(p.url); },
-      }, p.title))))));
+    return site.sections.map(section => uiDisclosure({label:section.title,meta:String(section.pages.length),open:site.sections.length === 1},
+      el('ul', null, section.pages.map(p => {
+        const link=uiNavLink({label:p.title,className:p.index?'idx':'',href:p.url,
+          onClick:e=>{e.preventDefault();if(p.index) openDocs({docs:p.url},{parent:docsState});else loadDocsPage(p.url);}});
+        link.dataset.url=p.url; link.title=p.description || p.title;
+        return el('li',null,link);
+      }))));
   }
 
   /** @param {DocsData} data @param {DocsKey | null} key @param {DocsOptions} [options] */
@@ -162,9 +163,9 @@
       const original = isHttpUrl(page.originalUrl) ? page.originalUrl : page.url;
       const top = readerTop(original, !docsState.card, page.title);
       top.append(el('button', { class: 'btn docs-toggle', 'aria-expanded': 'false', 'aria-controls': 'docsContents', onclick: () => toggleDocsContents(!reader.classList.contains('toc-open')) }, 'Contents'));
-      const pager = el('div', { class: 'docs-pager' },
-        prev ? el('button', { class: 'prev', onclick: () => loadDocsPage(prev.url) }, el('small', null, 'Previous'), prev.title) : null,
-        next ? el('button', { class: 'next', onclick: () => loadDocsPage(next.url) }, el('small', null, 'Next'), next.title) : null);
+      const pager = uiPager({className:'docs-pager',
+        previous:prev ? {label:prev.title,onClick:()=>loadDocsPage(prev.url)} : undefined,
+        next:next ? {label:next.title,onClick:()=>loadDocsPage(next.url)} : undefined});
       const minutes = Math.max(1, Math.round((page.wordCount || 0) / 230));
       const how = docsState.key.portalId ? `portalId "${docsState.key.portalId}"` : `docs "${String(docsState.key.docs).slice(0, 300)}"`;
       const body = passageSource(blockNodes(page.blocks, onLink), page.url, page.title, `Use read_doc_page with that url and ${how} for the rest of the page.`);

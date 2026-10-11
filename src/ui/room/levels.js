@@ -117,7 +117,7 @@
       const custom = portalViewItems(portal, portal.items);
       if (custom) return custom;
       const list = el('ul', { class: 'items' });
-      const more = el('button', { class: 'link-btn fp-more', type: 'button' });
+      const more = el('button', { class: 'btn quiet sm fp-more', type: 'button' });
       let count = 0;
       const page = () => {
         const next = portal.items.slice(count, displayMode === 'fullscreen' ? undefined : count + LEVEL_PAGE);

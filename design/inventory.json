@@ -1,0 +1,842 @@
+[
+  {
+    "name": "Text actions",
+    "coverage": "shared",
+    "components": [
+      "button"
+    ],
+    "sources": [
+      "src/ui/design/components/button.js"
+    ],
+    "definition": "Use a button for an action. Quiet actions have no persistent border or underline; content links keep their prose treatment.",
+    "variants": [
+      "neutral",
+      "primary",
+      "danger",
+      "quiet; compact/default"
+    ],
+    "states": [
+      "default",
+      "hover",
+      "focus",
+      "pressed",
+      "disabled",
+      "busy"
+    ],
+    "keyboard": "Native Enter/Space; busy prevents resubmission without changing the label.",
+    "followUp": "Retired link-btn throughout the room. Remaining raw markup is bounded in legacy-controls.json and uses shared CSS."
+  },
+  {
+    "name": "Icon actions",
+    "coverage": "shared",
+    "components": [
+      "iconButton"
+    ],
+    "sources": [
+      "src/ui/design/components/button.js"
+    ],
+    "definition": "Familiar glyph, accessible name, fast tooltip and stable target. Ambiguous commitments retain text.",
+    "variants": [
+      "compact",
+      "default"
+    ],
+    "states": [
+      "default",
+      "hover",
+      "focus",
+      "pressed",
+      "disabled"
+    ],
+    "keyboard": "Tab and Enter/Space. No hover-only actions.",
+    "followUp": "Use 14–16px glyphs in 24/28px targets; coarse pointers get 44px targets."
+  },
+  {
+    "name": "Metadata actions",
+    "coverage": "shared",
+    "components": [
+      "metadata"
+    ],
+    "sources": [
+      "src/ui/design/patterns.js"
+    ],
+    "definition": "Counts and secondary actions wrap independently of a story title. Passive counts never look pressed.",
+    "variants": [
+      "text",
+      "count",
+      "icon action"
+    ],
+    "states": [
+      "default",
+      "focus",
+      "pressed"
+    ],
+    "keyboard": "Ordinary Tab order; actions never nest inside the content-opening control.",
+    "followUp": "Continue migrating raw metadata actions when changing item renderers."
+  },
+  {
+    "name": "Navigation links",
+    "coverage": "shared",
+    "components": [
+      "navigationLink"
+    ],
+    "sources": [
+      "src/ui/room/docs.js"
+    ],
+    "definition": "A destination has href and current-page semantics, without a prose underline. Navigation remains distinguishable by placement and hover/focus.",
+    "variants": [
+      "default",
+      "current",
+      "nested"
+    ],
+    "states": [
+      "default",
+      "hover",
+      "focus",
+      "current"
+    ],
+    "keyboard": "Native link keyboard and context menu; intercept navigation only when the app handles that destination.",
+    "followUp": "Docs contents uses uiNavLink; remaining outline and search rows use the same contract locally."
+  },
+  {
+    "name": "Content links",
+    "coverage": "shared",
+    "components": [
+      "document"
+    ],
+    "sources": [
+      "src/ui/design/document.css"
+    ],
+    "definition": "Underlined references belong within reading content, citations and explanatory prose. Never remove underlines globally from anchors.",
+    "variants": [
+      "internal reference",
+      "external reference"
+    ],
+    "states": [
+      "default",
+      "hover",
+      "focus"
+    ],
+    "keyboard": "Native links; destination text describes where they go.",
+    "followUp": "Preserve article and documentation links; no fake button styled as a prose link."
+  },
+  {
+    "name": "Tabs",
+    "coverage": "shared",
+    "components": [
+      "tabs"
+    ],
+    "sources": [
+      "src/ui/room/compare.js"
+    ],
+    "definition": "Switch local panels; do not represent global destinations or preference values. Keep every panel mounted to retain reading state.",
+    "variants": [
+      "horizontal",
+      "wide overview"
+    ],
+    "states": [
+      "selected",
+      "unselected",
+      "disabled",
+      "focus"
+    ],
+    "keyboard": "One tab stop; Left/Right, Home/End, manual Enter/Space activation. Tab then reaches the panel.",
+    "followUp": "Comparison uses real tab semantics at narrow widths and named regions in its side-by-side overview. Vertical and closable tabs are not supported yet."
+  },
+  {
+    "name": "Segmented choices",
+    "coverage": "local",
+    "components": [
+      "field"
+    ],
+    "sources": [
+      "src/ui/design/components/field.css",
+      "src/ui/design/catalogue.js"
+    ],
+    "definition": "A short mutually exclusive value set uses a labelled native radio group; selection does not mean opening a tab panel.",
+    "variants": [
+      "segmented radio"
+    ],
+    "states": [
+      "unchecked",
+      "checked",
+      "disabled",
+      "focus"
+    ],
+    "keyboard": "Native radio arrows and Space; the label is the full target.",
+    "followUp": "Shared CSS and catalogue example are ready. No production segmented setting currently requires a JavaScript factory."
+  },
+  {
+    "name": "Layout choices",
+    "coverage": "local",
+    "components": [
+      "button"
+    ],
+    "sources": [
+      "src/ui/room/navigation.css",
+      "src/ui/room/toolbar.js"
+    ],
+    "definition": "Persistent layout preference shown as compact preview cards in Settings. Exactly one active option, stable preview and text.",
+    "variants": [
+      "preview card"
+    ],
+    "states": [
+      "selected",
+      "unselected",
+      "saving",
+      "disabled",
+      "focus"
+    ],
+    "keyboard": "Native buttons expose pressed state; changing a preview persists the preference.",
+    "followUp": "Keep previews product-owned; migrate to a reusable choice-card binder when a second use appears."
+  },
+  {
+    "name": "Status and tag pills",
+    "coverage": "shared",
+    "components": [
+      "badge"
+    ],
+    "sources": [
+      "src/ui/design/components/pill.js",
+      "src/ui/room/items.js",
+      "src/ui/room/social.js"
+    ],
+    "definition": "Passive metadata; never a focus stop. Meaning is written in text, not communicated by color alone.",
+    "variants": [
+      "neutral",
+      "accent",
+      "success",
+      "warning",
+      "error"
+    ],
+    "states": [
+      "static"
+    ],
+    "keyboard": "No keyboard interaction. Do not attach click handlers or required tooltips.",
+    "followUp": "New marks and clip tags use uiBadge. Avoid adding a status pill where existing text already explains the state."
+  },
+  {
+    "name": "Selectable pills",
+    "coverage": "shared",
+    "components": [
+      "chip"
+    ],
+    "sources": [
+      "src/ui/design/components/pill.js",
+      "src/ui/room/collections.js"
+    ],
+    "definition": "Interactive pill with a constant label and checkmark that reserves its width; use for selection or toggled filters.",
+    "variants": [
+      "toggle"
+    ],
+    "states": [
+      "unselected",
+      "selected",
+      "disabled",
+      "focus"
+    ],
+    "keyboard": "Native button with aria-pressed, Enter/Space; 24px floor and 44px coarse target.",
+    "followUp": "Evidence selection uses uiChip. A future removable filter needs a separately named remove action, never a nested button."
+  },
+  {
+    "name": "Disclosures and accordions",
+    "coverage": "shared",
+    "components": [
+      "disclosure"
+    ],
+    "sources": [
+      "src/ui/design/components/disclosure.js"
+    ],
+    "definition": "Native details/summary with one consistent chevron, target and text scale. Optional groups may allow many sections or only one open.",
+    "variants": [
+      "independent",
+      "exclusive named group"
+    ],
+    "states": [
+      "closed",
+      "open",
+      "focus"
+    ],
+    "keyboard": "Native Enter/Space. Do not add redundant aria-expanded or a focus trap.",
+    "followUp": "Library filters, collection setup, watches, imports, reader outline, docs and Space sections use the shared disclosure."
+  },
+  {
+    "name": "Text and search fields",
+    "coverage": "shared",
+    "components": [
+      "field"
+    ],
+    "sources": [
+      "src/ui/design/components/field.js"
+    ],
+    "definition": "Native text/search inputs with associated label, hint and error. A placeholder never substitutes for a name.",
+    "variants": [
+      "text",
+      "search",
+      "url"
+    ],
+    "states": [
+      "empty",
+      "filled",
+      "focus",
+      "invalid",
+      "disabled",
+      "readonly"
+    ],
+    "keyboard": "Native editing and form submission. Error description belongs to its field.",
+    "followUp": "Migration of local search fields can continue when those flows change; retain product search timing and cancellation."
+  },
+  {
+    "name": "Textarea and select",
+    "coverage": "shared",
+    "components": [
+      "field"
+    ],
+    "sources": [
+      "src/ui/design/components/field.js"
+    ],
+    "definition": "Native multiline and selection controls use the same field frame, label, error and minimum height.",
+    "variants": [
+      "textarea",
+      "native select"
+    ],
+    "states": [
+      "default",
+      "focus",
+      "invalid",
+      "disabled",
+      "readonly"
+    ],
+    "keyboard": "Native text/option navigation. Use a select for longer value sets.",
+    "followUp": "Do not replace native selects with custom menus; a searchable combobox needs its own tested behavior."
+  },
+  {
+    "name": "Checkboxes and toggles",
+    "coverage": "shared",
+    "components": [
+      "toggle",
+      "settingsRow"
+    ],
+    "sources": [
+      "src/ui/design/components/field.js"
+    ],
+    "definition": "An independent binary preference uses a named native checkbox. Its label is clickable and the value remains visible.",
+    "variants": [
+      "checkbox settings row"
+    ],
+    "states": [
+      "unchecked",
+      "checked",
+      "disabled",
+      "focus"
+    ],
+    "keyboard": "Space toggles; ordinary Tab order.",
+    "followUp": "Account listing and composer checkboxes remain local markup; migrate on change. Do not add a switch merely for visual variety."
+  },
+  {
+    "name": "Action menus",
+    "coverage": "shared",
+    "components": [
+      "menu"
+    ],
+    "sources": [
+      "src/ui/design/components/overlays.js"
+    ],
+    "definition": "Short list of actions in a native popover. Forms and rich content are not menus.",
+    "variants": [
+      "anchored action list"
+    ],
+    "states": [
+      "closed",
+      "open",
+      "disabled item"
+    ],
+    "keyboard": "Arrows, Home/End, first letter; Escape returns focus, Tab leaves, outside click dismisses.",
+    "followUp": "Shared for global More and Room options. A context-menu variant is not implemented; do not label arbitrary popovers role=menu."
+  },
+  {
+    "name": "Dialogs and drawers",
+    "coverage": "shared",
+    "components": [
+      "dialog"
+    ],
+    "sources": [
+      "src/ui/design/components/overlays.js",
+      "src/ui/room/toolbar.js"
+    ],
+    "definition": "Modal task surface with a name, explicit close, contained focus and restoration. Drawer is its edge-aligned placement variant.",
+    "variants": [
+      "modal",
+      "drawer"
+    ],
+    "states": [
+      "closed",
+      "open"
+    ],
+    "keyboard": "Native modal Escape and wrapped Tab; return to the opener.",
+    "followUp": "Settings uses drawer. A nonmodal inspector must not reuse modal semantics without a separate focus contract."
+  },
+  {
+    "name": "Inline panels and rich popovers",
+    "coverage": "local",
+    "components": [
+      "field",
+      "toolbar"
+    ],
+    "sources": [
+      "src/ui/room/reader-tools.js",
+      "src/ui/room/reblog.js"
+    ],
+    "definition": "Forms and optional tools disclosed alongside their owning control. Use group/dialog semantics according to behavior, not a menu just because it floats.",
+    "variants": [
+      "inline reader panel",
+      "composer popover"
+    ],
+    "states": [
+      "closed",
+      "open",
+      "busy",
+      "error"
+    ],
+    "keyboard": "Trigger exposes expanded and controls; keyboard users can enter and leave; Escape restores a sensible focus target.",
+    "followUp": "Reader find/comfort and reblog flows have product tests but separate binders. Consolidate after reconciling their dismissal and positioning requirements."
+  },
+  {
+    "name": "Selection trays",
+    "coverage": "shared",
+    "components": [
+      "tray"
+    ],
+    "sources": [
+      "src/ui/room/collections.js"
+    ],
+    "definition": "Compact contextual actions in document flow, visible only with a selection. No extra heading is required when the count and actions explain it.",
+    "variants": [
+      "sticky inline"
+    ],
+    "states": [
+      "hidden",
+      "visible",
+      "disabled action"
+    ],
+    "keyboard": "Normal Tab order; clearing restores focus to material instead of losing it with the tray.",
+    "followUp": "Evidence selection uses uiTray. Floating passage selection stays a specialized product composition."
+  },
+  {
+    "name": "Tooltips",
+    "coverage": "shared",
+    "components": [
+      "tooltip"
+    ],
+    "sources": [
+      "src/ui/design/components/tooltips.js"
+    ],
+    "definition": "Short hint supplements a familiar control name; it cannot contain essential settings, errors or interactive content.",
+    "variants": [
+      "hover",
+      "keyboard"
+    ],
+    "states": [
+      "hidden",
+      "visible"
+    ],
+    "keyboard": "150ms pointer delay; immediate keyboard; Escape dismisses before parent overlay; hoverable content.",
+    "followUp": "Touch actions work directly. Do not use tooltips on passive badges to hide essential meaning."
+  },
+  {
+    "name": "Toolbars and settings rows",
+    "coverage": "shared",
+    "components": [
+      "toolbar",
+      "settingsRow"
+    ],
+    "sources": [
+      "src/ui/design/patterns.js"
+    ],
+    "definition": "Compact wrapping action groups and labelled value rows. Expose a group name without adding unnecessary visible labels.",
+    "variants": [
+      "action group",
+      "label-control row"
+    ],
+    "states": [
+      "default",
+      "wrapping",
+      "disabled control"
+    ],
+    "keyboard": "Ordinary Tab order. Do not use role=toolbar without its composite keyboard contract.",
+    "followUp": "Product toolbars may arrange shared controls; fields and controls own their validation."
+  },
+  {
+    "name": "Cards and list items",
+    "coverage": "shared",
+    "components": [
+      "card",
+      "metadata"
+    ],
+    "sources": [
+      "src/ui/design/patterns.js",
+      "src/ui/room/items.js"
+    ],
+    "definition": "Semantic content container with separate heading, metadata and actions; do not make a whole card a button containing other buttons.",
+    "variants": [
+      "utility card",
+      "reading row",
+      "tile",
+      "lead",
+      "story"
+    ],
+    "states": [
+      "default",
+      "selected",
+      "loading",
+      "error"
+    ],
+    "keyboard": "Content opener and secondary actions are independent focus targets.",
+    "followUp": "Utility cards are shared. Seven reading forms remain intentional editorial product variants."
+  },
+  {
+    "name": "Pagination and load more",
+    "coverage": "shared",
+    "components": [
+      "pager",
+      "button"
+    ],
+    "sources": [
+      "src/ui/room/docs.js",
+      "src/ui/room/layouts.js",
+      "src/ui/room/river.js"
+    ],
+    "definition": "Previous/next names its destination; numbered navigation exposes current page; incremental loading is an action.",
+    "variants": [
+      "document pager",
+      "numbered lane",
+      "load more"
+    ],
+    "states": [
+      "first",
+      "middle",
+      "last",
+      "loading",
+      "error"
+    ],
+    "keyboard": "Ordinary Tab order. Preserve reading position and focus after adding content.",
+    "followUp": "Document pager is shared; lane navigation and incremental reading retain local layout and tested scroll behavior."
+  },
+  {
+    "name": "Breadcrumbs and back navigation",
+    "coverage": "local",
+    "components": [
+      "button",
+      "navigationLink"
+    ],
+    "sources": [
+      "src/ui/room/docs.js",
+      "src/ui/room/levels.js"
+    ],
+    "definition": "Back acts on the remembered reader stack. A breadcrumb is a location hierarchy, not decorative separator text.",
+    "variants": [
+      "back action",
+      "static location trail"
+    ],
+    "states": [
+      "default",
+      "current"
+    ],
+    "keyboard": "Back is a button; future clickable ancestors need a named nav/list and current-page semantics.",
+    "followUp": "Current docs trail is informational. Do not add extra crumb labels to the room header."
+  },
+  {
+    "name": "Document content",
+    "coverage": "shared",
+    "components": [
+      "document"
+    ],
+    "sources": [
+      "src/ui/design/document.css",
+      "src/ui/room/reader.js"
+    ],
+    "definition": "Comfortable reading scale separated from compact application controls, shared by articles and docs.",
+    "variants": [
+      "article",
+      "documentation"
+    ],
+    "states": [
+      "loading",
+      "ready",
+      "find highlight",
+      "selection",
+      "error"
+    ],
+    "keyboard": "Headings support focus destinations; find and passage controls have visible keyboard paths.",
+    "followUp": "Shared module includes paragraphs, headings, lists, quotes, media captions, code, tables and callouts. Product owns fetching and reading position."
+  },
+  {
+    "name": "Document navigation",
+    "coverage": "local",
+    "components": [
+      "navigationLink",
+      "disclosure",
+      "pager"
+    ],
+    "sources": [
+      "src/ui/room/docs.js"
+    ],
+    "definition": "Contents, current page, on-page outline, search and pager surround readable content. Narrow contents disclose without losing the current page.",
+    "variants": [
+      "wide columns",
+      "narrow contents panel"
+    ],
+    "states": [
+      "current",
+      "searching",
+      "no matches",
+      "loading",
+      "error"
+    ],
+    "keyboard": "Named nav regions, current-page announcement, Escape from contents, focus the loaded title.",
+    "followUp": "Composed from shared links/disclosures/pager; docs-specific fetching and layout remain local."
+  },
+  {
+    "name": "Code and data tables",
+    "coverage": "shared",
+    "components": [
+      "document"
+    ],
+    "sources": [
+      "src/ui/design/document.css",
+      "src/ui/room/reader.js"
+    ],
+    "definition": "Code scrolls inside its container; language and copy action stay outside selectable text. Data tables retain native headers and cells.",
+    "variants": [
+      "inline code",
+      "code block",
+      "semantic table"
+    ],
+    "states": [
+      "ready",
+      "copied",
+      "copy fallback",
+      "overflow"
+    ],
+    "keyboard": "Copy is named; scrollable tables are keyboard reachable and named.",
+    "followUp": "No sortable data grid is shipped. Sorting, column resizing and virtualized rows need a separate tested contract if introduced."
+  },
+  {
+    "name": "Feedback and notices",
+    "coverage": "shared",
+    "components": [
+      "feedback"
+    ],
+    "sources": [
+      "src/ui/design/patterns.js"
+    ],
+    "definition": "Explain the state and an available next action; avoid generic empty banners and needless headings.",
+    "variants": [
+      "empty",
+      "loading",
+      "error",
+      "info",
+      "success"
+    ],
+    "states": [
+      "visible",
+      "recovery pending"
+    ],
+    "keyboard": "Error uses alert, loading/success use status; recovery remains a real button.",
+    "followUp": "Long-lived failures belong inline, not only in a toast. Warning content can use info until a tested warning variant is introduced."
+  },
+  {
+    "name": "Toasts",
+    "coverage": "local",
+    "components": [],
+    "sources": [
+      "src/ui/room/dom.js",
+      "src/ui/room.html"
+    ],
+    "definition": "Brief nonessential confirmation in a polite status region. It must never be the only record of an error needing action.",
+    "variants": [
+      "confirmation"
+    ],
+    "states": [
+      "hidden",
+      "visible"
+    ],
+    "keyboard": "No focus stealing. Essential recovery controls stay in the page.",
+    "followUp": "One room toast exists; extract only after reconciling timeout and queue behavior. Do not introduce interactive toast actions yet."
+  },
+  {
+    "name": "Skeletons and progress",
+    "coverage": "local",
+    "components": [],
+    "sources": [
+      "src/ui/room/room.css",
+      "src/ui/room/catchup.js"
+    ],
+    "definition": "Loading shape is decorative; readable status or aria-busy explains work. Determinate progress exposes value and maximum.",
+    "variants": [
+      "skeleton",
+      "indeterminate status",
+      "native progress"
+    ],
+    "states": [
+      "loading",
+      "complete",
+      "failed"
+    ],
+    "keyboard": "Do not create focus stops. Honor reduced motion and accessible progress naming.",
+    "followUp": "Room skeleton and catch-up progress have local definitions. Use shared feedback for new ordinary loading states."
+  },
+  {
+    "name": "Avatars and media",
+    "coverage": "local",
+    "components": [],
+    "sources": [
+      "src/ui/room/items.js",
+      "src/ui/room/reader.js"
+    ],
+    "definition": "Images support content rather than replace names. Decorative avatars use empty alt beside the name; meaningful figures have text alternatives.",
+    "variants": [
+      "avatar",
+      "thumbnail",
+      "cover",
+      "figure"
+    ],
+    "states": [
+      "loading",
+      "ready",
+      "unavailable"
+    ],
+    "keyboard": "An image is not interactive unless it has a named control wrapper.",
+    "followUp": "Product image loading and editorial sizes stay local; avoid inventing an avatar size scale until used outside reading forms."
+  },
+  {
+    "name": "Dividers and spacing",
+    "coverage": "local",
+    "components": [],
+    "sources": [
+      "src/ui/room/room.css",
+      "design/tokens.json"
+    ],
+    "definition": "Use space before adding rules. Decorative separators carry no keyboard or announcement burden.",
+    "variants": [
+      "hairline",
+      "section space"
+    ],
+    "states": [
+      "static"
+    ],
+    "keyboard": "No focus stop; use semantic hr only for a thematic break.",
+    "followUp": "Existing separator is local CSS; all spacing must use the shared scale except intentional editorial geometry."
+  },
+  {
+    "name": "Composers and source pickers",
+    "coverage": "local",
+    "components": [
+      "field",
+      "button",
+      "disclosure"
+    ],
+    "sources": [
+      "src/ui/room/social.js",
+      "src/ui/room/add.js"
+    ],
+    "definition": "Product workflows compose fields, actions and feedback; draft text, validation and server state remain product responsibilities.",
+    "variants": [
+      "inline composer",
+      "source candidates",
+      "import report"
+    ],
+    "states": [
+      "editing",
+      "submitting",
+      "success",
+      "error",
+      "partial success"
+    ],
+    "keyboard": "Labels, submission prevention, error association and focus recovery are mandatory.",
+    "followUp": "Several fields/actions still use local markup. They are recorded in legacy-controls.json; migrate per flow with behavioral tests."
+  },
+  {
+    "name": "Drag and resize",
+    "coverage": "reserved",
+    "components": [],
+    "sources": [
+      "src/layout.ts"
+    ],
+    "definition": "Rearrangement must offer a non-drag route and retain other portals and saved material.",
+    "variants": [
+      "drag handle",
+      "resize handle"
+    ],
+    "states": [
+      "idle",
+      "dragging",
+      "settled"
+    ],
+    "keyboard": "Do not rely on dragging alone; tool-driven arrangement remains available.",
+    "followUp": "No drag or resize handles are shipped. Room arrangement currently uses tools; lane controls navigate the layout. Require direct keyboard alternatives before adding handles."
+  },
+  {
+    "name": "Combobox and command palette",
+    "coverage": "reserved",
+    "components": [],
+    "sources": [],
+    "definition": "Searchable option selection and command search have different keyboard and filtering requirements from action menus.",
+    "variants": [
+      "combobox",
+      "command dialog"
+    ],
+    "states": [
+      "empty",
+      "query",
+      "loading",
+      "results",
+      "no results",
+      "error"
+    ],
+    "keyboard": "Define active descendant or roving focus, Escape and selection semantics before building.",
+    "followUp": "No current product control requires either. Add production use, a full contract and interaction tests before promoting to shared."
+  },
+  {
+    "name": "Tree and data grid",
+    "coverage": "reserved",
+    "components": [],
+    "sources": [],
+    "definition": "Hierarchical selection and editable tabular data are composite widgets, not decorated lists or tables.",
+    "variants": [
+      "tree",
+      "treegrid",
+      "data grid"
+    ],
+    "states": [
+      "expanded",
+      "selected",
+      "editing",
+      "loading",
+      "error"
+    ],
+    "keyboard": "Define the WAI-ARIA composite keyboard model before implementation.",
+    "followUp": "Docs contents uses nested disclosures and links; it intentionally is not a tree widget. No grid need exists today."
+  },
+  {
+    "name": "Date, range and file inputs",
+    "coverage": "reserved",
+    "components": [
+      "field"
+    ],
+    "sources": [],
+    "definition": "Prefer labelled native inputs when a product need arrives. A bespoke calendar or slider needs a concrete reason.",
+    "variants": [
+      "native date",
+      "range",
+      "file"
+    ],
+    "states": [
+      "empty",
+      "filled",
+      "invalid",
+      "disabled"
+    ],
+    "keyboard": "Use native keyboard behavior and expose values/constraints.",
+    "followUp": "OPML import uses a product file input. No shared custom picker, date grid or range widget is claimed."
+  }
+]

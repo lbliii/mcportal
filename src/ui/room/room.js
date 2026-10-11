@@ -49,11 +49,11 @@
       el('div', { class: 'packs' }, cards),
       el('div', { class: 'welcome-actions' }, build,
         rebuilding
-          ? el('button', { class: 'link-btn', onclick: () => { loading = null; loadRoom(); } }, 'Cancel')
-          : el('button', { class: 'link-btn', onclick: () => buildRoom([]) }, 'Try a sample room'),
-        rebuilding ? null : el('button', { class: 'link-btn', onclick: () => pickOpml() }, 'Import subscriptions (OPML)'),
+          ? el('button', { class: 'btn quiet sm', onclick: () => { loading = null; loadRoom(); } }, 'Cancel')
+          : el('button', { class: 'btn quiet sm', onclick: () => buildRoom([]) }, 'Try a sample room'),
+        rebuilding ? null : el('button', { class: 'btn quiet sm', onclick: () => pickOpml() }, 'Import subscriptions (OPML)'),
         !rebuilding && data.identity?.mode === 'ghost' && data.identity.canSignIn
-          ? el('button', { class: 'link-btn', onclick: () => { signingIn.hidden = false; signIn(signingIn); } }, 'Sign in to your account')
+          ? el('button', { class: 'btn quiet sm', onclick: () => { signingIn.hidden = false; signIn(signingIn); } }, 'Sign in to your account')
           : null),
       signingIn,
       DEV ? null : el('div', { class: 'ask' },

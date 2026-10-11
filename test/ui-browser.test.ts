@@ -165,13 +165,13 @@ test('browser: Recall opens retained pages and returns with query, filters and f
   await page.waitFor(`document.querySelector('.recall-hit')`, 'Recall results');
   await page.eval(`document.querySelector('[aria-label="Search your library"]').value = 'Hijacking'; document.querySelector('[aria-label="Filter by kind"]').value = 'saved'; document.querySelector('.recall-search').requestSubmit()`);
   await page.waitFor(`document.querySelector('#recallCount').textContent.includes('1 match for')`, 'the filtered result');
-  await page.click('.recall-hit .link-btn');
+  await page.click('.recall-hit .btn.quiet:not(.ui-chip)');
   await page.waitFor(`!document.querySelector('#reader').hidden && document.querySelector('#reader .body')`, 'the recalled page');
   await page.click('#readerControls .reader-top button');
   await page.waitFor(`!document.querySelector('#experiences').hidden`, 'return to Recall');
   assert.equal(await page.eval(`document.querySelector('[aria-label="Search your library"]').value`), 'Hijacking');
   assert.equal(await page.eval(`document.querySelector('[aria-label="Filter by kind"]').value`), 'saved');
-  assert.equal(await page.eval(`document.activeElement.className`), 'link-btn');
+  assert.equal(await page.eval(`document.activeElement.className`), 'btn quiet sm');
   await page.click('#btnExperienceRoom');
   await page.waitFor(`!document.querySelector('#grid').hidden`, 'return to the room');
   assert.deepEqual(page.problems, []);
@@ -228,12 +228,12 @@ test('browser: selected Recall material creates a desk, supports a trail and com
   try {
     assert.equal(await page.eval(`document.documentElement.scrollWidth <= window.innerWidth`), true, 'no narrow-screen page overflow');
     await page.click('#comparisonTab1');
-    assert.equal(await page.eval(`document.querySelector('#comparisonSource1').classList.contains('compact-active')`), true);
+    assert.equal(await page.eval(`document.querySelector('#comparisonSource1').classList.contains('ui-tab-active')`), true);
     await page.click('#comparisonSource1 .experience-row button');
     await page.waitFor(`!document.querySelector('#reader').hidden && document.querySelector('#reader .body')`, 'the compared source in the reader');
     await page.click('#readerControls .reader-top button');
     await page.waitFor(`!document.querySelector('#experiences').hidden`, 'comparison continuity');
-    assert.equal(await page.eval(`document.querySelector('#comparisonSource1').classList.contains('compact-active')`), true);
+    assert.equal(await page.eval(`document.querySelector('#comparisonSource1').classList.contains('ui-tab-active')`), true);
   } finally { await page.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false }); }
   assert.deepEqual(page.problems, []);
 });
@@ -859,7 +859,7 @@ test('browser: the river merges the room into one stream: picks, new, a divider,
     assert.equal(await units(), 12);
     assert.equal(await page.eval(`document.querySelector('.river-fold').textContent`), '9 more from Saved');
     assert.equal(await page.eval(`document.querySelectorAll('.river-feed [data-story^="saved"]').length`), 3, 'three of the run, then the fold');
-    await page.click('.river-fold .link-btn');
+    await page.click('.river-fold .btn.quiet');
     assert.equal(await page.eval(`document.querySelectorAll('.river-feed [data-story^="saved"]').length`), 12);
     assert.equal(await page.eval(`document.activeElement.closest('article')?.dataset.story`), `saved\nhttps://example.com/saved-3`, 'focus moves to the first revealed story');
     assert.equal(await page.eval(`document.querySelector('.river-end').firstChild.textContent`), "That's everything your portals fetched.");
@@ -888,7 +888,7 @@ test('browser: river pages end on a separator that takes focus, and a refresh wa
     await page.click('.river-more .fp-more');
     assert.equal(await page.eval(`document.activeElement.dataset.from`), '11', 'focus goes to the new page');
     assert.match(await page.eval<string>(`document.activeElement.textContent`), /^Stories 11 to 1\d$/);
-    await page.click('.river-fold .link-btn');
+    await page.click('.river-fold .btn.quiet');
     await page.click('.river-more .fp-more');
     assert.equal(await page.eval(`document.activeElement.dataset.from`), '21');
     assert.equal(await page.eval(`document.activeElement.textContent`), 'Stories 21 to 30');
@@ -1537,7 +1537,7 @@ test('browser: Space links: the room offers a follow of whoever brought you, say
     await page.eval(`document.querySelector('#intros .btn.follow').click()`);
     await page.waitFor(`document.querySelector('#intros .btn.follow').getAttribute('aria-pressed') === 'true'`, 'the follow');
     assert.deepEqual(await page.eval(`window.__calls.at(-1)`), { name: 'relationship', args: { handle: 'ana', action: 'follow' } });
-    await page.eval(`document.querySelector('#intros .link-btn').click()`);
+    await page.eval(`document.querySelector('#intros .btn.quiet').click()`);
     assert.equal(await page.eval(`document.querySelectorAll('#intros .intro').length`), 1, 'Not now puts that one away');
 
     // Opening something hides the strip; the room brings it back.

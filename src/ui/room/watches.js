@@ -19,7 +19,7 @@
     const title = upcoming ? 'Events' : 'Page updates';
     const heading = el('header',{class:'experience-heading'}, el('h1',null,title),el('p',null,upcoming?'Your watched artists and calendars, arranged by date.':'A quiet inbox for the pages and releases you choose to follow.'));
     const content = el('div',{class:'watch-layout'},el('section',{class:'watch-main'},upcoming ? upcomingEvents(watches) : changeInbox(data.inbox.filter(f => watches.some(w=>w.id===f.watchId)))),
-      el('aside',{class:'watch-sidebar'},...watches.map(watchCard),el('details',{class:'watch-add'},el('summary',null,upcoming?'Follow an artist or calendar':'Track a page or repository'),watchSetup(upcoming)),el('details',null,el('summary',null,'About checks'),el('p',{class:'experience-muted'},data.worker))));
+      el('aside',{class:'watch-sidebar'},...watches.map(watchCard),uiDisclosure({label:upcoming?'Follow an artist or calendar':'Track a page or repository', className:'watch-add'},watchSetup(upcoming)),uiDisclosure({label:'About checks'},el('p',{class:'experience-muted'},data.worker))));
     $('experiences').replaceChildren(heading,content);
   }
   /** @param {import('../watches-state.ts').WatchFinding[]} findings */
@@ -30,15 +30,15 @@
       const card=el('article',{class:`change-card${f.read?' acknowledged':''}`},el('span',{class:'experience-kicker'},f.kind==='availability'?'SOURCE AVAILABILITY':'SOURCE CHANGE'),el('h3',null,f.title),el('p',{class:'experience-muted'},`Found ${new Date(f.at).toLocaleString()}`));
       if (f.beforeAt && f.afterAt) card.append(el('p',{class:'experience-muted'},`Compared ${new Date(f.beforeAt).toLocaleString()} → ${new Date(f.afterAt).toLocaleString()}`));
       if (f.diff) {
-        const details=el('details',null,el('summary',null,'Inspect the text diff'),el('div',{class:'change-diff',tabindex:0,'aria-label':`${f.title} text changes`},f.diff.map(d=>el('p',{class:`diff-${d.kind}`},el('span',{'aria-label':d.kind},d.kind==='added'?'+ ':d.kind==='removed'?'− ':'  '),d.text))));
+        const details=uiDisclosure({label:'Inspect the text diff'},el('div',{class:'change-diff',tabindex:0,'aria-label':`${f.title} text changes`},f.diff.map(d=>el('p',{class:`diff-${d.kind}`},el('span',{'aria-label':d.kind},d.kind==='added'?'+ ':d.kind==='removed'?'− ':'  '),d.text))));
         card.append(details);
       } else card.append(el('p',null,'The last good baseline is retained. This is an availability problem; it does not mean the source deleted its content.'));
       const actions=el('div',{class:'experience-row'},f.url?uiButton({label:'Open original', onClick:()=>openLink(f.url || '')}):null,
         f.diff?uiButton({label:'Ask your agent', onClick:()=>askChangeAgent(f)}):null,
-        el('button',{class:'link-btn',disabled:f.read,onclick:()=>watchOperation({action:'acknowledge',findingIds:[f.id]})},f.read?'Read':'Mark as read'));
+        el('button',{class:'btn quiet sm',disabled:f.read,onclick:()=>watchOperation({action:'acknowledge',findingIds:[f.id]})},f.read?'Read':'Mark as read'));
       card.append(actions);list.append(card);
     }
-    list.append(el('details',null,el('summary',null,'About saved updates'),el('p',{class:'experience-muted'},'Updates are kept for 30 days, up to 40 at a time. Long pages and changes may be shortened.')));
+    list.append(uiDisclosure({label:'About saved updates'},el('p',{class:'experience-muted'},'Updates are kept for 30 days, up to 40 at a time. Long pages and changes may be shortened.')));
     return list;
   }
   /** @param {import('../watches-state.ts').Watch[]} watches */

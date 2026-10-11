@@ -6,7 +6,7 @@ import { findChrome, Page } from './browser.ts';
 const chrome = findChrome();
 
 async function key(page: Page, key: string): Promise<void> {
-  for (const type of ['keyDown','keyUp']) await page.send('Input.dispatchKeyEvent',{type,key,code:key,windowsVirtualKeyCode:({Escape:27,Tab:9,ArrowDown:40,ArrowUp:38,Home:36,End:35} as Record<string,number>)[key] || key.toUpperCase().charCodeAt(0)});
+  for (const type of ['keyDown','keyUp']) await page.send('Input.dispatchKeyEvent',{type,key,...(type==='keyDown' && key==='Enter'?{text:'\r',unmodifiedText:'\r'}:{}),code:key===' '?'Space':key,windowsVirtualKeyCode:({Escape:27,Tab:9,ArrowDown:40,ArrowUp:38,ArrowLeft:37,ArrowRight:39,Home:36,End:35,Enter:13,' ':32} as Record<string,number>)[key] || key.toUpperCase().charCodeAt(0)});
 }
 
 test('shared controls preserve compact geometry, live aliases, growing text and coarse-pointer targets', { skip: !chrome && 'no Chrome found' }, async () => {
@@ -34,6 +34,58 @@ test('shared controls preserve compact geometry, live aliases, growing text and 
     }
     assert.deepEqual(page.problems, []);
   } finally { await page.close(); }
+});
+
+test('tabs expose one panel, skip disabled choices, activate manually and preserve focused reading across responsive overview', {skip:!chrome}, async()=>{
+ const page=await Page.open(chrome!,{width:800,height:900});
+ try {
+  await page.goto(`data:text/html,${encodeURIComponent(designControls())}`);
+  await page.click('#demoTab0');
+  await key(page,'ArrowRight');
+  assert.equal(await page.eval(`document.activeElement.id`),'demoTab2','disabled tab is skipped');
+  assert.equal(await page.eval(`document.querySelector('#demoTab0').getAttribute('aria-selected')`),'true','arrow movement does not switch content');
+  await key(page,'Enter');
+  assert.deepEqual(await page.eval(`['demoPanel0','demoPanel2'].map(id=>document.getElementById(id).hidden)`),[true,false]);
+  await key(page,'Home');assert.equal(await page.eval(`document.activeElement.id`),'demoTab0');
+  await key(page,' ');await key(page,'Tab');
+  assert.equal(await page.eval(`document.activeElement.id`),'demoPanel0','Tab moves from the selected tab into its panel');
+  await page.eval(`(()=>{const first=el('div',null,'First source'),second=el('div',null,el('button',{id:'focused-source'},'Read source'));const demo=uiTabs({id:'responsive',label:'Responsive sources',overviewAbove:500,items:[{label:'First',panel:first},{label:'Second',panel:second}]});document.body.append(demo.element);})()`);
+  await page.waitFor(`document.querySelector('#responsiveTab0').closest('[data-ui=tabs]').dataset.overview==='true'`,'wide overview');
+  assert.deepEqual(await page.eval(`['responsivePanel0','responsivePanel1'].map(id=>[document.getElementById(id).hidden,document.getElementById(id).getAttribute('role')])`),[[false,'region'],[false,'region']]);
+  await page.click('#focused-source');
+  await page.send('Emulation.setDeviceMetricsOverride',{width:320,height:800,deviceScaleFactor:1,mobile:false});
+  await page.waitFor(`document.querySelector('#responsiveTab1').getAttribute('aria-selected')==='true'`,'focused source retained on narrowing');
+  assert.equal(await page.eval(`document.activeElement.id`),'focused-source');
+  assert.equal(await page.eval(`document.querySelector('#responsivePanel0').hidden`),true);
+  assert.deepEqual(page.problems,[]);
+ } finally {await page.close();}
+});
+
+test('pills, native accordions, quiet actions and document links keep distinct interaction and visual contracts', {skip:!chrome}, async()=>{
+ const page=await Page.open(chrome!);
+ try {
+  await page.goto(`data:text/html,${encodeURIComponent(designControls())}`);
+  const before=await page.eval(`(()=>{const chip=document.querySelector('[data-ui=chip]');return [chip.offsetWidth,chip.offsetHeight,chip.textContent]})()`);
+  await page.click('[data-ui=chip]');
+  assert.deepEqual(await page.eval(`(()=>{const chip=document.querySelector('[data-ui=chip]');return [chip.offsetWidth,chip.offsetHeight,chip.textContent]})()`),before,'checkmark reserves space and label stays constant');
+  assert.equal(await page.eval(`document.querySelector('[data-ui=chip]').getAttribute('aria-pressed')`),'true');
+  assert.equal(await page.eval(`[...document.querySelectorAll('[data-ui=badge]')].every(n=>n.tabIndex===-1 && n.tagName==='SPAN')`),true);
+  await page.click('details[name=demo-accordion] summary');
+  assert.equal(await page.eval(`document.querySelector('details[name=demo-accordion]').open`),true);
+  await page.eval(`document.querySelectorAll('details[name=demo-accordion] summary')[1].focus()`);
+  await key(page,' ');
+  assert.deepEqual(await page.eval(`[...document.querySelectorAll('details[name=demo-accordion]')].map(n=>n.open)`),[false,true]);
+  assert.deepEqual(await page.eval(`['.btn.quiet','.ui-nav-link','.ui-document a'].map(selector=>getComputedStyle(document.querySelector(selector)).textDecorationLine)`),['none','none','underline']);
+  const quiet=await page.eval<{x:number,y:number}>(`(()=>{const b=[...document.querySelectorAll('button')].find(n=>n.textContent==='Quiet');b.scrollIntoView({block:'center'});const r=b.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})()`);
+  await page.send('Input.dispatchMouseEvent',{type:'mouseMoved',...quiet});
+  assert.notEqual(await page.eval(`getComputedStyle([...document.querySelectorAll('button')].find(n=>n.textContent==='Quiet')).backgroundColor`),'rgba(0, 0, 0, 0)','quiet has visible hover feedback');
+  await page.click('#demo-drawer-trigger');
+  await page.waitFor(`document.querySelector('#demo-drawer').open`,'drawer');
+  assert.equal(await page.eval(`document.querySelector('#demo-drawer').getBoundingClientRect().right===innerWidth`),true);
+  await page.eval(`document.querySelector('#demo-drawer input').focus()`);await key(page,'Escape');
+  await page.waitFor(`!document.querySelector('#demo-drawer').open && document.activeElement.id==='demo-drawer-trigger'`,'drawer focus return');
+  assert.deepEqual(page.problems,[]);
+ } finally {await page.close();}
 });
 
 test('component contracts enforce names and variants, associate field errors and keep busy actions stable', {skip:!chrome}, async()=>{

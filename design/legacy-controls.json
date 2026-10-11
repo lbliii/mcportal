@@ -16,15 +16,15 @@
     "reason": "Existing product controls and content-opening actions; shared CSS applies. Use typed factories for new ordinary actions and migrate these when changing this flow."
   },
   "room/collections.js": {
-    "maximum": 13,
+    "maximum": 10,
     "reason": "Desk editing and evidence selection remain product-specific; collection creation and cards now use shared patterns."
   },
   "room/compare.js": {
-    "maximum": 9,
+    "maximum": 8,
     "reason": "Existing product controls and content-opening actions; shared CSS applies. Use typed factories for new ordinary actions and migrate these when changing this flow."
   },
   "room/docs.js": {
-    "maximum": 6,
+    "maximum": 4,
     "reason": "Existing product controls and content-opening actions; shared CSS applies. Use typed factories for new ordinary actions and migrate these when changing this flow."
   },
   "room/experiences.js": {

@@ -86,9 +86,9 @@
     report.hidden = false;
     report.replaceChildren(...present([heading,
       el('p', { role: 'status' }, `${data.imported} added; ${data.alreadyPresent ?? 0} already present; ${data.failed.length} failed; ${data.deferred?.length ?? 0} left to import.`),
-      data.added?.length ? el('details', null, el('summary', null, 'Added subscriptions'), rows(data.added)) : null,
-      data.failed.length ? el('details', { open: true }, el('summary', null, 'Needs repair'), rows(data.failed)) : null,
-      data.deferred?.length ? el('details', { open: true }, el('summary', null, 'Left to import'),
+      data.added?.length ? uiDisclosure({label:'Added subscriptions'}, rows(data.added)) : null,
+      data.failed.length ? uiDisclosure({label:'Needs repair', open:true}, rows(data.failed)) : null,
+      data.deferred?.length ? uiDisclosure({label:'Left to import', open:true},
         el('p', null, 'Make room if needed, then retry. Large files may need more than one pass.'), rows(data.deferred)) : null,
       data.failed.length || data.deferred?.length ? el('button', { class: 'btn', onclick: () => runOpml(xml) }, 'Retry remaining subscriptions') : null,
       el('button', { class: 'btn', onclick: () => { report.hidden = true; report.replaceChildren(); (root.classList.contains('welcome-view') ? $first('button', $('welcome')) : $('btnAdd'))?.focus(); } }, 'Dismiss report')]));
