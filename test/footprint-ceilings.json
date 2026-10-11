@@ -4,7 +4,7 @@
     "linked": 7742,
     "hosted-new": 7058,
     "hosted-active": 7679,
-    "hosted-labs": 7679
+    "hosted-labs": 8192
   },
   "tools": {
     "account_settings": 61,
@@ -17,6 +17,7 @@
     "find_people": 126,
     "find_source": 139,
     "get_clip": 64,
+    "get_lens": 113,
     "get_public_profile": 62,
     "get_share": 69,
     "import_opml": 105,
@@ -50,6 +51,7 @@
     "share_settings": 90,
     "show_comparison": 259,
     "show_highlights": 143,
+    "show_plate": 400,
     "suggest_people": 127,
     "unlink_account": 63,
     "unshare": 49,

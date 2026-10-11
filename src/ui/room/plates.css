@@ -1,0 +1,44 @@
+  /* room/plates.css: agent illustrations (show_plate). Printed in the brand's paper-and-ink
+     roles inside the functional room: a plate reads as an illustration bound into the book. */
+  .plate { position:relative; margin:var(--mp-space-16) 0; padding:var(--mp-space-12) var(--mp-space-16); background:var(--mp-web-canvas); color:var(--mp-web-text); border:1.5px solid var(--mp-web-text); border-radius:var(--mp-radius-xs); isolation:isolate }
+  .plate::after { content:""; position:absolute; inset:0; border:1.5px solid var(--mp-brand-brick); border-radius:var(--mp-radius-xs); transform:translate(3px,3px); opacity:.5; z-index:-1; pointer-events:none }
+  .plate-head { display:flex; flex-wrap:wrap; gap:var(--mp-space-6) var(--mp-space-10); align-items:center; justify-content:space-between; padding-bottom:var(--mp-space-8); margin-bottom:var(--mp-space-8); border-bottom:1px dashed var(--mp-web-divider) }
+  .plate-kicker { font-size:var(--mp-type-11); font-weight:var(--mp-weight-heading); letter-spacing:.12em; text-transform:uppercase; color:var(--mp-web-secondary) }
+  .plate-badge { font-size:var(--mp-type-11); padding:1px var(--mp-space-8); border:1px solid currentColor; border-radius:999px; color:var(--mp-web-secondary) }
+  .plate-art { background-image:radial-gradient(color-mix(in srgb, var(--mp-web-text) 12%, transparent) 1px, transparent 1.2px); background-size:6px 6px; border-radius:2px; overflow-x:auto }
+  .plate-svg { display:block; width:100%; height:auto; min-width:28rem; font-family:var(--mp-font-ui) }
+  .plate-grid { stroke:var(--mp-web-text); stroke-opacity:.15 }
+  .plate-axis { stroke:var(--mp-web-text); stroke-width:2 }
+  .plate-tick { fill:var(--mp-web-secondary); font-size:11.5px }
+  .plate-label-text { fill:var(--mp-web-text); font-size:13px; font-weight:600 }
+  .plate-leader { stroke:var(--mp-action-primary); stroke-width:1.5; stroke-dasharray:3 3 }
+  .plate-dot { fill:var(--mp-action-primary); stroke:var(--mp-web-text); stroke-width:1.5 }
+  .plate-dot.cited { fill:var(--mp-brand-brick) }
+  .plate-event { stroke:var(--mp-brand-mustard); stroke-width:1.5; stroke-dasharray:4 3 }
+  .plate-event-label { fill:var(--mp-web-text); font-size:11.5px; font-weight:700 }
+  .plate-end { stroke:var(--mp-web-text); stroke-width:1.5 }
+  .plate-legend { display:flex; flex-wrap:wrap; gap:var(--mp-space-6) var(--mp-space-12); font-size:var(--mp-type-12); padding:var(--mp-space-4) var(--mp-space-4) 0 }
+  .plate-legend span { display:inline-flex; align-items:center; gap:var(--mp-space-6) }
+  .plate-legend i { width:10px; height:10px; border-radius:2px; display:inline-block }
+  .plate-details { display:grid; gap:var(--mp-space-4); margin:var(--mp-space-8) 0 0; font-size:var(--mp-type-13) }
+  .plate-details dt { font-weight:var(--mp-weight-strong) }
+  .plate-details dd { margin:0 0 var(--mp-space-4) }
+  .plate-steps { list-style:none; margin:0; padding:var(--mp-space-8) var(--mp-space-4); counter-reset:plate }
+  .plate-steps li { counter-increment:plate; position:relative; display:grid; gap:2px; padding:0 0 var(--mp-space-16) 2.75rem; min-height:2.25rem }
+  .plate-steps li::before { content:counter(plate); position:absolute; left:0; top:0; width:1.75rem; height:1.75rem; border-radius:50%; border:1.5px solid var(--mp-web-text); background:var(--mp-web-canvas); display:grid; place-items:center; font-weight:var(--mp-weight-heading); font-size:var(--mp-type-13); z-index:1 }
+  .plate-steps li:not(:last-child)::after { content:""; position:absolute; left:.875rem; top:1.75rem; bottom:0; border-left:1.5px dashed var(--mp-action-primary) }
+  .plate-steps li.key::before { background:var(--mp-action-primary); border-color:var(--mp-action-primary); color:var(--mp-action-on-primary) }
+  .plate-steps b { font-size:var(--mp-type-14) }
+  .plate-steps span { font-size:var(--mp-type-13); color:var(--mp-web-secondary) }
+  .plate-matrix { width:100%; min-width:28rem; border-collapse:collapse; font-size:var(--mp-type-13) }
+  .plate-matrix th, .plate-matrix td { padding:var(--mp-space-6) var(--mp-space-8); text-align:left; vertical-align:top; border-bottom:1px solid var(--mp-web-divider) }
+  .plate-matrix thead th { font-size:var(--mp-type-11); letter-spacing:.08em; text-transform:uppercase }
+  .plate-cell { display:inline-flex; align-items:baseline; gap:var(--mp-space-6) }
+  .plate-cell i { flex:none; width:10px; height:10px; border-radius:50%; border:1.5px solid var(--mp-web-text); transform:translateY(1px) }
+  .plate-cell.good i { background:var(--mp-action-primary); border-color:var(--mp-action-primary) }
+  .plate-cell.mixed i { background:linear-gradient(90deg, var(--mp-brand-mustard) 50%, transparent 50%); border-color:var(--mp-brand-mustard) }
+  .plate-cell.poor i { border-color:var(--mp-brand-brick) }
+  .plate-caption { margin:var(--mp-space-10) 0 var(--mp-space-6); font-size:var(--mp-type-14); line-height:var(--mp-line-body) }
+  .plate-refs { margin:var(--mp-space-6) 0 0; padding-left:1.5rem; font-size:var(--mp-type-12); color:var(--mp-web-secondary) }
+  .plate-refs a { color:var(--mp-web-link); cursor:pointer; text-decoration:underline }
+  .sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap }

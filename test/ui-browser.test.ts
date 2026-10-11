@@ -21,6 +21,7 @@ import { FileReadingStore } from '../src/reading.ts';
 import { FileSeenStore, seenHash } from '../src/seen.ts';
 import { FileProfileStore, MemoryProfileStore } from '../src/store.ts';
 import type { Fetcher } from '../src/types.ts';
+import { plateFrom } from '../src/plates.ts';
 import { findChrome, Page } from './browser.ts';
 import { startApp, type Running } from './helpers.ts';
 
@@ -1736,4 +1737,36 @@ test('browser: Recall preview selection keeps keyboard focus and reader return r
   assert.equal(await page.eval(`document.activeElement.textContent`), title);
   assert.equal(await page.eval(`document.activeElement.className`), 'recall-title');
   assert.deepEqual(page.problems, []);
+});
+
+test('browser: plates draw every kind from the spec, as text and SVG, and fit a narrow frame', { skip }, async () => {
+  await profiles.put('default', room());
+  const host = await attachHost();
+  const specs: Array<Record<string, unknown>> = [
+    { kind: 'series', mark: 'line', unit: '$', series: [{ name: 'price', points: [{ x: '2026-09-07', y: 214 }, { x: '2026-09-14', y: 228 }, { x: '2026-10-05', y: 182 }] }], events: [{ at: '2026-10-05', label: 'Sale' }] },
+    { kind: 'series', mark: 'bar', series: [{ name: 'Opened', points: [{ x: 'Mon', y: 3 }, { x: 'Tue', y: 5 }] }, { name: 'Read', points: [{ x: 'Mon', y: 1 }, { x: 'Tue', y: 2 }] }] },
+    { kind: 'timeline', entries: [{ at: '2026-09-14', label: 'Snapshots are enough' }, { at: '2026-10-02', label: '<img src=x onerror=alert(1)>', detail: 'Time it', ref: 'url:https://example.com/drills' }] },
+    { kind: 'steps', steps: [{ label: 'Dump' }, { label: 'Restore', detail: 'Weekly', emphasis: true }] },
+    { kind: 'matrix', columns: [{ label: 'Snapshots' }, { label: 'Dumps' }], rows: [{ label: 'Effort', cells: [{ mark: 'good', text: 'A toggle' }, { mark: 'mixed', text: 'A script' }] }] },
+  ];
+  try {
+    await page.goto(`${app.base}/preview`); await page.waitFor(`document.querySelector('[data-portal]')`, 'the host room');
+    for (const spec of specs) {
+      const plate = await plateFrom({ title: `A ${String(spec.kind)} plate`, caption: 'What to notice.', spec, refs: ['url:https://example.com/drills'] }, { userId: 'default' });
+      await page.eval(`window.postMessage({jsonrpc:'2.0',method:'ui/notifications/tool-result',params:{structuredContent:${JSON.stringify({ plate })}}},'*')`);
+      await page.waitFor(`document.querySelector('#reader h1')?.textContent === ${JSON.stringify(plate.title)}`, `the ${String(spec.kind)} plate`);
+      assert.match(await page.eval<string>(`document.querySelector('.plate-kicker').textContent`), /agent illustration/);
+      assert.equal(await page.eval(`document.querySelector('.plate-refs a').textContent`), 'example.com/drills');
+      if (spec.kind === 'series') assert.ok(await page.eval<number>(`document.querySelectorAll('.plate-svg ${spec.mark === 'bar' ? 'rect' : 'path'}').length`) >= 1);
+    }
+    // The timeline label that looks like markup stays text.
+    const timeline = await plateFrom({ title: 'Markup stays text', spec: specs[2]!, refs: ['url:https://example.com/drills'] }, { userId: 'default' });
+    await page.eval(`window.postMessage({jsonrpc:'2.0',method:'ui/notifications/tool-result',params:{structuredContent:${JSON.stringify({ plate: timeline })}}},'*')`);
+    await page.waitFor(`document.querySelector('#reader h1')?.textContent === 'Markup stays text'`, 'the timeline plate');
+    assert.equal(await page.eval(`document.querySelector('.plate img')`), null);
+    assert.match(await page.eval<string>(`document.querySelector('.plate-svg').textContent`), /<img src=x/);
+    await page.send('Emulation.setDeviceMetricsOverride', { width: 320, height: 800, deviceScaleFactor: 1, mobile: false });
+    try { assert.equal(await page.eval(`document.documentElement.scrollWidth<=window.innerWidth`), true); } finally { await page.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false }); }
+    assert.deepEqual(page.problems, []);
+  } finally { await page.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: host }); }
 });

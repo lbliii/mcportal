@@ -18,6 +18,7 @@ import { SOURCE_TOOLS } from './sources.ts';
 import { LIBRARY_TOOLS } from './library.ts';
 import { COLLECTION_TOOLS } from './collections.ts';
 import { COMPARISON_TOOLS } from './comparison.ts';
+import { PLATE_TOOLS } from './plates.ts';
 import { READING_WATCH_TOOLS } from './reading-watches.ts';
 import { CATCHUP_TOOLS } from './catchup.ts';
 import { WATCH_TOOLS } from './watches.ts';
@@ -40,6 +41,7 @@ export const TOOLS: readonly ToolDef[] = [
   ...CATCHUP_TOOLS,
   ...READING_WATCH_TOOLS,
   ...COMPARISON_TOOLS,
+  ...PLATE_TOOLS,
 ];
 
 const BY_NAME = new Map(TOOLS.map((t) => [t.name, t]));

@@ -3,7 +3,7 @@
  * MCPORTAL_LABS=frontpage). River and reblog graduated in 0.8.0; naming them does nothing. Read once at startup. A lab that's off is never offered to
  * the model or shown in the room, but what a user already chose with it stays valid.
  */
-export const LABS = ['frontpage'] as const;
+export const LABS = ['frontpage', 'plates'] as const;
 export type Lab = (typeof LABS)[number];
 
 export function labsFrom(value: string | undefined): Lab[] {

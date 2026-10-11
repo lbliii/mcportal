@@ -81,6 +81,8 @@ export type ToolResults = {
   open_collection: { collections: Collection[]; sources: Array<Pick<PortalResult, 'portalId' | 'title' | 'source'>>; desk?: CollectionData };
   update_collection: { collections: Collection[]; collection?: Collection };
   show_comparison: { comparison: import('../comparison.ts').ComparisonResult };
+  show_plate: { plate: import('../plates.ts').Plate };
+  get_lens: { lens: import('../lenses.ts').Lens };
   watch_reading: { watches: import('../reading-watches.ts').WatchResult };
   catch_up: { session: CatchupSession | null };
   open_room: RoomResult;

@@ -112,6 +112,7 @@ Labs are unfinished features, off unless named. A lab that's off is never offere
 | Lab | What it adds |
 |---|---|
 | `frontpage` | A `frontpage` layout: the agent's picks, then each portal's top items, top to bottom |
+| `plates` | Two tools for agent illustrations ([exploration](../plans/plates.md)): `show_plate` draws a chart, timeline, steps or matrix the agent specifies, as a card in the room; `get_lens` returns weekly reading activity with an output schema and no room UI, for hosts that draw their own answers |
 
 `river` and `reblog` were labs and are now always on; naming them does nothing.
 
