@@ -1,3 +1,4 @@
+import { ROOM_URI } from '../src/tools/kit.ts';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
@@ -245,7 +246,7 @@ test('open_docs renders as its own docs card; the Developer docs pack builds a r
   const c = await docsCtx();
   const list = await handleMessage({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} }, c);
   const tools = (list as any).result.tools as any[];
-  assert.equal(tools.find((t) => t.name === 'open_docs')._meta.ui.resourceUri, 'ui://mcportal/room.html');
+  assert.equal(tools.find((t) => t.name === 'open_docs')._meta.ui.resourceUri, ROOM_URI);
   assert.equal(tools.find((t) => t.name === 'read_doc_page')._meta, undefined, 'pages are read by the viewer, not shown as cards');
 
   const fresh = { ...c, store: new MemoryProfileStore() };

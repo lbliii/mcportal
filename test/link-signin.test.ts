@@ -244,7 +244,7 @@ test('token refresh: two processes refreshing at once spend the refresh token on
   }
 });
 
-test('linked identity and nudges: the account menu learns it is offline, and a newer hosted MCPortal is mentioned once', async () => {
+test('linked identity and updates: notices persist, dismissal survives restart without a legacy toast, and offline identity is retained', async () => {
   const s = await setUp();
   try {
     const { url } = (await s.call('link_account')).structuredContent;
@@ -258,12 +258,22 @@ test('linked identity and nudges: the account menu learns it is offline, and a n
       return new Response(await res.arrayBuffer(), { status: res.status, headers });
     };
     let clock = Date.now();
-    const session = new LocalSession({ dataDir: s.dataDir, localUser: 'default', local: s.local, base: { fetcher: createFixtureFetcher(), cache: new TtlCache() }, hostedUrl: s.app.base, fetch: newer, now: () => clock });
-    const call = async (name: string) => (await handleMessage({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: {} } }, await session.context()))!.result as any;
-    await call('open_room');
+    const publicUpdates: Fetcher = async (url, options) => url.endsWith('/.well-known/mcportal')
+      ? {status:200,url,contentType:'application/json',truncated:false,text:JSON.stringify({version:1,recommendedVersion:'9.9.9',minClientVersion:'0.10.0'})}
+      : createFixtureFetcher()(url,options);
+    const options = { dataDir: s.dataDir, localUser: 'default', local: s.local, base: { fetcher: publicUpdates, cache: new TtlCache() }, hostedUrl: s.app.base, fetch: newer, now: () => clock };
+    let session = new LocalSession(options);
+    const call = async (name: string, args: Record<string,unknown> = {}) => (await handleMessage({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }, await session.context()))!.result as any;
+    await call('check_updates');
     const second = await call('open_room');
-    assert.match(second.structuredContent.notice, /MCPortal 9\.9\.9 is out/);
-    assert.doesNotMatch((await call('open_room')).structuredContent.notice ?? '', /is out/, 'once');
+    assert.equal(second.structuredContent.update.status,'update_available');
+    assert.match(second.content[0].text,/MCPortal 9\.9\.9 is available/);
+    await call('set_update_preferences',{dismissedVersion:'9.9.9'});
+    session = new LocalSession(options);
+    await call('open_room');
+    const dismissed=await call('open_room');
+    assert.equal(dismissed.structuredContent.update.dismissed,true);
+    assert.doesNotMatch(dismissed.content[0].text,/MCPortal 9\.9\.9/,'no transient toast bypasses persisted dismissal');
     clock += 60_000;
     down = true;
     const offline = await call('open_room');

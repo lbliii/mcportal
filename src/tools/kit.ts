@@ -34,10 +34,14 @@ import type { SocialService } from '../social.ts';
 import type { SourceDeps } from '../sources.ts';
 import type { ProfileStore } from '../store.ts';
 import type { LibrarySearch } from '../library.ts';
+import { APP_VERSION } from '../version.ts';
 
-export const ROOM_URI = 'ui://mcportal/room.html';
+/** New releases get a fresh host resource-cache key. Older resource URIs remain readable. */
+export const ROOM_URI = `ui://mcportal/room-v${APP_VERSION}.html`;
 
 export interface ToolContext extends SourceDeps {
+  updateOrigin?: string | undefined;
+  updates?: import('../updates.ts').LocalUpdates | undefined;
   store: ProfileStore;
   /** Linked accounts search their complete hosted records in one bounded request. */
   library?: LibrarySearch | undefined;

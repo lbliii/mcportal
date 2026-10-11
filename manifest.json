@@ -149,6 +149,10 @@
       "description": "Sign this local MCPortal in to the user's hosted account, so their portal is the same everywhere and they can share."
     },
     {
+      "name": "check_updates",
+      "description": "Check the installed MCPortal version and available updates, with an upgrade guide."
+    },
+    {
       "name": "list_reading",
       "description": "What the user was reading: pages they opened and haven't finished, most recent first ('what was I in the middle of?')."
     },

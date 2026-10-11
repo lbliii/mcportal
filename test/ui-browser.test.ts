@@ -23,9 +23,67 @@ import { FileProfileStore, MemoryProfileStore } from '../src/store.ts';
 import type { Fetcher } from '../src/types.ts';
 import { findChrome, Page } from './browser.ts';
 import { startApp, type Running } from './helpers.ts';
+import { LocalUpdates, UPDATE_INTERVAL_MS } from '../src/updates.ts';
+import { memoryPersistence } from '../src/lib/document.ts';
+import { SERVER_INFO } from '../src/mcp.ts';
 
 const chrome = findChrome();
 const skip = !chrome && 'no Chrome found (set CHROME_PATH)';
+
+test('browser: update notices survive reload, dismiss per version, and expose ghost opt-in and offline state', {skip}, async()=>{
+  let now=Date.now(), checks=0, recommendedVersion='99.0.0', minClientVersion='0.1.0', offline=false;
+  const updates=new LocalUpdates({dataDir:'/unused',server:'https://mcportal.example',persistence:memoryPersistence(),now:()=>now,fetcher:async url=>{
+    checks++;if(offline)throw Error('offline');
+    return {status:200,url,contentType:'application/json',truncated:false,text:JSON.stringify({version:1,recommendedVersion,minClientVersion})};
+  }});
+  const local=await startApp({allowUnauthenticated:true},undefined,{updates,store:new MemoryProfileStore({default:{...defaultProfile(),onboarded:true}})});
+  const browser=await Page.open(chrome!);
+  const settings=()=>browser.click('#btnSettings');
+  const ready=()=>browser.waitFor(`document.querySelector('#updateSettings')?.textContent.includes('MCPortal ${SERVER_INFO.version}') && !document.querySelector('#updateSettings input')?.disabled`,'update status ready');
+  try {
+    await browser.goto(`${local.base}/preview`);await ready();assert.equal(checks,0,'ghost mode makes no automatic request');
+    await settings();assert.match(await browser.eval<string>(`document.querySelector('#updateSettings').textContent`),/Not checked yet/);
+    await browser.click('#updateSettings button');await ready();assert.equal(checks,1);
+    await browser.click('#btnCloseSettings');
+    await browser.waitFor(`!document.querySelector('#updateNotice').hidden && document.querySelector('#updateNotice').textContent.includes('99.0.0')`,'available banner');
+    await browser.goto(`${local.base}/preview`);await ready();assert.equal(await browser.eval(`document.querySelector('#updateNotice').hidden`),false);
+    await browser.click('#updateNotice button:last-child');await browser.waitFor(`document.querySelector('#updateNotice').hidden`,'saved dismissal');
+    await browser.goto(`${local.base}/preview`);await ready();assert.equal(await browser.eval(`document.querySelector('#updateNotice').hidden`),true);
+    await settings();assert.match(await browser.eval<string>(`document.querySelector('#updateSettings').textContent`),/dismissed for this version/);
+    await browser.click('#updateSettings input');await ready();assert.equal((await updates.read(false)).automatic,true);
+    now+=UPDATE_INTERVAL_MS+1;recommendedVersion='99.1.0';
+    await browser.goto(`${local.base}/preview`);await ready();await browser.waitFor(`document.querySelector('#updateNotice').textContent.includes('99.1.0')`,'later release reappears');
+    offline=true;now+=UPDATE_INTERVAL_MS+1;await browser.goto(`${local.base}/preview`);await ready();
+    await browser.waitFor(`document.querySelector('#updateNotice').textContent.includes('Last confirmed while online')`,'offline keeps confirmed update');
+    offline=false;minClientVersion='99.0.0';now+=UPDATE_INTERVAL_MS+1;await browser.goto(`${local.base}/preview`);await ready();
+    await browser.waitFor(`document.querySelector('#updateNotice').textContent.includes('update required')`,'required update');
+    assert.equal(await browser.eval(`document.querySelectorAll('#updateNotice button').length`),1,'required updates have no dismissal');
+    await browser.send('Emulation.setDeviceMetricsOverride',{width:320,height:800,deviceScaleFactor:1,mobile:false});
+    assert.equal(await browser.eval(`document.documentElement.scrollWidth<=window.innerWidth`),true,'notice fits narrow screens');
+    await settings();assert.equal(await browser.eval(`document.querySelector('#settingsPanel').scrollWidth<=document.querySelector('#settingsPanel').clientWidth`),true);
+    assert.deepEqual(browser.problems,[]);
+  } finally {await browser.close();await local.close();}
+});
+
+test('browser: hosted release notice can be dismissed and version stays in Settings', {skip}, async()=>{
+  const hosted=await startApp({allowUnauthenticated:true},undefined,{store:new MemoryProfileStore({default:{...defaultProfile(),onboarded:true}})});
+  const browser=await Page.open(chrome!);
+  try {
+    await browser.goto(`${hosted.base}/preview`);
+    await browser.waitFor(`document.querySelector('#updateNotice')?.textContent.includes('New in MCPortal ${SERVER_INFO.version}')`,'new release highlights');
+    await browser.click('#updateNotice button:last-child');await browser.goto(`${hosted.base}/preview`);
+    await browser.waitFor(`document.querySelector('#updateSettings')?.textContent.includes('Hosted')`,'hosted status');
+    assert.equal(await browser.eval(`document.querySelector('#updateNotice').hidden`),true);
+    await browser.click('#btnSettings');
+    assert.match(await browser.eval<string>(`document.querySelector('#updateSettings').textContent`),/Updates arrive through this hosted connection/);
+    assert.equal(await browser.eval(`document.querySelectorAll('#updateSettings input').length`),0);
+    await browser.send('Emulation.setDeviceMetricsOverride',{width:320,height:800,deviceScaleFactor:1,mobile:false});
+    await browser.goto(`${hosted.base}/upgrade`);
+    await browser.waitFor(`document.querySelector('h1')?.textContent==='Upgrade MCPortal'`,'upgrade guide heading');
+    assert.equal(await browser.eval(`document.documentElement.scrollWidth<=window.innerWidth`),true,'guide and terminal commands wrap on narrow screens');
+    assert.deepEqual(browser.problems,[]);
+  } finally {await browser.close();await hosted.close();}
+});
 
 const ARTICLE = 'https://yashgarg.dev/posts/ps5-rtmp';
 const LONG_ARTICLE = 'https://example.com/sticky-reader';

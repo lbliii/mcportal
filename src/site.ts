@@ -16,11 +16,12 @@ import { pipeline } from 'node:stream/promises';
 import type { ServerResponse } from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { escapeHtml } from './lib/web.ts';
+import { upgradeGuide, upgradeGuideHtml } from './upgrades.ts';
 import { installationGuide, installationIndex, installationPrompt } from './installation.ts';
 
 export const DEFAULT_SUPPORT_URL = 'https://github.com/lbliii/mcportal/issues';
-const POLICY_UPDATED = '2026-10-08';   // bump when what's stored changes
-const TERMS_UPDATED = '2026-10-07';    // bump when the terms change (and announce material changes first)
+const POLICY_UPDATED = '2026-10-11';   // bump when what's stored changes
+const TERMS_UPDATED = '2026-10-11';    // bump when the terms change (and announce material changes first)
 const IMAGE_DIR = fileURLToPath(new URL('./site/', import.meta.url));
 const TAGLINE = 'Your liminal webspace.';
 /** The hero's night sky, drawn by scripts/brand.ts with class hooks for the opening below. */
@@ -164,6 +165,7 @@ nav .brand{margin-right:auto;display:flex}@media (max-width:520px){nav{gap:18px}
 }
 .lede{font-size:var(--mp-type-19)}.muted{color:var(--mp-text-secondary);font-size:var(--mp-type-15)}
 code{background:var(--mp-surface-inset);padding:1px 6px;border-radius:4px;word-break:break-all;font-size:var(--mp-type-15)}
+.upgrade-guide pre{white-space:pre-wrap;overflow-wrap:anywhere;padding:12px;background:var(--mp-surface-inset);border-radius:4px}
 figure{margin:40px 0}
 figure .print{display:block;position:relative;border:2px solid var(--mp-web-frame);border-radius:var(--mp-radius-card);box-shadow:9px 9px 0 var(--mp-brand-teal)}
 figure img{display:block;width:100%;height:auto;border-radius:calc(var(--mp-radius-card) - 2px)}
@@ -258,7 +260,7 @@ function landing(site: SiteConfig): string {
 ${access}
 <div class="card install-option"><h3>Ask your agent</h3><p>A coding agent that can manage its MCP connections can help set this up for you. Give it the <a href="/install.md">installation guide</a>, or copy and paste this prompt:</p><label for="install-prompt">Setup prompt</label><textarea class="install-prompt" id="install-prompt" readonly rows="6" spellcheck="false">${prompt}</textarea><p class="muted">Select the prompt and copy it into your agent. If it cannot change connector settings, it can walk you through them. You complete GitHub sign-in in your browser.</p></div>
 <div class="card install-option"><h3>Add the connector yourself</h3><p>Add a custom connector (remote MCP server) with this URL, and sign in with GitHub. In Claude web or desktop, open <b>Connectors → Add custom connector</b>.</p><p><code>${mcp}</code></p><p>Then ask <i>“open my room”</i>. The visual room appears in hosts that support MCP Apps; other MCP hosts use the tools through the chat.</p></div>
-<p class="muted">Prefer a local room with no account? Install the Claude Code or Cowork plugin, or run from source. The <a href="/install.md">installation guide</a> covers those options and hosted setup for Codex and Claude Code. <a href="/llms.txt">Agent guide index</a>.${site.sourceUrl ? ` See the <a href="${escapeHtml(site.sourceUrl)}">source</a>.` : ''}</p>`, site, true);
+<p class="muted">Prefer a local room with no account? Install the Claude Code or Cowork plugin, or run from source. The <a href="/install.md">installation guide</a> and <a href="/upgrade">upgrade guide</a> cover those options and hosted setup for Codex and Claude Code. <a href="/llms.txt">Agent guide index</a>.${site.sourceUrl ? ` See the <a href="${escapeHtml(site.sourceUrl)}">source</a>.` : ''}</p>`, site, true);
 }
 
 function privacy(site: SiteConfig): string {
@@ -305,7 +307,7 @@ function privacy(site: SiteConfig): string {
 <p>What you see in your room is also available to the agent you use it in, and that agent's privacy policy covers your conversations (in Claude, Anthropic's).</p>
 
 <h2>MCPortal on your own computer</h2>
-<p>You can also run MCPortal on your own computer (the Claude Code plugin, the desktop bundle, or from source). Until you sign in, it's in ghost mode: everything stays in <code>~/.mcportal</code> on that computer, it fetches feeds and pages itself, and it sends nothing to this service.</p>
+<p>You can also run MCPortal on your own computer (a local plugin, the desktop bundle, or from source). Until you sign in, it's in ghost mode: your room stays in the local data directory and the app fetches feeds and pages itself. Ghost mode sends nothing to this service by default. If you explicitly check for updates or enable automatic checks, MCPortal requests public version metadata without room content, credentials or an installation identifier. The service receives an ordinary HTTP request, including the network address. Signed-in local copies default to automatic checks; you can turn them off in Settings.</p>
 <p>If you sign in from it, your room, saved items, clips, collections, reading sessions, watches, reading history, seen marks, public profile, shares and follows are stored by this service exactly as the table above says, and the first sign-in adds that computer's portal to your account. MCPortal on your computer still fetches feeds, articles and pictures itself, so those sites see your computer's address rather than the server's. Its sign-in tokens are kept in a file on your computer that only your user can read. Signing out copies your portal back to the computer, ends that sign-in, and deletes the file. Your <a href="/account">account page</a> lists each signed-in computer by name, and you can revoke one from there, for example if you lose it.</p>
 
 <h2>What other people see</h2>
@@ -376,7 +378,7 @@ function terms(site: SiteConfig): string {
 <ul>
   <li>You sign in with a GitHub account. You need to be at least 13, and old enough to have a GitHub account where you live.</li>
   <li>An account is for one person. Keep your GitHub account secure: what's done with your MCPortal account is your responsibility, including what your agent does in it on your behalf.</li>
-  <li>Using MCPortal on your own computer without signing in (ghost mode) doesn't involve the service at all; these terms cover the hosted service.</li>
+  <li>Your local room can work without a hosted account (ghost mode). Optional public update checks are described in the privacy policy; these terms cover the hosted service.</li>
 </ul>
 
 <h2>What MCPortal does</h2>
@@ -505,10 +507,10 @@ export function securityTxt(site: SiteConfig, now = new Date()): string {
  * Files honour a single `Range: bytes=…` request, which Safari needs before it will play a video.
  */
 export async function serveSite(res: ServerResponse, pathname: string, site: SiteConfig, range?: string): Promise<boolean> {
-  const pages: Record<string, (s: SiteConfig) => string> = { '/': landing, '/privacy': privacy, '/terms': terms, '/support': support, '/security': security };
-  if (pathname === '/llms.txt' || pathname === '/install.md') {
+  const pages: Record<string, (s: SiteConfig) => string> = { '/upgrade': s => layout('Upgrade MCPortal', titleBand('Upgrade MCPortal'), `<section class="upgrade-guide"><p class="lede">Keep your room. Get the improvements.</p>${upgradeGuideHtml(s.publicUrl)}</section>`, s), '/': landing, '/privacy': privacy, '/terms': terms, '/support': support, '/security': security };
+  if (pathname === '/llms.txt' || pathname === '/install.md' || pathname === '/upgrade.md') {
     res.writeHead(200, { 'content-type': `${pathname === '/llms.txt' ? 'text/plain' : 'text/markdown'}; charset=utf-8`, 'cache-control': 'public, max-age=300', ...HEADERS });
-    res.end(pathname === '/llms.txt' ? installationIndex(site.publicUrl) : installationGuide(site.publicUrl, site.inviteOnly));
+    res.end(pathname === '/upgrade.md' ? upgradeGuide(site.publicUrl) : pathname === '/llms.txt' ? installationIndex(site.publicUrl) : installationGuide(site.publicUrl, site.inviteOnly));
     return true;
   }
   if (pathname === '/.well-known/security.txt') {

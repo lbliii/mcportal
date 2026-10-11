@@ -2,6 +2,8 @@
 
 This guide installs MCPortal in each supported host, then covers signing in, updating and uninstalling. For a guided first run, follow [Getting started](../tutorials/getting-started.md) instead.
 
+Already installed? Follow [Upgrade MCPortal](upgrade.md) before adding another connection.
+
 ## Requirements
 
 A local install needs Node.js 22.18 or newer (any Node 24 works). Node runs MCPortal's TypeScript directly, so there's no build step and no `npm install`. On an older Node, MCPortal exits with a message naming the version it found and where.

@@ -12,6 +12,8 @@ export function installationIndex(publicUrl: string): string {
 
 ## Setup
 
+- [Upgrade an existing installation](${publicUrl}/upgrade.md): get current improvements while preserving your room.
+
 - [Installation guide](${publicUrl}/install.md): host-specific commands, manual connector setup, GitHub sign-in, local installation and verification.
 
 Remote endpoint: ${publicUrl}/mcp
@@ -29,6 +31,8 @@ Visual room: requires an MCP host that supports MCP Apps; other MCP hosts can us
 
 export function installationGuide(publicUrl: string, inviteOnly: boolean): string {
   return `# Install MCPortal
+
+Already installed? Follow the [upgrade guide](${publicUrl}/upgrade.md) to update the existing connection and keep your data.
 
 MCPortal is a reading room inside your agent. Choose a hosted connection or a local installation below.
 

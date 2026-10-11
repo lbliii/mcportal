@@ -80,6 +80,7 @@ export interface AppConfig {
 }
 
 export interface AppDeps {
+  updates?: import('./updates.ts').LocalUpdates | undefined;
   store: ProfileStore;
   reading?: ReadingStore | undefined;
   watchStore?: WatchStore | undefined;
@@ -258,6 +259,7 @@ export function createApp(config: AppConfig, deps: AppDeps): Server {
     log: reqLog.child(actorLogFields(userId, accounts.actor(userId))),
     store: deps.store, watchStore, reading, handoffs, seen, editions, clips, collections, experiences, publicProfiles, social, fetcher: deps.fetcher, cache: deps.cache, userId, watches, budget, metrics, actor: accounts.actor(userId),
     labs: deps.labs,
+    updates: deps.updates, updateOrigin: config.publicUrl,
     accountUrl: account?.url,
     uploadLink: account ? () => account.uploadLink(userId) : undefined,
     localFiles: !account && config.allowUnauthenticated && isLoopbackHost(config.host),
