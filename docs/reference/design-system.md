@@ -119,7 +119,7 @@ Contrast checks alone don't establish WCAG conformance.
 | Surface | Contract |
 |---|---|
 | Welcome packs | Opaque canvas; selected state shown by border and icon; all text visible without hover |
-| Toolbar and icon actions | Shared sizes; labeled actions; visible focus and pressed state |
+| Toolbar and icon actions | Familiar actions use symbols with accessible names and fast tooltips; ambiguous destinations keep short labels; visible focus and pressed state |
 | Portal rows and shelf cards | One button opens the content; metadata links and save/share actions are separate; no nested controls |
 | Metadata | Secondary text stays readable in hover and selected states; save is always visible |
 | Add-source sheet and composers | Real inputs and placeholders; control borders; disabled feedback |
@@ -132,6 +132,7 @@ Shared rules, in `primitives.css`:
 - Controls are at least 24px, 44px on coarse pointers.
 - Focus is a 2px outline with a 2px offset. Selection never relies on hue alone.
 - Buttons are visible without hover. Navigation uses real links; link-like controls respond to Enter and Space.
+- Room icon hints appear after 150ms of mouse hover or immediately on keyboard focus. They remain hoverable, dismiss with Escape, and stay inside the viewport and active dialog. Touch activates controls directly; essential instructions stay visible in the opened panel.
 - Increased contrast strengthens secondary text and borders. Forced colors use system colors. Reduced motion removes transitions, including scripted scrolling.
 - Layouts wrap. Container queries add to viewport fallbacks rather than replace them.
 

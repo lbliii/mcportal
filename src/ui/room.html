@@ -10,6 +10,7 @@
   /*include:room/room.css*/
   /*include:room/experiences.css*/
   /*include:room/navigation.css*/
+  /*include:room/tooltips.css*/
   /*include:space.css*/
   /*include:design/primitives.css*/
 </style>
@@ -22,12 +23,12 @@
   <nav class="experience-nav" aria-label="Main navigation">
     <button type="button" id="btnExperienceRoom" aria-current="page"><span class="experience-nav-label">Room</span></button>
     <button type="button" id="btnRecall"><span class="experience-nav-label">Library</span></button>
-    <button type="button" id="btnMore" popovertarget="moreMenu" aria-expanded="false">More <span aria-hidden="true">⌄</span></button>
+    <button type="button" class="ib" id="btnMore" data-icon="more" data-tooltip aria-label="More" popovertarget="moreMenu" aria-expanded="false"></button>
   </nav>
   <div class="spacer"></div>
   <div class="global-actions" role="group" aria-label="Display and settings">
-    <button class="ib" id="btnExpand" data-icon="expand" title="Fullscreen" aria-label="Fullscreen"></button>
-    <button class="btn room-only" id="btnSettings" aria-haspopup="dialog" aria-controls="settingsPanel" aria-expanded="false">Settings</button>
+    <button class="ib" id="btnExpand" data-icon="expand" data-tooltip aria-label="Fullscreen"></button>
+    <button class="ib room-only" id="btnSettings" data-icon="settings" data-tooltip aria-label="Settings" aria-haspopup="dialog" aria-controls="settingsPanel" aria-expanded="false"></button>
   </div>
 </header>
 <div class="navigation-menu" id="moreMenu" popover aria-label="More activities">
@@ -38,14 +39,14 @@
   <span class="status" id="status" role="status">Opening your portal…</span>
   <div class="spacer"></div>
   <button class="link-btn" id="btnCatchup" type="button">Catch up</button>
-  <button class="btn" id="btnAdd" aria-expanded="false" aria-controls="addSheet"><span data-icon="plus" aria-hidden="true"></span>Add source</button>
-  <button class="ib" id="btnRoomOptions" popovertarget="roomOptions" aria-expanded="false" aria-label="Room options">•••</button>
+  <button class="ib" id="btnAdd" data-icon="plus" data-tooltip aria-label="Add source" aria-expanded="false" aria-controls="addSheet"></button>
+  <button class="ib" id="btnRoomOptions" data-icon="more" data-tooltip popovertarget="roomOptions" aria-expanded="false" aria-label="Room options"></button>
 </div>
 <div class="navigation-menu" id="roomOptions" popover aria-label="Room options">
   <button type="button" id="btnRefresh"><span data-icon="refresh" aria-hidden="true"></span>Refresh sources</button>
 </div>
 <dialog class="settings-panel" id="settingsPanel" aria-labelledby="settingsTitle">
-  <header class="settings-head"><h2 id="settingsTitle">Settings</h2><button type="button" class="btn" id="btnCloseSettings" autofocus>Close</button></header>
+  <header class="settings-head"><h2 id="settingsTitle">Settings</h2><button type="button" class="ib" id="btnCloseSettings" data-icon="close" data-tooltip aria-label="Close settings" autofocus></button></header>
   <section class="settings-section">
     <h3>Room layout</h3>
     <div class="settings-layouts" id="layoutMenu" role="group" aria-label="Room layout">
@@ -134,12 +135,13 @@
   }
   /** @param {string} name @param {string} label @param {(e: MouseEvent) => void} onclick */
   function iconButton(name, label, onclick, cls = 'ib sm') {
-    return el('button', { class: cls, title: label, 'aria-label': label, onclick }, icon(name));
+    return el('button', { class: cls, 'data-tooltip': '', 'aria-label': label, onclick }, icon(name));
   }
   for (const node of $$('[data-icon]')) node.replaceChildren(icon(node.dataset.icon ?? ''));
 
   /*include:room/bridge.js*/
   /*include:room/dom.js*/
+  /*include:room/tooltips.js*/
   /*include:room/experiences.js*/
   /*include:room/recall.js*/
   /*include:room/collections.js*/

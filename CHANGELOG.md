@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Navigation
+- Use symbols for Settings, Add source, Close and overflow actions, with fast, keyboard-accessible tooltips across room and reader icon controls. Keep short labels for destinations and actions whose symbols would be ambiguous.
 - Keep Room and Library in one global bar, move Page updates and Events under More, and put layout, reading preferences and account controls in Settings. Collections live in Library; Compare appears with selected items and Catch up stays with the room.
 - Remove the redundant room-name label, use plain action labels, and reveal search filters and optional tracking forms on request. New profiles use “Your portal room” instead of the fixed “morning” name.
 - Keep only the most recent unfinished article in a compact Continue reading action. Source-specific display options appear when that source is open.

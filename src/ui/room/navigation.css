@@ -1,6 +1,6 @@
   /* One global destination row; preferences and occasional activities open on demand. */
   :root .bar .brand-word { display:block; }
-  .experience-nav { display:flex; gap:var(--mp-space-4); padding:0; border:0; overflow:visible; }
+  .experience-nav { display:flex; align-items:center; gap:var(--mp-space-4); padding:0; border:0; overflow:visible; }
   .experience-nav button { min-width:var(--mp-control-touch); padding:var(--mp-space-8); }
   .experience-nav-label { display:inline; }
   .room-toolbar { display:flex; align-items:center; gap:var(--mp-space-12); padding:var(--mp-space-8) var(--mp-space-12); }

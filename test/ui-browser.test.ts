@@ -1398,11 +1398,71 @@ test('browser: a comparison with a removed source remains accessible for repair'
 });
 
 
+test('browser: icon hints support hover, keyboard dismissal, modal bounds and direct touch actions', { skip }, async () => {
+  await profiles.put('default', room());
+  await openRoom();
+  const visible = `document.getElementById('controlTooltip').matches(':popover-open')`;
+  const move = async (selector: string) => {
+    const point = await page.eval<{x:number,y:number}>(`(() => { const r = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect(); return {x:r.x+r.width/2,y:r.y+r.height/2}; })()`);
+    await page.send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...point });
+  };
+  const escape = async () => {
+    await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+    await page.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+  };
+  for (const id of ['btnSettings', 'btnAdd', 'btnMore', 'btnCloseSettings']) {
+    assert.equal(await page.eval(`document.getElementById('${id}').textContent.trim()`), '');
+    assert.ok(await page.eval(`document.querySelector('#${id} svg') && document.getElementById('${id}').getAttribute('aria-label')`));
+  }
+  await move('#btnSettings');
+  await page.waitFor(visible, 'fast settings hint', 800);
+  assert.equal(await page.eval(`document.getElementById('controlTooltip').textContent`), 'Settings');
+  assert.equal(await page.eval(`document.getElementById('btnSettings').getAttribute('aria-describedby')`), 'controlTooltip');
+  assert.equal(await page.eval(`document.getElementById('btnSettings').hasAttribute('title')`), false, 'no competing native hint');
+  await move('#controlTooltip');
+  await new Promise(resolve => setTimeout(resolve, 220));
+  assert.equal(await page.eval(visible), true, 'the hint remains hoverable');
+  await escape();
+  assert.equal(await page.eval(visible), false);
+  assert.equal(await page.eval(`document.getElementById('btnSettings').hasAttribute('aria-describedby')`), false);
+
+  await page.send('Emulation.setDeviceMetricsOverride', { width: 320, height: 640, deviceScaleFactor: 1, mobile: false });
+  await page.click('#btnSettings');
+  await page.waitFor(`document.getElementById('settingsPanel').open`, 'settings dialog');
+  // Tab from the close button, then Shift+Tab back, exercising actual keyboard focus.
+  for (const modifiers of [0, 8]) {
+    await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9, modifiers });
+    await page.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9, modifiers });
+  }
+  await page.waitFor(`${visible} && document.getElementById('controlTooltip').textContent === 'Close settings'`, 'keyboard hint in the dialog');
+  assert.equal(await page.eval(`document.activeElement.id`), 'btnCloseSettings');
+  assert.ok(await page.eval(`(() => { const n = document.getElementById('controlTooltip'), r = n.getBoundingClientRect(); return n.closest('dialog')?.open && r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight; })()`));
+  await escape();
+  assert.equal(await page.eval(`document.getElementById('settingsPanel').open`), true, 'first Escape only dismisses the hint');
+  assert.equal(await page.eval(`document.activeElement.id`), 'btnCloseSettings');
+  await escape();
+  assert.equal(await page.eval(`document.getElementById('settingsPanel').open`), false);
+
+  await page.send('Emulation.setTouchEmulationEnabled', { enabled: true });
+  try {
+    const point = await page.eval<{x:number,y:number}>(`(() => { const r = document.getElementById('btnAdd').getBoundingClientRect(); return {x:r.x+r.width/2,y:r.y+r.height/2}; })()`);
+    await page.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ ...point, radiusX: 1, radiusY: 1, force: 1, id: 1 }] });
+    await page.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await page.waitFor(`!document.getElementById('addSheet').hidden`, 'one tap opens Add source');
+    assert.equal(await page.eval(visible), false, 'touch does not leave a hover hint open');
+    assert.ok(await page.eval(`document.getElementById('btnAdd').getBoundingClientRect().height >= 44`));
+  } finally {
+    await page.send('Emulation.setTouchEmulationEnabled', { enabled: false });
+    await page.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+  }
+  assert.deepEqual(page.problems, []);
+});
+
 test('browser: navigation keeps primary labels at 320px and discloses optional activities and settings', {skip}, async()=>{
   const profile=room();profile.saved.push({url:`${DOCS}/install.md`,title:'Install Example Docs',savedAt:new Date().toISOString()});
   await profiles.put('default',profile);
   await openRoom();
-  assert.deepEqual(await page.eval(`[...document.querySelectorAll('.experience-nav button')].map(b=>b.textContent.trim().replace(/ ⌄$/, ''))`), ['Room','Library','More']);
+  assert.deepEqual(await page.eval(`[...document.querySelectorAll('.experience-nav button')].map(b=>b.getAttribute('aria-label') || b.textContent.trim())`), ['Room','Library','More']);
   assert.equal(await page.eval(`document.getElementById('roomName').hidden`), true, 'no redundant room heading');
   assert.equal(await page.eval(`document.querySelector('#btnCompare')`), null, 'Compare is contextual');
   for (const width of [320, 640, 1024]) {

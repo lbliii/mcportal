@@ -32,7 +32,7 @@
       else if ((hit = /^([\d.,]+k?) comments?$/.exec(m))) {
         const url = item.discussionUrl && item.discussionUrl !== item.url ? item.discussionUrl : null;
         out.push(url
-          ? el('button', { class: 'mi', title: 'Open the discussion', 'aria-label': `${hit[1]} comments, open the discussion`, onclick: (/** @type {MouseEvent} */ e) => { e.stopPropagation(); openLink(url); } }, icon('comment'), hit[1])
+          ? el('button', { class: 'mi', 'data-tooltip': 'Open discussion', 'aria-label': `${hit[1]} comments, open the discussion`, onclick: (/** @type {MouseEvent} */ e) => { e.stopPropagation(); openLink(url); } }, icon('comment'), hit[1])
           : el('span', { class: 'mi', style: 'cursor:default' }, icon('comment'), hit[1]));
       } else if (/^by /.test(m)) byline = m;
       else if (item.share && (hit = /^(reblogged )?@([a-z0-9_]{2,30})$/.exec(m))) out.push(el('span', { class: 'meta-text' }, hit[1] ?? '', handleButton(hit[2] ?? '')));   // a Following item's people
@@ -56,9 +56,9 @@
   function itemActions(item, portal, when = true, reblog = true) {
     const { out, byline } = compactMeta(item, when);
     if (item.person) return { out: [...out, ...personActions(item, portal)], byline };   // a suggested person: no link to open, save or reblog
-    if (item.url) out.push(el('button', { class: 'mi go', title: 'Open the original', 'aria-label': 'Open the original', onclick: () => openLink(item.url ?? '') }, icon('external')));   // checked just before
+    if (item.url) out.push(el('button', { class: 'mi go', 'data-tooltip': '', 'aria-label': 'Open the original', onclick: () => openLink(item.url ?? '') }, icon('external')));   // checked just before
     out.push(saveButton(item, portal.source));
-    if (portal.source === 'saved' && item.url) out.push(el('button', { class: 'mi go', title: 'Share to your space', 'aria-label': 'Share to your space', onclick: () => openComposer(item) }, icon('share')));
+    if (portal.source === 'saved' && item.url) out.push(el('button', { class: 'mi go', 'data-tooltip': '', 'aria-label': 'Share to your space', onclick: () => openComposer(item) }, icon('share')));
     if (reblog && portal.source !== 'saved') { const button = reblogButton(reblogTarget(item, portal, item.share)); if (button) out.push(button); }
     return { out, byline };
   }

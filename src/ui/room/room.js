@@ -328,7 +328,7 @@
     const on = state.saved.has(item.url);
     return el('button', {
       class: cls, 'data-save-url': item.url, 'aria-pressed': String(on),
-      title: on ? 'Saved (click to remove)' : 'Save to Library',
+      'data-tooltip': on ? 'Remove from Library' : 'Save to Library',
       'aria-label': on ? 'Remove from saved' : 'Save to Library',
       onclick: (/** @type {MouseEvent} */ e) => { e.stopPropagation(); toggleSaved(item, source); },
     }, icon('bookmark'));
@@ -338,7 +338,7 @@
     for (const b of $$('[data-save-url]')) {
       const on = state.saved.has((b.dataset.saveUrl ?? ''));   // selected by data-save-url
       b.setAttribute('aria-pressed', String(on));
-      b.title = on ? 'Saved (click to remove)' : 'Save to Library';
+      b.dataset.tooltip = on ? 'Remove from Library' : 'Save to Library';
       b.setAttribute('aria-label', on ? 'Remove from saved' : 'Save to Library');
     }
   }
